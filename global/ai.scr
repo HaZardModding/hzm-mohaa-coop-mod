@@ -1,0 +1,2640 @@
+//	Enemy Spawning system created by Mackey McCandlish.
+//	
+//	Before level waittill prespawn "exec global/ai.scr".
+//	
+//	Used in many levels.
+//	
+//	Place an enemy, give him targetname "enemyspawner", preferrably a classname of "ai_actor" so his bounding box is blue in
+//	the editor. If you want him to not charge at the player at spawn, set his #playerseek to 0. 
+//
+//	You can make him run to a specific destination by creating a pathnode with targetname "enemyspawnerdestination" and giving
+//	both the node and the spawner the same #group value. Don't give any other spawner/node pair the same #group value.
+//
+//	Give the node and spawner the same #set value (doesn't have to be the same as the #group value).
+//
+//	You can create a trigger_multiple with targetname "enemyspawnertrigger" to set off the spawning. Give it the same #set value
+//	as whichever spawners you want it to set off. Or you can do "thread global/ai.scr::spawn #" where # is the #set value you
+//	want to set off.
+//
+//	You can do "thread global/ai.scr::spawngroup #1 #2" where #1 is the #set value you want to set off and #group is the group
+//	value you want to set off.
+//
+//	You can set off spawners multiple times, but each trigger only can set them off once.
+//
+//
+//	07/02/2002 (Jeff Leggett)
+//		Added new function DeleteEnemySpawner.
+//		pass it the targetname and the set # to delete.
+//		(note: Use the enemyname parameter for the AI that is being spawned in to set its targetname.)
+//
+main:
+level waittill prespawn
+	if (level.bombnum == NIL)
+		level.bombnum = 0
+
+	// auto-matically setup all friendlies that are spawned in to use the friendly.scr script.  If you don't want
+	// this to happen, set this to 0
+	level.auto_friendly = 1
+	/*
+	local.ent = $("t2")
+	println ("%%%%%%%%%%%%%%% " + local.ent.team)
+	*/
+
+	// Setup all the parade triggers
+	exec global/parade.scr
+	exec global/reanimator.scr
+	//exec global/FakeGunfire.scr
+
+	local.newset = 3152930
+	if ($enemyspawnertrigger)
+	for (local.i=1;local.i<$enemyspawnertrigger.size+1;local.i++)
+	{
+		if ($enemyspawnertrigger[local.i].target)
+		{
+			$enemyspawnertrigger[local.i].set = local.newset
+			local.string = $enemyspawnertrigger[local.i].target
+			local.ent = $($enemyspawnertrigger[local.i].target)
+			$enemyspawnertrigger[local.i].target = ""
+
+//			println ("0size is " + $(local.string).size)
+	
+			local.counter = 0
+			while ((local.ent.size == 1) && !(local.ent.team) && (local.counter < 50))
+			{
+				local.counter++
+				local.newent = $(local.ent.target)
+				local.ent.targetname = "enemyspawnertrigger"
+				local.ent.set = local.newset
+				local.string = local.ent.target
+				local.ent.target = ""
+//				println ("target will be " + local.string)
+				local.ent = local.newent
+//				println ("1size is " + $(local.string).size)
+			}
+
+			for (local.p=1;local.p<local.ent.size+1;local.p++)
+				local.ent[local.p].set = local.newset
+
+//				println ("2size is " + $(local.string).size)
+		
+			local.breaker = 0
+			while ($(local.string).size > 0)
+			{
+//				println ("3size is " + $(local.string).size)
+				if ($(local.string).size == 1)
+				{
+					$(local.string).set = local.newset
+					$(local.string).targetname = "enemyspawner"	
+				}
+				else
+				if (local.ent[1])
+				{
+					local.ent[1].set = local.newset
+					local.ent[1].targetname = "enemyspawner"
+				}
+			}
+
+/*
+			local.ent = $(local.ent[1].targetname)
+			local.ent.targetname = "enemyspawner"
+			local.ent.set = local.newset
+*/
+		}
+		else
+		println "no target"
+		local.newset++
+	}
+
+	if ($enemyspawnertrigger == NULL)
+		level.enemyspawnertriggers = 0
+		else
+		level.enemyspawnertriggers = $enemyspawnertrigger.size
+
+	if (level.enemyspawnertriggers > 0)
+	{
+		level.enemyspawnertrigger = exec global/makearray.scr $enemyspawnertrigger
+
+		for (local.i=1;local.i<level.enemyspawnertriggers+1;local.i++)
+		{
+
+			if (level.enemyspawnertrigger[local.i].thread)
+				println ("TRIGGER HAS THREAD " + level.enemyspawnertrigger[local.i].thread)
+			else
+				println "TRIGGER HAD NO THREAD"
+
+
+			if (level.enemyspawnertrigger[local.i].set == NIL)
+				exec global/error.scr ("Error, enemyspawnertrigger at " + level.enemyspawnertrigger[local.i].origin + " has no #set") 1
+			else
+			{
+				if (getcvar(debug) == "1")
+					println ("Spawned enemyspawnertrigger with #set " + level.enemyspawnertrigger[local.i].set)
+				level.enemyspawnertrigger[local.i] thread enemyspawnertrigger
+			}
+
+		}
+		println ("Spawned " + level.enemyspawnertriggers + " enemyspawnertriggers")
+	}
+
+
+	if ($enemyspawnerdestination == NULL)
+		level.enemyspawnerdestinations = 0
+		else
+		level.enemyspawnerdestinations = $enemyspawnerdestination.size
+
+	if (level.enemyspawnerdestinations > 0)
+	{
+		level.enemyspawnerdestination = exec global/makearray.scr $enemyspawnerdestination
+
+		for (local.i=1;local.i<level.enemyspawnerdestinations+1;local.i++)
+		{
+			if (level.enemyspawnerdestination[local.i].set == NIL)
+				exec global/error.scr ("Error, enemyspawnerdestination at " + level.enemyspawnerdestination[local.i].origin + " has no #set") 1
+
+			if (level.enemyspawnerdestination[local.i].group == NIL)
+				exec global/error.scr ("Error, enemyspawnerdestination at " + level.enemyspawnerdestination[local.i].origin + " has no #group") 1
+		}
+
+		println ("Spawned " + level.enemyspawnerdestinations + " enemyspawnerdestinations")
+	}
+
+
+	if ($ai_respondspawn == NULL)
+		level.ai_respondspawns = 0
+		else
+		level.ai_respondspawns = $ai_respondspawn.size
+
+	if (level.ai_respondspawns > 0)
+	{
+		level.ai_respondspawn = exec global/makearray.scr $ai_respondspawn
+
+		for (local.i=1;local.i<level.ai_respondspawns+1;local.i++)
+		{
+			level.ai_respondspawn delete
+		}
+
+//		println ("Spawned " + level.ai_respondspawns + " ai_respondspawns")
+		exec global/error.scr ("ERROR, ai_respondspawn is no longer supported. Use alarmnode/threads to spawn traditionally instead") 1
+
+	}
+
+	if ($ai_trigger == NULL)
+		level.ai_triggers = 0
+		else
+		level.ai_triggers = $ai_trigger.size
+
+	if (level.ai_triggers > 0)
+	{
+		level.ai_trigger = exec global/makearray.scr $ai_trigger
+
+		for (local.i=1;local.i<level.ai_triggers+1;local.i++)
+		{
+			if (level.ai_trigger[local.i].set == NIL)
+				exec global/error.scr ("Error, ai_trigger at " + level.ai_trigger[local.i].origin + " has no #set") 1
+				else
+				{
+					level.ai_triggerused[level.ai_trigger[local.i].set] = 0
+					println ("Spawned ai_trigger " + local.i)
+					level.ai_trigger[local.i] thread ai_trigger
+				}
+		}
+		println ("Spawned " + level.ai_triggers + " ai_triggers")
+	}
+
+	if ($ai_location == NULL)
+		level.ai_locations = 0
+		else
+		level.ai_locations = $ai_location.size
+
+	if (level.ai_locations > 0)
+	{
+		level.ai_location = exec global/makearray.scr $ai_location
+
+		for (local.i=1;local.i<level.ai_locations+1;local.i++)
+			if (level.ai_location[local.i].set == NIL)
+				exec global/error.scr ("Error, ai_location at " + level.ai_location[local.i].origin + " has no #set") 1
+
+		println ("Spawned " + level.ai_locations + " ai_location")
+	}
+
+	if ($ai_speaker == NULL)
+		level.ai_speakers = 0
+		else
+		level.ai_speakers = $ai_speaker.size
+
+	if (level.ai_speakers > 0)
+	{
+		level.ai_speaker = exec global/makearray.scr $ai_speaker
+
+		for (local.i=1;local.i<level.ai_speakers+1;local.i++)
+			if (level.ai_speaker[local.i].set == NIL)
+				exec global/error.scr ("Error, ai_speaker at " + level.ai_speaker[local.i].origin + " has no #set") 1
+
+		println ("Spawned " + level.ai_speakers + " ai_speakers")
+	}
+
+
+
+
+
+	println ("There are " + $friendlyspawner.size + " friendlyspawners")
+
+	if ($friendlyspawner == NULL)
+		level.friendlyspawners = 0
+		else
+		level.friendlyspawners = $friendlyspawner.size
+
+	if (level.friendlyspawners > 0)
+	{
+		level.currentfriendlies = 0
+		level.maxfriendlies = 0
+
+		level.friendlyspawner = exec global/makearray.scr $friendlyspawner
+
+		for (local.i=1;local.i<level.friendlyspawners+1;local.i++)
+			level.friendlyspawner[local.i] = waitthread global/spawner.scr::spawner_create level.friendlyspawner[local.i]
+
+// local.variable_for_returned_spawner = waitthread global/spawner.scr::spawner_create $dude
+ 
+// local.dude_spawned = waitthread global/spawner.scr::spawner_activate $targetname_of_spawner
+ 
+
+		thread friendlyspawner
+
+		println ("Spawned " + level.friendlyspawners + " friendlyspawners")
+
+	}
+
+	if ($areaspawner == NULL)
+		level.areaspawners = 0
+		else
+		level.areaspawners = $areaspawner.size
+
+	if (level.areaspawners > 0)
+	{
+		level.areaspawner = exec global/makearray.scr $areaspawner
+
+		for (local.i=1;local.i<level.areaspawners+1;local.i++)
+		{
+			
+			if (level.areaspawner[local.i].model == NIL)
+				exec global/error.scr ("Error, areaspawner at " + level.areaspawner[local.i].origin + " has no model") 1
+
+			if (level.areaspawner[local.i].area == NIL)
+				exec global/error.scr ("Error, areaspawner at " + level.areaspawner[local.i].origin + " has no #area") 1
+
+				local.area = level.areaspawner[local.i].area
+
+			level.areaspawner[local.i] = waitthread global/spawner.scr::spawner_create level.areaspawner[local.i]
+			level.areaspawner[local.i].area = local.area
+
+		}
+
+		println ("Spawned " + level.areaspawners + " areaspawners")
+		thread areaspawner
+	}
+
+	if ($fortalarm == NULL)
+		level.fortalarms = 0
+		else
+		level.fortalarms = $fortalarm.size
+
+	if (level.fortalarms > 0)
+	{
+		level.fortalarm = exec global/makearray.scr $fortalarm
+
+		for (local.i=1;local.i<level.fortalarms+1;local.i++)
+		{
+			if (level.fortalarm[local.i].set == NIL)
+				exec global/error.scr ("Error, fortalarm at " + level.fortalarm[local.i].origin + " has no #set") 1
+		}
+
+		println ("Spawned " + level.fortalarms + " fortalarms")
+	}
+
+
+	if ($ai_respond == NULL)
+		level.ai_responds = 0
+		else
+		level.ai_responds = $ai_respond.size
+
+	if (level.ai_responds > 0)
+	{
+		level.ai_respond = exec global/makearray.scr $ai_respond
+
+		for (local.i=1;local.i<level.ai_responds+1;local.i++)
+		{
+			if (level.ai_respond[local.i].set == NIL)
+				exec global/error.scr ("Error, ai_respond at " + level.ai_respond[local.i].origin + " has no #set") 1
+				else
+					level.ai_respond[local.i] thread ai_respondthread
+		}
+		println ("Spawned " + level.ai_responds + " ai_responds")
+	}
+
+	if ($ai_alarm == NULL)
+		level.ai_alarms = 0
+		else
+		level.ai_alarms = $ai_alarm.size
+
+	if (level.ai_alarms > 0)
+	{
+		level.ai_alarm = exec global/makearray.scr $ai_alarm
+
+		for (local.i=1;local.i<level.ai_alarms+1;local.i++)
+		{
+			if (level.ai_alarm[local.i].set == NIL)
+				exec global/error.scr ("Error, ai_alarm at " + level.ai_alarm[local.i].origin + " has no #set") 1
+				else
+					level.ai_alarm[local.i] thread ai_alarmthread
+		}
+		println ("Spawned " + level.ai_alarms + " ai_alarms")
+	}
+
+
+	if ($fortfoe == NULL)
+		level.fortfoes = 0
+		else
+		level.fortfoes = $fortfoe.size
+
+	if (level.fortfoes > 0)
+	{
+		level.fortbodys = 0
+		level.fortfoe = exec global/makearray.scr $fortfoe
+
+		for (local.i=1;local.i<level.fortfoes+1;local.i++)
+		{
+			level.fortfoe[local.i] thread fortfoegen
+
+			if (level.fortfoe[local.i].set == NIL)
+				exec global/error.scr ("Error, fortfoe at " + level.fortfoe[local.i].origin + " has no #set") 1
+		}
+
+		println ("Spawned " + level.fortfoes + " fortfoes")
+	}
+
+
+
+	if ($fortfriend == NULL)
+		level.fortfriends = 0
+		else
+		level.fortfriends = $fortfriend.size
+
+	if (level.fortfriends > 0)
+	{
+		level.fortfriend = exec global/makearray.scr $fortfriend
+
+		for (local.i=1;local.i<level.fortfriends+1;local.i++)
+			level.fortfriend[local.i] thread deaththread
+
+//		thread fortfriend
+
+		println ("Spawned " + level.fortfriends + " fortfriends")
+	}
+//	level waittill spawn
+
+	if ($enemyspawner == NULL)
+		level.enemyspawners = 0
+		else
+		level.enemyspawners = $enemyspawner.size
+
+	if (level.enemyspawners > 0)
+	{
+		level.enemyspawner = exec global/makearray.scr $enemyspawner
+
+		for (local.i=1;local.i<level.enemyspawners+1;local.i++)
+		{
+			
+			if (level.enemyspawner[local.i].enemyname == NIL)
+			{
+				//println "No enemy name!"
+				level.enemyspawner[local.i].enemyname = -1
+			}
+
+			if (level.enemyspawner[local.i].playerseek == NIL)
+				level.enemyspawner[local.i].playerseek = 1
+
+			if (level.enemyspawner[local.i].model == NIL)
+				exec global/error.scr ("Error, enemyspawner at " + level.enemyspawner[local.i].origin + " has no model") 1
+
+			if (level.enemyspawner[local.i].set == NIL)
+				exec global/error.scr ("Error, enemyspawner at " + level.enemyspawner[local.i].origin + " has no #set") 1
+			else
+				local.set = level.enemyspawner[local.i].set
+
+			if (level.enemyspawner[local.i].group == NIL)
+			{
+				// jsl-->unnecessary warning message
+				// println ("Warning, enemyspawner at " + level.enemyspawner[local.i].origin + " has no #group")
+				local.group = -1
+			}
+			else
+				local.group = level.enemyspawner[local.i].group
+
+			local.enemyname = level.enemyspawner[local.i].enemyname
+			local.playerseek = level.enemyspawner[local.i].playerseek
+
+			if (level.enemyspawner[local.i].walk == NIL)
+				local.walk = 0
+			else
+				local.walk = level.enemyspawner[local.i].walk
+			
+			level.enemyspawner[local.i] = waitthread global/spawner.scr::spawner_create level.enemyspawner[local.i]
+//			println ("this is " + level.enemyspawner[local.i].set)
+			
+
+			level.enemyspawner[local.i].enemyname = local.enemyname
+			level.enemyspawner[local.i].playerseek = local.playerseek
+			level.enemyspawner[local.i].walk = local.walk
+			
+			if (local.set)
+				level.enemyspawner[local.i].set = local.set
+			
+			if (local.group)
+				level.enemyspawner[local.i].group = local.group
+		}
+
+		local.healthtotal = 0
+		for (local.i=1;local.i<level.enemyspawners+1;local.i++)
+		{
+			if ((level.enemyspawner[local.i].nohealth == NIL) || (level.enemyspawner[local.i].nohealth != 1))
+			{
+				local.healthtotal++
+				level.enemyspawner[local.i].nohealth = 0
+			}
+		}
+
+		local.healthtotal = local.healthtotal * 0.25
+//		println (local.healthtotal + " AI Spawners will drop health")
+
+		while (local.healthtotal > 0)
+		{
+			local.num = randomint (level.enemyspawners) + 1
+			if (level.enemyspawner[local.num].nohealth == 0)
+			{
+				level.enemyspawner[local.num].nohealth = -1
+				local.healthtotal--
+			}
+		}
+
+		println ("Spawned " + level.enemyspawners + " enemyspawners")
+
+	}
+
+
+	for (local.i=1;local.i<$dogspawn.size + 1;local.i++)
+	{	
+		level.dogs = 1
+		if ($dogspawn[local.i].set != NIL)
+		{
+			local.ent = spawn script_origin
+			local.ent.origin = $dogspawn[local.i].origin
+			local.ent.set = $dogspawn[local.i].set
+			level.dogspawner[local.i] = local.ent
+			$dogspawn[local.i] thread killself
+		}
+		else
+		println ("dogspawn at " + $dogspawn[local.i].origin + " has no #set")
+	}
+
+
+/*
+	while (1)
+	{
+		println ("There are " + $friendlyspawner.size + " friendlyspawners")
+		wait 1
+	}
+*/
+
+	/*
+
+	while (1)
+	{
+		for (local.i=1;local.i<level.enemyspawners+1;local.i++)
+		{
+
+			if (level.enemyspawner[local.i].fnum != NIL)
+				println ("spawner" + local.i + "'s fnum is " + level.enemyspawner[local.i].fnum)
+			else
+				println ("spawner" + local.i + " has no fnum")
+
+			if (level.enemyspawner[local.i].health != NIL)
+				println ("spawner" + local.i + "'s health is " + level.enemyspawner[local.i].health)
+			else
+				println ("spawner" + local.i + " has no health")
+
+
+
+		}
+
+
+		wait 1
+
+	}
+	*/
+
+end
+
+killself:
+	wait 1
+	self delete
+
+end
+
+spawndog local.set local.healthnum:
+	if (level.spawneddogs == NIL)
+		level.spawneddogs = 0
+
+	for (local.i=1;local.i<level.dogspawner.size+1;local.i++)
+	{
+		if (level.dogspawner[local.i].set == local.set)
+		{
+			local.ent = spawn animal/german_shepherd.tik "targetname" "spawned_dog"
+			local.ent.origin = level.dogspawner[local.i].origin
+			level.spawneddogs++
+			local.ent thread dogattack
+			local.ent thread dogdeath
+			if (local.healthnum != NIL)
+				local.ent.health = local.healthnum
+		}
+	}
+end
+
+dogdeath:
+	self waittill death
+	level.spawneddogs--
+end
+
+dogattack:
+	self forceactivate
+	while (isalive self)
+	{
+		println ("dog is at " + self.origin + " with thinkstate " + self.thinkstate)
+		if (level.dogs == 1)
+			self attackplayer
+
+		wait 5
+	}
+end
+
+
+
+deaththread:
+	if (self.setthread == NIL)
+	end
+
+	self waittill death
+	thread level.script::self.setthread
+end
+
+
+foealarm:
+//	println ("-*-*- " + self + " saw somebody!")
+	local.seen = 0
+	if (self cansee $player)
+	{
+		self exec global/disable_ai.scr
+		self lookat $player
+		wait 2
+		if (self cansee $player)
+		{
+			if (self.alarming == 0)
+			{
+				thread setupalarm
+				local.seen = 1
+			}
+		}
+	}
+
+	if (local.seen == 0)
+	{
+		wait 1
+		self type_attack "alarm"
+		self alarmthread foealarm
+	}
+
+end
+
+
+fortfoegen:
+	level waittill spawn
+
+	self thread setupalarm
+
+//	self alarmthread setupalarm
+//	self alarmthread foealarm
+	self sight 512
+	self hearing 50
+	self.alarming = 0
+
+
+end
+	local.alarmed = 0
+	while ((isalive self) && (local.alarmed == 0))
+	{
+
+		for (local.i=1;local.i<level.fortbodys+1;local.i++)
+		{
+//			if (sighttrace (self.origin + (0 0 35)) (level.fortbody[local.i].origin + (0 0 35)) 0)
+			if (self cansee  (level.fortbody[local.i]))
+				local.alarmed = 1
+
+				wait 0.25
+		}		
+			wait 0.1
+	}
+	self.alarming = 1
+	if (getcvar(debug) == "1")
+		println ("-*-*- " + self + " saw a dead body")
+
+	thread forcealarm
+end
+
+forcealarm:
+
+	if (getcvar(debug) == "1")
+		println ("Forced Alarm " + self.set)
+		local.ent = -1
+
+	for (local.i=1;local.i<level.fortalarms+1;local.i++)
+	{
+		if (level.fortalarm[local.i].set == self.set)
+		local.ent = level.fortalarm[local.i]
+	}
+
+	if (local.ent != -1)
+	{
+		self exec global/disable_ai.scr
+		self runto local.ent
+		self waittill movedone
+		if (parm.movedone == 1)
+			self thread foealarmhit
+
+		self exec global/enable_ai.scr
+	}
+end
+
+setupalarm:
+
+	if (getcvar(debug) == "1")
+		println ("Setting up alarm " + self.set)
+
+		local.ent = -1
+
+	for (local.i=1;local.i<level.fortalarms+1;local.i++)
+	{
+		if (level.fortalarm[local.i].set == self.set)
+		local.ent = level.fortalarm[local.i]
+	}
+
+	if (local.ent != -1)
+	{
+		self type_attack "alarm"
+		self alarmthread foealarmhit
+		self alarmnode local.ent
+	}
+end
+
+
+foealarmhit:
+/*
+	local.ent = -1
+
+	for (local.i=1;local.i<level.fortalarms+1;local.i++)
+	{
+		if (level.fortalarm[local.i].set == self.set)
+		local.ent = level.fortalarm[local.i]
+	}
+
+	if (local.ent != -1)
+	{
+		if (getcvar(debug) == "1")
+			println ("-*-*- " + self + " is running to sound the alarm")
+		
+		self exec global/disable_ai.scr
+		self runto local.ent
+
+		self alarmthread ai_alarm_fired
+		self type_attack "alarm"
+
+		while (parm.movedone == 0)
+		{
+			self runto local.ent
+			waittill movedone
+		}
+		self exec global/enable_ai.scr
+
+*/
+	if (getcvar(debug) == "1")
+		println ("Setting OFF alarm " + self.set)
+
+	if (self.setthread)
+		thread level.script::self.setthread
+	thread spawn self.set
+	end
+
+
+	if (level.fortflag[self.set] == NIL)
+		level.fortflag[self.set] = 0
+
+	for (local.i=1;local.i<level.fortfriends+1;local.i++)
+	{
+		if ((level.fortfriend[local.i].set == self.set) && (level.fortflag[self.set] != 1))
+			level.fortfriend[local.i] thread spawnfortfriend
+
+	}
+
+	if (level.fortflag[self.set] == 0)
+	{
+		level.fortflag[self.set] = 1
+		if (self.setthread != NIL)
+			thread level.script::self.setthread
+	}
+//	}
+
+//		self exec global/enable_ai.scr
+		self runto $player
+	
+end
+
+spawnfortfriend:
+	self runto $player
+	self waittill death
+	if (self.setthread != NIL)
+		thread level.script::self.setthread
+end
+
+spawngroup local.set local.group local.enemyname:
+	thread spawn local.set NIL NIL NIL local.group local.enemyname
+end
+
+//-----------------------------------------------------------
+spawnset local.set local.enemyname local.get_there:
+//
+//	set local.get_there to 1 to have the ai not turn on until
+//  he gets to his destination
+//	
+//-----------------------------------------------------------
+
+//	setcvar g_scripttrace 1
+
+
+	if ( local.get_there==NIL )
+		local.get_there = 0
+
+	waitthread spawn local.set NIL NIL NIL NIL local.enemyname local.get_there
+
+//	setcvar g_scripttrace 0
+
+end
+
+spawn local.set local.pause local.thread local.off local.group local.enemyname local.get_there:
+
+	if (game.medic != NIL)
+		end
+
+	if ( local.get_there==NIL )
+		local.get_there = 0
+
+	if (getcvar(debug) == "1")
+		println ("ai.scr spawned " + local.set)
+
+	if (local.pause != NIL)
+		wait local.pause
+
+	local.nSpawned = 0
+
+	for (local.i=1;local.i<level.enemyspawners+1;local.i++)
+	{
+		local.num = 0
+
+		if (local.group != NIL)
+		{
+			if ((level.enemyspawner[local.i].set == local.set) && (level.enemyspawner[local.i].group == local.group))
+				local.num = 1
+		}
+		else
+			if (level.enemyspawner[local.i].set == local.set)
+				local.num = 1
+
+		if (local.num == 1)
+		{
+			if (getcvar(debug) == "1")
+			{
+				if (level.enemyspawner[local.i].area != NIL)
+					println ("spawned an enemy with area " + level.enemyspawner[local.i].area)
+				else
+					println ("spawned an enemy with no area")
+
+			}
+
+			if (level.totalbaddies == NIL)
+				level.totalbaddies = 1
+			else
+				level.totalbaddies++
+
+			local.ent = waitthread global/spawner.scr::spawner_activate level.enemyspawner[local.i]
+
+			local.nSpawned++
+			if (level.enemyspawner[local.i].enemyname != -1)
+			{
+				// println "Assigning targetname:" level.enemyspawner[local.i].enemyname
+				local.ent.targetname = level.enemyspawner[local.i].enemyname
+			}
+			else
+			{
+				if ( local.enemyname!=NIL )
+				{
+					local.ent.targetname	= local.enemyname
+					println "spawned with enemyname: " local.enemyname
+				}
+				else
+				{
+					if (level.script == "maps/m1l1.scr")
+						local.ent.targetname = "m1l1_baddie"
+				}
+			}
+			
+			//chrissstrahl - added dropgun support for 1337Smithy his morocco map
+			if (level.enemyspawner[local.i].dropgun == 0){
+				local.ent dontdropweapons
+			}
+			//end chrissstrahl
+
+			if (level.enemyspawner[local.i].area != NIL)
+			{
+				local.ent.area = level.enemyspawner[local.i].area
+				local.ent thread global/friendly.scr::areatrigger
+			}
+
+			if (level.enemyspawner[local.i].fnum != NIL)
+				level.enemyfnum[level.enemyspawner[local.i].fnum] = local.ent
+
+			local.ent.origin = level.enemyspawner[local.i].origin
+			local.ent.creator = level.enemyspawner[local.i]
+			
+			if ((level.dontdropweapons != NIL) && (level.dontdropweapons == 1))
+				local.ent dontdropweapons
+
+			local.ent forceactivate
+			local.ent thread enemyspawned local.off local.get_there
+			local.ent thread deathcheck
+
+			if (local.ent.thread != NIL)
+				local.ent thread level.script::local.ent.thread
+
+			if (local.thread != NIL)
+				local.ent thread level.script::local.thread
+
+			if (level.enemyspawner[local.i].nohealth == -1)
+				level.enemyspawner[local.i].nohealth = -2
+
+			if (level.enemyspawner[local.i].nohealth == 0)
+				level.enemyspawner[local.i].nohealth = -2
+		}
+	}
+
+//	println "spawn count: " local.nSpawned " for set #" local.set
+
+end
+
+alarmspawn local.set local.pause local.alarmthread local.alarmnode local.extra:
+
+	if (local.pause != NIL)
+		wait local.pause
+
+	for (local.i=1;local.i<level.enemyspawners+1;local.i++)
+	{
+		if (level.enemyspawner[local.i].set == local.set)
+		{
+			if (getcvar(debug) == "1")
+				println "spawned an enemy"
+
+			if (level.totalbaddies == NIL)
+				level.totalbaddies = 1
+				else
+				level.totalbaddies++
+
+			local.ent = waitthread global/spawner.scr::spawner_activate level.enemyspawner[local.i]
+			local.ent.targetname = "enemyspawnguy"
+
+//			local.ent = spawn level.enemyspawner[local.i].spawn_model "targetname" "enemyspawnguy"
+			local.ent.origin = level.enemyspawner[local.i].origin
+			local.ent.creator = level.enemyspawner[local.i]
+			local.ent type_idle "idle"
+
+			if ($player istouching $endtriggergun)
+			{
+				local.ent type_attack "alarm"
+				local.ent alarmnode local.alarmnode
+				local.ent alarmthread local.alarmthread
+			}
+			else
+			local.ent type_attack "turret"
+
+			local.ent forceactivate
+			local.ent thread enemyspawned
+			local.ent thread deathcheck
+
+			if ((local.extra != NIL) && (local.extra == 1) && ($player istouching $endtrigger))
+			{
+				local.ent.health = 250
+				local.ent.accuracy = 100
+				local.ent type_attack "turret"
+			}
+		}
+	}
+
+end
+
+
+deathcheck:
+		
+	self waittill death
+	level.totalbaddies--
+end
+
+
+
+enemyspawnertrigger:
+	//chrissstrahl - replace level waittill spawn
+	waitthread coop_mod/replace.scr::waitForPlayer
+	
+	if (getcvar(notrigger) == "1")
+	{
+		wait 4
+		self delete
+		end
+	}
+
+	if (game.medic != NIL)
+		end
+
+	if (self.friendly != NIL)
+	{
+		local.break = 0
+		while (local.break == 0)
+		{
+			
+			self waittill trigger
+
+			if ((parm.other == $player) || (parm.other.targetname == "friendly"))
+			{
+				if (getcvar(debug) == "1")
+					println (parm.other + " set off the trigger")
+			
+		for (local.i=1;local.i<level.enemyspawnertriggers+1;local.i++)
+		if ((level.enemyspawnertrigger[local.i]) && (level.enemyspawnertrigger[local.i].set == self.set) && (level.enemyspawnertrigger[local.i] != self))
+			level.enemyspawnertrigger[local.i] delete
+
+				thread spawn self.set
+				local.break = 1
+			}
+			wait 0.5
+		}
+	}
+	else
+	{
+		println ("origin " + self.origin)
+		self waittill trigger
+		if (getcvar(debug) == "1")
+			println (parm.other + " set off the triggerB")
+
+		for (local.i=1;local.i<level.enemyspawnertriggers+1;local.i++)
+		if ((level.enemyspawnertrigger[local.i]) && (level.enemyspawnertrigger[local.i].set == self.set) && (level.enemyspawnertrigger[local.i] != self))
+			level.enemyspawnertrigger[local.i] delete
+
+		thread spawn self.set
+	}
+
+	if (self.thread)
+	{
+		self thread level.script::self.thread
+//		println ("TRIGGER RAN THREAD " + self.thread)
+	}
+//	else
+//		println "TRIGGER HAD NO THREAD"
+
+	self delete
+
+	
+
+end
+
+
+
+areaspawner:
+	level waittill spawn
+	end
+	local.range = 7750
+	local.minrange = 1000
+	local.spawn = -1
+	level.currentspawnedenemies = 0
+
+	if (level.maxspawnedenemies == NIL)
+		level.maxspawnedenemies = -1
+	
+	if (getcvar(nospawn) == "1")
+		end
+
+	while (1)
+	{
+		while (level.currentspawnedenemies < level.maxspawnedenemies)
+		{
+			local.last = -1
+			local.spawn = -1
+			for (local.i=1;local.i<level.areaspawners+1;local.i++)
+			{
+				if (level.enemyarea[level.areaspawner[local.i].area] !=  0)
+				if !($player canseenoents level.areaspawner[local.i].origin)
+				{
+//					println (vector_length ($player.origin - level.areaspawner[local.i].origin))
+					local.newrange = vector_length ($player.origin - level.areaspawner[local.i].origin)
+					if ((local.newrange < local.range) && (local.newrange > local.minrange))
+					{
+						local.last = local.spawn
+						local.range = local.newrange
+						local.spawn = local.i
+
+					}
+					wait 0.25
+				}
+
+				if (local.last != -1)
+					local.spawn = local.last
+
+				if (local.spawn != -1)
+				{
+					if (getcvar(debug) == "1")
+						println ("spawned area number " + level.currentspawnedenemies)
+					level.bombnum++
+					local.bombnum = level.bombnum + 35617
+					level.currentspawnedenemies++
+			
+					spawn level.areaspawner[local.spawn].spawn_model "targetname" ("areaspawned_" + local.bombnum)
+					$("areaspawned_" + local.bombnum).origin = level.areaspawner[local.spawn].origin
+					$("areaspawned_" + local.bombnum) type_idle "idle"
+					$("areaspawned_" + local.bombnum) type_attack "cover"
+					$("areaspawned_" + local.bombnum) forceactivate
+					$("areaspawned_" + local.bombnum) thread areathink
+					local.i = level.areaspawners+5
+				}
+			}
+
+			wait (8 + randomfloat(8))
+		}
+		
+		wait 3
+	}
+
+end
+
+dthink:
+	self waittill death
+	level.currentspawnedenemies--
+end
+
+
+areathink:
+	thread dthink
+	self.health = 80
+	wait 2
+	self runto $player
+	self waittill movedone
+	while (isalive self)
+	{
+		self runto $player
+		self waittill movedone
+	}
+end
+
+
+hudprint local.string local.r local.g local.b:
+
+	println local.string
+	if ((level.hudprint != -1) && (level.hudprint != NULL))
+		level.hudprint delete
+
+	level.hudprint = local
+	local.hudelement = 187
+
+	if (local.r == NIL)
+		local.r = 1
+
+	if (local.g == NIL)
+		local.g = 1
+
+	if (local.b == NIL)
+		local.b = 1
+
+
+
+	local.distance = local.string.size / -2
+//	huddraw_rect local.hudelement (local.distance * 13) 100 0 0
+	huddraw_rect local.hudelement (local.distance * 10) 200 0 0
+	huddraw_color local.hudelement local.r local.g local.b
+
+
+	huddraw_font local.hudelement "facfont-20"
+	huddraw_string local.hudelement local.string
+	huddraw_align local.hudelement center top
+	local.strength = 1
+	huddraw_alpha local.hudelement local.strength
+
+
+
+	wait (2 * level.newtimescale)
+	while (local.strength > 0)
+	{
+		local.strength = local.strength - 0.02
+		huddraw_alpha local.hudelement local.strength
+		wait 0.02
+	}
+
+
+end
+
+
+killtheplayer:
+	while ($player.health > 0){
+		waitframe
+	}
+
+	local.timer = level.time
+	local.newtime = 0
+	while (local.newtime < 1.4)
+	{
+		local.newtime = (level.time - local.timer)
+		waitframe
+	}
+
+	waitframe
+//	setcvar cg_3rd_person "0"
+	level.3rd_person = 0
+	setcvar "medic_over" "1"
+	setcvar timescale 1
+	exec global/missioncomplete.scr m5l2a
+
+end
+
+medic_over:
+	if (getcvar(medic_over) == "1")
+	{
+		game.medic = NIL
+//		setcvar cg_3rd_person "0"
+		level.3rd_person = 0
+		waitframe
+		setcvar timescale 1
+		exec global/missioncomplete.scr m5l2a
+		end		
+	}
+
+	while (level.medic_searching == NIL)
+	{
+		if (getcvar(medic_over) == "1")
+		{
+			game.medic = NIL
+//			setcvar cg_3rd_person "0"
+			level.3rd_person = 0
+			waitframe
+			setcvar timescale 1
+			exec global/missioncomplete.scr m5l2a
+			end		
+		}
+		wait 0.4
+	}
+end
+
+origin_thread:
+	level.ender = $player.origin
+
+	local.range = 0.7
+	while (1)
+	{
+		$player.origin = ($player.origin * local.range) + (level.ender * (1 - local.range))
+		waitframe
+	}
+end
+
+3rd_person:
+// huh
+	local.nextview = level.time + 15
+	local.view = 0
+	local.dist = 220 // 170
+
+	while (level.3rd_person != 1)
+		waitframe
+	
+	thread origin_thread
+
+	while (level.3rd_person == 1)
+	{
+		if (level.medic != -1)
+		if (level.3rd_person == 1)
+		{
+			if (level.time > local.nextview)
+			{
+				local.view++
+				local.nextview = level.time + 25 
+			}
+
+			if (local.view > 1)
+				local.view = 0
+
+
+			local.org = (level.medic.origin - level.medic.playerend.origin)
+			local.org = vector_normalize (local.org)
+
+			if (local.view == 0)
+				local.org = local.org * local.dist
+			else
+				local.org = local.org * (local.dist * -1)
+
+			local.org[2] = local.dist / 4 // 2	
+			local.org = local.org + level.medic.origin
+
+//			local.org = angles_toleft (level.medic.angles)
+//			local.org[1] = local.org[1] * -1
+//			local.org[2] = local.org[2] * -1
+//			local.org2 = ((local.org * local.dist) + (level.medic.origin) + (0 0 local.dist))  
+//			local.org = ((local.org * 30) + (level.medic.origin))
+//			local.end = trace local.org local.org2 1
+
+			local.end = trace level.medic.origin local.org 1
+			local.vect = (local.end - level.medic.origin)
+			local.vect = vector_normalize (local.vect)
+			local.vect = local.vect * 45 + local.end
+			level.ender = local.end
+
+			local.angles = vector_toangles ( level.medic.origin - $player.origin)
+
+
+			$player.viewangles = local.angles
+			local.angles = $player.viewangles
+
+//			if (local.view != 0)
+//				local.angles[1] = local.angles[1] + 180
+
+			local.angles[0] = 15 // 25
+			$player.viewangles = local.angles
+		}
+		waitframe
+	}
+
+	while (1)
+	{
+		local.org = (level.medic.playerend.origin - level.medic.origin)
+		local.org = vector_normalize (local.org)
+
+		local.org = local.org * local.dist
+
+		local.org[2] = local.dist / 2
+		local.org = local.org + level.medic.playerend.origin
+
+		local.end = trace level.medic.playerend.origin local.org 1
+		local.vect = (local.end - level.medic.playerend.origin)
+		local.vect = vector_normalize (local.vect)
+		local.vect = local.vect * 45 + local.end
+		level.ender = local.end
+
+		local.angles = vector_toangles ( level.medic.origin - local.end)
+
+		$player.viewangles = local.angles
+		local.angles = $player.viewangles
+		local.angles[0] = 25
+		$player.viewangles = local.angles
+		waitframe
+	}
+
+end
+
+medichunt:
+
+	level.3rd_person = 0
+	level.medic = -1
+	thread 3rd_person
+	thread medic_over	
+	thread savetheplayer
+	thread killtheplayer
+	
+
+	$player.gothim = -1
+	thread timescalemover 
+
+	level.newtimescale = 0.9999
+//	thread medicdance
+
+
+	local.medicstart = $player.origin
+
+	local.playerstartnum = randomint (level.friendlyspawners) + 1
+
+	if (getcvar(debug) == "1")
+		println ("Playerstartnum was " + local.playerstartnum)
+
+	local.playerstart = level.friendlyspawner[local.playerstartnum]
+	level.hudprint = -1
+	thread hudprint " " 0.1 1 0.1
+
+	$player glue local.playerstart 0
+	$player physics_off
+	wait 3
+//	setcvar cg_3rd_person 0
+	level.3rd_person = 0
+
+	thread hudprint "You have 60 seconds to find a safe hiding spot.."
+	wait 4
+	thread hudprint ".. and then Bazooka-Med will be on your trail!"
+	wait 4
+	thread hudprint "ready" 1 0 0
+	wait 2
+	thread hudprint "set" 1 1 0
+	wait 2
+	thread hudprint "GO!!" 0 1 0
+	$player unglue
+	$player physics_on
+	wait 0.5
+	level.crumbs = 0
+	thread crumb
+	wait 1.5
+	local.timer = 60
+
+	
+
+	while (local.timer > 0)
+	{
+		thread hudprint local.timer
+		thread crumb
+		wait 1
+		local.timer--
+	}
+
+//	local.medicstart = local.playerstart
+//	while (local.medicstart == local.playerstart)
+//		local.medicstart = level.friendlyspawner[(randomint (level.friendlyspawners)) + 1]
+
+
+	local.medic = spawn "human/1st-ranger_medic.tik"
+	local.medic.playerend = spawn human/1st-ranger_captain.tik
+//	local.medic.playerend model "player/american_army.tik"
+	local.medic.playerend.no_idle = 1
+	local.medic.playerend exec global/disable_ai.scr
+	local.medic.playerend lookat local.medic
+	local.medic.playerend anim "thompson_crate_standtocrouch"
+	local.medic.playerend.origin = $player.origin
+	local.medic.playerend droptofloor
+	local.medic.playerstartnum = local.playerstartnum
+	local.medic.playerend thread playerenddie
+
+	local.medic exec global/disable_ai.scr
+	local.medic nodamage
+	local.medic.origin = local.medicstart
+	local.medic thread medichuntthink
+	local.medic item weapons/bazooka.tik	
+	local.medic.weapon = "Bazooka"
+	level.medic = local.medic
+
+	$player nodamage
+	$player notsolid
+//	$player glue local.medic
+	$player physics_off
+	$player hide
+//	$player model "fx/dummy.tik"
+//	setcvar cg_3rd_person 1
+	level.3rd_person = 1
+
+end
+
+playerenddie:
+	while (isalive self)
+		wait 1
+
+	local.num = randomint(5)
+	if (local.num == 0)
+		thread hudprint "Nice try, please drive through." 1 0.1 0.1
+	else
+	if (local.num == 1)
+		thread hudprint "Nice try, come again." 1 0.1 0.1
+	else
+	if (local.num == 2)
+		thread hudprint "You lose. Hide better." 1 0.1 0.1
+	else
+	if (local.num == 3)
+		thread hudprint "So close, yet so very, very far.." 1 0.1 0.1
+	else
+		thread hudprint "Thou art ownt, medicstyle." 1 0.1 0.1
+
+
+	wait 5
+	game.medic = 0
+	level.3rd_person = 0
+	setcvar "medic_over" "1"
+	setcvar timescale 1
+	exec global/missioncomplete.scr m5l2a
+end
+
+savetheplayer:
+	while (game.medic != NIL)
+		wait 0.5
+
+	$player.watchmedic = 5
+//	$player solid
+//	$player unglue
+	$player physics_on
+	$player show
+end
+
+
+
+playerwatchesmedic:
+	$player.watchmedic = 0
+//	$player.viewangles = (0 70 0)
+
+	local.nextview = level.time + 15
+	local.view = 0
+
+	while ($player.watchmedic == 0)
+	{
+		if (level.time > local.nextview)
+		{
+			local.view++
+			local.nextview = level.time + 25
+		}
+
+		if (local.view > 1)
+			local.view = 0
+
+		if (local.view == 0)
+		local.angles = vector_toangles ( self.playerend.origin - self.origin)
+			else
+		if (local.view == 1)
+		local.angles = vector_toangles ( self.origin - self.playerend.origin)
+
+//		$player.viewangles = local.angles
+		local.angles2 = $player.viewangles
+		local.angles2[0] = 45
+//		$player.viewangles = local.angles2
+		waitframe
+	}
+
+	if ($player.watchmedic == 5)
+		end
+
+	while (isalive $player)
+	{
+		local.angles = vector_toangles ( self.origin - $player.origin)
+//		$player.viewangles = local.angles
+		waitframe
+	}
+
+end
+
+
+seeplayer:
+	wait 10
+	while !(self.playerend canseenoents self)
+		wait 0.25
+
+	self.movedoneradius = 150
+
+	if (self.medicthink)
+		self.medicthink delete
+
+	if (self.checkspawns)
+		self.checkspawns delete
+
+	self.stophunt = 1
+
+	self.foundcrumb = 2
+
+	self exec global/stand.scr
+	wait 0.25
+	self lookat self.playerend
+	$player.medicdance stopsound
+	thread hudprint "The Bazooka-Med has you." 0.1 1 0.1
+	$player.gothim = 1
+	waitframe
+	level.newtimescale = 0.9999
+	wait 2
+	$player.watchmedic = 2
+	level.3rd_person = 2
+//	$player unglue
+	$player physics_on
+	$player.origin = self.playerend.origin
+//	self.playerend delete
+//	$player show
+//	$player solid
+//	$player droptofloor
+
+	wait 0.5
+	local.ent = spawn script_origin
+	local.ent.origin = $player.origin
+	$player glue local.ent
+//	$player physics_off
+	wait 2
+	self accuracy 100
+
+
+	self walkto self.playerend
+	self waittill move
+
+	local.aim = self.playerend gettagposition "bip01 head"
+	local.aim = local.aim + (0 0 -25)
+
+
+	self.playerend.health = 5
+	thread playerdie
+	setcvar "medic_over" "1"
+	println "***1***"
+
+	if (parm.movefail)
+	{
+		self exec global/aimat.scr local.aim
+		wait 0.75
+		local.timer = level.time + 10
+
+		level.newtimescale = 0.7
+	println "***2***"
+
+		while ((isalive self.playerend) && (level.time < local.timer))
+		{
+	println "***3***"
+			self exec global/aimat.scr local.aim
+			wait 0.75
+			self exec global/shoot.scr
+			wait 0.5
+		}
+	}
+	else
+	{
+	println "***4***"
+		while (vector_length (self.origin - self.playerend.origin) > 400)
+			wait 0.1
+
+		while !(self.playerend canseenoents self)
+			wait 0.1
+
+
+		self exec global/aimat.scr local.aim
+		wait 0.75
+		level.newtimescale = 0.7
+		local.timer = level.time + 10
+
+		self exec global/aimat.scr local.aim
+		wait 0.75
+		self exec global/shoot.scr
+		wait 2
+		self exec global/aimat.scr (local.aim + (0 0 35))
+		wait 0.75
+		self exec global/shoot.scr
+		wait 2
+		self walkto self.playerend
+		self waittill movedone
+		self exec global/aimat.scr local.aim
+		wait 0.75
+		self exec global/shoot.scr
+		wait 2
+		self exec global/aimat.scr (local.aim + (0 0 35))
+		wait 0.75
+		self exec global/shoot.scr
+		wait 2
+	println "***5***"
+	}
+
+	if (isalive self.playerend)
+	{
+	println "***6***"
+		level.newtimescale = 0.99999
+		$player.gothim = 1
+		thread hudprint "Congratulations! Could have sworn he had you.." 0.5 0.8 1.0
+		self takedamage
+		self damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+		$player unglue
+		$player physics_on
+
+		wait 5
+		game.medic = 0
+//		setcvar cg_3rd_person "0"
+		level.3rd_person = 0
+		setcvar "medic_over" "1"
+		setcvar timescale 1
+		exec global/missioncomplete.scr m5l2a
+	}
+
+
+end
+
+playerdie:
+	while (isalive $player)
+		waitframe
+	
+	local.timer = level.time + 1
+	while (local.timer > level.time)
+	{
+		println (local.timer + " " + level.time)
+		level.newtimescale = 0.1
+		waitframe
+	}
+		level.newtimescale = 1
+end
+
+medichuntthink:
+	
+	level.newtimescale = 0.9999
+	self german
+
+	thread playerwatchesmedic
+	thread seeplayer
+
+	self.medicthink = local
+	self notsolid
+	self.movedoneradius = 150
+
+	self exec global/stand.scr	
+	thread medicdance
+	local.time = level.time + 9
+	/*
+	while (level.time < local.time)
+	{
+		self exec global/stand.scr
+		wait 0.2
+	}
+	*/
+
+	level.medic_searching = 1
+	wait 9
+	thread checkspawns
+	$player.gothim = 0
+	
+
+	wait 1.5
+	thread hudprint "Ready or not, here I come!" 0.1 0.1 1
+	wait (4 * level.newtimescale)
+	thread hudprint "Good luck" 0.1 0.1 1
+
+
+end
+
+timescalemover:
+
+	while ($player.gothim == -1)
+	{
+		setcvar timescale level.newtimescale
+		wait 0.5
+	}
+
+	local.timescale = 2
+
+	while ((local.timescale < 4) && ($player.gothim == 0))
+	{
+		local.timescale = local.timescale + 0.05
+		setcvar timescale local.timescale
+		level.newtimescale = local.timescale
+		wait 1
+	}
+
+
+	while (1)
+	{
+		setcvar timescale 1
+		wait 0.5
+	}
+
+end
+
+
+checkspawns:
+	if (self.stophunt != NIL)
+		end
+
+	if (self.checkspawns)
+		self.checkspawns delete
+
+	self.checkspawns = local
+	self.foundcrumb = 0
+	thread crumbcheck
+
+	for (local.i=1;local.i<level.friendlyspawners+1;local.i++)
+		local.checked[local.i] = 0
+
+
+	// local.medic.playerstartnum
+
+	local.checkedcount = 0
+
+	local.allfail = 1
+	local.break = 0
+	self.movedoneradius = 80
+	while (local.break == 0)
+	{
+		if (self.stophunt != NIL)
+			end
+
+		if ((local.checkedcount > 3) && (local.checked[self.playerstartnum] == 0))
+			local.checkthis = self.playerstartnum
+		else
+			local.checkthis = randomint (level.friendlyspawners) + 1
+
+//		if (local.checkthis == self.playerstartnum)
+//			println "GOING TO PLAYER'S START NOW!!"
+
+//			local.checkthis = self.playerstartnum
+
+
+		if (local.checked[local.checkthis] == 0)
+		{
+			if (getcvar(debug) == "1")
+			{
+				if (local.checkthis == self.playerstartnum)
+					println "GOING TO NOW RUNNING TO PLAYER'S START!!"
+				else
+					println ("Medic is running to " + level.friendlyspawner[local.checkthis].origin)
+			}
+			self runto level.friendlyspawner[local.checkthis].origin
+			self waittill move
+//			println ("Parm movefail was " + parm.movefail)
+			if !(parm.movefail)
+			{
+				local.checked[local.checkthis] = 1
+				local.allfail = 0
+				self waittill movedone
+				self exec global/stand.scr
+				wait ((randomint (4)) + 1)
+				local.checkedcount++
+
+			}
+			else
+			{
+				if (getcvar(debug) == "1")
+					if (local.checkthis == self.playerstartnum)
+						println "COULDN'T GET TO PLAYERS START"
+				
+				local.checkedcount--
+			}
+
+		}				
+
+		local.break = 1
+
+		for (local.i=1;local.i<level.friendlyspawners+1;local.i++)
+		{
+			if (local.checked[local.i] == 0)
+			{	
+//				println ("Checked " + local.i + " = 0")
+				local.break = 0
+				waitframe
+			}
+//			else
+//				println ("Checked " + local.i + " = 1")
+		}
+		wait 0.1
+
+//			println "GOING TO PLAYER'S START NOW!!"
+
+	}
+
+	if (local.allfail == 0)
+		self thread chasethread
+	else
+	{
+		level.newtimescale = 0.99999
+		self.gotthim = 1
+		thread hudprint "Congratulations, you have eluded Bazooka-Med" 0.5 0.8 1.0
+		self takedamage
+		self damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+		$player unglue
+		$player physics_on
+
+		wait 5
+		game.medic = 0
+//		setcvar cg_3rd_person "0"
+		level.3rd_person = 0
+		setcvar "medic_over" "1"
+		setcvar timescale 1
+		exec global/missioncomplete.scr m5l2a
+	}
+
+end
+
+crumbcheck:
+	local.startnum = 5000
+	if (self.stophunt != NIL)
+		end
+
+	while (self.foundcrumb == 0)
+	{
+	
+		local.vect = vector_length (self.origin - level.crumb[1].origin)
+		if (local.vect < local.startnum)
+		{
+			local.startnum = local.vect
+//			println ("*********** " + local.vect)
+		}
+	
+		if (vector_length (self.origin - level.crumb[1].origin) < 450)
+		{
+			self.foundcrumb = 3
+			if (self.medicthink)
+				self.medicthink delete
+
+			if (self.checkspawns)
+				self.checkspawns delete
+
+			self thread chasethread
+
+			end
+		}
+
+		wait 0.1
+	}
+
+end
+
+chasethread:
+	self.foundcrumb = 1
+	local.crumbs = 0
+	local.failed = -1
+	self.movedoneradius = 150
+
+	while (local.crumbs < level.crumbs)
+	{
+		if (self.stophunt != NIL)
+			end
+
+		if (self.checkspawns)
+			self.checkspawns delete
+
+		local.crumbs++
+		self runto level.crumb[local.crumbs]
+		self waittill move
+		if (parm.movefail)
+		{
+			if (local.failed == 0)
+			{
+		 		thread hudprint "Bazooka-Med seems to have lost the trail" 0.1 0.1 1
+				self exec global/stand.scr
+				wait 3
+			}
+			local.failed = 1
+
+		}
+		else
+		{
+			self waittill movedone
+			if (local.failed != 0)
+			{
+				thread hudprint "BAZOOKA-MED HAS THE TRAIL!!" 1 0.1 0.1
+				local.failed = 0
+				wait 2
+			}
+		}
+	}
+
+	if (self.stophunt != NIL)
+		end
+
+	thread checkspawns
+end
+
+medicdance:
+	local.ent = spawn script_model
+	local.ent model "fx/dummy.tik"
+	local.ent notsolid
+	local.ent glue $player
+
+	$player.medicdance = local.ent
+	waitframe
+	local.ent loopsound medicdance 2 "levelwide"
+//	local.ent playsound medicdance volume 2
+//	local.ent waittill sounddone
+	wait 300
+		
+	if ((isalive $player) && ($player.gothim == 0))
+	{
+		level.newtimescale = 0.99999
+		self.gotthim = 1
+		thread hudprint "Congratulations, you have eluded Bazooka-Med" 0.5 0.8 1.0
+		self takedamage
+		self damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+		$player unglue
+		$player physics_on
+
+		wait 5
+		game.medic = 0
+//		setcvar cg_3rd_person "0"
+		level.3rd_person = 0
+		setcvar "medic_over" "1"
+		setcvar	timescale 1
+		exec global/missioncomplete.scr m5l2a
+	}
+
+end
+
+crumb:
+	local.ent = spawn script_origin
+	local.ent.origin = $player.origin
+	level.crumbs++
+	level.crumb[level.crumbs] = local.ent
+end
+
+killfriends:
+//	while (isalive $player)
+//	{
+		for (local.i=1;local.i<$friendly.size+1;local.i++)
+		{
+			if (isalive $friendly[local.i])
+				$friendly[local.i] thread diedie
+			
+		}
+
+//	}
+end
+
+diedie:
+	wait 1
+	self damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+end
+
+
+friendlyspawner:
+	level waittill spawn
+
+	if (game.medic != NIL)
+	{
+		for (local.i=1;local.i<level.friendlyspawners+1;local.i++)
+			level.friendlyspawner[local.i] droptofloor
+
+		thread medichunt
+		thread killfriends
+		end
+	}
+
+	end
+
+	local.range = 950
+	local.spawn = -1
+	local.last = -1
+	local.lastspawner = -1
+
+	if (getcvar(nospawn) == "1")
+		end
+
+	while (1)
+	{
+		while (level.currentfriendlies < level.maxfriendlies)
+		{
+			local.range = 50000
+			for (local.i=1;local.i<level.friendlyspawners+1;local.i++)
+			{
+				if (level.friendlyspawner[local.i] != local.lastspawner)
+				{
+					local.newrange = vector_length ($player.origin - level.friendlyspawner[local.i].origin)
+					if (local.newrange < local.range)
+					{
+						if !($player canseenoents (level.friendlyspawner[local.i].origin + (0 0 50)))
+						{
+							local.last = local.spawn
+							local.range = local.newrange
+							local.spawn = local.i
+							wait 1
+		
+//							if (getcvar(debug) == "1")
+//								println ("friendly spawner " + local.i + " is prepping")
+						}
+					}
+				}
+			}
+
+			if (local.last != -1)
+			local.spawn = local.last
+
+			if (local.spawn != -1)
+			{
+//				println ("local.spawner is " + local.spawn)
+//				println ("spawned friendly number " + level.currentfriendlies)
+				level.currentfriendlies++
+				level.friendlys++
+		
+//				local.ent = spawn level.friendlyspawner[local.spawn].spawn_model "targetname" "friendly"
+				local.ent = waitthread global/spawner.scr::spawner_activate level.friendlyspawner[local.spawn]
+
+				level.friendly[level.friendlys] = local.ent
+				local.ent.origin = level.friendlyspawner[local.spawn].origin
+				local.ent waitthread global/friendly.scr::friendlyinit
+				local.ent type_idle "idle"
+				local.ent type_attack "cover"
+				local.ent forceactivate
+				local.ent thread friendlythink
+				local.i = level.friendlyspawners+5
+				local.lastspawner = local.i
+
+				if (getcvar(debug) == "1")
+					println ("friendly spawner " + local.i + " is genning")
+	
+		 	}
+
+			wait 2
+		}
+			wait 3
+	}
+
+end
+
+friendlydead:
+	self waittill death
+	level.currentfriendlies--
+	for (local.i=1;local.i<level.friendlys+1;local.i++)
+		if (level.friendly[local.i] == self)
+			level.friendly[local.i] = level.deadent
+
+end
+
+friendlythink:
+	self exec global/disable_ai.scr
+	self thread friendlydead
+	self threatbias ignoreme
+	self accuracy 3
+	self.health = 100
+	self.maxhealth = 100
+	self.friendtype = 0 // was 0
+	self.mins = -30
+	self.maxs = 50
+	self.distance = 400
+
+	self runto $player
+	wait 4
+	self exec global/enable_ai.scr
+	self threatbias 0
+	
+	self.movedoneradius = 300
+
+	while ((isalive self) && (vector_length (self.origin - $player.origin) > 500))
+	{
+		self runto $player
+		self waittill movedone
+		waitframe
+	}
+
+	if (isalive self)
+	{
+		self.friendtype = 0
+		self thread global/friendly.scr::friendlythink
+	}
+
+end
+
+
+sniperthink:
+	self accuracy 100
+	self threatbias -50
+	self noticescale 1
+
+
+	local.ent = spawn script_origin
+	local.ent.origin = self.origin
+	if !(self.target)
+		exec global/error.scr ("ERROR, sniper at " + self.origin + " has no target") 1
+
+	println "GETTIN READY TO SNIPE"
+	
+	local.mode = 0
+	while (isalive self)
+	{
+		self leash 0
+
+		if (local.mode == 0)
+		{
+			self exec global/disable_ai.scr
+			self runto self.target
+			self waittill movedone
+			self tether self.target
+			self exec global/enable_ai.scr
+			local.mode = 1
+		}
+		else
+		{
+			self exec global/disable_ai.scr
+			self runto local.ent
+			self waittill movedone
+			self tether local.ent
+			self exec global/enable_ai.scr
+			local.mode = 0
+		}
+		wait (3 + randomint(10))
+	}
+
+	local.ent delete
+
+end
+
+// jsl--> local.get_there means turn off ai so that they get to their target.  Once there, turn ai back on...
+enemyspawned local.off local.get_there:
+
+
+	if (self.creator.type != NIL)
+	{
+		if (self.creator.type == "sniper")
+		{
+			self.accuracy = 100
+			self.noticescale = 1
+			self gun KAR98sniper
+			self item weapons/KAR98sniper.tik
+			self gun "KAR98sniper"
+			self useweaponclass rifle
+
+		}
+	}
+
+	if ( local.get_there==NIL )
+		local.get_there = 0
+
+//	self.angles = self.creator.angles
+//	self.angle = self.creator.angle
+
+	/*
+	if (getcvar(debug) == "1")
+	{
+		if (self.creator.group != NIL)
+		{
+			println ("Group is " + self.creator.group + " and Set is " + self.creator.set)
+		}
+	}
+	*/
+
+	local.targ = NIL
+	if (self.creator.group != -1)
+	{
+		for (local.i=1;local.i<level.enemyspawnerdestinations+1;local.i++)
+		{
+			if ((level.enemyspawnerdestination[local.i].group == self.creator.group) && (level.enemyspawnerdestination[local.i].set == self.creator.set))
+			{
+				if (getcvar(debug) == "1")
+					println (self + " spawned and is running to " + self.creator.set + "/" + self.creator.group)
+				local.targ = level.enemyspawnerdestination[local.i]
+			}
+		}
+	}
+	else
+	if (self.creator.spawn_target != "")
+	{
+		local.targ = $(self.creator.spawn_target)
+//		println ("local.targ is " + local.targ + " and creator target is " + self.creator.target)
+//		println (" oh and local.targ's origin is " + local.targ.origin)
+	}
+
+
+	if (self.creator.pause != NIL)
+		wait self.creator.pause
+
+
+	if ((local.targ != NIL) && (local.targ != NULL))
+	{
+		local.break = 0
+
+//		self tether local.targ
+
+		local.disabledAI = 0
+
+		if (self.type_attack == "balcony_attack" || level.disableAI==1)
+		{
+			local.disabledAI = 1
+			exec global/disable_ai.scr
+		}
+
+		if ( local.get_there==1 )
+		{
+//			dprintln self.targetname ": running to target with AI off!"
+			self exec global/disable_ai.scr
+		}
+
+		while (local.break == 0)
+		{
+			if (isalive self)
+			{
+				if (self.creator.walk == 1)
+					self walkto local.targ
+				else
+					self runto local.targ
+
+				self waittill movedone
+				self resetleash
+
+//				if (parm.movedone == 1)
+				if (vector_length (self.origin - local.targ.origin) < 80)
+					local.break = 1
+				else
+					wait 1
+			}
+			else
+				local.break = 1
+		}
+		if(self && isalive self)
+			self resetleash
+
+		if ( local.get_there==1 && isAlive self )
+		{
+//			dprintln self.targetname ": got there, turning ai back on!!!"
+			self exec global/enable_ai.scr
+		}
+		if(self && isalive self)
+			self tether local.targ
+
+		if (local.disabledAI==1)
+			exec global/enable_ai.scr
+
+		if (getcvar(debug) == "1")
+			println (self + " ran to and reached " + self.creator.set + "/" + self.creator.group)
+	}
+
+	//chrissstrahl - modified for coop use
+	if (isalive self){
+		if (level.coop_singleplayer == 1 && self.team == $player.team || level.coop_singleplayer != 1 && self.team == "american" ){
+			println ("#coop info: friendly american")
+			if ( level.auto_friendly==1 ){
+				level.friendlys++
+				level.friendly[level.friendlys] = self
+				if (self.creator.fnum){
+					println ("*fnum 1")
+					if !(level.fnum[self.creator.fnum]){
+						level.fnum[self.creator.fnum] = self
+						println ("*fnum 2")
+					}
+				}
+				println ("*fnum 3")
+
+				self.targetname = "friendly"
+				self thread global/friendly.scr::friendlythink
+				self.friendtype = 0
+			}
+			end
+		}
+	}
+	//end chrissstrahl
+	
+	println "..........................."
+
+
+//	println ("playerseek is " + self.creator.playerseek)
+
+	if (self && self.creator.playerseek != 0)
+		self.nosurprise = 1
+
+
+	/*
+	if (isalive self)
+	if (self.team == $player.team)
+	{
+		level.friendlys++
+		level.friendly[level.friendlys] = self
+		self.targetname = "friendly"
+		self thread global/friendly.scr::friendlythink
+		self.friendtype = 0
+		end
+	}
+	*/
+	
+	if (self && self.creator.playerseek == 1)
+	{
+
+		local.ent = spawn script_origin
+		local.ent.origin = self.origin
+		if (local.off != NIL)
+		{
+			self exec global/disable_ai.scr
+			self.nosurprise = 1
+//			self hearing 0
+//			self sight 0
+		}
+
+		while (isalive self)
+		{
+			self runto $player
+
+			if (local.off != NIL)
+			{
+				wait local.off
+				self exec global/enable_ai.scr
+				self exec global/aimat.scr $player
+//				self sight 2500
+//				self hearing 2500
+				local.off = NIL
+			}
+
+			self waittill movedone
+
+			self runto local.ent
+			self waittill movedone
+			waitframe
+		}
+
+		local.ent delete
+
+	}
+	else
+	if (self && self.creator.playerseek == 2)
+	{
+
+		local.range = randomint(250) + 350
+		self.movedoneradius = local.range - 35
+		self exec global/disable_ai.scr
+		while ((isalive self) && (vector_length (self.origin - $player.origin) > local.range))
+		{
+			self runto $player
+			self waittill movedone
+			waitframe
+		}
+
+		self exec global/enable_ai.scr
+
+		while ((isalive self) && (self.thinkstate != "attack"))
+		{
+			self runto $player
+			self waittill movedone
+			waitframe
+		}
+
+	}
+	else
+	if (self && self.creator.playerseek == 3)
+	{
+		wait 3.5
+
+		while ((isalive self) && (self.thinkstate != "attack"))
+		{
+			self runto $player
+			self waittill movedone
+			waitframe
+		}
+
+	}
+
+	
+end
+
+
+/*		
+	self notsolid
+	level waittill spawn
+	if (self.model == NIL)
+		self.model = "human/german_wehrmact_soldier.tik"
+	self.spawn_model = self.model
+	self.model = "fx/dummy.tik"
+	self.shouldbreathsteam = self.breathsteam
+	self.breathsteam = 0
+	if (getcvar(debug) == "1")
+		println (self + " has model " + self.spawn_model)
+*/
+
+end
+
+
+debug:
+	level.frienddebug = 1
+end
+
+aisound:
+	if (self.pause != NIL)
+		wait self.pause
+
+	if (self.sound == NIL)
+		self.sound = "airplane"
+
+	if (getcvar(debug) == "1")
+		println ("playing sound " + self.sound + " at " + self.origin)
+
+		self playsound self.sound
+end
+
+ai_trigger:
+	level waittill spawn
+	self waittill trigger
+	if (level.ai_triggerused[self.set] == 0)
+	{
+		if (getcvar(debug) == "1")
+			println "Triggering ai_respond"
+
+		level.ai_triggerused[self.set] = 1
+		for (local.i=1;local.i<level.ai_speakers+1;local.i++)
+		{
+			if (level.ai_speaker[local.i].set == self.set)
+				level.ai_speaker[local.i] thread aisound
+		}
+
+		local.ent = -1
+
+		for (local.i=1;local.i<level.ai_locations+1;local.i++)
+		{
+			if (self.set == level.ai_location[local.i].set)
+			{
+				local.ent = level.ai_location[local.i]
+				local.i = level.ai_locations + 5
+			}
+		}
+
+		for (local.i=1;local.i<level.ai_alarms+1;local.i++)
+		{
+			if ((isalive level.ai_alarm[local.i]) && (level.ai_alarm[local.i].set == self.set))
+			{
+				level.ai_alarm[local.i] thread dosound
+			}
+		}
+
+		for (local.i=1;local.i<level.ai_responds+1;local.i++)
+		{
+			if ((isalive level.ai_respond[local.i]) && (level.ai_respond[local.i].set == self.set))
+			{
+				level.ai_respond[local.i] thread dosound
+			}
+		}
+
+		if (getcvar(debug) == "1")
+			println ("local.ent is " + local.ent)
+
+
+		if (local.ent != -1)
+		{
+			for (local.i=1;local.i<level.ai_alarms+1;local.i++)
+			{
+				if (level.ai_alarm[local.i].set == self.set)
+				{
+					level.ai_alarm[local.i] thread runtoplayer local.ent
+				}
+			}
+
+		}
+
+
+	}
+
+end
+
+runtoplayer local.ent:
+
+	local.num = -1
+
+	if (self.type_idle == "patrol")
+	{
+		local.patrolpath = self.patrolpath
+		local.num = 1
+	}
+
+	if (isalive self)
+	{
+		if (getcvar(debug) == "1")
+			println (self + " is walking to inspect the sound")
+		local.origin = self.origin
+		self runto local.ent
+		self waittill movedone
+		wait 2
+		self walkto local.origin
+		self waittill movedone
+	}
+
+	if (local.num == 1)
+	{
+		self type_idle "patrol"
+		self patrolpath local.patrolpath
+	}
+
+//		self 		
+
+end
+
+dosound:
+	if (isalive self)
+	{
+		if (self.pause != NIL)
+			wait self.pause
+
+		if (self.sound != NIL)
+			self playsound self.sound
+	}
+end
+
+
+ai_alarmthread:
+		self alarmthread ai_alarm_fired
+		self type_attack "alarm"
+end
+
+
+ai_respondspawnthread:
+
+	self hide
+	self notsolid
+end
+
+ai_respondthread:
+
+//	self hide
+//	self notsolid
+end
+
+ai_alarm_fired:
+
+		for (local.i=1;local.i<level.ai_respondspawns+1;local.i++)
+		{
+			if (level.ai_respondspawn[local.i].set == self.set)
+			{
+				level.bombnum++
+				local.bombnum = level.bombnum + 35617
+
+				spawn script_origin "targetname" ("responder_start" + local.bombnum)
+				$("responder_start" + local.bombnum).origin = level.ai_respondspawn[local.i].origin
+
+				if (getcvar(debug) == "1")
+					println ("model spawning is " + level.ai_respondspawn[local.i].spawn_model)
+
+				spawn level.ai_respondspawn[local.i].spawn_model "targetname" ("responder_" + local.bombnum)
+				$("responder_" + local.bombnum).origin = level.ai_respondspawn[local.i].origin
+				$("responder_" + local.bombnum) type_idle "idle"
+				$("responder_" + local.bombnum) type_attack "turret"
+				$("responder_" + local.bombnum) forceactivate
+				$("responder_" + local.bombnum).start = $("responder_start" + local.bombnum)
+				$("responder_" + local.bombnum) thread responder_think
+			}
+		}
+
+		for (local.i=1;local.i<level.ai_responds+1;local.i++)
+		{
+			if (level.ai_respondspawn[local.i].set == self.set)
+			{
+				level.bombnum++
+				local.bombnum = level.bombnum + 3561
+
+				spawn script_origin "targetname" ("responder_start" + local.bombnum)
+				$("responder_start" + local.bombnum).origin = level.ai_respond[local.i].origin
+
+				level.ai_respond[local.i] forceactivate
+				level.ai_respond[local.i].start = $("responder_start" + local.bombnum)
+				level.ai_respond[local.i] thread responder_think
+			}
+		}
+
+		self.start = self.origin
+		self thread responder_think
+
+end
+
+responder_think:
+	if (self.pause != NIL)
+		wait self.pause
+
+	if (self.endpoint == NIL)
+		self.endpoint = "player"
+
+	while (isalive self)
+	{
+		self runto $(self.endpoint)
+		self waittill movedone
+		self runto self.start
+		self waittill movedone
+	}
+		self.start delete
+end
+
+//				$("responder_" + local.bombnum) exec global/disable_ai.scr
+//				$("responder_" + local.bombnum) patrolpath local.node
+
+rotatedown local.amount:
+	self rotateydown local.amount
+	self waitmove
+end
+
+rotateup local.amount:
+	self rotateyup local.amount
+	self waitmove
+end
+
+
+//----------------------------------------------------------------------
+DeleteEnemySpawner local.enemyname local.set:
+//
+//	Delete enemy spawners with the passed in enemy name and set number....
+//
+//	Added by Jeff Leggett 7/1/2002
+//
+//----------------------------------------------------------------------
+
+	if (local.enemyname == NULL)
+	{
+		println "DeleteEnemySpawner: Enemyname is NULL"
+		End
+	}
+
+	if ( local.enemyname.size<1 )
+	{
+		println "DeleteEnemySpawner: Size<0 for:" local.enemyname
+		End
+	}
+	
+	for (local.i=local.enemyname.size;local.i>0;local.i--)
+	{
+		if ( local.enemyname[local.i].set == local.set )
+		{
+			local.enemyname[local.i] bedead
+			local.enemyname[local.i] delete
+		}
+	}
+
+	End

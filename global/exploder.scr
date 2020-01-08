@@ -1,0 +1,658 @@
+//	Exploding chunk system created by Mackey McCandlish.
+//	
+//	Before level waittill prespawn "exec global/exploder.scr".
+//	
+//	Used in levels where stuff blows up.
+//	
+//	Create a script_object that is a "undestroyed" version of the thing that is supposed to blow up and targetname it "exploder"
+//
+//	Create a script_object that is a "destroyed" version of the thing that is supposed to blow up and targetname it
+//	"explodersmashed". They occupy the same physical space.
+//
+//	Create script_object chunks of geometry that are going to fly out of the destroyable object/building and place them in the
+//	places they're supposed to fly from. Make them near but not touching the geometry of the explodersmashed. Targetname them
+//	"exploderchunk".
+//	
+//	Create one script_origin for each exploderchunk and make the chunk target the origin the same way a jump pad would target
+//	the jump pad destination in Quake3.
+//	
+//	Create script_models with targetname "exploderfire" and the "model" value of the tiki you want to use. These will be tiki
+//	explosions that will go off.
+//
+//	Give all the chunks, smasheds, fires, and exploders the same #set value. Note you can have any number of smasheds, chunks, 
+//	fires, or exploders, but typically you only have one smashed and one exploder. The reason you would want multiple of any 
+//	of these is that you can give any of them a #pause value, and that will make it delay that long before occuring, so you 
+//	could create a multistage explosion.
+//	
+//	You can create an explodertrigger (with the same #set), or just do "thread global/exploder.scr::explode #" (# being the 
+//	#set value of the exploder in question).
+//	
+
+
+main:
+	level.exploderrepeat = 0
+
+	if (level.debug == NIL)
+		level.debug = 0
+
+	if ($explodersmashed == NULL)
+		level.explodersmasheds = 0
+	else
+		level.explodersmasheds = $explodersmashed.size
+
+	if (level.explodersmasheds > 0){
+		level.explodersmashed = exec global/makearray.scr $explodersmashed
+
+		for (local.i=1;local.i<level.explodersmasheds+1;local.i++){
+			level.explodersmashed[local.i] hide
+			level.explodersmashed[local.i] notsolid
+
+			if (level.explodersmashed[local.i].set == NIL)
+				exec global/error.scr ("Error, ExploderSmashed at " + level.explodersmashed[local.i].origin + " has no #set") 1
+			//else //[200] chrissstrahl - disabled because it spams the console
+				//println ("Spawned ExploderSmashed " + local.i)
+		}
+	}
+
+	if ($exploderchunk == NULL)
+		level.exploderchunks = 0
+	else
+		level.exploderchunks = $exploderchunk.size
+
+	if (level.exploderchunks > 0){
+		level.exploderchunks = $exploderchunk.size
+		level.exploderchunk = exec global/makearray.scr $exploderchunk
+
+		for (local.i=1;local.i<level.exploderchunks+1;local.i++){
+			if (level.exploderchunk[local.i].target == NIL)
+				println "Error, ExploderChunk has no Target!!!"
+
+			level.exploderchunk[local.i] hide
+			level.exploderchunk[local.i] notsolid
+			level.exploderchunk[local.i].org = level.exploderchunk[local.i].origin
+			level.exploderchunk[local.i].ang = level.exploderchunk[local.i].angles
+
+			if (level.exploderchunk[local.i].set == NIL)
+				exec global/error.scr ("Error, ExploderChunk at " + level.exploderchunk[local.i].origin + " has no #set") 1
+			//else //[200] chrissstrahl - disabled this, because it spams the console a bit to much
+				//println ("Spawned ExploderChunk " + local.i)
+
+			if (!(level.exploderchunk[local.i].target) || (level.exploderchunk[local.i].target == NIL))
+				exec global/error.scr ("Error, ExploderChunk at " + level.exploderchunk[local.i].origin + " has no target") 1
+		}
+	}
+
+	
+	if ($exploderfire == NULL)
+		level.exploderfires = 0
+	else
+		level.exploderfires = $exploderfire.size
+
+	if (level.exploderfires > 0){
+		level.exploderfires = $exploderfire.size
+		level.exploderfire = exec global/makearray.scr $exploderfire
+
+		for (local.i=1;local.i<level.exploderfires+1;local.i++){
+			if (level.exploderfire[local.i].model == NIL)
+				exec global/error.scr ("Error, ExploderFire at " + level.exploderfire[local.i].origin + " has no model") 1
+			else if (getcvar(debug) == "1")
+				println ("ExploderFire has model " + level.exploderfire[local.i].model)
+
+			level.exploderfire[local.i].mdl = level.exploderfire[local.i].model
+			level.exploderfire[local.i].model = "fx/dummy.tik"
+			level.exploderfire[local.i] notsolid
+
+	/*
+			level.exploderfire[local.i].mdl = level.exploderfire[local.i].model
+			local.ent = spawn script_model
+			local.ent2 = level.exploderfire[local.i]
+			local.ent.origin = local.ent2.origin
+			local.ent.set = local.ent2.set
+			local.ent.mdl = local.ent2.mdl
+			local.ent.pause = local.ent2.pause
+			level.exploderfire[local.i] = local.ent
+			local.ent2 delete
+	*/
+//			level.exploderfire[local.i].model = "fx/dummy.tik"
+
+			 // "set" level.exploderfire[local.i].set
+			if (level.exploderfire[local.i].set == NIL)
+				exec global/error.scr ("Error, ExploderFire at " + level.exploderfire[local.i].origin + " has no #set") 1
+			//else //[200] chrissstrahl - disabled because it spams the console
+				//println ("Spawned ExploderFire " + local.i)
+		}
+	}
+
+	if ($exploder == NULL)
+		level.exploders = 0
+	else
+		level.exploders = $exploder.size
+
+	if (level.exploders > 0){
+		level.exploders = $exploder.size
+		level.exploder = exec global/makearray.scr $exploder
+
+		for (local.i=1;local.i<level.exploders+1;local.i++){
+			if (level.exploder[local.i].walkable == NIL){
+				level.exploder[local.i] notsolid
+				level.exploder[local.i] thread solidify
+			}
+
+			thread fireinit level.exploder[local.i].set
+//			thread fireoff level.exploder[local.i].set
+
+			if (level.exploder[local.i].set == NIL)
+				exec global/error.scr ("Error, Exploder at " + level.exploder[local.i].origin + " has no #set") 1
+			//else //[200] chrissstrahl - disabled because it spams the console
+				//println ("Spawned Exploder " + local.i)
+		}
+	}
+
+
+	if ($explodertrigger == NULL)
+		level.explodertriggers = 0
+	else
+		level.explodertriggers = $explodertrigger.size
+
+	if (level.explodertriggers > 0){
+		level.explodertriggers = $explodertrigger.size
+		level.explodertrigger = exec global/makearray.scr $explodertrigger
+
+		for (local.i=1;local.i<level.explodertriggers+1;local.i++){
+			level.explodertrigger[local.i] thread explodetrigger
+
+			if (level.explodertrigger[local.i].set == NIL)
+				exec global/error.scr ("Error, ExploderTrigger at " + level.explodertrigger[local.i].origin + " has no #set") 1
+			//else //[200] chrissstrahl - disabled because it spams the console
+				//println ("Spawned ExploderTrigger " + local.i)
+		}
+	}
+
+	if (getcvar(exploders) == "0")
+		thread killexploders
+end
+
+killexploders:
+	wait 3
+
+	for (local.i=1;local.i<level.explodertriggers+1;local.i++)
+		level.explodertrigger[local.i] delete
+
+	for (local.i=1;local.i<level.exploderchunks+1;local.i++)
+		level.exploderchunk[local.i] delete
+
+	for (local.i=1;local.i<level.exploders+1;local.i++)
+		level.exploder[local.i] delete
+
+	for (local.i=1;local.i<level.exploderfires+1;local.i++)
+		level.exploderfire[local.i] delete
+end
+
+
+solidify:
+	//chrissstrahl - replacing level waittill spawn
+	waitthread coop_mod/replace.scr::waitForPlayer
+	self solid
+	self disconnect_paths
+end
+
+
+repeat:
+	wait 2
+	level.exploderrepeat = 0
+end
+
+
+explodetrigger:
+	level.explodertimer[self.set] = level.time
+	self waittill trigger
+	
+	//chrissstrahl - check to make sure buildings that are suppose to be destroyed by tank
+	//chrissstrahl - will not be destroyed by ordinary gunfire
+	if(level.gametype != 0){
+		if( level.coop_mapname == "m5l1a" || level.coop_mapname == "m5l2b" ){
+			if(level.coop_playerTank == NULL || parm.other.entnum != level.coop_playerTank.entnum && parm.other.targetname != "world"){
+//iprintlnbold_noloc("DEV: explodetrigger denied: "+parm.other.entnum+":"+parm.other.targetname)
+				goto explodetrigger
+			}
+		}
+	}
+
+	if (level.time > level.explodertimer[self.set]){
+		level.explodertimer[self.set] = level.time + 6
+		thread explode self.set
+	}
+	
+	if (level.exploderrepeat == 1){
+		wait 5
+		goto explodetrigger
+	}
+end
+
+delayplaysound local.delay local.sound:
+	wait local.delay
+	self playsound (local.sound) 0 1 512
+end
+
+firelight:
+	if (self.fire == NIL){ end }
+
+	local.r = 0.5 + randomfloat (0.8)
+	local.g = 0.4 + randomfloat (0.6)
+	
+	self lightRed (local.r)
+	self lightGreen (local.g)
+
+	wait 0.2
+	goto firelight
+end
+
+
+
+fireoff local.i:
+//			level.exploderfire[local.i] hide
+//			level.exploderfire[local.i] anim stop
+//			level.exploderfire[local.i] model "fx/dummy.tik"
+
+	if (level.exploderfire[local.i].fire != NIL){
+		level.exploderfire[local.i] lightOff
+		level.exploderfire[local.i] stoploopsound
+		level.exploderfire[local.i].thread delete
+	}
+end
+
+
+fireoff2 local.name:
+	for (local.i=1;local.i<level.exploderfires + 1;local.i++){
+		if (level.exploderfire[local.i].set == local.name){
+			level.exploderfire[local.i] hide
+			level.exploderfire[local.i] model "fx/dummy.tik"
+
+			if (level.exploderfire[local.i].fire != NIL){
+				level.exploderfire[local.i] lightOff
+				level.exploderfire[local.i] stoploopsound
+				level.exploderfire[local.i].thread delete
+			}
+		}
+	}
+end
+
+
+fireon local.i:
+	if (level.exploderfire[local.i].pause != NIL)
+		wait level.exploderfire[local.i].pause
+
+	if (level.exploderfire[local.i].damageradius != NIL)
+		local.damageradius = level.exploderfire[local.i].damageradius
+	else
+		local.damageradius = 512
+
+	if (level.exploderfire[local.i].damage != NIL)
+		radiusdamage level.exploderfire[local.i].origin level.exploderfire[local.i].damage local.damageradius
+
+	if (getcvar(debug) == "1")
+		println ("Model is " + level.exploderfire[local.i].mdl)
+
+//			level.exploderfire[local.i] model level.exploderfire[local.i].mdl
+//			level.exploderfire[local.i] show
+//			level.exploderfire[local.i] rendereffects "+dontdraw"
+//			level.exploderfire[local.i] notsolid
+
+//			level.exploderfire[local.i] anim start
+
+	exec global/model.scr level.exploderfire[local.i].origin level.exploderfire[local.i].mdl
+	if (level.exploderfire[local.i].fire != NIL){
+		level.exploderfire[local.i] lightOn	
+
+		if (randomint(100) > 50)
+			level.exploderfire[local.i] loopsound "sound/environment/fire_small.wav" 1.5 256
+		else
+			level.exploderfire[local.i] loopsound "sound/environment/fire_big.wav" 1.5 256	
+
+		level.exploderfire[local.i] thread firelight
+		level.exploderfire[local.i].thread = parm.previousthread
+	}
+end
+
+fireinit local.name:
+	for (local.i=1;local.i<level.exploderfires + 1;local.i++){
+		if (level.exploderfire[local.i].set == local.name){
+			if (level.exploderfire[local.i].fire != NIL){
+				level.exploderfire[local.i] light (1.0 0.8 0.0)
+			}
+		}
+	}
+
+end
+
+explodersmashedON local.i:
+	if (level.explodersmashed[local.i].pause != NIL)
+		wait level.explodersmashed[local.i].pause
+	
+	level.explodersmashed[local.i] playsound ("stonecrash0" + (randomint(3) + 1))
+	level.explodersmashed[local.i] show
+	level.explodersmashed[local.i] solid
+	waitframe
+	waitframe
+	level.explodersmashed[local.i] disconnect_paths
+end
+
+
+exploderchunkONN local.i:
+	if (level.exploderchunk[local.i].pause != NIL){
+		wait level.exploderchunk[local.i].pause
+	}
+	level.exploderchunk[local.i] show
+end
+
+
+exploderOFF local.i:
+	if (level.exploder[local.i].pause != NIL)
+		wait level.exploder[local.i].pause
+
+	if (level.exploder[local.i].sound != NIL)
+		level.exploder[local.i] playsound level.exploder[local.i].sound
+
+//	println ("Hid exploder " + local.i)
+	level.exploder[local.i] hide
+	level.exploder[local.i] notsolid
+	level.exploder[local.i] connect_paths
+end
+
+
+
+explode local.name:
+	if (getcvar(exploders) == "0")
+		end
+
+	if (getcvar(debug) == "1")
+		println ("** Set off explosion with set #: " + local.name)
+
+//	println ("explode " + local.name)
+	level.explodertimer[local.name] = level.time + 6
+
+	for (local.i=1;local.i<level.explodersmasheds+1;local.i++){
+		if (local.name == level.explodersmashed[local.i].set){
+			thread explodersmashedON local.i
+		}
+	}
+
+	/*
+	for (local.i=1;local.i<level.exploderchunks+1;local.i++)
+	{
+		if (local.name == level.exploderchunk[local.i].set)
+		{
+			thread exploderchunkON local.i
+		}
+	}
+	*/
+
+	for (local.i=1;local.i<level.exploders+1;local.i++){
+		if (local.name == level.exploder[local.i].set){
+			thread exploderOFF local.i
+		}
+	}
+
+	for (local.i=1;local.i<level.exploderfires + 1;local.i++){
+		if(level.exploderfire[local.i] == NULL){continue} //chrissstrahl - null entity
+		if (level.exploderfire[local.i].set == local.name){
+			level.exploderfire[local.i] thread fireon local.i
+		}
+	}
+
+	for (local.i=1;local.i<level.exploderchunks+1;local.i++){
+		if (level.exploderchunk[local.i]){
+			if (local.name == level.exploderchunk[local.i].set){
+				level.exploderchunk[local.i] thread explodechunk
+			}
+		}
+	}
+
+	for (local.i=1;local.i<level.exploderfires+1;local.i++){
+		if(level.exploderfire[local.i] == NULL){continue} //chrissstrahl - null entity
+		if (local.name == level.exploderfire[local.i].set){
+			level.exploderfire[local.i] thread fireoff local.i
+		}
+//			level.exploderfire[local.i] thread fireoff level.exploderfire[local.i].set
+	}
+
+
+	if (level.exploderrepeat != 1)
+		end
+
+	for (local.i=1;local.i<level.exploderchunks+1;local.i++){
+		if (local.name == level.exploderchunk[local.i].set){
+			level.exploderchunk[local.i] physics_off
+			level.exploderchunk[local.i].velocity = (0 0 0)
+			level.exploderchunk[local.i] hide
+			level.exploderchunk[local.i].origin = level.exploderchunk[local.i].org
+			level.exploderchunk[local.i].angles = level.exploderchunk[local.i].ang
+		}
+	}
+
+
+	wait 6
+
+	for (local.i=1;local.i<level.exploders+1;local.i++){
+		if (local.name == level.exploder[local.i].set){
+			level.exploder[local.i] show
+			level.exploder[local.i] solid
+		}
+	}
+
+	for (local.i=1;local.i<level.explodersmasheds+1;local.i++)
+		if (local.name == level.explodersmashed[local.i].set){
+			level.explodersmashed[local.i] hide
+			level.explodersmashed[local.i] notsolid
+		}
+		
+	for (local.i=1;local.i<level.exploderfires+1;local.i++){
+		if (local.name == level.exploderfire[local.i].set)
+			level.exploderfire[local.i] thread fireoff local.i
+
+//			level.exploderfire[local.i] thread fireoff level.exploderfire[local.i].set
+	}
+end
+
+phyvel local.vec:
+	self physics_velocity ( local.vec )
+	wait 0.2
+	self physics_on 1
+	self physics_velocity ( local.vec )
+end
+
+rocksound:
+	wait (1 + randomfloat(4))
+	self playsound ("stonesmall0" + (randomint(5) + 1))
+end
+
+moveitout local.num:
+	local.num = local.num / 15
+	local.number = 1
+	while (local.number < 20){
+		local.number = local.number + 0.4
+		local.o = self.origin
+		if (local.num > 0)
+		local.o[2] = local.o[2] - local.num
+		else
+		local.o[2] = local.o[2] + local.num
+
+		self.origin = local.o
+		waitframe
+	}
+end
+
+
+explodetouch:
+	self waittill touch
+
+// if (parm.other == $world)
+	if (self != NULL)
+		thread moveitout self.velocity[2]
+//	self hide
+end
+
+
+explodechunk:
+	if (self.pause != NIL)
+		wait self.pause
+
+	self show
+	self notsolid
+	local.vec = (self.origin - self.target.origin)
+	local.veclength = vector_length (local.vec)
+	local.vec = vector_normalize (local.vec)
+	local.vecscale = local.veclength * -1
+	local.vec[0] = local.vec[0] * local.vecscale
+	local.vec[1] = local.vec[1] * local.vecscale
+	local.vec[2] = local.vec[2] * (local.vecscale * 1.5)
+
+	thread phyvel local.vec
+
+	self thread explodetouch
+	self thread rocksound
+
+	if (self.anglex == NIL)
+		self.anglex = 0
+
+	if (self.angley == NIL)
+		self.angley = 0
+
+	if (self.anglez == NIL)
+		self.anglez = 0
+
+	if ((self.anglex == 0) && (self.angley == 0) && (self.anglez == 0)){
+		if (self.origin[0] > self.target.origin[0])
+			local.xnum = self.origin[0] - self.target.origin[0]
+		else
+			local.xnum = self.target.origin[0] - self.origin[0]
+
+		if (self.origin[1] > self.target.origin[1])
+			local.ynum = self.origin[1] - self.target.origin[1]
+		else
+			local.ynum = self.target.origin[1] - self.origin[1]
+
+
+		self.anglex = randomfloat(local.veclength / 3) * (randomint(3) - 1)
+		self.angley = randomfloat(local.veclength / 3) * (randomint(3) - 1)
+		self.anglez = randomfloat(local.veclength / 3) * (randomint(3) - 1)
+		
+		if (local.xnum > local.ynum){ // was 1.5s
+			if (self.origin[0] > self.target.origin[0])
+				self.anglex = local.veclength * -0.5 - (randomfloat(0.5))
+			else
+				self.anglex = local.veclength * 0.5 + (randomfloat(0.5))
+		}
+		else{
+			if (self.origin[1] > self.target.origin[1])
+				self.anglez = local.veclength * 0.5  + (randomfloat(0.5))
+			else
+				self.anglez = local.veclength * -0.5 - (randomfloat(0.5))
+		}
+	}
+
+	local.vec[0] = self.anglex
+	local.vec[1] = self.angley
+	local.vec[2] = self.anglez
+
+	self rotatex local.vec[0]
+	self rotatey local.vec[1]
+	self rotatez local.vec[2]
+
+	local.break = 0
+	local.breaker = 1.2
+
+//	self thread removetouch
+
+	wait 0.5
+	local.inc = 10.0 + (randomint(15))
+	local.x = local.vec[0] / local.inc
+	local.y = local.vec[1] / local.inc
+	local.z = local.vec[2] / local.inc
+
+//	thread moveitdown
+	
+	for (local.i = 0; local.i < local.inc; local.i++){
+		if (local.vec[0] > 0)
+			local.vec[0] = local.vec[0] - local.x
+		else
+			local.vec[0] = local.vec[0] - local.x
+
+		if (local.vec[1] > 0)
+			local.vec[1] = local.vec[1] - local.y
+		else
+			local.vec[1] = local.vec[1] - local.y
+
+		if (local.vec[2] > 0)
+			local.vec[2] = local.vec[2] - local.z
+		else
+			local.vec[2] = local.vec[2] - local.z
+
+		self rotatex local.vec[0]
+		self rotatey local.vec[1]
+		self rotatez local.vec[2]
+
+		waitframe
+	}
+	wait 10
+	
+	if (self != NULL)
+		self delete
+end
+
+removetouch:
+	local.lastvelocity = self.velocity
+	local.lastvelocity2 = self.velocity
+
+	local.break = 0
+	local.amount = 50
+	while (local.break == 0){
+		local.v = self.velocity
+		local.count = 0
+		for (local.i=0;local.i<3;local.i++){
+			if ((local.v[local.i] > local.amount * -1) && (local.v[local.i] < local.amount))
+				local.count++
+		}
+		if (local.count > 2)
+			local.break = 1
+
+		if (self.velocity == ( 0 0 0))
+			println "NO VELOCITY"
+
+		local.lastvelocity2 = local.lastvelocity
+		local.lastvelocity = self.velocity
+//		println self.velocity
+		waitframe
+	}
+	self delete
+end
+
+
+moveitdown:
+	wait (2 + randomfloat(1.5))
+	local.number = 1
+	while (local.number < 20){
+		local.number = local.number + 0.4
+		local.o = self.origin
+		local.o[2] = local.o[2] - local.number
+		self.origin = local.o
+		waitframe
+	}
+end
+
+
+
+
+
+waitplaysound local.waiter local.sound local.chan local.vol local.range:
+	wait local.waiter
+	self playsound local.sound local.chan local.vol local.range
+end
+
+
+/*
+	models/emitters/mortar_higgins
+	models/emitters/explosion_mine.tik
+	models/emitters/explosion_tank.tik
+	models/emitters/explosion_bombdirt.tik
+*/

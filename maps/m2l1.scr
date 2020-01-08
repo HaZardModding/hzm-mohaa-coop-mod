@@ -1,0 +1,592 @@
+// M2L1 level script
+// geometry: Natestah
+// scripting/detailing: Z
+//=========================================================================
+main:{
+//=========================================================================
+	level.coop_aaMap = 1				//chrissstrahl - let global scripts know this is a AA level
+	level.coopPrevMap = "m1l3c"			//chrissstrahl - set previouse map (for mom voteing)
+	level.coopNextMap = "m2l2a"			//chrissstrahl - set next map (for mom voteing)
+	thread coop_mod/main.scr::main 	//chrissstrahl - start coop mod extensions
+	
+	//chrissstrahl - setup stuff that is needed
+	if(level.gametype != 0){
+		thread coop_updatespawn2
+		thread coop_updatespawn4
+		spawn trigger_once setthread coop_updatespawn5 origin ( 3060 6703 0 ) targetname coop_spawnTrigger
+	}
+
+	thread global/exploder.scr::main
+	exec global/ai.scr
+	exec global/loadout.scr maps/m2l1.scr
+	
+
+//////////////////////
+level waittill prespawn
+println "z:        prespawn marker"
+///////////////////
+
+	//$world farplane 10000
+
+	level.tempnum = 0
+	level.bombnum = 0
+
+	level.s7_test = 0
+	level.s7_time = 0
+
+	level.flags[0] = 0  //the gate guards dont have enemy
+	level.flags[1] = 0  //document1 not taken
+	level.flags[2] = 0  //document2 not taken
+	level.flags[3] = 0  //document3 not taken
+	level.flags[4] = 0  //document4 not taken
+	level.remaining_documents = 4
+
+
+
+	//soundtrack music/m2l1.mus
+	exec global/ambient.scr m2l1
+	thread global/door_locked.scr::lock
+	$obj2_door	lock
+
+
+///////////////////////////
+level waittill spawn
+println "z:        level waittill spawn marker"
+///////////////////////////
+
+	$hall_guards ai_off
+
+	//$player item items/camera.tik
+	waitthread global/items.scr::add_item "radio" nomessage
+	waitthread global/items.scr::add_item "explosives" nomessage
+	println "z:         BLAH BLAH BLAH"
+	//$dog1 remove
+
+	thread scene1
+	thread objective1
+
+	/////////////////////////////////
+	//*** TEMP reset the Objectives portion of the HUD
+	//waitthread global/objectives.scr::reset_objectives
+	//waitthread global/objectives.scr::blank_objectives
+
+	level.objective2_text = ("Steal the research documents. [" + level.remaining_documents + " remaining].")
+
+	waitthread global/objectives.scr::add_objectives 1 2 "Enter the complex with the assistance of Major Grillo." $obj1_trigger.origin
+	waitthread global/objectives.scr::add_objectives 2 2  level.objective2_text $document1.origin
+	waitthread global/objectives.scr::add_objectives 3 2 "Enter the main facility." $obj3_trigger2.origin
+
+	waitthread global/objectives.scr::current_objectives 1
+	/////////////////////////////////////
+
+
+	//$powerlines_sound exec global/loopsound.scr m2l1_electrical_hum2
+	//$2nd_floor_machine exec global/loopsound.scr m2l1_machine_loop3
+	$radio1_sound exec global/loopsound.scr m2l1_radio1
+	$radio2_sound exec global/loopsound.scr m2l1_radio2
+	$radio3_sound exec global/loopsound.scr m2l1_radio3
+}end
+
+
+
+///////////////////////////////
+//////////////////////////////////
+//////////////////////////////////
+objective1:
+	$obj1_trigger waittill trigger
+
+	waitthread global/objectives.scr::add_objectives 1 3
+	waitthread global/objectives.scr::current_objectives 2
+end
+
+autosave_inside:
+	if(level.gametype == 0){//chrissstrahl - only in sp
+		exec global/autosave.scr 2
+	}
+end
+
+//////////////////////////////////
+//objective2:
+//trigger $obj3_door
+
+//$obj2_trigger1 waittill trigger
+
+//waitthread global/objectives.scr::add_objectives 2 2 "Steal all Research Documents" $obj2_trigger2.origin
+//waitthread global/objectives.scr::current_objectives 2
+
+//$obj2_trigger2 waittill trigger
+
+//waitthread global/objectives.scr::add_objectives 2 2 "Steal all Research Documents" $document1.origin
+//waitthread global/objectives.scr::current_objectives 2
+//end
+
+/////////////////////////
+document1:
+	if (level.flags[1] == 1){
+		//iprintln "Picture already taken."
+		end
+	}
+	parm.other playsound pickup_papers //chrissstrahl - playsound on who ever picked up the papers
+	$document1 remove
+	iprintln "Document taken."
+	level.flags[1] = 1
+	thread obj2_give_new_objective
+end
+
+/////////////////////////
+document2:
+	if (level.flags[2] == 1){
+		//iprintln "Picture already taken."
+		end
+	}
+	parm.other playsound pickup_papers //chrissstrahl - playsound on who ever picked up the papers
+	$document2 remove
+	iprintln "Document taken."
+	level.flags[2] = 1
+	thread obj2_give_new_objective
+end
+
+/////////////////////////
+document3:
+	if (level.flags[3] == 1){
+		//iprintln "Picture already taken."
+		end
+	}
+	parm.other playsound pickup_papers //chrissstrahl - playsound on who ever picked up the papers
+	$document3 remove
+	iprintln "Document taken."
+	level.flags[3] = 1
+	thread obj2_give_new_objective
+end
+
+/////////////////////////
+document4:
+	if (level.flags[4] == 1){
+		//iprintln "Picture already taken."
+		end
+	}
+	parm.other playsound pickup_papers //chrissstrahl - playsound on who ever picked up the papers
+	$document4 remove
+	iprintln "Document taken."
+	level.flags[4] = 1
+	thread obj2_give_new_objective
+end
+
+
+
+/////////////////////////////////////
+obj2_give_new_objective:
+	level.remaining_documents --
+	level.objective2_text = ("Steal the research documents [" + level.remaining_documents + " remaining]")
+	println level.objective2_text
+	waitthread global/objectives.scr::add_objectives 2 2  level.objective2_text
+
+	println "level.flags[1] " level.flags[1]
+	println "level.flags[2] " level.flags[2]
+	println "level.flags[3] " level.flags[3]
+	println "level.flags[4] " level.flags[4]
+
+
+	if (level.flags[1] == 0){
+		set_objective_pos $document1.origin
+	//	waitthread global/objectives.scr::add_objectives 2 2 "Steal all Research Documents" $document1.origin
+	}
+	if (level.flags[2] == 0){
+		set_objective_pos $document2.origin
+	//	waitthread global/objectives.scr::add_objectives 2 2 "Steal all Research Documents" $document2.origin
+	}
+	if (level.flags[3] == 0){
+		set_objective_pos $document3.origin
+	//	waitthread global/objectives.scr::add_objectives 2 2 "Steal all Research Documents" $document3.origin
+	}
+	if (level.flags[4] == 0){
+		set_objective_pos $document4.origin
+	//	waitthread global/objectives.scr::add_objectives 2 2 "Steal all Research Documents" $document4.origin
+	}	
+	if (level.flags[1] == 1 && level.flags[2] == 1 && level.flags[3] == 1 && level.flags[4] == 1){
+		thread objective3
+	}
+end
+
+///////////////////////////////////
+//clickitem_fail: // this is a global thread name that's called when the clickitem is fired and misses
+//iprintln "That's not a research document."
+//end
+
+/////////////////
+objective3:
+	waitthread global/objectives.scr::add_objectives 2 3
+	waitthread global/objectives.scr::current_objectives 3
+	
+	if(level.gametype == 0){//chrissstrahl - don't lock players in/out in coop
+		$front_door	lock
+		$front_door	close
+	}
+
+	$obj2_door	unlock
+	$obj2_door	open $obj2_trigger1
+
+	$obj3_trigger2 waittill trigger
+
+	waitthread global/objectives.scr::add_objectives 3 3
+	exec global/missioncomplete.scr m2l2a bsp2bsp
+end
+
+/////////////////////////////////////////////
+/////////////////////////////////////////////
+scene1:
+	// the gate
+	$oss_man exec global/disable_ai.scr
+	$oss_man nodamage
+	
+	$s1g1 thread s1_guards
+	$s1g2 thread s1_guards
+	$s1g3 thread s1_guards
+
+	$super_sniper remove
+	$oss_man thread s1_scripted
+end
+
+super_sniper_init:
+	self nodamage
+	self exec global/disable_ai.scr
+	self exec global/crouch.scr
+	self immune bullet
+	self immune fast_bullet
+	self immune explosion
+	self immune rocket
+	while (isAlive $oss_man)
+	{
+		self walkto $super_sniper_node1
+		self waittill movedone
+		self walkto $super_sniper_node2
+		self waittill movedone
+	}
+end
+
+//////////////////////////////
+s1_scripted:
+	waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl - wait for any player to join
+	wait 4
+	
+	//centerprint "Blue fox this is white rook."
+	exec coop_mod/replace.scr::playsound dfr_M2L1_200m //chrissstrahl - made coop compatible
+	wait 3
+
+	//centerprint "I'm in the guard house near the gate."
+	exec coop_mod/replace.scr::playsound dfr_M2L1_201m //chrissstrahl - made coop compatible
+	
+///////////////////
+$s1_trigger waittill trigger
+////////////////////
+	
+//	$player stufftext "tmstart sound/music/mus_04f_suspense.mp3"
+	
+	self exec global/walkto.scr $s1_window_node
+	self waittill movedone
+	wait .5
+
+	//centerprint "I'm now standing in front of the window."
+	exec coop_mod/replace.scr::playsound playsound dfr_M2L1_202m
+	self exec coop_mod/replace.scr::turnto //chrissstrahl - made coop compatible
+	wait .2
+	self exec coop_mod/replace.scr::lookat	//chrissstrahl - made coop compatible
+	wait 2.5
+
+	// check to see if the player is using the scope?
+	//centerprint "You should be able to see me through the scope."
+	exec coop_mod/replace.scr::playsound dfr_M2L1_203m	//chrissstrahl - made coop compatible
+	self anim_scripted actor_M2L1_203 
+	wait 2.7
+
+		//chrissstrahl - made coop compatible
+	if(level.gametype == 0){
+		local.key = getboundkey1 "useweaponclass rifle"
+		iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key) (loc_convert_string " to switch to the sniper rifle.")
+
+		local.key = getboundkey1 "+attacksecondary"
+		iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key) (loc_convert_string " to use the scope on the sniper rifle.")
+	}else{
+		iprintlnbold_noloc ("Hint: Use the scope of your Siper rifle for distant enemies.")
+	}
+
+	//former trigger break
+	
+	// check to see if the gate guards have enemy
+	if (level.flags[0] == 1 || (!(IsAlive $s1g1) && !(IsAlive $s1g2) && !(IsAlive $s1g3))) goto s1_continue1
+	//centerprint "I'm going to take out the guards at the gate."
+	exec coop_mod/replace.scr::playsound dfr_M2L1_204m	//chrissstrahl - made coop compatible
+	wait 2.5
+
+	if (level.flags[0] == 1) goto s1_continue1
+	//centerprint "When I open fire, give me sniper cover."
+	exec coop_mod/replace.scr::playsound dfr_M2L1_205m	//chrissstrahl - made coop compatible
+	wait 2.5
+
+
+s1_continue1:
+	println "z:        s1_continue1"
+	//centerprint "Watch the perimeter for any reinforcements."
+	exec coop_mod/replace.scr::playsound dfr_M2L1_206m	//chrissstrahl - made coop compatible
+	wait 2.5
+	
+	thread coop_mod/spawnlocations.scr::m2l1_update1 //chrissstrahl - update spawnpoints for coop
+
+	self exec global/runto.scr $s1_guards_node
+	println "z:        waiting for grillo to get to the node"
+	self waittill movedone
+	
+	println "z:        grillo at attack node"
+
+//	self exec global/stand.scr
+
+	self exec global/enable_ai.scr
+	waitframe
+	self american
+
+
+// at this point the oss man should recognize the guards as enemies and attack them, the guards should recognize him as an enemy and fight back.
+
+	if (IsAlive $s1g1)
+		$s1g1 waittill death
+	if (IsAlive $s1g2)
+		$s1g2 waittill death
+	if (IsAlive $s1g3)
+		$s1g3 waittill death
+
+
+	thread s1_open_the_gate
+end
+
+
+///////////////////
+s1_open_the_gate:
+//$push_gate_node1
+//$push_gate_node2
+//$gate_facing_node1
+//$gate_facing_node2
+
+	$main_gate notsolid
+	local.so = spawn script_origin
+	local.so.origin = self.origin
+	local.so glue self
+
+	self exec global/disable_ai.scr
+	self.gren_awareness = 0
+
+	local.break = 0
+	while (local.break < 10)
+	{
+	//	self runto $push_gate_node1
+//		self runto ( -1932 -2984 484)
+		self runto ( -1922 -3004 484)
+		self waittill movedone
+		waitframe
+		if (parm.movedone != 1)
+			local.break = 100
+		local.break ++
+	}	
+
+//	$player stufftext "tmstart sound/music/mus_17c_failure.mp3"
+	exec coop_mod/replace.scr::tmstart "sound/music/mus_17d_failure.mp3"		//chrissstrahl - made coop compatible
+
+	println "Z:   turning to the gate"
+
+//	self turnto $gate_facing_node1
+	local.temp = spawn script_origin
+	local.temp.origin = (self.origin + ( -90 0 0))
+	self turnto local.temp
+	//self waittill turndone
+	wait .5
+	
+	self turnto NULL
+	self lookat NULL
+	self.angles = (0 180 0)
+
+	println "Z:   anim_noclip open_gate_a"
+	self anim_noclip open_gate_a
+	self waittill animdone
+	println "Z:   current origin: " self.origin
+	
+//	self.origin = $push_gate_node2.origin
+	self.origin = ( -1932 -2988 484)
+	println "Z:   reset angle"
+	self.angles = (0 180 0)
+	println "Z:   anim_noclip open_gate_b"
+	self anim_noclip open_gate_b
+	self waittill animdone
+	println "Z:   binding the gate"
+	$main_gate bind local.so
+	
+//	wait 4
+
+	println "Z:   anim_noclip open_gate_loop"
+	self anim_noclip open_gate_loop
+	$main_gate loopsound m2l1_gate_open
+	wait 8
+
+	println "Z:   spawning enemy"
+
+
+	thread s1_spawn_enemies 
+	self exec global/setdeathanim.scr "open_gate_death"
+	self.health = 1
+	self threatbias 100000
+	self takedamage
+	self dontdropweapons
+
+	if ($super_sniper)
+		$super_sniper thread activate_super_sniper
+	
+	println "Z:   waiting for grillo's death"
+	
+	thread s1_failsafe
+
+self waittill death
+
+	println "Z:   dead"
+//	thread global/objectives.scr::add_objectives 1 1
+//	thread global/objectives.scr::add_objectives 1 2 "Continue on without Major Grillo" $obj1_trigger.origin
+
+	if ($super_sniper)
+		$super_sniper thread unsuper_super_sniper
+		
+	$main_gate unbind
+	$main_gate solid
+	self playsound M2L1_grillo_dies
+	$main_gate stoploopsound
+
+	//self exec global/bullethit.scr (0 0 250) 500 0 1
+
+//	$player stufftext "tmstart sound/music/mus_17c_failure.mp3"
+	//self killed
+	//self.health = 0
+
+	$gate_clip remove
+end
+
+activate_super_sniper:
+	$super_sniper removeimmune bullet
+	$super_sniper removeimmune fast_bullet
+	$super_sniper removeimmune explosion
+	$super_sniper removeimmune rocket
+	$super_sniper sight 5000
+	$super_sniper accuracy 100
+	$super_sniper exec global/enable_ai.scr
+end
+
+unsuper_super_sniper:
+	$super_sniper takedamage
+	$super_sniper accuracy 20
+end
+
+s1_failsafe:
+	wait 1
+	local.temp = spawn script_origin
+	local.temp.origin = ( -1531 -2118 487)
+	local.temp playsound kar98sniper_snd_fire
+	wait 1.8
+	local.temp playsound kar98sniper_snd_fire
+	wait .2
+	if (isAlive self){
+		self playsound snd_bh_flesh
+		self exec global/bullethit.scr (0 0 250) 500 0 1
+	}
+	end
+
+s1_spawn_enemies:
+	while (IsAlive self)
+	{
+		waitthread global/ai.scr::spawn 3
+		wait 1
+	
+		if (IsAlive level.enemyfnum[1])
+			level.enemyfnum[1] waittill death
+		if (IsAlive level.enemyfnum[2])
+			level.enemyfnum[2] waittill death
+	}	
+end
+
+///////////////
+s1_guards:
+	self waittill hasenemy
+	println "z:   " self  " has enemy"
+	level.flags[0] = 1  //the gate guards have enemy
+end
+
+
+
+/////////////////
+music2:
+	//exit the research center music
+	//called by BSP
+	//$player stufftext "tmstartloop sound/music/mus_16a_mystery.mp3" //chrissstrahl
+	exec coop_mod/replace.scr::tmstartloop "sound/music/mus_16a_mystery.mp3" //chrissstrahl - made coop compatible
+	
+	thread coop_mod/spawnlocations.scr::m2l1_update3 //chrissstrahl - update spawnpoints for coop
+end
+
+/////////////////
+s7_test:
+	//called by using the mg42
+	println "z:           it worked"
+	if (level.s7_test == 3)
+		end
+	if (level.time <= level.s7_time + 10)
+		end
+
+	level.s7_time = level.time
+	level.s7_test++
+	
+	thread global/ai.scr::spawn 9
+	//thread global/ai.scr::spawn 
+end
+
+enable_hall_guards:
+	println "z:          $hall_guards ai_on"
+	$hall_guards ai_on
+end
+
+ladder_hint:
+	println "z:           ladder hint"
+	// You can only climb one side of a ladder.
+	// Approach this ladder from the west to climb it.
+	// Look up and press your forward key ( __ ) to climb a ladder.
+	
+	iprintlnbold "You can only climb one side of a ladder."
+	iprintlnbold "Approach this ladder from the west to climb it."
+	
+	//chrissstrahl - made coop compatible
+	if(level.gametype == 0){
+		local.key = getboundkey1 "+forward"
+		iprintlnbold_noloc (loc_convert_string "Look up and press your forward key ( ") (loc_convert_string local.key) (loc_convert_string " ) to climb a ladder.")
+	}
+	else{
+		iprintlnbold_noloc (loc_convert_string "Look up and press your forward key to climb a ladder.")
+	}
+end
+
+//=========================================================================
+coop_updatespawn2:{
+//=========================================================================
+	$obj2_trigger1 waittill trigger
+	thread coop_mod/spawnlocations.scr::m2l1_update2 //chrissstrahl - update spawnpoints for coop
+	
+	$coop_spawnTrigger setSize ( -20 -20 -20 ) ( 20 20 100 )//chrissstrahl - set size of trigger for spawnloacation update
+}
+
+//=========================================================================
+coop_updatespawn4:{
+//=========================================================================
+	$obj3_trigger1b waittill trigger
+	if( level.coop_updatespawn4done != NIL ){ end }
+	level.coop_updatespawn4done = TRUE
+	thread coop_mod/spawnlocations.scr::m2l1_update4 //chrissstrahl - update spawnpoints for coop
+}
+
+//=========================================================================
+coop_updatespawn5:{
+//=========================================================================
+	thread coop_mod/spawnlocations.scr::m2l1_update5 //chrissstrahl - update spawnpoints for coop
+}
+

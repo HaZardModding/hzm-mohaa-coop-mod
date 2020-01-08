@@ -1,0 +1,1415 @@
+//chrissstrahl fix these
+//level.goatsbutt lookat $player //chrissstrahl - fixme
+//$alarm_switch_trigger[1] douse $player //chrissstrahl - fixme
+//remove trigger hurt at -2676 -6480 -388
+
+
+
+
+
+/////////////////////SCRIPT/////////
+// I MADE THis
+//////////////////////////////
+
+//=========================================================================
+main:{
+//=========================================================================
+	level.coop_aaMap = 1				//chrissstrahl - let global scripts know this is a AA level
+	//level.coop_playerHasDisguise = 1	//chrissstrahl - 
+	level.coopPrevMap = "m2l1"			//chrissstrahl - set previouse map (for mom voteing)
+	level.coopNextMap = "m2l2b"			//chrissstrahl - set next map (for mom voteing)
+	level.coop_noWeapon	= 1				//chrissstrahl - players are suppose to have no weapons
+	thread coop_mod/main.scr::main 	//chrissstrahl - start coop mod extensions
+	
+	//chrissstrahl - setup stuff that is needed
+	if(level.gametype != 0){
+		//chrissstrahl - add them now only in mp, to avoid the spam at start add them before players are on the server - sp see further below
+		waitthread global/objectives.scr::add_objectives 1 2 "Find a disguise." $suit.origin
+		waitthread global/objectives.scr::add_objectives 2 2 "Destroy the Naxos Prototype." $obj2.origin
+		waitthread global/objectives.scr::add_objectives 3 2 "Enter the 2nd U-boat." $endlevel.origin
+		waitthread global/objectives.scr::current_objectives 1
+	}
+
+//	$officerdoor1 notsolid
+	$crate1_end notsolid
+	$crate2_end notsolid
+	$crate3_end notsolid
+	$crate1_start notsolid
+	$crate2_start notsolid
+	$crate3_start notsolid
+//	$gate2 notsolid
+	exec global/loadout.scr maps/m2l2a.scr
+	exec global/cardgame.scr
+level waittill prespawn
+	level.script = maps/m2l2a.scr
+//	thread global/exploder.scr::main
+	exec global/alarmlight.scr
+	exec global/ambient.scr m2l2a
+
+	level waittill spawn
+	waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl - wait for any player to join
+
+	if($leaningguy)
+		$leaningguy remove
+		
+	level.skillz = getcvar(skill)
+	
+//	$officerdoor1 solid
+//	$officerdoor1 disconnect_paths
+//	$gate2 solid
+//	$gate2 disconnect_paths
+
+	level.scienceinterupt = 0
+	level.alarmlights = 0
+	level.ai_alarm_backup_time = 15
+	level.ai_alarm_backup_max = 4
+	
+	if( level.gametype == 0 ){//chrissstrahl - this seams to work only in singleplayer
+		$player.has_disguise = 1
+	}
+	//chrissstrahl - disguise in mp seams not to work
+	//exec coop_mod/replace.scr::has_disguise 1 //chrissstrahl - made coop compatible
+	
+	level.alarm = 0
+
+	if(level.gametype == 0 ){ //chrissstrahl - add them now only in sp
+		waitthread global/objectives.scr::add_objectives 1 2 "Find a disguise." $suit.origin
+		waitthread global/objectives.scr::add_objectives 2 2 "Destroy the Naxos Prototype." $obj2.origin
+		waitthread global/objectives.scr::add_objectives 3 2 "Enter the 2nd U-boat." $endlevel.origin
+		waitthread global/objectives.scr::current_objectives 1
+	}
+	
+///"stuffing" guys into variables and alarm system setup
+	level.alarm_sound = m2l2_alarm
+
+	thread global/alarm_system.scr::alarm_system_setup
+	level.guythatlikesnorway = waitthread global/alarm_system.scr::find_guy "guythatlikesnorway"
+	level.guythathatesnorway = waitthread global/alarm_system.scr::find_guy "guythathatesnorway"
+	level.whatsthesub = waitthread global/alarm_system.scr::find_guy "whatsthesub"
+	level.whatsthesubspot = level.whatsthesub.origin
+	level.hushyhushy = waitthread global/alarm_system.scr::find_guy "hushyhushy"
+	level.hushyhushyspot = level.hushyhushy.origin
+	level.stupid = waitthread global/alarm_system.scr::find_guy "stupid"
+	level.jokey = waitthread global/alarm_system.scr::find_guy "jokey"
+	level.goatsbutt = waitthread global/alarm_system.scr::find_guy "goatsbutt"
+	level.sentry2dude = waitthread global/alarm_system.scr::find_guy "sentry2dude"
+	level.officer1 = waitthread global/alarm_system.scr::find_guy "officer1"
+	level.loweralarmerguy = waitthread global/alarm_system.scr::find_guy "loweralarmerguy"
+
+	waitthread global/items.scr::add_item "explosives" nomessage
+//	level.youallright = $youallright
+
+
+
+
+//////////////////////////
+	///conversation////
+	thread norgirls
+	thread whattheydoin
+	///////////////////
+
+	thread playalarmsound
+	thread wakeupcardplayers
+	thread suspiciousscientists
+	thread endmission
+	thread moveaflak
+	thread scientistidle
+	thread objective2
+	thread sentry1toggleoff
+//	thread sentry2dude
+	thread sentry1alarm
+	thread wavesounds
+	thread specialmove1
+	thread sentry2hintmessage
+	thread hints
+	$suckyfatty thread cardplayersdeath
+
+
+//  easy skill setup
+	$suckyfatty thread easyskill
+	level.guythatlikesnorway thread easyskill
+	level.guythathatesnorway thread easyskill
+	level.whatsthesub thread easyskill
+	level.hushyhushy thread easyskill
+	level.stupid thread easyskill
+	level.jokey thread easyskill
+	level.goatsbutt thread easyskill
+	level.sentry2dude thread easyskill
+	level.officer1 thread easyskill
+	level.loweralarmerguy thread easyskill
+	$guy1 thread easyskill
+	$guy2 thread easyskill
+	$guy3 thread easyskill
+	$wrenchman1 thread easyskill
+	$crateguy1 thread easyskill
+	$crateguy2 thread easyskill
+	
+	//speakers/////
+	thread intercomsoundcycle
+	/////////////////
+//stupidstuff
+
+ //    $cartpusher1 remove
+ //  $cartpusher2 remove
+ //    $cartpusher3 remove
+//	$torpedo1 remove
+//	$torpedo2 remove
+//	$torpedocart remove
+
+	$likeynorwaydoor lock
+	$lockednaxos lock
+//	$craneflag1 bind $crane  craneflag is not working
+//	$craneflag2 bind $crane
+	$hangingflak notsolid
+	$hangingflak bind $craneflag2
+	$hangingflak bind $crane
+	$crate1_end hide
+	$crate2_end hide
+	$crate3_end hide
+	$guy1 exec coop_mod/replace.scr::holster //chrissstrahl - made coop compatible
+	$guy2 exec coop_mod/replace.scr::holster //chrissstrahl - made coop compatible
+	$guy3 exec coop_mod/replace.scr::holster //chrissstrahl - made coop compatible
+	$guy1 type_disguise "none"
+	$guy2 type_disguise "none"
+	$guy3 type_disguise "none"
+	$guy1.hearing = 200
+	$guy2.hearing = 200
+	$guy3.hearing = 200
+	$guy2.hearing = 200
+	$guy3.hearing = 200
+	$guy2 accuracy 9
+	$guy1 accuracy 8
+	$exploderfire anim stop
+ 	$radio loopsound m2l2_radio
+	$norgirlstrig nottriggerable
+	$sledgehammerguy thread sledgehammercarry
+	$wrenchman1 thread wrenchycarry
+	$welderguy2 thread weldercarry
+	level.officer1.maxdist = 4000
+	$naxossmashed hide
+	$antenasmashed hide
+	level.goatsbutt exec coop_mod/replace.scr::lookat //chrissstrahl - coop mod
+	level.goatsbutt.fov = 160
+	$youallright remove
+	$wrenchman1 gun "walter p38"
+	$wrenchman1 exec coop_mod/replace.scr::holster //chrissstrahl - made coop compatible
+	level.jokey gun "walter p38"
+	level.stupid gun "walter p38"
+	thread sentry2thing
+	$suckyfatty fixedleash 1
+	$suckyfatty hearing 200
+	$suckyfatty leash 512
+	$suckyfatty resetleash
+	level.sentry2dude.avoidplayer = 0
+//remove
+//$player stufftext "notarget"
+//$player stufftext "noclip"
+//$player.origin = "-2400 -4140 -485" //at the end
+//$player.origin = "-3760 -805 -495" //start of pens (outside)
+//wait 5
+//thread cometolife
+//setcvar s_volume 0
+}end
+
+sentry2hintmessage:
+	$papers2hint waittill trigger
+	if(level.sentry2hintmessaged != 1)
+	{
+		level.sentry2hintmessaged = 1
+		iprintlnbold "You need a new set of papers to procede past this point."
+	}
+end
+cardplayersdeath:
+	level.deadcardplayers = 0
+	self waittill death
+	level.deadcardplayers++
+	if(level.cardplayers != 3)
+		$suckyfatty attackplayer
+end
+
+hints:
+	if(level.gametype == 0){
+		local.key = getboundkey1 "Holster"
+		iprintlnbold_noloc (loc_convert_string "Press the ( ") (loc_convert_string local.key) (loc_convert_string " ) key to holster your weapon.")	
+		wait 1
+		iprintlnbold "If your weapon is not holstered"
+		iprintlnbold "your cover will be blown."
+		wait 2
+	}
+	//chrissstrahl - stealth does not work some how, so screw this
+	//else{
+		//iprintlnbold_noloc("Holster your weapon now !")
+	//}
+end
+
+easyskill:
+	if(level.skillz != "0"){ end }
+	if(self.health > 50)
+		self.health = (self.health / 2)
+//	println self.targetname "'s health is " self.health
+	self noticescale 1000
+//	println self.targetname "'s noticescale is " self.noticescale
+	self accuracy (self.accuracy / 3)
+end
+
+
+huddrawrefresh:
+end
+
+
+sentry2thing:
+	$sentry2trigger waittill trigger
+	level.sentry2dude leash 2048
+	level.sentry2dude resetleash
+	level.sentry2dude attackplayer
+end
+
+
+wakeupcardplayers: 
+	while(1){
+		if(level.alarm == 1){
+			if(isalive $suckyfatty)
+			$suckyfatty hearing 512
+			if(level.skillz == "0"){
+				$suckyfatty accuracy 3
+				$suckyfatty noticescale 150
+				
+			}
+		}
+		if(level.alarm == 0){
+			wait 1
+		}
+		wait 1
+	}
+end
+
+wavesounds:
+	local.asdf = 1
+	for(local.i = 1;local.i <= $wavelaps.size;local.i++){
+			if($wavelaps[local.i].volume == "1")
+				$wavelaps[local.i] loopsound wave_laps_low 1
+			if($wavelaps[local.i].volume == "2")
+				$wavelaps[local.i] loopsound wave_laps_med 1
+			if($wavelaps[local.i].volume == "3")
+          		$wavelaps[local.i] loopsound wave_laps_high 1
+				
+//				$wavelaps[local.i] loopsound wave_laps .2
+		}
+end
+
+
+unholsterweapon:
+	self exec coop_mod/replace.scr::unholster //chrissstrahl - made coop compatible
+	self attackplayer
+end
+
+alarmall:
+	if(level.alarm != 1){
+     	//$alarm_switch_trigger[1] douse $player //chrissstrahl
+		
+		//chrissstrahl - make sure this works in coop
+     	local.player = exec coop_mod/replace.scr::player_closestTo $alarm_switch_trigger[1]
+		while(local.player == NULL){
+			wait 0.5
+			local.player = exec coop_mod/replace.scr::player_closestTo $alarm_switch_trigger[1]
+		}
+		//end chrissstrahl
+		$alarm_switch_trigger[1] douse local.player //chrissstrahl
+	}
+end
+
+
+gate3lockedsound:
+	$gate3 playsound gate_metal_locked
+end
+//gate2lockedsound:
+//	$gate2 playsound gate_metal_locked_clue
+//end
+
+
+enablesentrytrigger:
+	level.goatsbutt exec global/enable_ai.scr
+	$sen1on nottriggerable
+	$sen1off nottriggerable
+end
+
+//sentry2dude:
+//	$sentry2dude waittill death
+//	wait 2
+//	if(level.gate2hasopened != 1)
+//	{
+//		thread gate2open
+//	}
+//end
+
+sentry1toggleon:
+	level.peopletalking = 1 //this is here since scientist will likely die during waittill say done
+	$sen1on waittill trigger
+	if(isalive level.goatsbutt)
+		level.goatsbutt exec global/enable_ai.scr
+	thread sentry1toggleoff
+end
+sentry1toggleoff:
+	level.peopletalking = 0 //this is here since scientist will likely die during waittill say done
+	$sen1off waittill trigger
+	if(isalive level.goatsbutt)
+		level.goatsbutt exec global/disable_ai.scr
+	thread sentry1toggleon
+end
+
+//gate2open:
+//	$gate2locked nottriggerable
+//	level.gate2hasopened = 1 
+//	$gate2 playsound fence_roll_open
+//	$gate2 movesouth 240
+//	$gate2 waitmove
+//	wait 1
+//	$gate2 connect_paths
+//end
+
+
+papers2pickup:
+	level.sentry2hintmessaged = 1
+	$papers2 remove
+	waitthread global/items.scr::remove_item "papers_level1"
+	waitthread global/items.scr::add_item "papers_level2"
+end
+
+objective1:
+	waitthread global/objectives.scr::add_objectives 1 3 "Find a disguise." $obj1.origin
+	waitthread global/objectives.scr::current_objectives 2
+	
+end
+
+objective2:
+	$naxos waittill trigger
+	level.scienceinterupt = 2
+	thread ohnothenaxos1
+	thread blowupthenaxos
+	waitthread global/objectives.scr::add_objectives 2 3 "Destroy the Naxos Prototype." $obj2.origin
+	waitthread global/objectives.scr::current_objectives 3
+	thread norgirlsinpos
+//	level.youallright thread youok
+end
+
+
+/*   Was used for a guy.. he was considered buggy. I don't have time to fix
+youok:
+den_m2l2_237r  "Sir, are you alright? Can I get you anything?" maps "m dm obj"
+den_m2l2_238r  "What's going on?" maps "m dm obj"
+den_m2l2_239r  "A gun!" maps "m dm obj"
+den_m2l2_240p  "Sabotage!" maps "m dm obj"
+den_m2l2_241a  "Bomb!" maps "m dm obj"
+den_m2l2_242f  "Intruder!" maps "m dm obj"
+
+	// youokpoint
+	self type_disguise "none"
+	self exec global/walkto.scr $youokpoint
+	$youoktrig waittill trigger
+	self turnto $player
+	self lookat $player
+ 	wait .5
+	self say den_m2l2_237r
+	self waittill saydone
+	self say den_m2l2_238r
+	self waittill saydone
+	self say den_m2l2_239r
+	self waittill saydone
+	self attackplayer
+end
+*/
+
+blowupthenaxos:
+	$antenanotsmashed remove
+	$naxosnotsmashed remove
+	$naxossmashed show
+	$antenasmashed show
+	$exploderfire anim start
+	$naxos playsound explode_prototype
+	wait 30
+end
+
+ohnothenaxos1:
+     if(level.naxossequencetriggered != 1){
+     	level.naxossequencetriggered = 1
+	     $guy1 exec global/disable_ai.scr
+          $guy2 exec global/disable_ai.scr
+		$guy3 exec global/disable_ai.scr
+		$guy1 anim scientist_detachclipboard
+		$guy2 anim scientist_detachclipboard
+		$guy3 anim scientist_detachclipboard
+		waitframe
+		waitframe // $guy3 wasn't quick enough to put away his clipboard so I gave him another frame.. ??
+		$guy3 thread guytalk
+          $guy3 exec coop_mod/replace.scr::unholster //chrissstrahl - made coop compatible
+		$guy3 exec global/enable_ai.scr
+		$guy3 attackplayer
+		$guy1 exec coop_mod/replace.scr::turnto //chrissstrahl - made coop compatible
+		$guy2 exec coop_mod/replace.scr::turnto //chrissstrahl - made coop compatible
+   	     wait 1.5
+          $guy1 exec coop_mod/replace.scr::unholster //chrissstrahl - made coop compatible
+          $guy2 exec coop_mod/replace.scr::unholster //chrissstrahl - made coop compatible 
+		$guy1 exec global/enable_ai.scr
+		$guy2 exec global/enable_ai.scr
+		waitframe
+     	$guy1 attackplayer
+     	$guy2 attackplayer
+
+		wait 30
+		if(isalive $guy1 && level.skillz != "0")
+			$guy1 accuracy 100
+		if(isalive $guy2 && level.skillz != "0")
+			$guy2 accuracy 200
+		if(isalive $guy3 && level.skillz != "0")
+			$guy3 accuracy 300
+///	  	$guy3 say den_m2l2_232f //guy3 is using guy1's voice
+  //   	$guy3 waittill saydone
+//     	$guy3 say den_m2l2_233f
+//     	$guy3 waittill saydone
+
+   	}
+end  
+guytalk:
+	if(isalive self)
+	{
+		self idlesay den_m2l2_232f
+		self waittill saydone
+	}
+	if(isalive self)
+	{
+		self idlesay den_m2l2_233f
+		self waittill saydone	
+	}
+	$guy2 idlesay den_m2l2_234h 
+	$guy2 waittill saydone
+	$guy1 idlesay den_m2l2_235q
+	$guy1 waittill saydone
+	$guy2 idlesay den_m2l2_236b
+	$guy2 waittill saydone
+end
+/*
+den_m2l2_232f "He has a gun!" maps "m dm obj"
+den_m2l2_233f "He's a spy!" maps "m dm obj"
+den_m2l2_234h "Stop him!" maps "m dm obj"
+den_m2l2_235f "The prototype!" maps "m dm obj"
+den_m2l2_236h "No!" maps "m dm obj"
+den_m2l2_237r "Sir, are you alright? Can I get you anything?" maps "m dm obj"
+den_m2l2_238r "What's going on?" maps "m dm obj"
+den_m2l2_239r "A gun!" maps "m dm obj"
+den_m2l2_240p "Sabotage!" maps "m dm obj"
+*/
+
+objective3:
+	waitthread global/objectives.scr::add_objectives 3 3 "Enter the 2nd U-boat." $endlevel.origin
+end
+
+scientistidle:
+	thread startwallscience $guy1 $guy2 $wall1 $wall2 $wall1look $wall2look
+	$guy3 anim scientist_attachclipboard
+	waitframe
+	$guy3 thread standattable $table
+end
+
+//=========================================================================
+playalarmsound:{
+//=========================================================================
+	//chrissstrahl - fixme
+	while(1){
+		while(level.alarm == 1){
+			wait 85
+			//$player playsound den_m2l2_258b//chrissstrahl
+			exec coop_mod/replace.scr::playsound den_m2l2_258b //chrissstrahl - coop
+   			for(local.i = 1;local.i <= $alarm_sound.size;local.i++){
+				//if((vector_length ($player.origin - $alarm_sound[local.i].origin) < 1024)){ //chrissstrahl
+				if( waitexec coop_mod/replace.scr::withinDistanceOf $alarm_sound[local.i] 1024 ){ //chrissstrahl - coop
+					$alarm_sound[local.i] playsound den_m2l2_258p
+				}
+			}
+		}
+		wait 1
+	}
+}end
+
+//=========================================================================
+intercomsoundoff local.sound:{
+//=========================================================================
+	for(local.i = 1;local.i <= $alarm_sound.size;local.i++){
+		//if((vector_length ($player.origin - $alarm_sound[local.i].origin) < 1024)){ //chrissstrahl
+		if( waitexec coop_mod/replace.scr::withinDistanceOf $alarm_sound[local.i] 1024 ){ //chrissstrahl - coop
+			$alarm_sound[local.i] playsound local.sound					
+		}
+	}
+}end
+
+intercomsoundcycle:
+	wait 3
+	level.peopletalking = 1
+	if(level.alarm != 1){
+		waitthread waitforpeopletotalk
+		thread intercomsoundoff den_m2l2_253p
+//		$player playsound den_m2l2_253b
+		wait 50
+	}
+	else{
+		wait 50
+	}
+	
+	if(level.alarm != 1){
+		waitthread waitforpeopletotalk
+		thread intercomsoundoff den_m2l2_254p
+//		$player playsound den_m2l2_254b
+		wait 50
+	}
+	else{
+		wait 50
+	}
+	
+	if(level.alarm != 1){
+		waitthread waitforpeopletotalk
+		thread intercomsoundoff den_m2l2_255p
+//		$player playsound den_m2l2_255b
+		wait 50
+	}
+	else{
+		wait 50
+	}
+	
+	if(level.alarm != 1){
+		waitthread waitforpeopletotalk
+		thread intercomsoundoff den_m2l2_256p
+//		$player playsound den_m2l2_256b
+		wait 50
+	}
+	else{
+		wait 50
+	}
+	
+	if(level.alarm != 1){	
+		waitthread waitforpeopletotalk
+		thread intercomsoundoff den_m2l2_257p
+//		$player playsound den_m2l2_257b
+		wait 50
+	}
+	else{
+		wait 50
+	}
+end
+
+waitforpeopletotalk:
+	wait 1
+	if(level.peopletalking == 1)
+		while(level.peopletalking == 1)
+			wait 2
+end
+
+endmission:
+	$endlevel waittill trigger
+	thread objective3
+	exec global/missioncomplete.scr m2l2b 1
+end
+
+guygo local.spot local.lookspot:
+	self.avoidplayer = 0
+	self exec global/walkto.scr local.spot
+	self waittill movedone
+	self exec global/turnto.scr local.lookspot
+end
+
+guygonolook:
+	self exec global/walkto.scr local.spot
+	self waittill movedone	
+end
+
+
+likeynorway:
+	level.guythatlikesnorway type_disguise "none"
+	level.guythathatesnorway type_disguise "none"
+	$suit remove
+	$papers1 remove
+	iprintlnbold "Be prepared to show your papers when asked."
+	
+	if(level.gametype == 0){//chrissstrahl - made coop compatible
+		local.key = getboundkey1 "toggleitem"
+		iprintlnbold_noloc (loc_convert_string "Press the ( ") (loc_convert_string local.key) (loc_convert_string " ) key to show your papers.")	
+	}
+	
+	parm.other playsound pickup_papers	//chrissstrahl - made coop compatible
+	parm.other playsound pickup_uniform	//chrissstrahl - made coop compatible
+	
+	thread objective1
+	waitthread global/items.scr::add_item "papers_level1"
+	waitthread global/items.scr::add_item "uniform"
+	$likeynorwaydoor unlock
+	wait .2
+	$likeynorwaydoor open level.guythathatesnorway
+	wait 1.5
+	level.guythathatesnorway thread guygo guythathatesnorwayspot1 level.guythatlikesnorway
+	level.guythatlikesnorway thread guygo guythatlikesnorwayspot1 level.guythathatesnorway
+	level.peopletalking = 0
+	waitthread likeynorwaytalk level.guythathatesnorway den_M2L2_205q
+	waitthread likeynorwaytalk level.guythatlikesnorway den_m2l2_206r
+	waitthread likeynorwaytalk level.guythathatesnorway den_m2l2_207q
+	waitthread likeynorwaytalk level.guythatlikesnorway den_m2l2_208r
+	waitthread likeynorwaytalk level.guythathatesnorway den_m2l2_209q
+	waitthread likeynorwaytalk level.guythatlikesnorway den_m2l2_210r
+	level.guythatlikesnorway type_disguise "salute"
+	level.guythathatesnorway type_disguise "salute"
+	level.peopletalking = 0
+	level.guythatlikesnorway exec global/walkto.scr $guard1patrol1
+	level.guythathatesnorway exec global/walkto.scr $guard2patrol2
+	$suckyfatty hearing 1024
+end
+
+likeynorwaytalk local.talker local.word:
+	if((isalive local.talker) && local.talker.thinkstate != "attack")
+	{
+		local.talker say local.word
+		local.talker waittill saydone
+	}
+end
+
+forceturn local.turn:
+	self exec global/disable_ai.scr
+	self exec global/stand.scr
+	self exec global/turnto.scr local.turn
+	wait .5
+	self exec global/enable_ai.scr
+end
+
+norgirlsinpos:
+	$lockednaxos unlock
+	$norgirlstrig triggerable
+	$lockednaxos open level.jokey
+	waitframe
+	level.stupid exec global/runto.scr $stupidspot2
+	level.jokey exec global/runto.scr $jokeyspot2
+//	level.stupid.origin = $stupidspot2.origin
+//	level.jokey.origin = $jokeyspot2.origin	
+end
+
+norgirls:
+	$norgirlstrig waittill trigger
+	if(level.alarm != 1)
+	{
+		wait 1.5
+		if(isalive level.jokey)
+		{
+			if(isalive level.stupid)
+			{
+				level.peopletalking = 1
+				level.stupid thread guygo stupidspot1 jokeyspot1
+				level.jokey thread guygo jokeyspot1 stupidspot1
+//				level.jokey thread chasetalk level.stupid jokeyspot1
+				level.stupid say den_m2l2_211h
+				level.stupid waittill saydone
+				level.jokey say den_m2l2_212p
+				level.jokey waittill saydone
+				level.stupid say den_m2l2_213h
+				level.stupid waittill saydone
+				level.jokey say den_m2l2_214p
+				level.jokey waittill saydone
+				level.stupid say den_m2l2_215h
+				level.stupid waittill saydone
+				level.jokey say den_m2l2_216p
+				level.jokey waittill saydone
+				level.stupid say den_m2l2_217h
+				level.stupid waittill saydone
+				level.jokey say den_m2l2_218p
+				level.jokey waittill saydone
+				level.stupid say den_m2l2_219h
+				level.stupid waittill saydone
+				level.jokey say den_m2l2_220p 
+				level.jokey waittill saydone
+				level.peopletalking = 0
+			}
+		}
+	}
+end
+
+chasetalk local.guytochase local.realdest:
+	self.movedoneradius = 128
+	while((isalive local.guytochase) && (isalive self))
+	{
+		if((vector_length (self.origin - local.guytochase.origin) < 256))
+		{
+//			println "catching up"
+			self exec global/runto.scr local.guytochase
+			self waittill movedone
+			self exec global/stand.scr
+			waitframe
+			self exec global/walkto.scr local.realdest
+		}
+	wait 1
+	}
+end
+
+whattheydoin:
+	$whattheydointrig waittill trigger
+	if!(isalive level.whatsthesub)
+		end
+	if!(isalive level.hushyhushy)
+		end
+	level.whatsthesub type_disguise "none"
+	level.hushyhushy type_disguise "none"
+	level.whatsthesub thread forceturn level.hushyhushy
+	level.hushyhushy thread forceturn level.whatsthesub
+	wait .5
+	level.peopletalking = 1
+	waitthread whatsuptalk level.whatsthesub level.hushyhushy den_m2l2_221f
+	waitthread whatsuptalk level.hushyhushy level.whatsthesub den_m2l2_212b
+	waitthread whatsuptalk level.whatsthesub level.hushyhushy den_m2l2_223f
+     waitthread whatsuptalk level.hushyhushy level.whatsthesub den_m2l2_224b
+	waitthread whatsuptalk level.whatsthesub level.hushyhushy den_m2l2_225f
+     waitthread whatsuptalk level.hushyhushy level.whatsthesub den_m2l2_226b 
+//			level.whatsthesub say den_m2l2_221f
+//			level.whatsthesub waittill saydone
+//			level.hushyhushy say den_m2l2_212b
+//			level.hushyhushy waittill saydone
+//			level.whatsthesub say den_m2l2_223f
+//			level.whatsthesub waittill saydone
+//			level.hushyhushy say den_m2l2_224b
+//			level.hushyhushy waittill saydone
+//			level.whatsthesub say den_m2l2_225f
+//			level.whatsthesub waittill saydone
+//			level.hushyhushy say den_m2l2_226b 
+//			level.hushyhushy waittill saydone
+	level.peopletalking = 0
+	wait 2
+	if(isalive level.whatsthesube)
+		level.whatsthesub type_disguise "salute"
+	if(isalive level.hushyhushy)
+		level.hushyhushy type_disguise "salute"
+end
+whatsuptalk local.talker local.listener local.word:
+	if!(isalive local.talker)
+		end
+	if!(isalive local.listener)
+		end
+//	local.listener	anim marine_bord
+	local.talker say local.word
+	local.talker waittill saydone
+	local.talker anim marine_bored
+end
+
+suspiciousscientists:
+	$sciencetrig waittill trigger
+	level.scienceinterupt = 1
+	wait 1
+	$guy3 thread sciencetalk
+end
+
+///////////////////////////////////
+//// Scientist sequence ///////////
+///////////////////////////////////
+
+sciencetalk:
+	if(level.alarm == 1)
+	{
+		self attackplayer
+		end
+	}
+	self exec global/stand.scr
+	waitframe
+	self exec global/stand.scr
+	wait 1
+	local.player = exec coop_mod/replace.scr::player_closestTo self	//chrissstrahl - made coop compatible
+	self lookat local.player
+	self thread guygo $whatareyou local.player
+	self idlesay den_m2l2_227f
+	self waittill saydone
+	if (level.scienceinterupt == 2)
+		end
+	self idlesay den_m2l2_228f
+	self waittill saydone
+	if (level.scienceinterupt == 2)
+		end
+	self idlesay den_m2l2_229f
+	self waittill saydone
+	if (level.scienceinterupt == 2)
+		end
+	self idlesay den_m2l2_230f
+	self waittill saydone
+	if (level.scienceinterupt == 2)
+		end
+	self idlesay den_m2l2_231f
+	self waittill saydone
+	if (level.scienceinterupt == 2)
+	end
+	level.scienceinterupt = 0
+	wait 2
+	self thread standattable $table
+end
+
+sentry2accept:
+	$sentry2trigger nottriggerable
+end
+
+sentry1trigdisable:
+	$sentry1trig nottriggerable
+end
+
+sentry1alarm:
+	$sentry1trig waittill trigger
+	if (isalive level.goatsbutt)
+	{ 
+		level.goatsbutt say den_alarm_01c
+		level.goatsbutt waittill saydone
+		level.goatsbutt attackplayer
+	}
+end
+
+moveaflak:
+	$movetheflak waittill trigger
+	thread cometolife
+	if(level.alarm != 1)
+	exec global/autosave.scr 1
+	
+end
+
+cometolife:
+	exec coop_mod/replace.scr::tmstart "sound/music/mus_17b_mystery.mp3" //chrissstrahl - made coop compatible
+//	thread pushthecart
+	$hangingflak anim "idle"
+	$welderguy1 thread welding
+	$welderguy2 thread welding
+	thread hammerguy1
+	thread crateguysgo
+	thread cranego
+	thread officer1go
+	thread wrenchguys
+end
+
+noattack:
+	if(isalive self)
+		self exec global/disable_ai.scr
+	wait 6
+	if(isalive self)
+		self exec global/enable_ai.scr
+end
+wrenchguys:
+//	$wrenchman1.isinplace = 0
+	thread wrenchman1
+end
+
+wrenchman1:
+	local.wrenchspot = spawn script_origin
+	local.wrenchspot.origin = ($wrench1spot1.origin + ( -18 0 0)) 
+	while(isalive $wrenchman1)
+	{
+		$wrenchman1 waitthread global/wrenching.scr::wrench local.wrenchspot wrench1look1
+
+//		$wrenchman1 waitthread global/hammer.scr::hammer wrench1spot1 wrench1look1
+	}
+end
+
+officer1go:
+	wait 10
+///	$officer1 waitthread guygonolook officer1spot1
+	level.officer1 forceactivate
+	level.officer1 exec global/walkto.scr $officer1spot1
+	level.officer1 waittill movedone
+	$officerdoor1 open level.officer1
+
+	wait .2
+	level.officer1 exec global/walkto.scr $officer1spot2
+	level.officer1 waittill movedone
+	level.officer1 exec global/walkto.scr $officer1spot3
+	level.officer1 waittill movedone
+	local.lookent = spawn script_origin
+	local.lookent.origin = ( -3635 -6845 -319 )
+	level.officer1 exec global/walkto.scr $officer1spot4
+	level.officer1 waittill movedone
+	level.officer1 turnto local.lookent
+
+
+end
+
+cranego:
+	$crane loopsound crane_run
+	$crane speed 40
+	$crane movenorth 3500
+	$crane waitmove
+	$crane stopsound
+end
+
+////////////////////////////////////////////////////////////
+//////////***********************///////////////////////////
+//////////**SLEDGHAMMER GUYS!!!**///////////////////////////
+//////////***********************///////////////////////////
+////////////////////////////////////////////////////////////
+
+hammerguy1:
+	$sledgehammerguy thread sledgehammering
+
+end
+
+sledgehammering:
+	self gun "walter p38"
+	self exec coop_mod/replace.scr::holster //chrissstrahl - made coop compatible
+	self type_attack "alarm"
+	self anim sledgehammer_init
+	self alarmthread maps/m2l2a.scr::cower
+	self.health = 1
+	wait 5
+	while(!self.stophammering)
+	{
+		self anim sledge_hammer_action
+		if(self.stophammering)
+			end
+		wait (randomint(10))
+		self anim sledge_hammer_idle
+		self waittill animdone
+	}
+end
+
+cower:
+	self.stophammering = 1
+	self exec global/disable_ai.scr
+	self waittill animdone
+	self anim sledge_hammer_stop
+	self waittill animdone
+	self exec coop_mod/replace.scr::unholster //chrissstrahl - made coop compatible
+	self exec global/enable_ai.scr
+	self attackplayer
+end
+
+////////////////////////////////////////////////////////////
+//////////**********************////////////////////////////
+//////////**WELDING GUYS!!!*****////////////////////////////
+//////////**********************////////////////////////////
+////////////////////////////////////////////////////////////
+
+welding:
+	self forceactivate
+	self thread welderdeath
+	self.health = 1
+	self exec global/setdeathanim.scr "welding_death"
+	self anim welding_init
+	self type_attack "alarm"
+	self alarmthread maps/m2l2a.scr::weldinginterupt
+	wait 5
+	while (level.alarm == 0)
+	{
+		self anim welding_start
+		self waittill animdone
+		self anim welding_action
+		wait (randomint(10) + 5)
+		self anim welding_end
+		self waittill animdone
+		self anim welding_idle
+		wait (randomint(10) + 10)
+	}
+	self thread weldinginterupt
+end
+
+weldinginterupt:
+	if(self.inturpupted == 1)
+		end
+	self thread welderbreak
+	self exec global/disable_ai.scr
+	self.interupted = 1
+	wait .1
+	self anim welding_stop
+	self waittill animdone
+	wait .1
+	self gun "walter p38"
+	self exec global/enable_ai.scr
+end
+
+welderbreak:
+	if(self.welderbroke != 1)
+	{ 	
+     	self.welderbroke = 1
+     	spawn script_model model "models/miscobj/welding_tank.tik" targetname ((self.targetname) + "big1")
+     	$((self.targetname) + "big1") notsolid
+     	$((self.targetname) + "big1").origin = self.origin
+     	$((self.targetname) + "big1").angles = self.angles
+     	$((self.targetname) + "big1") anim tank_death 
+	}
+end
+
+welderdeath:
+	if(self.ded != 1)
+	{
+		self waittill death
+		self thread welderbreak
+	}	
+	self.ded = 1
+end
+
+////////////////////////////////////////////
+//////////**********************////////////
+//////////****CRATE GUYS!!!*****////////////
+//////////**********************////////////
+////////////////////////////////////////////
+
+crateguysgo:
+	thread crateguy1go
+	thread crateguy2go
+end
+
+crateguy1go:
+	$crateguy1 waitthread global/movecrate.scr::movecrate crate1_start crate1_end gimmeagun
+	while(isalive $crateguy1)
+		$crateguy1 waitthread global/wrenching.scr::wrench wrench2spot1 wrench2spot2
+end
+
+crateguy2go:
+	$crateguy2 waitthread global/movecrate.scr::movecrate crate2_start crate2_end gimmeagun
+	$crateguy2 waitthread global/movecrate.scr::movecrate crate3_start crate3_end gimmeagun
+	while(isalive $crateguy2)
+		$crateguy2 waitthread global/wrenching.scr::wrench wrench2spot2 wrench2spot1
+end
+
+gimmeagun:
+	self gun "Walter p38"
+end
+
+////////////////////////////////////////////
+//////////**********************////////////
+//////////****TABLE GUYS!!!*****////////////
+//////////**********************////////////
+////////////////////////////////////////////
+
+standattable local.table:
+		self thread sciwalkto local.table
+end
+
+//-----------sciwalkto------------
+
+sciwalkto local.table:
+	self forceactivate
+	self anim scientist_attachclipboard
+	waitframe
+	self type_attack "alarm"
+	self alarmthread ohnothenaxos1
+	self exec global/walkto.scr local.table
+	self waittill movedone
+	self exec global/turnto.scr $tablelook
+	self thread depressed
+end
+
+//-----------depressed------------
+
+depressed:
+	if(level.scienceinterupt == 0)
+	{
+		self anim "scientist_standtable_straight"
+		if (level.scienceinterupt != 0)
+			end
+		local.randnum = (randomint(4) + 6)
+		for(local.i = 1;local.i < local.randnum; local.i++)
+		{
+			if (level.scienceinterupt != 0)
+			end
+			wait .5
+		}
+		wait local.randnum
+		self thread tablesciencepickthread
+	}	
+end
+
+//-----------idle1------------
+
+idle1:
+
+	if(level.scienceinterupt == 0)
+	{
+		self anim "scientist_standtable_lean01"
+		if (level.scienceinterupt != 0)
+			end
+		self waittill animdone
+		self thread tablesciencepickthread
+	}
+end
+
+//-----------idle2------------
+
+idle2:
+
+	if(level.scienceinterupt == 0)
+	{	
+		self anim "scientist_standtable_lean02"
+		if (level.scienceinterupt != 0)
+		end	
+		self waittill animdone
+		self thread tablesciencepickthread
+	}
+end
+
+//-----------idle3------------
+
+idle3:
+
+	if(level.scienceinterupt == 0)
+	{
+		self anim "scientist_standtable_lean03"
+		if (level.scienceinterupt != 0)
+		end	
+		self waittill animdone
+		self thread tablesciencepickthread
+	}
+end
+
+
+//-----------idletodepressed------------
+
+idletodepressed:
+
+	if(level.scienceinterupt == 0)
+	{
+		if (level.scienceinterupt != 0)
+			end
+		self anim "scientist_standtable_leantostraight"
+		if (level.scienceinterupt != 0)
+			end
+		self waittill animdone
+		self thread depressed
+	}
+end
+
+tablesciencepickthread:
+	local.randnum = randomint (100)	
+	if		(local.randnum < 30)	self thread idle1
+	else if	(local.randnum < 60)	self thread idle2
+	else if	(local.randnum < 90)	self thread idle3
+	else	
+					self thread idletodepressed
+end
+
+////////////////////////////////////////////////////////////
+//////////**********************////////////////////////////  cartpushers are cut
+//////////****CART PUSHERS!!!***////////////////////////////
+//////////**********************////////////////////////////
+////////////////////////////////////////////////////////////
+/*
+pushthecart:
+
+
+	$torpedocart notsolid
+	$cartpusher1 notsolid
+	$cartpusher2 notsolid
+	$cartpusher3 notsolid
+	$cartpusher1 exec global/disable_ai.scr
+	$cartpusher2 exec global/disable_ai.scr
+	$cartpusher3 exec global/disable_ai.scr
+	$torpedo1 notsolid
+	$torpedo2 notsolid
+	thread cartpusher $torpedocart
+
+end
+
+cartpusherguysetup local.object:
+	self bind $torpedocart
+	self anim cart_push
+end
+
+
+cartpusher local.object:
+	wait 5
+	$torpedo1 bind local.object
+	$torpedo2 bind local.object
+	$cartpusher1 thread cartpusherguysetup local.object
+	$cartpusher2 thread cartpusherguysetup local.object
+	$cartpusher3 thread cartpusherguysetup local.object
+	local.object speed 6000
+	local.object moveeast 600
+	local.object waitmove
+	$gate2 thread gateopenforcart
+	local.object speed 70
+	local.object moveeast 1300
+	local.object waitmove
+	$gate2 thread gatecloseforcart
+
+	local.object moveeast 600
+	local.object waitmove
+	$gate3 thread gateopenforcart
+	local.object moveeast 700
+	local.object waitmove
+	$gate3 thread gatecloseforcart
+	local.object moveeast 2700
+	local.object waitmove
+	local.object movenorth 1
+//	thread cartalldone
+end
+gateopenforcart:
+	self movesouth 240
+	self waitmove
+	level.openforcart = 1
+end
+gatecloseforcart:
+	wait .5
+	if(level.openforcart == 1)
+	{
+		self movenorth 240
+		self waitmove
+		level.openforcart = 0
+	}
+	else
+	self thread gatecloseforcart
+end
+cartalldone:
+	$cartpusher1 thread detachfromcart
+	$cartpusher2 thread detachfromcart
+	$cartpusher3 thread detachfromcart
+	$torpedocart solid
+end
+
+detachfromcart:
+	self anim idle
+	self unbind
+	self solid
+	self exec global/enable_ai.scr
+end
+*/
+
+
+///////////////////////////////////////
+////////Wall Science///////////////////
+///////////////////////////////////////
+
+startwallscience local.scientist1 local.scientist2 local.scientist2stand local.scientist1stand local.scientist2look local.scientist1look:
+	spawn trigger_relay targetname "wallsciencecontrol"
+	local.scientist1 forceactivate
+	local.scientist2 forceactivate
+	local.scientist2 anim scientist_attachclipboard
+	waitframe
+	local.scientist1 type_attack "alarm"
+	local.scientist2 type_attack "alarm"
+	local.scientist1 alarmthread ohnothenaxos1
+	local.scientist2 alarmthread ohnothenaxos1
+	local.scientist1 exec global/walkto.scr local.scientist1stand
+	local.scientist1 waittill movedone
+	local.scientist2 exec global/walkto.scr local.scientist2stand
+	local.scientist2 waittill movedone
+	local.scientist1 forceactivate
+	local.scientist2 forceactivate
+	local.scientist1 exec global/turnto.scr local.scientist1look
+	local.scientist2 exec global/turnto.scr local.scientist2look	
+	local.scientist2.origin = (local.scientist2.origin + (8 0 0))
+	wait 2
+	goto walldepressed
+walldepressed:
+	local.scientist1 anim_scripted "scientist_wallchart_depressedtoidle_sci1"
+	local.scientist2 anim_scripted "scientist_wallchart_depressedtoidle_sci2"
+	waitthread animwait local.scientist1 local.scientist2	
+	goto wallchoice
+wallchoice:
+	local.randnum = randomint (100)
+	if		(local.randnum < 30)	goto wallidle1
+	else if	(local.randnum < 60)	goto wallidle2
+	else if	(local.randnum < 90)	goto wallidle3
+	else		goto wallidletodepressed
+	
+wallidle1:
+//	println "wallidle1"
+	local.scientist1 anim_scripted "scientist_wallchart_idle1_sci1"
+	local.scientist2 anim_scripted "scientist_wallchart_idle1_sci2"	
+	waitthread animwait local.scientist1 local.scientist2
+	goto wallchoice
+wallidle2:
+//	println "wallidle2"
+	local.scientist1 anim_scripted "scientist_wallchart_idle2_sci1"
+	local.scientist2 anim_scripted "scientist_wallchart_idle2_sci2"	
+	waitthread animwait local.scientist1 local.scientist2
+	goto wallchoice
+wallidle3:
+//	println "wallidle3"
+	local.scientist1 anim_scripted "scientist_wallchart_idle3_sci1"
+	local.scientist2 anim_scripted "scientist_wallchart_idle3_sci2"	
+	waitthread animwait local.scientist1 local.scientist2
+	goto wallchoice
+wallidletodepressed:
+//	println "wallidletodepressed"
+	local.scientist1 anim_scripted "scientist_wallchart_idletodepressed_sci1"
+	local.scientist2 anim_scripted "scientist_wallchart_idletodepressed_sci2"		
+	waitthread animwait local.scientist1 local.scientist2
+	goto walldepressed
+end
+
+animwait local.scientist1 local.scientist2:
+	level.wallscifinishcount = 0
+	local.scientist1 thread animguy1wait
+	local.scientist2 thread animguy2wait
+	$wallsciencecontrol waittill trigger
+end
+
+animguy1wait:
+	self waittill animdone
+	self anim "scientist_wallchart_idle2_sci1"
+	level.wallscifinishcount++
+	thread animcount
+end
+
+animguy2wait:
+	self waittill animdone
+	self anim "scientist_wallchart_idle2_sci2"	
+	level.wallscifinishcount++
+	thread animcount
+end
+
+animcount:
+	if(level.wallscifinishcount == 2)
+	trigger $wallsciencecontrol
+end
+
+scialarm:
+	self exec global/enable_ai.scr
+	self exec coop_mod/replace.scr::unholster //chrissstrahl - made coop compatible
+	self attackplayer
+end
+
+/////////////////////////////////////
+//////// carry stuff over to m2l2b///
+/////////////////////////////////////
+
+sledgehammercarry:
+	game.m2l2sledgedead = 0
+	self waittill death
+	game.m2l2sledgedead = 1	
+end
+
+wrenchycarry:
+	game.m2l2wrenchdead = 0
+	self waittill death
+	game.m2l2wrenchdead = 1	
+end
+
+weldercarry:
+	game.m2l2welderdead = 0
+	self waittill death
+	game.m2l2welderdead = 1	
+end
+
+//////////////////////////////
+/// supersecret Nazi tricks //
+//////////////////////////////
+
+specialmove1:
+	$specialmove waittill trigger
+	wait 1
+	level.whatsthesub exec global/disable_ai.scr
+	level.hushyhushy exec global/disable_ai.scr
+	level.whatsthesub anim specialmove
+	level.whatsthesub waittill animdone
+	level.hushyhushy anim specialmove
+	level.hushyhushy waittill animdone
+	level.whatsthesub exec global/enable_ai.scr
+	level.hushyhushy exec global/enable_ai.scr
+	wait 1
+	goto specialmove1
+end
+
+doorlocked:
+	self playsound door_metal_locked
+end
+
+//=========================================================================
+coop_playerJustSpawned1:{
+//=========================================================================
+	//while($player[1].health > 0){
+		//$player[1] german
+		//waitframe
+	//}
+}end
+

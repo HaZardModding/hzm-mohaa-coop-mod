@@ -1,0 +1,595 @@
+//=========================================================================
+InitCrab:
+//=========================================================================
+{
+	level.compassPointAtTank = 0
+	level.crabdead = 0
+
+	level.barricade2Trigger = waitthread global/FindTrigger.scr::FindTrigger "barricade2"
+	level.barricade2Trigger nottriggerable
+
+	$bohler1.collisionent = $bohler_collide
+	$bohler1_turret0.collisionent = $bohler_cannon_collide
+
+	$bohler2.collisionent = $bohler_collide
+	$bohler2_turret0.collisionent = $bohler_cannon_collide
+	
+	//get the bohlers in the canyon ready to go
+	thread initBohlers
+
+	//	$escortparade1a.dontdropweapons = 1
+	//	$escortparade1b.dontdropweapons = 1
+	//	$escortparade2.dontdropweapons = 1
+
+	thread CliffWallBazookaGuys
+	$escortspawntrigger thread TriggerPairedSpawner
+}end
+
+// Vehicle triggers are paired with each enemy spawner and parade trigger so either the player or a vehicle can set them off
+//=========================================================================
+TriggerPairedSpawner:
+//=========================================================================
+{
+	self waittill trigger
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger self.target
+
+	if (local.trigger){
+		trigger local.trigger
+	}
+
+	self remove
+}end
+	
+//=========================================================================
+initBohlers:
+//=========================================================================
+{
+	level.bohlerDelay = 3
+	//println "DEBUG: initializing bohlers" //chrissstrahl - not needed
+	local.trigger1 = waitthread global/FindTrigger.scr::FindTrigger "spawnbohler1"
+
+//chrissstrahl - not needed
+/*
+	if (local.trigger1 == NULL){
+		println "DEBUG: BOHLER TRIGGER NOT FOUND"
+	}
+	else{
+		println ("DEBUG: bohler triggername = " + local.trigger1.find_name)
+	}
+*/
+	local.trigger1 waittill trigger
+	//	iprintln ("DEBUG: triggered Bohler trigger")
+
+	waitframe
+
+	$bohler1 thread maps/e1l2/bohler.scr::initGun $abandonbohler1 $bohler1_turret0 $bohlerguy1 $bohlerguy2 $bohler1operate	
+	local.trigger2 = waitthread global/FindTrigger.scr::FindTrigger "spawnbohler2"
+	local.trigger2 waittill trigger
+	waitframe
+
+	$bohler2 thread maps/e1l2/bohler.scr::initGun $abandonbohler2 $bohler2_turret0 $bohlerguy3 $bohlerguy4 $bohler2operate
+}end
+
+//=========================================================================
+ReturnToCrab:
+//=========================================================================
+{
+	if (level.hackGuardCrab == 1){ //chrissstrahl - this is used by developers, we can leave this
+		$tank2.origin 	= $tank2escortpath.origin
+		$tank3.origin 	= $tank3escortpath.origin
+		$jeep.origin 	= $tank4escortpath.origin
+		$player.origin 	= $jeep.origin + (0 0 150)
+		end
+	}
+
+	// Wait till the player gets near the commander in the jeep (after the jeep has stopped)
+	local.player = waitexec coop_mod/replace.scr::player_closestTo $commander NIL
+	
+	//chrissstrahl - wait for player in coop
+	while (local.player == NULL || $jeep.stopped == 0 || vector_length($commander.origin-local.player.origin) > 650){
+		waitframe
+	}
+
+	$commander exec coop_mod/replace.scr::lookat //chrissstrahl
+	$commander upperanim A_12_FuchesTalk05
+	$commander waittill animdone
+	//iprintln "Baker, I want you to stay ahead of the tanks, and use your sniper rifle to take out any ambushes before they have a chance to attack the minesweeper."	
+	wait 4
+
+	$commander lookat NULL
+	exec global/autosave.scr level.autosave // "Escort the tanks"
+	level.autosave++
+}end
+
+//=========================================================================
+ObjectiveGuardCrab:
+//=========================================================================
+{
+	if (level.hackGuardCrab == 1){
+		$tank2.origin  = $tankexitpath.origin
+		$tank3.origin  = $tank2.origin + (0 300 0)
+		$jeep.origin   = $tank2.origin + (0 600 0)
+		
+//chrissstrahl - make coop compatible
+		local.tankPlayerPos = $tank2.origin + (0 900 0)
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player =  $player[local.i]
+			if(local.player == NULL){
+				continue
+			}
+			local.player.origin = local.tankPlayerPos
+			local.player notsolid
+			local.player nodamage
+			if(level.gametype != 0){
+				local.player hide
+			}
+		}
+
+		level.crabdead = 1
+		$tank2 hide
+		
+		level.bustedtank = spawn script_model model vehicles/US_V_Sherman_BustedTread.tik
+		level.bustedtank.origin = $tank2.origin
+		level.bustedtank.angles = $tank2.angles
+		level.bustedtank notsolid
+		end
+	}
+	
+	level.compassPointAtTank = 1
+
+	//hackery
+	thread lookForTheTank $escortparade1a "escortparadetrigger1a" "killescortparade1a" "escortparade1a_paradeguy"
+	thread lookForTheTank $escortparade1b "escortparadetrigger1b" "killescortparade1b" "escortparade1b_paradeguy"
+	thread lookForTheTank $escortparade2 "escortparadetrigger2" "killescortparade2" "escortparade2_paradeguy"
+	thread lookForTheTank $escortparade2 "escortparadetrigger2" "killescortparade2" "escortparade2_paradeguy"
+	
+	thread stopParade1
+	thread stopParade2
+	
+	$tank2 takedamage
+	$tank2 drive $tank2escortpath 5 200 256 256
+	wait 8
+
+	$tank3 drive $tank3escortpath 5 200 256 256
+	wait 8
+
+	$jeep nodamage
+	$jeep.speed 			= 50
+	level.infantryfollow 	= $jeep
+	$jeep.stopped 			= 0
+	
+	$jeep thread maps/e1l2/Intro.scr::InfantryFollowingBehind $tank4escortpath $mrinvisible2
+	//$jeep thread maps/e1l2/Intro.scr::InfantryFollowingTank $infantry1 $tank4escortpath $mrinvisible2
+	$jeep drive $tank4escortpath $jeep.speed 200 256 256
+	thread maps/e1l2/Intro.scr::jeepGo
+
+	//$jeep anim start_wheels
+	$jeep anim jeep_idle_drive
+	$jeep thread DontHitGuyInFront $tank3
+	//thread JeepFollowTank local.jeepspeed
+
+	//$tank2 drive $escortpath 10 200 256 256
+	$tank2.mineclearing anim start
+	$tank2.mineclearing waittill animdone
+	$tank2.minesweeperOn = 1
+	$tank2.mineclearing anim spin
+	wait 3
+
+	thread destroyBarricade2
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "tankbusttrigger"
+	local.trigger waittill trigger
+	wait 4
+
+	//	println "DEBUG:  getting tag"
+	local.tread = $tank2 gettagposition "driver_enter"
+	thread spawn_fx local.tread models/emitters/explosion_mine.tik
+	wait .2
+
+	thread spawn_fx local.tread models/emitters/explosion_tank.tik
+	level.crabdead = 1
+	$tank2 fullstop
+	$tank2.mineclearing detach
+	waitframe
+
+	$tank2.mineclearing.angles = $tank2.angles
+	//$tank2 waitthread StopBlowingUpMines
+	$tank2.mineclearing anim stop
+	$tank2.minesweeperOn = 0
+	$tank2 hide
+
+	level.bustedtank = spawn script_model model vehicles/US_V_Sherman_BustedTread.tik
+	level.bustedtank.origin = $tank2.origin
+	level.bustedtank.angles = $tank2.angles
+	level.bustedtank notsolid
+	level.compassPointAtTank = 0
+	wait 0.8
+
+	$tank3 fullstop
+	$tank2 disconnect_paths
+	$tank3 disconnect_paths
+	$jeep fullstop
+	$jeep anim stop_wheels
+	$jeep.stopped = 1
+	$jeep anim jeep_idle_still
+	$jeep disconnect_paths
+	$tank2 connect_paths
+	waitthread CleanupCrab
+}end
+
+//=========================================================================
+spawn_fx local.tread local.fx:
+//=========================================================================
+{
+	local.temp = spawn script_model model local.fx
+	local.temp notsolid
+	local.temp.origin = local.tread
+	local.temp anim start
+	local.temp notsolid
+	wait 5
+
+	local.temp remove
+}end
+
+// self thread DontHitGuyInFront $tank2
+//=========================================================================
+DontHitGuyInFront local.guyinfront:
+//=========================================================================
+{
+	local.dist = 1000
+	while(level.crabdead == 0){
+		local.dist = vector_length(self.origin - $(local.guyinfront).origin)
+		
+		if(local.dist < 400){
+			if(self.speed > 1){
+			//iprintln ("Slowdown: " + local.dist)
+			self.speed = self.speed - 1.0
+			self modifydrive self.speed 100 256
+			}
+		}
+		else if(local.dist > 400){
+			if(self.speed < 200){
+				//iprintln ("SpeedUp: " + local.dist)
+				self.speed = self.speed + 1.0
+				self modifydrive self.speed 100 256
+			}
+		}
+		waitframe
+	}
+}end
+
+//=========================================================================
+destroyBarricade2:
+//=========================================================================
+{
+
+	$shootbarricade2 waittill trigger
+	$shootbarricade2 delete
+	
+	level.barricade2Trigger triggerable
+	$tank2.shootingAtSomething = 1
+	wait .3
+	
+	$tank2.gun setAimTarget level.barricade2Trigger
+	$tank2.gun waittill ontarget
+	$tank2.gun anim fire
+	waitframe
+
+	$tank2.gun anim idle
+	trigger level.barricade2Trigger
+	wait 1
+
+	$tank2.shootingAtSomething = 0
+}end
+
+//=========================================================================
+JeepFollowTank local.startjeepspeed:
+//=========================================================================
+{
+	local.jeepspeed = local.startjeepspeed
+
+	while (level.crabdead == 0){
+		local.jeepdist = vector_length($jeep.origin - $tank3.origin)
+
+		if (local.jeepdist > 800){
+			local.jeepspeed += 10
+		}
+		else if (local.jeepdist > 500){
+		}
+		else if (local.jeepdist > 300){
+			local.jeepspeed -= 5
+		}
+		else{
+			local.jeepspeed -= 10
+		}
+		$jeep modifydrive local.jeepspeed 200 256 256
+		wait 1
+	}
+}end
+
+//=========================================================================
+BazookaGuyGo:
+//=========================================================================
+{
+	wait 5
+	$tankbazookaguy ai_on
+	$tankbazookaguy show
+	$tankbazookaguy nodamage
+	$tankbazookaguy exec global/disable_ai.scr
+	$tankbazookaguy.accuracy = 100
+	$tankbazookaguy runto $tankbazookaguyrunto
+	wait 3
+
+	$tankbazookaguy exec global/aimat.scr $tank2
+	$tankbazookaguy setaimtarget $tank2
+	wait 1
+
+	$tankbazookaguy exec global/shoot.scr
+	$tankbazookaguy.accuracy = 20
+	$tankbazookaguy dontdropweapons
+	$tankbazookaguy exec global/enable_ai.scr
+	$tankbazookaguy takedamage
+	wait 1
+}end
+
+//=========================================================================
+CliffWallBazookaGuys:
+//=========================================================================
+{
+	while (1){
+		for (local.i=1;local.i<=$bazookaguy.size;local.i++){
+			if ($bazookaguy[local.i].shootingattank == NIL){
+				$bazookaguy[local.i].dontdropweapons = 1
+				$bazookaguy[local.i].dontdrophealth  = 1
+				$bazookaguy[local.i].shootingattank  = 1
+				$bazookaguy[local.i] thread someoneShootAtTheTank
+			}
+		}
+		wait 1
+	}
+}end
+
+//=========================================================================
+lookForTheTank local.dummy local.findnameStart local.findnameStop local.guyname:
+//=========================================================================
+{
+	local.triggerStart = waitthread global/FindTrigger.scr::FindTrigger local.findnameStart
+	local.triggerStop  = waitthread global/FindTrigger.scr::FindTrigger local.findnameStop
+	//chrissstrahl - fix error on missing objcets
+	if( local.triggerStart == NIL || local.triggerStop == NIL || local.dummy == NULL ){ end }
+	
+	local.triggerStart waittill trigger
+	local.dummy.goValue = 1
+	
+	//local.triggerStop thread stopTheMadness local.dummy
+	while (local.dummy.goValue == 1){
+		for (local.i = 1; local.i <= $(local.guyname).size; local.i++)
+
+			if !( $(local.guyname)[local.i].lookingForTank == 1){
+				$(local.guyname)[local.i].dontdropweapons = 1
+				$(local.guyname)[local.i].dontdrophealth  = 1
+				$(local.guyname)[local.i] thread someoneShootAtTheTank
+			}
+		wait 1
+	}
+}end
+
+//=========================================================================
+stopTheMadness local.dummy:
+//=========================================================================
+{
+	self waittill trigger
+	local.dummy.goValue = 0
+}end
+
+//=========================================================================
+someoneShootAtTheTank:
+//=========================================================================
+{
+	self.lookingForTank = 1
+	local.point = spawn script_origin 
+
+	while (self && isAlive self){
+		local.view 	 = self.origin 	 + (0 0 150)
+		local.tank 	 = $tank2.origin + (0 0 150)
+		local.cansee = sighttrace local.view local.tank
+
+		if (local.cansee == 1){
+			self exec global/disable_ai.scr
+			
+			while (self && isAlive self){
+				self upperanim bazooka_reload_e1l2
+				self waittill upperanimdone
+				
+				local.xcoord 	= ( randomint 200 ) - 99
+				local.ycoord 	= ( randomint 200 ) - 99
+				local.zcoord 	= ( randomint 200 ) - 99 
+				local.aimpoint 	= $tank2.origin + (local.xcoord local.ycoord local.zcoord)
+				
+				self turnto local.tank
+				self waittill turndone
+				
+				self exec global/aimat.scr local.aimpoint
+				local.point.origin = local.aimpoint
+				self setaimtarget local.point
+				wait 1.5
+
+				self exec global/shoot.scr
+			}
+		}
+		wait 3
+	}
+	local.point delete
+}end
+
+//=========================================================================
+CleanupCrab:
+//=========================================================================
+{
+	thread global/EntityCleanup.scr::EntityCleanup "bazookaguy" 1000
+}end
+
+//=========================================================================
+SpeedUp:
+//=========================================================================
+{
+	self delete
+	$tank2 modifydrive 13 200 256
+	$tank3 modifydrive 13 200 256
+	$jeep modifydrive 130 200 256
+	$jeep.speed = 130
+}end
+
+//=========================================================================
+SlowDown:
+//=========================================================================
+{
+	self delete
+	$tank2 modifydrive 8 200 256
+	$tank3 modifydrive 8 200 256
+	$jeep modifydrive 80 200 256
+	$jeep.speed = 80
+	//self modifydrive self.speed 100 256
+}end
+
+//=========================================================================
+TankShoot local.triggerer:
+//=========================================================================
+{
+	//to insure that the minesweeping attachment doesn't hit the trigger
+	if (local.triggerer.targetname != "tank2"){
+		end
+	}
+
+	local.triggertarget = waitthread global/FindTrigger.scr::FindTrigger $(self.target).find_name
+	
+	/*
+	local.soundtype = self.explodertype
+	local.soundplayer = self.target
+	self.soundplayer thread exploderPlaySound local.explodertype
+	*/
+	
+	self delete
+		
+	if (local.triggerer.gun == NIL){
+		trigger local.triggertarget
+		end
+	}
+	
+	local.triggerer.aimingAtSomething = 1
+	wait .3
+		
+	local.triggerer.gun setAimTarget local.triggertarget
+	local.triggerer.gun waittill ontarget
+	wait 2.0
+
+	local.triggerer.gun anim fire	
+	waitframe
+
+	local.triggerer.gun anim idle
+	local.triggerer.aimingAtSomething = 0
+	waitframe
+
+	trigger local.triggertarget
+}end
+
+//=========================================================================
+exploderPlaySound local.explodertype:
+//=========================================================================
+{
+	if (local.explodertype == "stone"){
+		self playsound stonecrash
+	}
+	else if (local.explodertype == "rockslide"){
+		local.rand = (randomint 2) + 1
+
+		if (local.rand == 1){
+			self playsound explode_rockslide1
+		}
+		else{
+			self playsound explode_rockslide2
+		}
+	}
+}end
+
+//=========================================================================
+stopParade1:
+//=========================================================================
+{
+	local.exploderTrigger 			= waitthread global/FindTrigger.scr::FindTrigger "escorttanktarget1"
+	local.stopFirstParadeTrigger 	= waitthread global/FindTrigger.scr::FindTrigger "killescortparade1a"
+	local.stopSecondParadeTrigger 	= waitthread global/FindTrigger.scr::FindTrigger "killescortparade1b"
+
+	local.exploderTrigger waittill trigger
+	//	iprintln "HIT THE EXPLODER TRIGGER"
+	
+	trigger local.stopFirstParadeTrigger
+	trigger local.stopSecondParadeTrigger
+
+	for (local.i = 1; local.i <= $escortparade1a_paradeguy.size; local.i++){
+		$escortparade1a_paradeguy[local.i] exec global/bullethit.scr (0 0 250) 500 0 1
+	}
+
+	for (local.i = 1; local.i <= $escortparade1b_paradeguy.size; local.i++){
+		$escortparade1b_paradeguy[local.i] exec global/bullethit.scr (0 0 250) 500 0 1
+	}
+}end
+
+//=========================================================================
+stopParade2:
+//=========================================================================
+{
+	local.exploderTrigger 	= waitthread global/FindTrigger.scr::FindTrigger "escorttanktarget2"
+	local.stopParadeTrigger = waitthread global/FindTrigger.scr::FindTrigger "killescortparade2"
+	local.exploderTrigger waittill trigger
+
+	//	iprintln "HIT THE EXPLODER TRIGGER"
+	trigger local.stopParadeTrigger
+
+	for (local.i = 1; local.i <= $escortparade2_paradeguy.size; local.i++){
+		$escortparade2_paradeguy[local.i] exec global/bullethit.scr (0 0 250) 500 0 1
+	}
+}end
+
+//=========================================================================
+minesweeperDamagePlayer local.damageModel:
+//=========================================================================
+{
+	$minesweeperdamage hide
+	$minesweeperdamage notsolid
+	//iprintln ("DEBUG: location is " + $minesweeperdamage.origin)
+	
+	while (1){
+		while (self.minesweeperOn == 1){
+			//dprintln ("DEBUG: location is " + $minesweeperdamage.origin)
+			
+			//chrissstrahl - make coop compatible
+			for (local.i = 1;local.i <= $player.size;local.i++){
+				local.player =  $player[local.i]
+				if(	level.gametype == 0 || //handle also in sp
+					local.player != NULL &&
+					local.player.health > 0 &&
+					local.player.dmteam != "spectator" &&
+					local.player.flags["coop_isActive"] == 1)
+				{
+					level.coop_player = local.player
+					if (local.damageModel isTouching local.player){
+						//dprintln "OOWWWW"
+						local.player damage local.damageModel 20 local.damageModel (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+					}
+				}
+			}
+			
+			local.vector  = angles_toforward self.angles
+			local.vector  = vector_scale local.vector 265
+			local.vector += ( 0 0 70 )
+			local.damageModel.origin = $tank2.origin + local.vector
+			local.damageModel.angles = $tank2.angles
+			waitframe
+		}
+		
+		while (self != NULL && self.minesweeperOn != 1){
+			waitframe
+		}
+	}
+}end
+

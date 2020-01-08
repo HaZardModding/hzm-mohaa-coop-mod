@@ -1,0 +1,1133 @@
+//=========================================================================
+main:{
+//=========================================================================
+	level.coop_aaMap = 1						//chrissstrahl - let global scripts know this is a AA level
+	level.coopPrevMap = "m2l2c"					//chrissstrahl - set previouse map (for mom voteing)
+	level.coopNextMap = "briefing/briefing3"	//chrissstrahl - set next map (for mom voteing)
+	thread coop_mod/main.scr::main 			//chrissstrahl - start coop mod extensions
+	
+	//chrissstrahl - setup stuff that is needed
+	if(level.gametype != 0){
+		spawn trigger_once targetname coop_updateSpawn1 setthread coop_updateSpawn1 origin (600 5400 -144) //chrissstrahl - spawn trigger where player leaves vent
+		spawn trigger_once targetname coop_updateSpawn2 setthread coop_updateSpawn2 origin ( -726 6023 -200) //chrissstrahl - spawn trigger where player leaves vent
+		spawn trigger_once targetname coop_updateSpawn3 setthread coop_updateSpawn3 origin ( -482 3000 -463) //chrissstrahl - spawn trigger where player leaves vent
+	}
+	
+	$duckcap notsolid
+//	exec global/exploder.scr
+	exec global/loadout.scr maps/m2l3.scr
+level waittill prespawn
+	exec global/ambient.scr m2l3
+	exec global/alarmlight.scr
+
+level waittill spawn
+	level.skillz = getcvar(skill)
+	level.script = maps/m2l3.scr
+	level.trainisleaving = 0
+	level.maxspawn = 0
+	waitthread global/chainspawner.scr::spawners 4
+	$world farplane 10000
+	$world farplane_color ".6 .6 .7"
+
+	waitthread global/objectives.scr::add_objectives 1 2 "Exfiltrate the base." $obj1.origin
+	waitthread global/objectives.scr::add_objectives 2 1 "Meet up with allies at train station." $endlevel.origin
+	waitthread global/objectives.scr::current_objectives 1
+
+	wait 1  //-hack to get around bad gamesaves
+	thread playalarmsound
+	thread fogstuff1
+	thread senslespeoplesetup
+	thread sequence1
+
+	thread sequence2prep
+	thread seq2interuptdisableonoff // toggles sequence2 interupter 
+	$sequence2interupttrig nottriggerable // starts the sequence2 interupter trigger to disabled
+	thread sequence2interupt //interupts disabled ai to make them shoot at you
+	thread sequence2
+
+	thread sequence3
+	thread seq3interuptdisableonoff // toggles sequence2 interupter 
+	$sequence3interupttrig nottriggerable // starts the sequence2 interupter trigger to disabled
+	thread sequence3interupt //interupts disabled ai to make them shoot at you
+
+	thread makepeoplesmartagain
+
+	if(level.gametype == 0){//chrissstrahl - this is not relevant for us in mp
+		$player.has_disguise = 0
+	}
+	thread objectiveupdate1
+	thread ventsystem "duck" $triggerduck $duckcap
+	thread sequence4
+	thread turnsoundoff
+	thread trainsequence
+	thread rotatevent
+	thread endlevelthread
+	thread circleguyactivate
+	thread secondtrainthreat
+	thread playersafe
+	thread savegamethread
+	///////////////////////////
+	// stupid stuff ///////////
+	///////////////////////////
+	level.holdupsounding = 0
+	level.getoverheresounding = 0
+	level.deadoenemies = 0
+	level.alarm = 1
+	$trainguy1 hide
+	$trainguy2 hide
+	$trainguy3 hide
+//	$trainguy4 hide
+	$trainguy4 remove
+	
+	exec coop_mod/replace.scr::threatbias -50	//chrissstrahl - coop mod compatible
+	
+	$trainguy1 threatbias 100
+	$trainguy2 threatbias 100
+	$trainguy3 threatbias 100
+//	$trainguy4 threatbias 100
+	$radio1 loopsound m2l3_radio1
+	$radio2 loopsound m2l3_radio2
+	level.completednow = 0
+
+	$oenemy.nosurprize = 1
+	$oenemy.silent = 1
+	level.runtoforlevel1guys = spawn script_origin
+	level.runtoforlevel1guys.origin = ( 186 6449 -510)
+
+	for(local.i = 1; local.i <= $alarm_sound.size; local.i++){
+		$alarm_sound[local.i] loopsound m2l2_alarm
+	}
+	for(local.i = 1; local.i <= $machines.size; local.i++){
+		$machines[local.i] loopsound m2l3_machine_loop
+	}
+	for(local.i = 1; local.i <= $electrichum.size; local.i++){
+		$electrichum[local.i] thread removeme
+//		$electrichum[local.i] loopsound electrical_hum2
+	}
+	exec coop_mod/replace.scr::tmstop	//chrissstrahl - coop compatible
+	exec coop_mod/replace.scr::tmstartloop "sound/music/mus_10a_action.mp3"	//chrissstrahl - coop compatible
+     level.deadspawnguys = 0
+	thread playerthreaten
+	level.chainspawnwaittime = 2
+	
+	if(level.gametype == 0){ //chrissstrahl - handle for sp
+		$player forcelegsstate CROUCH_IDLE
+	}
+	
+	level.chainspawner_thread = "startguys"
+	level.ventkills = 0
+	$germansoldier2 thread ventkillcount
+	$circleguy thread ventkillcount
+	$germansoldier3 thread ventkillcount
+	$germansoldier1 thread ventkillcount
+	$germanofficer2 thread ventkillcount
+	for(local.i = 1 ;local.i <= $nobody.size ;local.i++){
+		$nobody[local.i] thread easyskill
+		$nobody[local.i] thread startguys
+	}
+	$germanofficer1 thread easyskill
+	$germansoldier4 thread easyskill
+	$circleguy thread easyskill
+	
+	if(level.skillz == "0" && level.gametype == 0){	//chrissstrahl - not needed in coop, I guess
+		$player threatbias -30
+	}
+	
+	if( level.gametype != 0){//chrissstrahl - spawn trigger to update spawnpoints - set size of triggerfield in coop only
+		wait 0.25
+		$coop_updateSpawn1 setsize ( -200 -200 -100) (200 200 10)
+		$coop_updateSpawn2 setsize ( -100 -200 -500) (100 300 100)
+		$coop_updateSpawn3 setsize ( -10 -20 -10) (10 2 200)
+		$player origin ( -726 6023 -200) //find the fucking trigger
+	}	
+}end
+
+removeme:
+	wait .5
+	self remove
+end
+
+easyskill:
+	if(level.skillz != "0")
+		end
+	if(self.health > 50)
+		self.health = (self.health / 2)
+//	println self.targetname "'s health is " self.health
+	self noticescale 1000
+//	println self.targetname "'s noticescale is " self.noticescale
+	self accuracy (self.accuracy / 3)
+
+end
+
+ventkillcount:
+	self thread easyskill // piggy back hack
+	self waittill death
+	level.ventkills++
+end
+
+huddrawrefresh:
+
+end
+
+runtoplayerallthetime:
+	self resetleash
+/*
+	self.sighttimes = 0
+	while(isalive self)
+	{
+     	while(self.sighttimes <= 50 && (isalive self))
+     	{
+     		if!(sighttrace ($player.origin + (0 0 50)) (self.origin + (0 0 50)) 1)
+     			self.sighttimes++
+     		else
+     			self.sighttimes = 0
+     		wait .5
+     	}
+     	if(isalive self)
+      	{
+	    		self.movedoneradius = 3000
+     		self exec global/disable_ai.scr
+     		self forceactivate
+     		wait .25
+     		self exec global/runto.scr $player
+			self sight 4000
+			self waittill movedone
+     		self exec global/stand.scr
+     		self exec global/enable_ai.scr
+			self.sighttimes = 0
+     	}
+	}
+*/
+end
+
+
+rotatevent:
+	$openventtrig waittill trigger 
+	thread stopalarmdialog
+//	$openedvent rotatexup 86
+//	$openedvent waitmove
+//	$openedvent notsolid
+//	$openedvent playsound vent_gate_open
+	exec global/autosave.scr 1
+	thread global/chainspawner.scr::init
+
+end
+
+stopalarmdialog:
+	level.guyshavespoke = 0	
+end
+
+goroach:
+	$roach1.origin = $roachpath1.origin
+	wait 2
+	$roach1 notsolid
+	$roach1 followpath $roachpath1
+	//$roach1 flypath $roachpath1 30 30 30
+	$roach1 waitmove
+end
+
+playalarmsound:
+	level.altime = 1
+	while(level.soundthing != 1){
+		wait 42
+		for(local.i = 1;local.i <= $alarm_sound.size;local.i++){
+//chrissstrahl - make coop compatible
+			local.player = exec coop_mod/replace.scr::player_closestTo $alarm_sound[local.i]
+			if( local.player != NULL ){
+				if((vector_length (local.player.origin - $alarm_sound[local.i].origin) < 1024)){
+					$alarm_sound[local.i] playsound den_m2l2_258p
+				}
+			}
+     	}
+		wait 7
+	}
+end
+
+
+fogstuff1:
+	$fogpoint1 waittill trigger
+	$world farplane 20000
+	$fogpoint2 waittill trigger
+	$world farplane 10000
+	goto fogstuff1
+end
+
+senslespeoplesetup:  //so that people don't see you in vent system
+	$germansoldier4 exec global/disable_ai.scr
+	$germansoldier3 exec global/disable_ai.scr
+	$germansoldier2 exec global/disable_ai.scr
+	$germansoldier1 exec global/disable_ai.scr
+	$germanofficer1 exec global/disable_ai.scr
+	$germanofficer2 exec global/disable_ai.scr
+end
+
+makepeoplesmartagain: //so that people will see you when you get out of vents
+	local.guy = $ventchain
+//	println local.guy
+	local.i = 1
+
+	for(local.i = 1; local.i <= 7; local.i++)
+	{
+		local.guysname = $("ventkiller" + local.i)
+		local.guy = waitthread global/spawner.scr::spawner_create local.guysname
+		local.guysname = ("ventkillspawned" + local.i)
+		local.guy.targetname = local.guysname
+	}
+
+	$smartpeople waittill trigger
+	level.maxspawn = 0
+//	if(level.ventkills > 4)
+//		level.maxspawn = 2
+//	else if (level.ventkills > 2)
+//		level.maxspawn = 1
+//	else
+//		level.maxspawn = 0
+
+//	if(level.skillz == "0" && level.ventkills >= 2)
+//		level.ventkills = (level.ventkills - 3)
+//	waitframe
+	
+//	for(local.i = 1; local.i <= level.ventkills; local.i++)
+//	{
+//		local.guysname = ("ventkillspawned" + local.i)
+//		local.theguy = waitthread global/spawner.scr::spawner_activate local.guysname
+//		local.theguy thread easyskill
+//		local.theguy attackplayer
+//	}
+
+//	$germansoldier4 exec global/enable_ai.scr
+//	$germansoldier3 exec global/enable_ai.scr
+	$germansoldier4 remove
+	$germansoldier3 remove
+
+	if (isAlive $germansoldier2)
+	{
+//		$germansoldier2 exec global/enable_ai.scr
+		$germansoldier2 remove
+	}
+//	$germansoldier1 exec global/enable_ai.scr
+//	$germanofficer1 exec global/enable_ai.scr
+//	$germanofficer2 exec global/enable_ai.scr
+	$germansoldier1 remove
+	$germanofficer1 remove
+	$germanofficer2 remove
+	
+	if(level.gametype == 0){//chrissstrahl - not needed in mp
+		$player.has_disguise = 0
+	}
+
+//	wait 6
+	if(isalive $germansoldier4)
+	{
+//		$germansoldier4 type_attack "alarm"
+//		$germansoldier4 alarmnode "runwayspot2"
+  //   	$germansoldier4 forceactivate
+//		waitframe
+//		$germansoldier4 attackplayer
+		$germansoldier4 remove
+	}
+	if(isalive $germanofficer1)
+	{
+//		$germanofficer1 type_attack "alarm"
+//		$germanofficer1 alarmnode "runwayspot1"
+  //   	$germanofficer1 forceactivate
+//		waitframe
+//		$germanofficer1 attackplayer
+//		$germanofficer1 remove
+	}
+//	wait 5
+	if(isalive $germansoldier1)
+	{
+//		$germansoldier1 type_attack "alarm"
+//		$germansoldier1 alarmnode "germansoldier2spot3"
+//		waitframe
+//		$germansoldier1 attackplayer
+//		$germansoldier1 exec global/runto.scr $germansoldier2spot3
+		$germansoldier1 remove
+	}
+	if(isalive $germanofficer2)
+	{
+//		$germanofficer2 type_attack "alarm"
+//		$germanofficer2 alarmnode "germansoldier2spot3"
+//		waitframe
+//		$germanofficer2 attackplayer
+//		$germanofficer2 exec global/runto.scr $germansoldier2spot3
+		$germanofficer2 remove
+	}
+	level.maxspawn = 5
+end
+
+startguys:
+	self thread easyskill
+	while(isalive self)
+	{
+		wait .1
+		if(level.firstsectionpassed == 1)
+			self waitthread removefirstsectionguy
+	}
+end
+removefirstsectionguy:
+	self.sighttimes = 0
+	while(self.sighttimes <= 6 && (isalive self))
+	{
+//		if!(sighttrace ($player.origin + (0 0 50)) (self.origin + (0 0 50)) 1)
+		//if!($player inpvs self)	//chrissstrahl
+		if!(exec coop_mod/replace.scr::inpvs self)	//chrissstrahl - coop compatible
+		{
+			self.sighttimes++
+			self exec global/disable_ai.scr
+			self runto level.runtoforlevel1guys
+		}
+		else
+		{
+			self.sighttimes = 0
+			self exec global/enable_ai.scr
+		}
+		wait .5
+	}
+	wait .2
+	if(isalive self)
+		self remove
+end
+
+sequence1: //there is an intruder
+	thread goroach
+	level.talking = 1
+	$germansoldier4 say den_M2L3_263r //There is an intruder!
+	$germansoldier4 waittill saydone
+	$germanofficer1 say den_m2l3_264p //Check over there!
+	$germanofficer1 waittill saydone
+	$germansoldier2 say den_m2l3_266b //I already checked there!
+	$germansoldier2 waittill saydone
+	$germansoldier1 say den_m2l3_265a //I'll look in here!
+	$germansoldier1 waittill saydone
+	$germansoldier3 say den_m2l3_267q //What's he look like?
+	$germansoldier3 waittill saydone
+	$germansoldier2 say den_m2l3_272a //Has anyone seen him?
+	$germansoldier2 waittill saydone
+	$germansoldier1 say den_m2l3_268h //what was that sound?
+	$germansoldier1 waittill saydone
+	$germansoldier1 say den_m2l3_259b //he's in the vents!
+	$germansoldier1 waittill saydone	
+	$germansoldier2 say den_m2l3_260q //I'm going in after him.
+
+	$germansoldier2 exec global/enable_ai.scr
+	$germansoldier2 noticescale 1
+	$germansoldier2 exec coop_mod/replace.scr::turnto	//chrissstrahl - coop mod
+	$germansoldier2 attackplayer
+	wait 4
+	level.guyshavespoke = 1
+	level.talking = 0
+end
+
+sequence2prep:
+	$seq2preptrig waittill trigger
+	if (isAlive $germansoldier2)
+	{
+		$germansoldier2 exec global/disable_ai.scr
+	}
+end
+
+seq2interuptdisableonoff:
+	$seq2interuptenabletrig waittill trigger
+	$sequence2interupttrig triggerable
+
+	$seq2interuptdisabletrig waittill trigger
+	$sequence2interupttrig nottriggerable
+	goto seq2interuptdisableonoff
+end
+
+seq3interuptdisableonoff:
+	$seq3interuptenabletrig waittill trigger
+
+	$sequence3interupttrig triggerable
+	$seq3interuptdisabletrig waittill trigger
+	$sequence3interupttrig nottriggerable
+	goto seq3interuptdisableonoff
+end
+
+sequence2: //still looking
+	level.talking = 1
+	$sequence2trig waittill trigger
+
+	if (isAlive $germansoldier2)
+	{
+		$germansoldier2 exec global/walkto.scr $germansoldier2spot3
+	}
+
+	$germansoldier3 exec global/walkto.scr $germansoldier3spot3
+	$germansoldier1 notsolid
+	$germansoldier1 exec global/runto.scr $germansoldier1spot3
+
+	if (isAlive $germansoldier2)
+
+	{
+	$germansoldier2.origin = $germansoldier2spot2.origin
+	}
+
+	$germansoldier1.origin = $germansoldier1spot2.origin
+	$germansoldier3.origin = $germansoldier3spot2.origin
+	wait 1
+	if (isAlive $germansoldier2)
+	{
+
+		$germansoldier2 say den_m2l3_269f //There are intruders in the base!
+		$germansoldier2 waittill saydone
+	}	
+	$germansoldier3 say den_m2l3_270r //No there is only one!
+	$germansoldier3 waittill saydone
+	$germansoldier3 say den_m2l3_273b //He is dressed like an Officer!
+	$germansoldier3 waittill saydone
+	$germansoldier1 say den_m2l3_271f //I heard there were four!
+	$germansoldier1 waittill saydone
+	wait 2
+	level.talking = 0
+end
+
+sequence3: //reporting in	
+	level.talking = 1
+	$sequence3trig waittill trigger
+	wait 1
+	$germansoldier1 solid
+	if(isalive $germansoldier1)
+	{
+		$germansoldier1 turnto $germanofficer2
+		$germansoldier1 waittill turndone
+	}
+	if(isalive $germansoldier1)
+		$germansoldier1 idlesay den_m2l3_259b //he's in the vents!
+	wait 2
+	{
+		$germanofficer2 turnto $germansoldier1
+		$germanofficer2 waittill turndone
+	}
+	if(isalive $germanofficer2)
+		$germanofficer2 idlesay den_m2l3_262f //He's going to try to get to the rail station!
+	wait .75
+	$germansoldier1 exec global/walkto.scr $germansoldierspot4
+	wait 1
+	
+	$germanofficer2 exec global/walkto.scr $germanofficerspot1
+		if (isAlive $germansoldier2)
+	{
+		$germansoldier2 exec global/walkto.scr $germansoldier2spot4
+		wait 2
+	}	
+	wait 2
+	level.talking = 0
+end
+
+objectiveupdate1:
+	$obj1trig waittill trigger
+
+	waitthread global/objectives.scr::add_objectives 1 3 "Exfiltrate the base." $obj1.origin
+	waitthread global/objectives.scr::add_objectives 2 2 "Meet up with allies at train station."  $endlevel.origin
+	waitthread global/objectives.scr::current_objectives 2
+end
+
+objectiveupdate2:
+	waitthread global/objectives.scr::add_objectives 1 3 "Exfiltrate the base." $obj1.origin
+	waitthread global/objectives.scr::add_objectives 2 3 "Meet up with allies at train station." $endlevel.origin
+end
+
+savegamethread:
+	$savegame2 waittill trigger
+	exec global/autosave.scr 2
+	wait .2
+     level.firstsectionpassed = 1
+	if(isalive $nobody)
+	$nobody thread removefirstsectionguy
+	thread oenemydeath
+	thread irunaway1death
+	thread irunaway2death
+end
+oenemydeath:
+	$oenemy waittill death
+	level.maxspawn++
+end
+irunaway1death:
+	$irunaway1 waittill death
+	level.maxspawn++
+end
+irunaway2death:
+	$irunaway2 waittill death
+	level.maxspawn++
+end
+
+
+sequence2interupt:
+	$sequence2interupttrig waittill trigger
+
+	$germansoldier3 exec global/enable_ai.scr
+	if (isAlive $germansoldier2)
+		{
+		$germansoldier2 exec global/enable_ai.scr
+		}
+end
+
+sequence3interupt:
+	$sequence3interupttrig waittill trigger
+	$germansoldier1 exec global/enable_ai.scr
+	$germanofficer2 exec global/enable_ai.scr
+end
+
+sequence4:
+	$sequence4prep waittill trigger
+	$seq4guy3 thread easyskill
+	$seq4guy3 exec global/walkto.scr $seq4guy3spot
+	if(level.skillz == "0" && level.gametype == 0)	//chrissstrahl - only sp
+		exec global/autosave.scr 3
+	
+end
+
+turnsoundoff:
+	$soundofftrig waittill trigger
+	level.soundthing = 1
+end
+
+trainsequence:
+//	local.thing = $player.origin
+//	$player.origin = $choochootrain.origin
+//	waitframe 
+//	$player.origin = local.thing
+     $choochootraindoor hide
+     $choochootrain hide
+	$trainfront hide
+	$choochootraindoor bind $choochootrain 
+	$trainfront bind $choochootrain
+	$choochootrain speed 10000
+	$choochootrain moveto $choochootrainpath
+	$choochootrain waitmove
+	$choochootrig waittill trigger
+	$trainfront show
+	$choochootraindoor show
+	$choochootrain show
+	level.maxspawn = 3
+	level.chainspawner_thread = "spawnddeathcount"
+	if(level.gametype == 0){	//chrissstrahl - only sp
+		$player.has_disguise = 0
+	}
+	$choochootrain notsolid
+	$choochootraindoor notsolid
+	$choochootrain followpath $choochootrainpaths ignoreangles
+	exec coop_mod/replace.scr::playsound m2l3_train_approach
+	$choochootrain waitmove
+	$trainguy1 waitthread trainguys $trainguy1spot
+	$trainguy2 waitthread trainguys $trainguy2spot
+	$trainguy3 waitthread trainguys $trainguy3spot
+//	$trainguy4 waitthread trainguys $trainguy4spot
+	$choochootraindoor movewest 128
+	$choochootraindoor waitmove
+
+	thread timetrain
+	thread battletalk
+end
+	
+trainguys local.spot:
+	local.spot notsolid
+	self.nosurprize = 1
+	self.silent = 1
+	self show
+	self.origin = local.spot.origin
+	self resetleash
+	self forceactivate
+end
+
+battletalk:
+	if(level.getoverheresounding != 1)	
+	{
+		level.getoverheresounding = 1	
+		$trainguy1 say m2l3_getoverhere
+		$trainguy1 waittill saydone
+		wait 1
+		level.getoverheresounding = 0
+	}
+	wait 1
+	if(level.holdupsounding != 1)
+	{
+		level.holdupsounding = 1
+		if(level.getoverheresounding == 1)
+			wait 3
+		$trainguy1 say m2l3_holdup
+		$trainguy1 waittill saydone
+		wait 1
+		level.holdupsounding = 0
+	}
+	wait 1
+	$trainguy1 say m2l3_attack 
+	$trainguy1 waittill saydone
+
+end
+
+endlevelthread:
+	$inthetrain waittill trigger
+	level.completednow = 1
+	
+	if(level.gametype != 0){//chrissstrahl - coop compatible
+		level.trainisleaving = 1
+	}
+	
+	if( 1 || $player.size > 1 ){//chrissstrahl - coop mod - fixme test
+		end
+	}
+	
+    exec coop_mod/replace.scr::stopwatch 0	//chrissstrahl - coop compatible
+	
+	thread trainleavetoggle
+	thread gladyoucouldmakeit
+	$endlevel waittill trigger
+	thread objectiveupdate2
+	setcvar "g_m3l1" "1"
+	exec global/missioncomplete.scr briefing/briefing3
+end
+
+trainleavetoggle:
+	$toggleletsgo waittill trigger
+	if(level.trainisleaving == 1)
+	{
+		thread traintakeoff
+	}
+	
+	if(level.gametype == 0){//chrissstrahl - keep for sp only
+		level.completednow = 0
+		$inthetrain waittill trigger
+		level.completednow = 1
+		goto trainleavetoggle
+	}
+end
+
+gladyoucouldmakeit:
+	if(isalive $trainguy1)
+	{
+		$trainguy1 exec coop_mod/replace.scr::turnto	//chrissstrahl - coop mod compatible
+		$trainguy1 say m2l3_outstanding
+		$trainguy1 waittill saydone
+	}
+	if(isalive $trainguy2)
+	{
+		$trainguy2 exec coop_mod/replace.scr::turnto	//chrissstrahl - coop compaible
+		$trainguy2 say m2l3_iwetmyself
+		$trainguy2 waittill saydone	
+	}
+	if(isalive $trainguy1)
+	$trainguy1 say m2l3_letsgo
+end
+
+lockedgrate:
+	self playsound vent_gate_locked
+end
+
+lockeddoor:
+	self playsound door_metal_locked
+//	iprintln "This door is locked."
+end
+
+lockedgarage:
+	self playsound garagedoor_locked
+//	iprintln "This door is locked."
+end
+
+becomecoverguy:
+	self.type_attack = "cover"
+end
+
+
+
+
+timetrain:
+	iprintlnbold_noloc 110 (loc_convert_string " seconds to get to train")
+	wait 20
+	iprintlnbold_noloc  90 (loc_convert_string " seconds to get to train")
+	wait 20
+	thread trainsounding
+	iprintlnbold_noloc  70 (loc_convert_string " seconds to get to train")
+	wait 10
+	exec coop_mod/replace.scr::stopwatch 60	//chrissstrahl - coop compatible
+	exec coop_mod/replace.scr::loopsound bombtick	//chrissstrahl - coop compatible
+	wait 60
+	exec coop_mod/replace.scr::stoploopsound bombtick	//chrissstrahl - coop compatible
+	
+	if(level.completednow != 1){
+		thread traintakeoff
+	}
+	//chrissstrahl - otherwise
+	else{
+		thread coop_levelComplete
+	}
+	level.trainisleaving = 1
+end
+
+
+trainsounding:
+//train playsound train taking off
+end
+
+traintakeoff:
+	//chrissstrahl - make sure the train takes off only once
+	if(level.traintookoff != NIL){ end }
+	level.traintookoff = TRUE
+	
+	$endlevel nottriggerable
+	$choochootraindoor moveeast 128
+	$choochootraindoor waitmove
+	$trainguy1 remove
+	$trainguy2 remove
+	$trainguy3 remove
+//	if(isalive $trainguy4)
+//		$trainguy4 remove
+	$choochootrain followpath $trainescapepath ignoreangles
+	//$player playsound m2l3_train_approach	//chrissstrahl - not sure if that is clever to play it on all, but well, here we go
+	exec coop_mod/replace.scr::playsound m2l3_train_approach	//chrissstrahl - coop compatibility
+	$choochootrain move
+	wait 1
+	if(level.gametype == 0){ //chrissstrahl - we don't fail in coop, at least not like this
+		missionfailed
+	}else{
+		iprintlnbold_noloc(" =^= You failed to complete the Mission =^=")
+		wait 3
+		exec global/missioncomplete.scr m2l3
+	}
+end
+
+jumpthegate:
+	self.nosurprize = 1
+	self.silent = 1
+	self exec global/disable_ai.scr
+	local.lookspot = spawn script_origin
+	local.lookspot.origin = (self.origin - (90 0 -55))
+	self turnto local.lookspot
+	self waittill turndone
+//	wait 1
+	self.origin = self.alarmnode.origin
+	local.lookspot remove
+	self anim_noclip jumpgate
+	self waittill animdone
+	self type_attack "cover" 
+	local.runspot = spawn script_origin
+	local.runspot.origin = (self.origin + ( -384 0 50 ))
+	self exec global/runto.scr local.runspot
+	wait .5
+	self exec global/enable_ai.scr
+	self type_attack cover
+end
+jumpthegate2:
+	self.nosurprize = 1
+	self.silent = 1
+	self exec global/disable_ai.scr
+	local.lookspot = spawn script_origin
+	local.lookspot.origin = (self.origin + ( 90 0 55 ))
+	self turnto local.lookspot
+	self waittill turndone
+//	wait 1
+	self.origin = self.alarmnode.origin
+	local.lookspot remove
+	self anim_noclip jumpgate
+	self waittill animdone
+	self type_attack "cover" 
+	local.runspot = spawn script_origin
+	local.runspot.origin = (self.origin + ( 384 0 50 ))
+	self exec global/runto.scr local.runspot
+	wait .5
+	self exec global/enable_ai.scr
+
+	self type_attack cover
+end
+
+playerthreaten:
+     $threatenplayer waittill trigger
+	thread playerthreatenstuff
+	goto playerthreaten
+end	
+playerthreatenstuff:
+	level.safety doactivate $world  // triggers safety zone setup //chrissstrahl - replaced $player with $world
+	exec coop_mod/replace.scr::threatbias 200	//chrissstrahl - coop mod compatible
+	
+	$trainguy1 threatbias -200
+	$trainguy2 threatbias -200
+	$trainguy3 threatbias -200
+	$trainguy1 accuracy 1
+	$trainguy2 accuracy 1
+	$trainguy3 accuracy 1
+//	println "threatening trainguy1 accuracy of: " $trainguy1.accuracy
+//	println "threatening trainguy2 accuracy of: " $trainguy1.accuracy
+//	println "threatening trainguy3 accuracy of: " $trainguy1.accuracy
+//	$trainguy4 threatbias -100
+	local.thespawner = level.chainspawnzone.target
+	while(local.thespawner)
+	{	
+		local.theguy = (local.thespawner + "spawned")
+//		println ("local.theguy's name is " + local.theguy)
+		if(isalive $(local.theguy))
+		{
+			//chrissstrahl - make this really hard in coop
+			if(level.gametype == 0 || $player.size < 2){
+				local.theguy accuracy 50
+			}else{
+				local.theguy accuracy 90
+			}
+//			println "accuracy of spawned guy is " local.theguy.accuracy
+
+//			println "maxdist of spawned guy is " local.theguy.maxdist
+		}
+     	local.thespawner = local.thespawner.target
+	}
+end
+playersafe:
+	level.safety = spawn trigger_relay
+	safetyloop:
+	$playersafetrigger waittill trigger
+	thread playersafestuff
+	level.safety waittill trigger
+	goto safetyloop
+end
+
+
+playersafestuff:
+	if(level.gametype == 0){	//chrissstrahl - only do in sp
+		$player threatbias -50
+	}
+	$trainguy1 threatbias 100
+	$trainguy2 threatbias 100
+	$trainguy3 threatbias 100
+	$trainguy1 accuracy 20
+	$trainguy2 accuracy 20
+	$trainguy3 accuracy 20
+//	println "trainguy1 accuracy of: " $trainguy1.accuracy
+//	println "trainguy2 accuracy of: " $trainguy1.accuracy
+//	println "trainguy3 accuracy of: " $trainguy1.accuracy
+//	$trainguy4 threatbias 100
+	local.thespawner = level.chainspawnzone.target
+	while(local.thespawner)
+	{	
+		local.theguy = (local.thespawner + "spawned")
+//		println ("local.theguy's name is" + local.theguy)
+		if(isalive $(local.theguy))
+		{
+     		local.theguy accuracy 20
+		}
+     		local.thespawner = local.thespawner.target
+	}
+end
+
+secondtrainthreat:
+	thread lastdash
+	$safezone2 waittill trigger
+	level.chainspawnwaittime = 4
+	level.procede = 1
+	if(level.holdupsounding != 1)
+	{
+
+		level.holdupsounding = 1
+		if(level.getoverheresounding == 1)
+			wait 3
+		$trainguy1 say m2l3_holdup
+		$trainguy1 waittill saydone
+		wait 1
+		level.holdupsounding = 0
+	}
+	thread playerthreatenstuff
+	wait 7
+	thread playersafestuff
+	if(level.getoverheresounding != 1)	
+	{
+		level.getoverheresounding = 1	
+		$trainguy1 say m2l3_getoverhere
+		$trainguy1 waittill saydone
+		wait 1
+		level.getoverheresounding = 0
+	}
+end
+
+lastdash:
+	$dangerzone2 waittill trigger //hack - should not be named dangerzone
+	level.chainspawnwaittime = 20
+	level.maxspawn = 1
+end
+
+spawnddeathcount:
+	if(level.chainspawnzone != t331)
+		self thread removefirstsectionguy
+	self waittill death
+	level.deadspawnguys++
+	thread procedecheck
+end
+
+procedecheck:
+//	println level.deadspawnguys
+	if(level.deadspawnguys >= 8 && level.procede != 1)
+	{
+		level.procede = 1
+		level.deadspawnguys = 4
+		$threatenplayer nottriggerable
+		thread playersafestuff
+		
+		if(level.getoverheresounding != 1)	
+		{
+     		level.getoverheresounding = 1	
+     		$trainguy1 say m2l3_getoverhere
+     		$trainguy1 waittill saydone
+			wait 1
+			level.getoverheresounding = 0
+		}
+		wait 15
+		if(level.holdupsounding != 1)
+		{
+     		level.holdupsounding = 1
+     		if(level.getoverheresounding == 1)
+     			wait 3
+     		$trainguy1 say m2l3_holdup
+     		$trainguy1 waittill saydone
+			wait 1
+     		level.holdupsounding = 0
+		}
+		thread playerthreatenstuff
+		level.procede = 0		
+	}
+end
+
+ventcrawler:
+	if((randomint(3)) == 2)
+	{
+     	if(level.ventcrawling != 1)
+     	{
+			level.ventcrawling = 1
+     		self playsound vent_squeak
+			wait 8
+			level.ventcrawling = 0
+     	}
+	}
+end
+
+
+ventsystem local.duckguy local.duckguytrigger local.cap:
+	local.cap solid
+	if(	$(local.duckguy) == NULL ){ end }	//chrissstrahl - prevent error msg
+	
+	$(local.duckguy) exec global/disable_ai.scr
+	$(local.duckguy) exec global/prone.scr
+ventcrawlershoot:
+	local.duckguytrigger waittill trigger
+	if(	$(local.duckguy) == NULL ){ end }	//chrissstrahl - prevent error msg
+	
+	$(local.duckguy) exec coop_mod/replace.scr::turnto	//chrissstrahl - coop mod compatible
+	$(local.duckguy) exec coop_mod/replace.scr::lookat	//chrissstrahl - coop mod compatible
+	wait 1
+	
+	if(	$(local.duckguy) == NULL ){ end }	//chrissstrahl - prevent error msg
+	$(local.duckguy) exec global/shoot.scr
+	wait 1
+	goto ventcrawlershoot
+end
+circleguyactivate:
+	$circleguy hearing 380
+	while(isalive $circleguy){
+		wait 10
+		$circleguy forceactivate
+	}
+end
+
+
+//=========================================================================
+coop_updateSpawn1:{
+//=========================================================================
+//chrissstrahl - set new location for spawnpoints
+	thread coop_mod/spawnlocations.scr::m2l3_update1	
+}end
+
+//=========================================================================
+coop_updateSpawn2:{
+//=========================================================================
+//chrissstrahl - set new location for spawnpoints
+	thread coop_mod/spawnlocations.scr::m2l3_update2	
+}end
+
+//=========================================================================
+coop_updateSpawn3:{
+//=========================================================================
+//chrissstrahl - set new location for spawnpoints
+	thread coop_mod/spawnlocations.scr::m2l3_update3
+	level.coop_disableSpawnWarper = TRUE //chrissstrahl - make this a bit more dificult here
+}end
+
+//=========================================================================
+coop_playerJustSpawned local.i:{
+//=========================================================================
+//chrissstrahl - handle players once they are just spawned
+//players 1-6 are spawned in the truck, make em crouch so they fit in
+	local.player = $player[local.i]
+	if(local.player != NULL && local.player != NIL){
+		local.vec = local.player.origin
+		if(local.vec[2] < -200){ end }
+		
+		local.player forcelegsstate CROUCH_IDLE
+
+		//chrissstrahl - make em stand up again if they are out of the shaft
+		while(local.player != NULL){
+			local.vec = local.player.origin
+			if(local.player.dmteam == "spectator" || local.player.health <= 0 || local.vec[2] < -200 ){
+				local.player forcelegsstate STAND
+				end
+			}
+			waitframe
+		}
+	}
+}end
+
+//=========================================================================
+coop_playerJustSpawned1:{
+//=========================================================================
+	thread coop_playerJustSpawned 1
+}end
+
+//=========================================================================
+coop_playerJustSpawned2:{
+//=========================================================================
+	thread coop_playerJustSpawned 2
+}end
+
+//=========================================================================
+coop_playerJustSpawned3:{
+//=========================================================================
+	thread coop_playerJustSpawned 3
+}end
+
+//=========================================================================
+coop_playerJustSpawned4:{
+//=========================================================================
+	thread coop_playerJustSpawned 4
+}end
+
+//=========================================================================
+coop_playerJustSpawned5:{
+//=========================================================================
+	thread coop_playerJustSpawned 5
+}end
+
+//=========================================================================
+coop_playerJustSpawned6:{
+//=========================================================================
+	thread coop_playerJustSpawned 6
+}end
+
+//=========================================================================
+coop_playerJustSpawned7:{
+//=========================================================================
+	thread coop_playerJustSpawned 7
+}end
+
+//=========================================================================
+coop_playerJustSpawned8:{
+//=========================================================================
+	thread coop_playerJustSpawned 8
+}end
+
+//=========================================================================
+coop_levelComplete:{
+//=========================================================================
+	thread trainleavetoggle
+	thread gladyoucouldmakeit
+	thread objectiveupdate2
+	setcvar "g_m3l1" "1"
+	wait 1
+	exec global/missioncomplete.scr briefing/briefing3
+}end

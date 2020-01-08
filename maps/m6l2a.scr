@@ -1,0 +1,821 @@
+// LEVEL: 			M6L2A														
+// CAMPAIGN: 		Germany															
+// TITLE:			"The Communications Blackout"										
+// GEOMETRY/DESIGN: 	Benson Russell, Adam Bellefeuil, Keith Bell						
+// SCRIPTING:		Steve Fukuda														
+//============================================================================
+main:{
+//============================================================================
+	level.coopNextMap = "m6l2b"			//Pasted by Criminal for coop comp. - set next map (for mom voteing)
+	level.coopPrevMap = "m6l1c"			//Pasted by Criminal for coop comp. - set previouse map (for mom voteing)
+	level.coop_aaMap = 1				//Pasted by Criminal for coop comp. - let global scripts know this is a AA level
+	level.coop_debugSpawn = 1 			//Pasted by Criminal for coop comp. - enable spawnpoint debug (make visible)
+	thread coop_mod/main.scr::main      //Pasted by Criminal for coop comp. - start coop mod extensions
+	
+	exec global/loadout.scr maps/m6l2a.scr
+
+	//*** INITIALIZE ALARM SYSTEM
+	exec global/alarmer.scr 
+
+	//*** INITIALIZE SPOTLIGHT SYSTEM
+	exec global/spotlight.scr
+
+	level waitTill prespawn
+
+	level.script = maps/m6l2a.scr
+
+	//*** INITIALIZE AMBIENT SOUND SYSTEM
+	exec global/ambient.scr m6l2a
+
+	//*** INITIALIZE ANY "JACK IN THE BOX" CABINETS IN BUILDINGS
+	exec global/cabinet.scr
+
+	//*** STOP ANY PREVIOUSLY PLAYING MUSIC
+	//$player stufftext "tmstop"			//Criminal.
+	exec coop_mod/replace.scr::tmstop 		//Criminal-coop comp.
+
+	//*** MACKEY'S SPOTLIGHT DEBUGGER
+	//level.debug = 1
+
+	//*** INITIALIZE BACKGROUND MUSIC
+	soundtrack music/m6l2a.mus
+
+	//*** INITIALIZE DOOR LOCKING SYSTEM
+	exec global/door_locked.scr::lock
+
+	//*** INITIALIZE FOG DISTANCE AND COLOR
+	level.farplaneswitching = 0 	//initialize checking variable
+	level.farplane = 1600
+	level.farplane_color = ".1 .1 .2"
+
+	$world farplane level.farplane
+	$world farplane_color level.farplane_color
+
+	//*** INITIALIZE WEATHER EFFECTS (SNOW)
+	/*
+	setcvar "cg_rain_shader" "textures/snow"
+	setcvar "cg_rain_numshaders" "12"
+	setcvar "cg_rain_speed" "240"
+	setcvar "cg_rain_speed_vary" "100"
+	setcvar "cg_rain_min_dist" "3072"
+	setcvar "cg_rain_length" "2"
+	setcvar "cg_rain_width" "2"
+	setcvar "cg_rain_density" ".4"
+	setcvar "cg_rain_slant" "300"
+	*/
+	//setcvar "cg_rain" "1"
+
+	//*** INITIALIZE EXPLODING BUILDINGS
+	thread global/exploder.scr::main
+
+	//*** PAUSE ALL FX ANIMATIONS
+	$objective1_fireball1 anim stop
+	$objective1_fireball2 anim stop
+	$objective1_fireball3 anim stop
+	$objective1_fireball4 anim stop
+	$objective1_fireball5 anim stop
+	$objective1_fireball6 anim stop
+	$objective1_fireball7 anim stop
+
+	//*** INITIALIZE SPAWNERS AFTER RADIO COMM SHACKS ARE DESTROYED
+	level.scene3_spawner_started = 0	
+
+	//*** INITIALIZE THE NUMBER OF ALARMS IN THE LEVEL
+	level.alarmpopulation = 8
+
+	//*** INITIALIZE THE ALARMS TO BE IN THE OFF STATE
+	level.alarmactive = 0
+
+	//***	Find out what skill the player is using for difficulty checking 
+	level.skill = getcvar (skill)
+
+//	level waitTill spawn //chrissstrahl
+	waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl - coop compabitility
+
+	waitthread global/items.scr::add_item "explosives" nomessage
+
+	println "STEVEFU: MARKER 1" 
+
+	//*** SET SPECIAL ITEMS
+	waitthread global/items.scr::add_item "radio_explosives"	// Show radio_explosives inventory icon
+
+	//*** CHECK TO SEE IF THE PLAYER IS ALLOWED TO EXIT THE LEVEL
+	thread objective1_donecheck
+
+	//*** INITIALIZE OBJECTIVES
+	waitthread global/objectives.scr::add_objectives 1 2 "Plant explosives in the radio command post, in the northeast corner of the town. [6 remaining]" $cp1_bomb1.origin
+	//waitthread global/objectives.scr::add_objectives 2 1 "Escape through the Commandant's residence on the south side of town." $exitnode.origin
+
+	thread global/objectives.scr::current_objectives 1
+
+	//*** START THE MACHINE GUNS
+	thread defense_mg42
+
+	//*** START THE RADIO OPERATORS AT THEIR STATIONS IN THE COMMAND POST
+	//	$radio1_operator thread radio_operator_setup 
+	//	$radio2_operator thread radio_operator_setup 	// this one's an alarm guy
+	//	$radio3_operator thread radio_operator_setup 	// this one's an alarm guy
+	//	$radio4_operator thread radio_operator_setup
+
+	//*** START THE FAR AWAY GUYS ON THEIR PATROLS
+	thread patrol_ai_forceactivate
+
+	//*** START SOME SUSPENSEFUL MUSIC AS A ONE SHOT
+	//$player stufftext "tmstart sound/music/mus_01a_suspense.mp3"			//Criminal.
+	exec coop_mod/replace.scr::tmstart "sound/music/mus_01a_suspense.mp3"	//Criminal - coop comp.
+	
+	//*** INITIALIZE OBJECTIVE 1 
+	level.objective1_completed = 0
+	thread objective1_donecheck
+	thread initialize_bombsites
+}end
+
+//============================================================================
+alarm_player_reset:{
+//============================================================================
+	thread global/alarmer.scr::alarm_player_reset
+}end
+
+//OBJECTIVE 1 SUPPORT THREADS
+//============================================================================
+objective1_donecheck:{
+//============================================================================
+//*** If the player hasn't destroyed the radio command post, he can't get through the amazing invisible blocker brush at the exit.
+
+	while !(level.objective1_completed == 1){
+		if(exec coop_mod/replace.scr::istouching $levelchange_blocker){ //chrissstrahl - handle in sp/mp
+			iprintlnbold "You have not completed all of your objectives yet."
+			wait 3
+		}
+		waitframe //infinite loop warning protection
+	}
+}end
+
+//OBJECTIVE 1 BOMB PLANTING THREADS (Plant Explosives in the Radio Command Post)
+//============================================================================
+initialize_bombsites:{
+//============================================================================
+//*** Initialize values used in tracking bomb plant objective status, and cloak the preattached explosive models
+	level.objective1_bombcount = 6
+	//	$cp1_bomb1 hide
+	level.cp1_bomb1_status = 0	
+	//	$cp1_bomb2 hide
+	level.cp1_bomb2_status = 0	
+	//	$cp1_bomb3 hide
+	level.cp1_bomb3_status = 0	
+	//	$cp2_bomb1 hide
+	level.cp2_bomb1_status = 0	
+	//	$cp2_bomb2 hide
+	level.cp2_bomb2_status = 0	
+	//	$cp2_bomb3 hide
+	level.cp2_bomb3_status = 0	
+}end
+
+//============================================================================
+cp1_bombplant1:{
+//============================================================================
+//*** Trigger_useonce in bsp
+	$cp1_bomb1 model "animate//radiobomb.tik"
+	$cp1_bomb1 playsound radiobomb
+
+	level.objective1_bombcount --
+	level.cp1_bomb1_status = 1
+	
+	thread objective1_bombtracker
+	thread objective1_locationcheck
+}end
+
+//============================================================================
+cp1_bombplant2:{
+//============================================================================
+//*** Trigger_useonce in bsp
+	$cp1_bomb2 model "animate//radiobomb.tik"
+	$cp1_bomb2 playsound radiobomb
+
+	level.objective1_bombcount --
+	level.cp1_bomb2_status = 1
+
+	thread objective1_bombtracker
+	thread objective1_locationcheck
+}end
+
+//============================================================================
+cp1_bombplant3:{
+//============================================================================
+//*** Trigger_useonce in bsp
+	$cp1_bomb3 model "animate//radiobomb.tik"
+	$cp1_bomb3 playsound radiobomb
+
+	level.objective1_bombcount --
+	level.cp1_bomb3_status = 1
+
+	thread objective1_bombtracker
+	thread objective1_locationcheck
+}end
+
+
+//============================================================================
+cp2_bombplant1:{
+//============================================================================
+	//*** Trigger_useonce in bsp
+	$cp2_bomb1 model "animate//radiobomb.tik"
+	$cp2_bomb1 playsound radiobomb
+
+	level.objective1_bombcount --
+	level.cp2_bomb1_status = 1
+
+	thread objective1_bombtracker
+	thread objective1_locationcheck
+}end
+
+
+//============================================================================
+cp2_bombplant2:{
+//============================================================================
+//*** Trigger_useonce in bsp
+	$cp2_bomb2 model "animate//radiobomb.tik"
+	$cp2_bomb2 playsound radiobomb
+
+	level.objective1_bombcount --
+	level.cp2_bomb2_status = 1
+
+	thread objective1_bombtracker
+	thread objective1_locationcheck
+}end
+
+
+//============================================================================
+cp2_bombplant3:{
+//============================================================================
+//*** Trigger_useonce in bsp
+	$cp2_bomb3 model "animate//radiobomb.tik"
+	$cp2_bomb3 playsound radiobomb
+
+	level.objective1_bombcount --
+	level.cp2_bomb3_status = 1
+
+	thread objective1_bombtracker
+	thread objective1_locationcheck
+}end
+
+
+//============================================================================
+objective1_bombtracker:{
+//============================================================================
+//*** update and assemble the objective message, check for objective 1 completion, then activate objective 3 while blowing the place up
+//*** stop the suspense music and activate the action music
+//*** activate the visible hud countdown timer for the explosives 
+	level.locationchecktext = ("Plant explosives in the radio command post, in the northeast corner of the town. [" + level.objective1_bombcount + " remaining]")
+
+	if (level.objective1_bombcount == 0){
+		if (level.gametype==0){	//Criminal - Singleplayer.
+			//*** *Autosave*
+			exec global/autosave.scr 1	//"Bombs planted"
+		}
+		level.objective1_completed = 1
+
+		//*** Player can now exit the window at the end of the level
+		$levelchange_blocker remove
+
+		waitthread global/objectives.scr::add_objectives 1 3 "Plant explosives in the radio command post, in the northeast corner of the town."
+		waitthread global/objectives.scr::add_objectives 2 2 "Escape through the Commandant's residence on the south side of town." $exitnode.origin
+		thread global/objectives.scr::current_objectives 2
+
+		//*** Start the bomb ticking at the player's position
+		//$player exec global/loopsound.scr bombtick (not needed, this is now a series of radiobombs.)
+		//*** STOP ANY PREVIOUSLY PLAYING MUSIC
+
+		//$player stufftext "tmstop"		//Criminal.
+		exec coop_mod/replace.scr::tmstop 	//Criminal - coop comp.
+
+		//*** Start the action music on a permanent loop
+
+		//$player stufftext "tmstartloop sound/music/mus_18a_action.mp3"		//Criminal.
+		exec coop_mod/replace.scr::tmstartloop "sound/music/mus_18a_action.mp3"	//Criminal - coop comp.
+
+		//*** Wait indefinitely until the player is clear of the blast radius, wait on a trigger in the bsp at the open gates
+		//$detonator waittill trigger
+		//*** Stop the radiobomb ticking noise, start the stopwatch
+		
+		//$player stopwatch 8			// Criminal.
+		//$player loopsound bombtick	// Criminal.
+		exec coop_mod/replace.scr::stopwatch 8			//Criminal - coop comp.
+		exec coop_mod/replace.scr::loopsound bombtick	//Criminal - coop comp.
+		wait 8
+
+		//$player stoploopsound bombtick	//Criminal.
+		exec coop_mod/replace.scr::stoploopsound bombtick //Criminal - coop comp.	
+		thread objective1_detonation
+		thread threat_condition_delta
+	}
+}end
+
+
+//============================================================================
+objective1_locationcheck:{
+//============================================================================
+//*** Moves the compass waypoint indicator to the next bomb plant location
+	if (level.cp1_bomb1_status == 0){
+		waitthread global/objectives.scr::add_objectives 1 2 level.locationchecktext $cp1_bomb1.origin
+		//waitthread global/objectives.scr::add_objectives 2 1 "Escape through the Commandant's residence on the south side of town." $exitnode.origin
+		thread global/objectives.scr::current_objectives 1
+	}else if (level.cp1_bomb2_status == 0){
+		waitthread global/objectives.scr::add_objectives 1 2 level.locationchecktext $cp1_bomb2.origin
+		//waitthread global/objectives.scr::add_objectives 2 1 "Escape through the Commandant's residence on the south side of town." $exitnode.origin
+		thread global/objectives.scr::current_objectives 1
+	}else if (level.cp1_bomb3_status == 0){
+		waitthread global/objectives.scr::add_objectives 1 2 level.locationchecktext $cp1_bomb3.origin
+		//waitthread global/objectives.scr::add_objectives 2 1 "Escape through the Commandant's residence on the south side of town." $exitnode.origin
+		thread global/objectives.scr::current_objectives 1
+	}else if (level.cp2_bomb1_status == 0){
+		waitthread global/objectives.scr::add_objectives 1 2 level.locationchecktext $cp2_bomb1.origin
+		//waitthread global/objectives.scr::add_objectives 2 1 "Escape through the Commandant's residence on the south side of town." $exitnode.origin
+		thread global/objectives.scr::current_objectives 1
+	}else if (level.cp2_bomb2_status == 0){
+		waitthread global/objectives.scr::add_objectives 1 2 level.locationchecktext $cp2_bomb2.origin
+		//waitthread global/objectives.scr::add_objectives 2 1 "Escape through the Commandant's residence on the south side of town." $exitnode.origin
+		thread global/objectives.scr::current_objectives 1
+	}else if (level.cp2_bomb3_status == 0){
+		waitthread global/objectives.scr::add_objectives 1 2 level.locationchecktext $cp2_bomb3.origin
+		//waitthread global/objectives.scr::add_objectives 2 1 "Escape through the Commandant's residence on the south side of town." $exitnode.origin
+		thread global/objectives.scr::current_objectives 1
+	}
+}end
+
+//============================================================================
+objective1_detonation:{
+//============================================================================
+	//*** Set off the explosives
+	exec global/exploder.scr::explode 1
+
+	//*** Set off the pyrotechnics
+	thread objective1_fireballs
+
+	//*** Execute massive radius damage and kill player if he is in the predetermined kill zone
+	radiusdamage ( ($objective1_shockwave.origin) + (0 0 16) ) 1000 1000 0
+
+	//*** Shake the player's view hard
+	exec global/earthquake.scr .23 4 0 0
+
+	//*** Make the funky falling tower sound
+	$explosion_speaker1 playsound m6l2a_tower
+	wait 0.15 
+
+	$explosion_speaker2 playsound m6l2a_tower
+	
+	if(level.gametype==0){//Criminal - Singleplayer
+		if ($player isTouching $death_detector){
+			$player damage $world 5500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+		}
+	}else{//Criminal - Multiplayer
+		for (local.i = 1; local.i <= $player.size; local.i++) {
+			local.player = $player[local.i]
+			if(	local.player != NULL &&
+				local.player istouching $death_detector &&
+				local.player.dmteam != "spectator" &&
+				local.player.healthh > 0)
+			{
+				local.player damage $world 5500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+			}
+		}
+	}
+	//*** Remove all script_model furniture and objects inside the command post, including the doors
+	$cp1_crates1 remove
+
+	$cp1_locker1 remove	
+	$cp1_locker2 remove
+	$cp1_locker3 remove	
+	$cp1_locker4 remove
+	$cp1_locker5 remove	
+	$cp1_locker6 remove
+	$cp1_locker7 remove	
+	$cp1_locker8 remove
+
+	$cp2_locker1 remove	
+	$cp2_locker2 remove
+	$cp2_locker3 remove	
+	$cp2_locker4 remove
+	$cp2_locker5 remove	
+	$cp2_locker6 remove
+
+	$cp1_cot1 remove
+	$cp1_cot2 remove
+	$cp2_cot1 remove
+
+	$cp1_phonograph1 remove
+
+	$cp1_metaldesk1 remove
+	$cp1_metaldesk2 remove
+	$cp2_metaldesk1 remove
+	$cp2_metaldesk2 remove
+	$cp2_metaldesk3 remove
+	$cp2_metaldesk4 remove
+	
+	$cp1_radiochair1 remove
+	$cp1_radiochair2 remove
+	$cp2_radiochair1 remove	
+	$cp2_radiochair2 remove
+	$cp2_radiochair3 remove
+	$cp2_radiochair4 remove	
+
+	$cp1_radio1 remove
+	$cp1_radio2 remove
+	$cp2_radio1 remove
+	$cp2_radio2 remove
+	$cp2_radio3 remove
+	$cp2_radio4 remove
+
+	$cp1_microphone1 remove
+	$cp1_microphone2 remove
+	$cp2_microphone1 remove
+	$cp2_microphone2 remove
+	$cp2_microphone3 remove
+	$cp2_microphone4 remove
+
+	$cp1_woodchair1 remove
+	$cp1_wooddesk1 remove
+	$cp1_typewriter1 remove
+	$cp1_stove1 remove
+	$cp1_stovepipe1 remove
+
+	//	$cp1_clock1 remove
+	//	$cp2_clock1 remove
+
+	$cp1_bomb1 remove
+	$cp1_bomb2 remove
+	$cp1_bomb3 remove
+
+	$cp2_bomb1 remove
+	$cp2_bomb2 remove
+	$cp2_bomb3 remove
+
+	$cp1_lightbulb1 remove
+	$cp1_lightbulb2 remove
+	$cp1_lightbulb3 remove
+
+	$cp2_lightbulb1 remove
+	$cp2_lightbulb2 remove
+	$cp2_lightbulb3 remove
+	
+	$cp2_centertable1 remove
+	$cp2_centertable2 remove
+
+	$cp2_wooddesk1 remove
+	$cp2_woodchair1 remove
+	$cp2_stove1 remove
+	$cp2_stovepipe1 remove
+
+	$cp1_frontdoor remove
+	$cp2_frontdoor remove
+
+	$health1 remove
+	$health2 remove
+	$health3 remove
+	$health4 remove
+	$health5 remove
+	$health6 remove
+	
+	$grenade1 remove
+}end
+
+//============================================================================
+objective1_fireballs:{
+//============================================================================
+	$objective1_fireball1 anim start
+	$objective1_fireball5 anim start
+	$objective1_fireball7 anim start
+	$objective1_fireball2 anim start	
+	waitframe
+
+	$objective1_fireball3 anim start
+	waitframe
+
+	$objective1_fireball4 anim start
+	waitframe
+
+	$objective1_fireball6 anim start
+}end
+
+//*** CALL IN ANY AND ALL REINFORCEMENTS FROM SPAWNER LAND AFTER THE COMM SHACKS BLOW UP, MAKE THE PLAYER FIGHT TO THE EXIT
+//============================================================================
+threat_condition_delta:{
+//============================================================================
+	thread scene3_spawner1_initialize
+	//thread scene3_spawner2_initialize
+	//thread scene3_spawner3_initialize
+	//thread scene3_sniper_perch1_activate
+
+	//*** Alarm is now permanently enabled and it gets tough.
+	wait 3
+
+	level.alarm_always_on = 1
+	level.alarm_always_on_base = 6		//14
+	level.alarm_always_on_random = 4	//7
+
+	thread global/alarmer.scr::turn_alarm_on	
+}end
+
+//OBJECTIVE 3 SUPPORT THREADS (Get to the Train Station)
+//============================================================================
+m6l2a_changelevel:{
+//============================================================================
+//*** Set next level to "The Schmerzen Express - M6L2B" and propagate weapons listed in loadout.scr
+	waitthread global/objectives.scr::add_objectives 2 3 "Escape through the Commandant's residence on the south side of town." 
+	exec global/missioncomplete.scr m6l2b 1
+}end
+
+//SPECIAL RADIO OPERATOR ANIMATION SUPPORT THREADS
+//============================================================================
+radio_operator_setup:{
+//============================================================================
+//*** Guy on radio by radio2, who is unable to hear because of his loud headphones. Haaaha!
+	local.self anim chair_radio_listenidle
+	local.self thread radio_operator_chairdeath
+}end
+
+//============================================================================
+radio_operator_chairdeath:{
+//============================================================================
+//*** If the player kills the guy undetected, the radio operator will do a special death animation that defies elementary physics
+	while (isAlive local.self) {
+		//if !(local.self cansee $player){ //chrissstrahl
+		if !(local.self exec coop_mod/replace.scr::cansee){//chrissstrahl - sp/mp compatible
+			local.self exec global/setdeathanim.scr chair_death_backwards
+		//}else if (local.self cansee $player){//chrissstrahl
+		}else if (local.self exec coop_mod/replace.scr::cansee){//chrissstrahl - sp/mp compatible
+			local.self exec global/killed.scr 
+		}
+		waitframe
+	}
+}end
+
+//DUMBASS AI PATROL SUPPORT THREADS (PREVENT COMA AFTER 60 SECONDS OF NON PLAYER CONTACT)	// and dumbass comments through whole script - Crim.		
+//============================================================================
+patrol_ai_forceactivate:{
+//============================================================================
+
+	//*** Get the ai to move when the player's not directly in their vis set
+	//*** NPC: alarm2_officer_patroller
+		//if ( (isAlive $alarm2_officer_patroller) && !($alarm2_officer_patroller cansee $player) ){ //chrissstrahl
+		if ( (isAlive $alarm2_officer_patroller) && !($alarm2_officer_patroller exec coop_mod/replace.scr::cansee)){//chrissstrahl - sp/mp compatible
+			$alarm2_officer_patroller forceactivate
+		}	
+
+	//*** NPC: alarm3_gestapo_patroller
+		//if ( (isAlive $alarm3_gestapo_patroller) && !($alarm3_gestapo_patroller cansee $player) ){ //chrissstrahl
+		if ( (isAlive $alarm3_gestapo_patroller) && !($alarm3_gestapo_patroller exec coop_mod/replace.scr::cansee)){ //chrissstrahl - sp/mp compatible
+			$alarm3_gestapo_patroller forceactivate
+		}
+
+	//*** NPC: alarm3_winterguy_patroller_alarmer
+		//if ( (isAlive $alarm3_winterguy_patroller_alarmer) && !($alarm3_winterguy_patroller_alarmer cansee $player) ){ //chrissstrahl
+		if ( (isAlive $alarm3_winterguy_patroller_alarmer) && !($alarm3_winterguy_patroller_alarmer cansee $player) ){ //chrissstrahl - sp/mp compatible
+			$alarm3_winterguy_patroller_alarmer forceactivate
+		}
+
+	//*** NPC: bridge_winter_patroller1
+		//if ( (isAlive $bridge_winter_patroller1) && !($bridge_winter_patroller1 cansee $player) ){ //chrissstrahl
+		if ( (isAlive $bridge_winter_patroller1) && !($bridge_winter_patroller1 exec coop_mod/replace.scr::cansee) ){//chrissstrahl - sp/mp compatible
+			$bridge_winter_patroller1 forceactivate
+		}
+
+	//*** NPC: bridge_winter_patroller2
+		//if ( (isAlive $bridge_winter_patroller2) && !($bridge_winter_patroller2 cansee $player) ){ //chrissstrahl
+		if ( (isAlive $bridge_winter_patroller2) && !($bridge_winter_patroller2 exec coop_mod/replace.scr::cansee) ){//chrissstrahl - sp/mp compatible
+			$bridge_winter_patroller2 forceactivate
+		}
+
+	//*** NPC: bridge_winter_patroller3
+		//if ( (isAlive $bridge_winter_patroller3) && !($bridge_winter_patroller3 cansee $player) ){ //chrissstrahl
+		if ( (isAlive $bridge_winter_patroller3) && !($bridge_winter_patroller3 exec coop_mod/replace.scr::cansee) ){//chrissstrahl - sp/mp compatible
+			$bridge_winter_patroller3 forceactivate
+		}
+
+	//*** NPC: exit_winter_patroller
+		//if ( (isAlive $exit_winter_patroller) && !($exit_winter_patroller cansee $player) ){ //chrissstrahl
+		if ( (isAlive $exit_winter_patroller) && !($exit_winter_patroller exec coop_mod/replace.scr::cansee) ){//chrissstrahl - sp/mp compatible
+			$exit_winter_patroller forceactivate
+		}
+
+	//*** Just before their 60 second limit is up, reissue the thread so they'll keep patrolling 
+	wait 59 
+	goto patrol_ai_forceactivate
+}end
+
+//DEFENSE SUPPORT THREADS
+//============================================================================
+defense_mg42:{
+//============================================================================
+//*** Power up the machineguns along the main street
+	$mg1 thread global/mg42_active.scr::mg42 1200
+	$mg2 thread global/mg42_active.scr::mg42 1500
+}end
+
+//============================================================================
+scene3_spawner1_initialize:{
+//============================================================================
+	level.scene3_spawner_started = 1		//signals that this is spawner is active and is used to test the shutdown trigger for this spawner
+	level.scene3_spawn1_teamvalue = 0		//initializes variable for total number spawned to date
+	level.scene3_spawn1_teamlimitmax = 6	//initializes constant for total number allowed to spawn (original = 30)
+	level.scene3_spawn1_currentalive = 0	//initializes variable for number of enemies currently alive from this spawner
+	level.scene3_spawn1_currentalivemax = 3	//initializes constant for maximum number allowed to be alive at any given time from this spawner
+	level.scene3_spawn1_loopwaittime = 1	//initializes constant for time between respawns
+	level.scene3_spawn1_deactivator = 0		//initializes variable for shutting down this loop's ability to spawn when the player is past this area
+
+	thread scene3_spawndetector1_control
+}end
+
+
+//============================================================================
+scene3_spawndetector1_control:{
+//============================================================================
+	local.loopwaittime = 0.2
+
+	//while ($player isTouching $scene3_spawndetector1){ //chrissstrahl
+	while (exec coop_mod/replace.scr::istouching $scene3_spawndetector1){ //chrissstrahl - sp/mp compatibility
+		//*** 3 at a time, use +3, use +2 or +1 for a tougher challenge (add higher numbers to tune respawns to easier levels)
+		//*** Crazy overwhelming fire and maneuver enemy attack, use nothing
+		if ((level.scene3_spawn1_currentalive + 3) <= level.scene3_spawn1_currentalivemax && level.scene3_spawn1_deactivator == 0 && level.scene3_spawn1_teamvalue < level.scene3_spawn1_teamlimitmax){
+			//if ((level.scene3_spawn1_currentalive) <= level.scene3_spawn1_currentalivemax && level.scene3_spawn1_deactivator == 0 && level.scene3_spawn1_teamvalue < level.scene3_spawn1_teamlimitmax)
+			//if ((level.scene3_spawn1_currentalive + 1) <= level.scene3_spawn1_currentalivemax && level.scene3_spawn1_deactivator == 0 && level.scene3_spawn1_teamvalue < level.scene3_spawn1_teamlimitmax)
+			local.scene3_spawn1_ai_name1 = "scene3_spawn1_ai1_" + level.scene3_spawn1_teamvalue	//assign a name to the spawned enemy
+			local.org1 = $scene3_spawndetector1_spawner1.origin						//spawn location as a script_origin
+
+			local.scene3_spawn1_ai_name2 = "scene3_spawn1_ai2_" + level.scene3_spawn1_teamvalue
+			local.org2 = $scene3_spawndetector1_spawner2.origin					
+
+			local.scene3_spawn1_ai_name3 = "scene3_spawn1_ai3_" + level.scene3_spawn1_teamvalue
+			local.org3 = $scene3_spawndetector1_spawner3.origin
+			
+			//*** Spawn 3 enemy soldiers in a wave
+			spawn models/human/german_winter_type1.tik "targetname" (local.scene3_spawn1_ai_name1) "type_attack" "cover" 
+
+			$(local.scene3_spawn1_ai_name1).origin = local.org1					//place the guy in the correct spot						
+			level.scene3_spawn1_currentalive ++									//increment the max allowed alive at any given time			
+			level.scene3_spawn1_teamvalue ++									//track the scene's enemy population
+			$(local.scene3_spawn1_ai_name1) thread scene3_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene3_spawn1_ai_name1) thread scene3_spawn1_ai_navigate1 	//call navigation thread 
+
+			local.scene3_spawn1_ai_name1.mindist = 128
+			local.scene3_spawn1_ai_name1.maxdist = 1800
+			local.scene3_spawn1_ai_name1.leash = 10000
+			local.scene3_spawn1_ai_name1.fixedleash = 0
+			local.scene3_spawn1_ai_name1.sight = 4000
+			local.scene3_spawn1_ai_name1.noticescale = 50
+			local.scene3_spawn1_ai_name1.accuracy = 100
+			local.scene3_spawn1_ai_name1.hearing = 4000
+			local.scene3_spawn1_ai_name1.interval = 256
+			local.scene3_spawn1_ai_name1 gun "MP40"
+	
+			spawn models/human/german_winter_type1.tik "targetname" (local.scene3_spawn1_ai_name2) "type_attack" "cover" 
+			
+			$(local.scene3_spawn1_ai_name2).origin = local.org2					//place the guy in the correct spot						
+			level.scene3_spawn1_currentalive ++									//increment the max allowed alive at any given time
+			level.scene3_spawn1_teamvalue ++
+			$(local.scene3_spawn1_ai_name2) thread scene3_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene3_spawn1_ai_name2) thread scene3_spawn1_ai_navigate2 	//call navigation thread 
+			$(local.scene3_spawn1_ai_name2) gun "mp40"
+
+			local.scene3_spawn1_ai_name2.mindist = 128
+			local.scene3_spawn1_ai_name2.maxdist = 1800
+			local.scene3_spawn1_ai_name2.leash = 10000
+			local.scene3_spawn1_ai_name2.fixedleash = 0
+			local.scene3_spawn1_ai_name2.sight = 4000
+			local.scene3_spawn1_ai_name2.noticescale = 1
+			local.scene3_spawn1_ai_name2.accuracy = 100
+			local.scene3_spawn1_ai_name2.hearing = 4000
+			local.scene3_spawn1_ai_name2.interval = 256
+			local.scene3_spawn1_ai_name2.ammo_grenade = 2
+
+			spawn models/human/german_winter_type1.tik "targetname" (local.scene3_spawn1_ai_name3) "type_attack" "cover" 
+
+			$(local.scene3_spawn1_ai_name3).origin = local.org3				//place the guy in the correct spot						
+			level.scene3_spawn1_currentalive ++								//increment the max allowed alive at any given time
+			level.scene3_spawn1_teamvalue ++
+			$(local.scene3_spawn1_ai_name3) thread scene3_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene3_spawn1_ai_name3) thread scene3_spawn1_ai_navigate3  	//call navigation thread 
+
+			local.scene3_spawn1_ai_name3.mindist = 128
+			local.scene3_spawn1_ai_name3.maxdist = 1800
+			local.scene3_spawn1_ai_name3.leash = 10000
+			local.scene3_spawn1_ai_name3.fixedleash = 0
+			local.scene3_spawn1_ai_name3.sight = 4000
+			local.scene3_spawn1_ai_name3.noticescale = 1
+			local.scene3_spawn1_ai_name3.accuracy = 100
+			local.scene3_spawn1_ai_name3.hearing = 4000
+			local.scene3_spawn1_ai_name3.interval = 256
+			local.scene3_spawn1_ai_name3.ammo_grenade = 2
+		}
+		wait local.loopwaittime			//every local.loopwaittime seconds, resume the while loop	
+	}
+	wait local.loopwaittime				//prevent infinite loop warning
+	goto scene3_spawndetector1_control
+}end
+
+//============================================================================
+scene3_spawn1_detect_death:{
+//============================================================================
+	self waittill death
+	self.targetname = ""
+	level.scene3_spawn1_currentalive --	//decrement the population count 
+}end
+
+//============================================================================
+scene3_spawn1_ai_navigate1:{
+//============================================================================
+	self exec global/runto.scr $scene3_spawn1_rallypoint1
+}end
+
+//============================================================================
+scene3_spawn1_ai_navigate2:{
+//============================================================================
+	self exec global/runto.scr $scene3_spawn1_rallypoint2
+}end
+
+//============================================================================
+scene3_spawn1_ai_navigate3:{
+//============================================================================
+	self exec global/runto.scr $scene3_spawn1_rallypoint3
+}end
+
+//============================================================================
+scene3_spawn1_terminate:{
+//============================================================================
+	if (level.scene3_spawner_started == 1){
+		level.scene3_spawn1_deactivator = 1
+	}
+}end
+
+//MISCELLANEOUS ESSENTIAL SUPPORT THREADS				
+//*** These threads are called by trigger_multiples in the bsp, one trigger per thread
+//============================================================================
+farplane_near:{
+//============================================================================
+	level.farplaneswitching = 1	
+	
+	while (level.farplane > 1600 && level.farplaneswitching == 1){
+		level.farplane = level.farplane - 10
+		println level.farplane
+		$world farplane level.farplane
+		wait .1
+	}
+}end
+
+//============================================================================
+farplane_far:{
+//============================================================================
+	level.farplaneswitching = 2
+
+	while (level.farplane < 2400 && level.farplaneswitching == 2){
+		level.farplane = level.farplane + 10
+		println level.farplane
+		$world farplane level.farplane
+		wait .1
+	}
+}end
+
+//MISCELLANEOUS SOUND SUPPORT THREADS
+//*** Player tries to play the piano
+//============================================================================
+piano:{
+//============================================================================	
+	$pianospeaker playsound moh_piano
+}end
+
+//*** Player plucks the cello
+//============================================================================
+cello:{
+//============================================================================
+	$cellospeaker playsound moh_cello
+}end
+
+//============================================================================
+locked_gate_sound:{
+//============================================================================
+	//$player playsound gate_metal_locked	//Criminal.
+	exec coop_mod/replace.scr::playsound gate_metal_locked //Criminal - coop comp.
+}end
+
+//============================================================================
+locked_iron_gate_sound:{
+//============================================================================
+	//$player playsound gate_iron_locked	//Criminal.
+	exec coop_mod/replace.scr::playsound gate_iron_locked //Criminal -coop comp.
+}end
+
+//MISCELLANEOUS ALARM GUY SUPPORT THREADS
+//============================================================================
+alarmer:{
+//============================================================================
+//*** Sets the spawned alarm reinforcement guy properties
+//*** *DIFFICULTY* SELECTOR
+	if (level.skill == "0"){
+		self.accuracy = 10
+	}else if (level.skill == "1"){
+		self.accuracy = 25
+	}else if (level.skill == "2"){
+		self.accuracy = 80
+	}
+}end
+
+

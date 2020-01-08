@@ -1,0 +1,863 @@
+//
+// thinkTank.scr
+//
+
+// most of this code was copied from vehicles_thinkers so that I could 
+//    customize it for e1l1 (get it to not use global variables, so that
+//    multiple tanks can have multiple targets, etc).
+//=========================================================================
+tankGo:
+//=========================================================================
+{
+	// essential parameters that are not set get defaults	
+	if (self.health == NIL) {
+		self.health = 400
+	}
+
+	self.health_set = 1
+
+	if (self.tankSpeed == NIL){
+		self.tankSpeed = 200
+	}
+
+	if (self.tankLookAhead == NIL){
+		self.tankLookAhead = 200
+	}
+
+	if (self.tankPathLoop == NIL){
+		self.tankPathLoop = 0
+	}
+
+	if (self.tankAccel == NIL){
+		self.tankAccel = 30
+	}
+
+	if (self.tankDriveDelay == NIL){
+		self.tankDriveDelay = 0
+	}
+
+	if (self.tankEngageDelay == NIL){
+		self.tankEngageDelay = 0
+	}
+
+	if (self.tankStunTime == NIL){
+		self.tankStunTime = 5
+	}
+
+	if (self.tankStopIfClose == NIL){
+		self.tankStopIfClose = 0
+	}
+
+	if (self.tankGuysJumpOut == NIL){
+		self.tankGuysJumpOut = 0
+	}
+
+	// maybe we want to see the debugging info
+	if (level.tankDebugPrint){
+		self waitthread tankPropertiesPrint
+	}
+
+	// start basic thinking loops
+	if (self.tankTarget == NULL){
+		local.notattacking = 1
+	}
+	else{
+		local.notattacking = 0
+	}
+
+	self.shotCount = 0
+	self thread tankEngageEnemy local.notattacking 
+	self thread tankDrivePath 
+
+	// if the player gets too close, then they die!
+	if (self.tankKillPlayer){
+		self thread tankKillPlayer
+	}
+}end
+
+//=========================================================================
+tankKillPlayer:
+//=========================================================================
+{
+end
+	while ((isAlive self) && self != NULL && self != NIL){
+		local.player = NULL
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+
+			if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 ){
+				local.dir  = self.origin
+				local.dir -= local.player.origin //chrisstrahl - coop compatible
+				local.dist = vector_length local.dir
+				//iprintlnbold local.dist
+
+				if (local.dist < 800) {
+					//iprintlnbold "player dies now"			
+					thread maps/e1l1/explosion.scr::big local.player //chrisstrahl - coop compatible
+				}
+			}
+		}
+		wait 0.5
+	}
+}end
+
+//=========================================================================
+tankEngageEnemy local.nottacking:
+//=========================================================================
+{
+	//	if (self.tankTarget == NIL || self.tankTarget == NULL)
+	//		end
+	if (self.tankEngageDelay > 0) {
+		if (level.tankDebugPrint){
+			println self.targetname " engage delaying " self.tankDriveDelay
+		}
+
+		wait self.tankEngageDelay
+	}
+
+	if (level.tankDebugPrint){
+		println self.targetname " engaging "
+	}
+
+	self thread enemy_tank_think local.notattacking self.tankType
+}end
+
+//=========================================================================
+tankDrivePath:
+//=========================================================================
+{
+	if (self.tankPath == NIL || self.tankPath == NULL) {
+		if (level.tankDebugPrint){
+			println self.targetname " no path, not driving"
+		}
+		end
+	}
+
+	// drive, if need be
+	if (self.tankDriveDelay > 0) {
+		if (level.tankDebugPrint){
+			println self.targetname " drive delaying " self.tankDriveDelay
+		}
+
+		wait self.tankDriveDelay
+	}
+
+	if (level.tankDebugPrint){
+		println self.targetname " moving out"
+	}
+
+	while (self != NIL && self != NULL){
+		self.driving = 1
+		self drive self.tankPath self.tankSpeed self.tankAccel 200 self.tankLookAhead
+		self waittill drive
+
+		if (self) {
+			self stop
+			self.driving = 0
+		}
+
+		if (!self.tankPathLoop){
+			break
+		}
+		wait 1
+	}
+}end
+
+//=========================================================================
+tankPropertiesPrint:
+//=========================================================================
+{
+	// belch all the properties out to the console
+	println "Tank " self.targetname " ---------------------------------"
+	println "  health = " self.health
+
+	if (self.tankTarget == NULL || self.tankTarget == NIL){
+		println "  tankTarget = (none)"
+	}
+	else{
+		println "  tankTarget = " self.tankTarget.targetname
+	}
+
+	println "  tankType = " self.tankType
+	println "  speed = " self.tankSpeed
+	println "  accel = " self.tankAccel
+	println "  lookahead = " self.tankLookAhead
+
+	if (self.tankPath == NULL){
+		println "  path = (none)"
+	}
+	else{
+		println "  path = " self.tankPath.targetname
+	}
+
+	println "  drive delay = " self.tankDriveDelay
+	println "  engage delay = " self.tankEngageDelay
+	println "  stun time = " self.tankStunTime
+	println "  stop if close to player = " self.tankStopIfClose
+	println "-------------------------------------------------------"
+}end
+
+//=========================================================================
+enemy_tank_think local.notattacking local.type:
+//=========================================================================
+{
+	self.type = local.type
+	self rendereffects "-shadow"
+
+	// make sure we only set health once...
+	if ( self.health_set==NIL || self.health_set==0 ){
+		self.health_set = 1
+		self.start_health = (((randomint 3) + 1) * 400)
+		self.health = self.start_health
+	}
+
+	self removeondeath 0
+	level.tank_stunned_time = 80
+
+	if (level.tankDebugPrint){
+		println "z:          self.target " self.target 
+	}
+
+	if (self.target){
+		self.collisionent = self.target
+		//	self.collisionent hide
+	}
+
+	self.gun  = self QueryTurretSlotEntity 0
+	self.gun2 = self QueryTurretSlotEntity 1
+
+	if (self.gun){
+		self.gun nodamage
+	}
+
+	if (self.gun2){
+		self.gun2 nodamage
+	}
+
+	if (level.sightdistance == NIL){
+		level.sightdistance = 16000
+	}
+
+	if (self.death_thread==NULL || self.death_thread==NIL){
+		self thread TankExplodeOnDeath local.type
+	}
+
+	// wait until we have a target
+	while (self != NULL && self != NIL && (IsAlive self) && (self.tankTarget == NULL || self.tankTarget == NIL)) {
+		wait 1
+	}
+
+	if (self == NULL || self == NIL || !(IsAlive self)){
+		end
+	}
+
+	if (local.notattacking != 1 && self.tankTarget != NULL && self.tankTarget != NIL){
+		//while ( (level.playertanktarget == 0) || (level.playertanktarget == NIL) )
+		//	wait 1
+		self waitthread resetAimTarget
+		thread enemy_tank_attack_loop self.gun
+		self.attack_thread = parm.previousthread
+		thread tank_pain self.gun
+		self.pain_thread = parm.previousthread
+	}
+
+	if (self.tankStopIfClose){
+		thread tank_stop_if_close
+	}
+}end
+
+//=========================================================================
+TankExplodeOnDeath local.type:
+//=========================================================================
+{
+	self.death_thread	= local
+	self removeondeath 0
+	self.type = local.type
+	self rendereffects "-shadow"
+
+	if ( self.health_set==NIL || self.health_set==0 ){
+		self.health_set   = 1
+		self.start_health = (((randomint 3) + 1) * 400)
+		self.health 	  = self.start_health
+	}
+
+	self removeondeath 0
+	self waittill death
+
+	if (level.tankDebugPrint){
+		println "z:         " self " is dead. self.start_health: " self.start_health
+	}
+
+	thread tank_killed
+}end
+
+//=========================================================================
+tank_stop_if_close:
+//=========================================================================
+{
+	//chrisstrahl - this is only a quick fix, might need more attention
+	local.player = exec coop_mod/replace.scr::player_closestTo self
+	
+	while ( (isAlive self) && !(vector_within self.origin local.player.origin 450) ){//chrisstrahl
+		iprintlnbold_noloc( "thinkTank.scr - tank_stop_if_close" )
+		wait 1
+		//	println "z:         tank stop if close: " self " is not close"	
+	}
+
+	if !(isAlive self){
+		end
+	}
+
+	if (self.driving == 1){
+		self stop
+	}
+	//		println "z:         tank stop if close: " self " is close. stopping."
+}end
+
+//=========================================================================
+tank_killed:
+//=========================================================================
+{
+	self playsound explode_tank
+	self stop
+	self.driving = 0
+
+	local.do_collision = 1
+	local.turretmodel  = NIL
+	local.type = self.type
+
+	if (self.attack_thread){
+		self.attack_thread delete
+	}
+
+	if (self.pain_thread){
+		self.pain_thread delete
+	}
+
+	if (level.tankDebugPrint){
+		println "z:          self.type: " self.type
+	}
+
+	switch (self.type){
+		case empty_turretless_tiger:
+			local.model = models/vehicles/tigertank_wot_d.tik
+			break
+		case panzer_desert:
+			local.model = models/vehicles/panzer_iv_eud_e1l1.tik
+			//local.model = models/vehicles/panzer_iv_d.tik
+			break
+		case panzer:
+			local.model = models/vehicles/panzer_iv_d_e1l1.tik
+			//local.model = models/vehicles/panzer_iv_d_e1l1.tik
+			//local.model = models/vehicles/panzer_iv_eud.tik
+
+			if (self.tankGuysJumpOut > 0){
+				// a guy jumps out!
+				local.get_out = 1
+				local.anims[0] = panzer_exit_1
+				local.anims[1] = panzer_exit_2
+				local.anims[2] = panzer_exit_3
+			}
+			else{
+				// tank is on fire, everybody dies!
+				thread maps/e1l1/explosion.scr::timedFireAndSmoke (self.origin + ( 0 0 100 )) 
+			}
+			break
+		case empty_panzer_desert:
+			local.model = models/vehicles/Panzer_destroyed_lowpoly_base.tik
+			local.turretmodel = models/vehicles/Panzer_destroyed_lowpoly_cannon.tik
+			local.get_out = 0
+			break
+		case sherman:
+			thread maps/e1l1/explosion.scr::timedFireAndSmoke (self.origin + ( 0 0 100 )) 
+			//local.model = models/vehicles/shermantank_damaged.tik
+			local.model = models/vehicles/shermantank_damaged_e1l1.tik
+		
+			local.turretmodel = NIL
+			local.get_out = 0
+//			local.do_collision = 0
+			break;
+	
+		case empty_tiger:
+			thread maps/e1l1/explosion.scr::timedFireAndSmoke (self.origin + ( 0 0 100 )) 
+			local.model = models/vehicles/tigertank_destroyed_base.tik
+			local.turretmodel = models/vehicles/tigertank_destroyed_cannon.tik
+			local.get_out = 0
+//			local.do_collision = 0
+			break;
+		case bridge_tiger:
+			// tiger tank that get's pushed into the bridge...
+			local.model = models/vehicles/tigertank_destroyed_base.tik
+			local.get_out = 0
+			local.do_collision = 0
+			break
+		case panzerwerfer:
+			local.model = models/vehicles/Panzerwerfer_d_base.tik
+			local.turretmodel = models/vehicles/Panzerwerfer_d_cannon.tik
+			local.get_out = 0
+			break;
+		case empty_panzer_winter:
+			local.model = models/vehicles/PanzerIV_w_d_base.tik
+			local.turretmodel = models/vehicles/PanzerIV_w_d_cannon.tik
+			local.get_out = 0
+			break;
+		case panzer_winter:
+			local.model = models/vehicles/PanzerIV_w_d_base.tik
+			local.turretmodel = models/vehicles/PanzerIV_w_d_cannon.tik
+			local.get_out = 1
+			local.anims[0] = panzer_exit_1
+			local.anims[1] = panzer_exit_2
+			local.anims[2] = panzer_exit_3
+			break;
+		case empty_panzer_lowpoly:
+			local.model = models/vehicles/panzer_destroyed_lowpoly_base.tik
+			local.turretmodel = models/vehicles/panzer_destroyed_lowpoly_cannon.tik
+			local.get_out = 0
+//			local.do_collision = 0
+			break;
+		case empty_t34:
+			local.model = models/vehicles/t34_base_d.tik
+			local.turretmodel = models/vehicles/t34_cannon_d.tik
+			local.get_out = 0
+//			local.do_collision = 0
+			break;
+		case bridge_panzer:
+			// tiger tank that get's pushed into the bridge...
+			local.model = models/vehicles/Panzer_destroyed_lowpoly_base.tik
+			local.get_out = 0
+			local.do_collision = 0
+			break
+		case berlin_panzer:
+			local.model = models/vehicles/panzer_destroyed_lowpoly_base.tik
+			local.turretmodel = models/vehicles/panzer_destroyed_lowpoly_cannon.tik
+			local.get_out = 1
+			local.anims[0] = tank_exit_1
+			local.anims[1] = tank_exit_2
+			local.anims[2] = tank_exit_3
+			local.anims[3] = tank_exit_4
+			break
+		default:
+			local.model = models/vehicles/tigertank_destroyed_base.tik
+			local.turretmodel = models/vehicles/tigertank_destroyed_cannon.tik
+			local.get_out = 1
+			local.anims[0] = tank_exit_1
+			local.anims[1] = tank_exit_2
+			local.anims[2] = tank_exit_3
+			local.anims[3] = tank_exit_4
+			break
+	}
+	local.name 	 = self
+	local.angles = self.angles
+	local.origin = self.origin
+
+	if (self.collisionent == NULL){
+		println "!!! tank " self.targetname " has no collision entity"
+	}
+	else {
+		local.brushmodel = self.collisionent.brushmodel
+		local.targetname = self.targetname
+	}
+
+	//stop the smoke emitter that came from damage and start a temp emitter for the death model
+	if (self.smoke){
+		self.smoke anim stop
+		self.smoke = NIL
+	}
+
+	self anim temp_smoke
+	self anim temp_sizzle
+	
+	self.gun  = self QueryTurretSlotEntity 0
+	self.gun2 = self QueryTurretSlotEntity 1
+
+	if (self.gun){
+		local.turretangles = self.gun.angles
+	}
+
+	self thread spawn_fx models/emitters/explosion_tank.tik
+	waitframe
+
+	exec global/earthquake.scr .2 4 0 0
+	//radiusdamage self.origin level.bomb_damage level.bomb_explosion_radius
+	radiusdamage (self.origin + (0 0 200)) 800 400
+	waitframe
+
+	if (self.gun){
+		self DetachTurretSlot 0
+		self.gun remove
+	}
+
+	if (self.gun2){
+		self DetachTurretSlot 1
+		self.gun2 remove
+	}
+
+	self remove
+
+	if ( local.do_collision==1 ){
+		local.collision = thread damaged_collision local.angles local.origin local.brushmodel
+	}
+	
+	local.damaged = thread spawn_damaged_new local.model local.angles local.origin
+	local.damaged.targetname = local.targetname
+	local.damaged.smoke	= local.smoke
+
+	//produce temporary smoke and burning sound
+	local.damaged anim temp_smoke
+	local.damaged anim temp_sizzle
+
+	if ( local.collision != NIL ){
+		local.damaged notsolid
+		local.collision disconnect_paths
+	}
+
+	if ( local.turretmodel != NIL ){
+		local.turretname = local.targetname + "_damaged_turret"
+		local.damaged attachmodel local.turretmodel "turret0" 1 local.turretname
+		local.turretname detach
+		local.turretname.angles = local.turretangles
+
+		if (local.get_out == 1){
+			local.turretname thread tank_guys_get_out local.anims local.name local.type local.angles
+		}
+	}
+	else{
+		if (local.get_out == 1){
+			local.damaged thread tank_guys_get_out local.anims local.name local.type local.angles local.turretname
+		}
+	}
+}end
+
+//=========================================================================
+tank_guys_get_out local.anims local.name local.type local.angles local.turretname:
+//=========================================================================
+{
+	wait 3
+
+	if (self.state != "open"){
+		if(local.turretname){
+			local.turretname anim open
+		}
+		else{
+			self anim open
+		}
+
+		self playsound tank_snd_dooropen
+	}
+	
+	wait 1
+	//self waittill animdone
+
+	if (self.state != "open"){
+		if(local.turretname){
+			local.turretname anim open_idle
+		}
+		else{
+			self anim open_idle
+		}
+	
+		self.state = "open"
+	}
+
+	//insert roberts random sorter here
+	exec global/randomorder.scr local.anims
+
+	//waitthread tank_guy_spawn local.anims[local.i] local.name local.type local.angles
+	for (local.i = 0; local.i < self.tankGuysJumpOut; local.i ++){
+		if (!local.anims[local.i]){
+			local.anims[local.i] = panzer_exit_3
+		}
+
+		waitthread tank_guy_spawn local.anims[local.i] local.name local.type local.angles
+	}
+}end
+
+//=========================================================================
+tank_guy_spawn local.anim local.name local.type local.angles:
+//=========================================================================
+{
+	if (level.tankDebugPrint){
+		println "z:       spawning guy to get out " local.anim
+	}
+
+	switch ( local.type ){
+		case	panzer_winter:
+			local.model_type = human/german_winter_Artillery-Crew
+		break;
+
+		default:
+		local.temp = randomint 3
+		
+		// DHS: only tank commanders for now
+		//if (local.temp == 0)
+		//	local.model_type = human/german_panzer_grenadier
+		//if (local.temp == 1)
+		//	local.model_type = human/german_panzer_obershutze
+		//if (local.temp == 2)
+			local.model_type = human/german_panzer_tankcommander
+		break;
+	}
+
+	local.ent = spawn local.model_type
+	local.ent.origin = self gettagposition "tag_start"
+
+	if ( local.angles!=NIL ){
+		local.ent.angles = local.angles
+	}
+	else{
+		local.ent.angles = self gettagangles "tag_start"
+	}
+
+	local.ent noticescale 1
+	local.ent sight 	4500
+	local.ent mindist 	2024
+	local.ent maxdist 	2448
+	local.ent leash 	10000
+
+	if (level.dontdropweapons == 1){
+		local.ent dontdropweapons
+	}
+	
+	local.ent exec global/disable_ai.scr
+	local.ent notsolid
+
+	if (level.tankDebugPrint){
+		println "z:         starting anim: " local.name " " local.anim
+	}
+
+	local.ent anim_noclip local.anim
+	local.ent waittill animdone
+
+	if (level.tankDebugPrint){
+		println "z:         ending   anim: " local.name " " local.anim
+	}
+
+	if ( (local.anim == "tank_exit_2") || (local.anim == "panzer_exit_2") ){
+		local.ent.position = "crawl"
+	}
+
+	if ( (local.anim == "tank_exit_3") || (local.anim == "panzer_exit_3") ){
+		local.ent.health = 45 
+	}
+
+	if (local.anim == "tank_exit_4"){
+		local.ent bedead
+		end
+	}
+
+	wait .4
+	if (level.tankDebugPrint){
+		println "z:         making solid: " local.name " " local.anim
+	}
+
+	local.ent solid
+
+	if (level.tankDebugPrint){
+		println "z:         enabling AI: " local.name " " local.anim
+	}
+
+	local.ent exec global/enable_ai.scr
+	local.ent attackplayer
+}end
+
+//=========================================================================
+tank_pain local.gun local.relock_on_player:
+//=========================================================================
+{
+	local.previoushealth = self.health
+	local.timer = 0
+	self immune bash
+
+	if ( local.relock_on_player==NIL ){
+		local.relock_on_player	= 1
+	}
+
+	local.timeToUnStun = 0
+
+	while(isAlive self){	
+		wait .1
+
+		//if ( (isAlive self) && (self.health < local.previoushealth) )
+		local.dHealth = local.previoushealth - self.health
+		if ( (isAlive self) && local.dHealth > 100 && self.tankStunTime > 0){
+			if (level.tankDebugPrint){
+				println "z:         " self " is damaged. self.start_health: " self.start_health
+				println "z:         current health: " self.health
+				println "z:         previous health: " local.previoushealth
+				println "z:         " self " is stunned"
+			}
+
+			self playsound damage_tank
+			self.stunned = 1
+			local.gun setAimTarget NULL
+			local.newSpeed = 1
+			//self.tankSpeed*0.5
+
+			if (self.driving == 1) {
+				self modifydrive local.newSpeed self.tankAccel 256
+			}
+
+			if (self.driving_reverse == 1) {
+				self modifydrive local.newSpeed self.tankAccel 256
+				self modifydrive -5 100 256
+			}
+
+			if ( self.smoke==NIL ){
+				self.smoke = spawn "models/emitters/linger_smoke.tik"
+				self.smoke notsolid
+				self.smoke anim start
+				self.smoke.origin = (self.origin + (0 0 80))
+				self.smoke glue self
+			}
+
+			local.previoushealth = self.health
+			local.timeToUnStun = level.time + self.tankStunTime
+		}
+		
+		if (local.timeToUnStun == 0){
+			// if we're not stunned, make sure we re-lock target, 
+			//    in case it has changed
+			self waitthread resetAimTarget
+		}
+		else if (local.timeToUnStun != 0 && level.time > local.timeToUnStun){
+			local.timeToUnStun = 0
+
+			if ( local.relock_on_player==1 && self.tankTarget != NULL) {
+				self waitthread resetAimTarget
+			}
+
+			if (self.driving == 1){
+				self modifydrive local.newSpeed self.tankAccel 256
+			}
+			if (self.driving_reverse == 1){
+				self modifydrive -local.newSpeed self.tankAccel 256
+			}
+
+			self.stunned = 0
+			if (level.tankDebugPrint) {
+				println "z:         " self " is no longer stunned"
+			}
+		}
+	}
+}end
+
+//=========================================================================
+enemy_tank_attack_loop local.gun:    //self is the tank
+//=========================================================================
+{
+	if ( self.paused==NIL ){
+		self.paused = 0
+	}
+
+	local.waited = 0
+
+	while (IsAlive self){
+		// get our gun on target 1st...
+		local.gun waittill ontarget
+
+		if ( self.paused==0 ){
+			local.gun waittill ontarget
+			wait 0.25	// center on target for just a little..
+			local.trace_offset = local.gun.origin + (0 0 48)
+
+			if (self.stunned == 1){
+				//println "z:             " self " is not firing because stunned"
+				wait 1
+				local.waited = 1
+			}
+			else if (self.tankTarget == NULL){
+				// do nothing
+			}
+			else if !(vector_within self.tankTarget.centroid local.trace_offset level.sightdistance){		
+				//println "z:             " self " is not firing because range"
+				wait 1
+				//local.waited = 1
+			}
+
+			// for some reason these ray casts aren't getting the player tank, even
+			//    though the player tank isn't obsured!  (DHS 4/20)
+			//else if ((self == $scene3AxisTank4) && !(sighttrace local.trace_offset ($player.origin + (0 0 60)) 1)){
+			//sighttrace( Vector start, Vector end, [ Integer pass_entities ], [ Vector mins ], [ Vector maxs ] )
+			else if ((self == $scene3AxisTank4) && !(exec coop_mod/replace.scr::sighttrace (0 0 60) local.trace_offset 1)){ //chrisstrahl - coop compatible
+				println "z:             " self " is not firing because sight trace"
+				wait 1
+				local.waited = 1
+			}
+			else{
+				//println "z:         " self " on target, firing!"
+				// wait 3
+
+				if ( local.waited==0 ){
+					wait 2
+					local.waited = 1
+				}
+
+				if (self.stunned != 1) {
+					local.gun anim fire
+					self.shotCount++
+				}
+				wait 5
+			}
+		}
+		else{
+			wait 1
+		}
+	}
+}end
+
+//=========================================================================
+resetAimTarget:
+//=========================================================================
+{
+	if (self.tankTarget != NULL && self.tankTarget != NIL){
+		local.tankTarget = $self.tankTarget
+
+		if (local.tankTarget != NULL && local.tankTarget != NIL){
+			self.gun setAimTarget self.tankTarget
+		}
+	}
+}end
+
+//=========================================================================
+spawn_fx local.fx:
+//=========================================================================
+{
+	local.temp = spawn script_model model local.fx
+	local.temp notsolid
+	local.temp.origin = self.origin
+	local.temp anim start
+	local.temp notsolid
+	wait 5
+
+	local.temp remove
+}end
+
+//=========================================================================
+spawn_damaged local.model:
+//=========================================================================
+{
+	local.damaged = spawn script_model model local.model
+	local.damaged.origin = self.origin
+	local.damaged.angles = self.angles
+	local.damaged notsolid
+}end local.damaged
+
+//=========================================================================
+spawn_damaged_new local.model local.angles local.origin:
+//=========================================================================
+{
+	local.damaged = spawn script_model model local.model
+	local.damaged.origin = local.origin
+	local.damaged.angles = local.angles
+}end local.damaged
+
+//=========================================================================
+damaged_collision local.angles local.origin local.brushmodel:
+//=========================================================================
+{
+	local.collision = spawn script_object model local.brushmodel
+	local.collision.origin = local.origin
+	local.collision.angles = local.angles
+	local.collision safesolid
+}end local.collision
+

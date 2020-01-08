@@ -1,0 +1,555 @@
+//
+// scene5.scr
+//
+// in the bunker!
+//
+//=========================================================================
+Init:
+//=========================================================================
+{
+	level.deadRadios = 0
+	wait 1
+
+	//spawn trigger_relay targetname "gnabbedDocsTrigger"
+	//spawn trigger_relay targetname "destroyedRadioTrigger"
+	// machine gunner, behavior TBD, for now don't hog CPU cycles
+	//$bgunner1 ai_off
+	//$bgunner1 hide
+
+	//chrissstrahl - we don't do slow checks in coop
+	if (level.gametype == 0 && level.slowMachine != 0) {
+		$blokes0011 remove
+
+		for (local.i = 1; local.i <= $enemyspawnertrigger.size; local.i++) {
+			println local.i " spawner trigger : " $enemyspawnertrigger[local.i].set ", " $enemyspawnertrigger[local.i].target
+
+			if ($enemyspawnertrigger[local.i].target == "runningbridgeguys") {
+				$enemyspawnertrigger[local.i] nottriggerable
+			}
+
+			if ($enemyspawnertrigger[local.i].target == "gaterunners") {
+				$enemyspawnertrigger[local.i] thread resetGateRunnersEnemyname
+			}
+		}
+		thread maps/e1l1/scene3.scr::thinSpawnerSet 1965 2
+	}
+
+	$bunkerExplosionTrigger thread doBunkerExplosion
+	thread lockBunker
+	thread monitorDocuments
+	$radio1 waitthread doSound e1l1_radio_loopA 
+	$radio2 waitthread doSound e1l1_radio_loopB
+	$radio3 waitthread doSound e1l1_radio_loopC 
+
+	$radio1 thread monitorRadio
+	$radio2 thread monitorRadio
+	$radio3 thread monitorRadio
+
+	$scene6AlliedTank1 nodamage
+	$scene6AlliedTank1 hide
+	$scene6AlliedTank1 notsolid
+	$scene6AlliedTank1.gun = $scene6AlliedTank1 QueryTurretSlotEntity 0
+	$scene6AlliedTank1.gun hide
+	$scene6AlliedTank1.gun notsolid
+	$scene6AlliedTank1.gun2 = $scene6AlliedTank1 QueryTurretSlotEntity 1
+	$scene6AlliedTank1.gun2 hide
+	$scene6AlliedTank1.gun2 notsolid
+
+	$scene6AlliedTank2 nodamage
+	$scene6AlliedTank2 hide
+	$scene6AlliedTank2 notsolid
+	$scene6AlliedTank2.gun = $scene6AlliedTank2 QueryTurretSlotEntity 0
+	$scene6AlliedTank2.gun hide
+	$scene6AlliedTank2.gun notsolid
+	$scene6AlliedTank2.gun2 = $scene6AlliedTank2 QueryTurretSlotEntity 1
+	$scene6AlliedTank2.gun2 hide
+	$scene6AlliedTank2.gun2 notsolid
+
+	thread explodingGuys
+	thread doTanks
+	thread doBunkerSkirmishes
+	thread doRunnerGagGuys
+	thread doEndGuys
+}end
+
+//=========================================================================
+doBunkerSkirmishes:
+//=========================================================================
+{
+	// init all skirmish guys (turn ai off, hide, notsolid)
+	waitthread initSkirmish 1
+	waitthread initSkirmish 2
+	waitthread initSkirmish 3
+
+	$EnterFinalBunkerRoom1Trigger waittill trigger
+	waitthread startSkirmish 1
+
+	$EnterFinalBunkerRoom2Trigger waittill trigger
+	waitthread killSkirmish 1
+	waitthread startSkirmish 2
+
+	$EnterFinalBunkerRoom3Trigger waittill trigger
+	waitthread killSkirmish 2
+	waitthread startSkirmish 3
+
+	$scene6Trigger waittill trigger
+	waitthread killSkirmish 3
+}end
+
+//=========================================================================
+initSkirmish local.num:
+//=========================================================================
+{
+	local.good_guy_name = ("BunkerSkirmish" + local.num + "Ally_spawn")
+	local.bad_guy_name  = ("BunkerSkirmish" + local.num + "Axis_spawn")
+
+	waitthread initSkirmishGuys local.good_guy_name local.bad_guy_name
+	waitthread initSkirmishGuys local.bad_guy_name local.good_guy_name
+}end
+
+//=========================================================================
+initSkirmishGuys local.targname local.enemytargname:
+//=========================================================================
+{
+	level.num_skirmish_guys[local.targname]  = 0
+	level.skirmish_cancelled[local.targname] = 0
+
+	/*
+	for (local.i=1; local.i<=$(local.targname).size; local.i++)
+	{
+		local.ent = $(local.targname)[local.i]
+
+		local.ent ai_off
+		local.ent hide
+		local.ent notsolid
+
+		local.ent thread countSkirmishGuys local.targname local.enemytargname
+	}
+	*/
+}end
+
+//=========================================================================
+countSkirmishGuys local.targname local.enemytargname:
+//=========================================================================
+{
+	level.num_skirmish_guys[local.targname]++
+	self waittill death
+	level.num_skirmish_guys[local.targname]--
+
+	if ((level.num_skirmish_guys[local.targname] <= 0) &&
+		(level.skirmish_cancelled[local.targname] == 0)){
+		waitthread rallySkirmishGuys local.enemytargname
+	}
+}end
+
+//=========================================================================
+rallySkirmishGuys local.targname:
+//=========================================================================
+{
+	for (local.i=1; local.i<=$(local.targname).size; local.i++){
+		local.ent = $(local.targname)[local.i]
+
+		if (isalive local.ent){
+			local.ent waitthread global/SafeMoveTo.scr::SafeRunTo $BunkerSkirmishRally[1 + (randomint $BunkerSkirmishRally.size)]
+		}
+	}
+}end
+
+//=========================================================================
+startSkirmish local.num:
+//=========================================================================
+{
+	local.good_guy_name = ("BunkerSkirmish" + local.num + "Ally")
+	local.bad_guy_name  = ("BunkerSkirmish" + local.num + "Axis")
+
+	waitthread startSkirmishGuys local.good_guy_name (local.bad_guy_name + "_spawn") "models/human/Sc_Al_US_InfMask"
+	waitthread startSkirmishGuys local.bad_guy_name (local.good_guy_name + "_spawn") "models/human/german_afrika_private_headwrap.tik"
+}end
+
+//=========================================================================
+startSkirmishGuys local.targname local.enemytargname local.modelname:
+//=========================================================================
+{
+	local.guyname = (local.targname + "_spawn")
+
+	for (local.i=1; local.i<=$(local.targname).size; local.i++){
+		local.spawnpoint = $(local.targname)[local.i]
+		local.ent = spawn local.modelname targetname local.guyname origin (local.spawnpoint.origin + (0 0 5))
+		local.ent thread countSkirmishGuys local.guyname local.enemytargname
+
+		/*
+		local.ent = $(local.targname)[local.i]
+		local.ent solid
+		local.ent show
+		local.ent ai_on
+		if ((local.ent.target != NIL) && (local.ent.target != NULL) && (local.ent.target != ""))
+			local.ent runto local.ent.target
+		*/
+	}
+}end
+
+//=========================================================================
+killSkirmish local.num:
+//=========================================================================
+{
+	local.good_guy_name = ("BunkerSkirmish" + local.num + "Ally_spawn")
+	local.bad_guy_name  = ("BunkerSkirmish" + local.num + "Axis_spawn")
+
+	waitthread killSkirmishGuys local.good_guy_name
+	waitthread killSkirmishGuys local.bad_guy_name
+}end
+
+//=========================================================================
+killSkirmishGuys local.targname:
+//=========================================================================
+{
+	level.skirmish_cancelled[local.targname] = 1
+	local.arr = exec global/makearray.scr $(local.targname)
+	local.num = $(local.targname).size
+
+	for (local.i=1; local.i<=local.num; local.i++){
+		local.arr[local.i] delete
+	}
+}end
+
+//=========================================================================
+doTanks:
+//=========================================================================
+{
+	$EnterFinalBunkerRoom1Trigger waittill trigger
+	
+	//chrissstrahl - coop mod respawn area
+	if(level.gametype != 0){
+		//chrissstrahl - create spawnpoints for coop
+		waitthread coop_mod/spawnlocations.scr::e1l1_update10
+	}
+
+	$scene6AlliedTank1 		show
+	$scene6AlliedTank1 		solid
+	$scene6AlliedTank1.gun 	show
+	$scene6AlliedTank1.gun 	solid
+	$scene6AlliedTank1.gun2 show
+	$scene6AlliedTank1.gun2 solid
+
+	$scene6AlliedTank2 		show
+	$scene6AlliedTank2 		solid
+	$scene6AlliedTank2.gun 	show
+	$scene6AlliedTank2.gun 	solid
+	$scene6AlliedTank2.gun2 show
+	$scene6AlliedTank2.gun2 solid
+
+	//	$scene6AlliedTank1.mineclearing = spawn script_model model vehicles/US_V_MineClearing.tik
+	//	$scene6AlliedTank1.mineclearing attach $scene6AlliedTank1 origin 1
+	$scene6AlliedTank1 drive $EndTank1MidStart 5 100 200 256
+	wait 0.5
+
+	$scene6AlliedTank2 drive $EndTank2MidStart 5 100 200 256
+	$scene6AlliedTank1 waittill drive
+	$scene6AlliedTank1 stop
+	$scene6AlliedTank2 stop
+}end
+
+//=========================================================================
+monitorDocuments:
+//=========================================================================
+{
+	$documentsTrigger waittill trigger	
+	//$player playsound pickup_papers1 //chrissstrahl
+	$documents playsound pickup_papers1 //chrissstrahl - make coop compatible
+	$documents hide
+	wait 0.5
+
+	waitthread maps/e1l1/objectives.scr::transition "foundDocs"
+	trigger	$gnabbedDocsTrigger
+}end
+
+//=========================================================================
+monitorRadio:
+//=========================================================================
+{
+	//chrissstrahl - coop compatible
+	waitthread coop_mod/replace.scr::waitForPlayer
+
+	local.soundObj = self.attachedSound
+	local.origin   = self.origin
+
+	while (self != NULL && self != NIL && self.health > 0){
+		wait 0.1
+	}
+
+	if (local.soundObj != NULL && local.soundObj != NIL){
+		local.soundObj remove
+	}
+	
+	level.deadRadios++
+	if (level.deadRadios == 3){
+		waitthread maps/e1l1/objectives.scr::transition "killedRadios"
+	}
+
+	local.explosion = spawn models/emitters/adamspark.tik
+	local.explosion.origin = local.origin
+	wait 0.3
+
+	local.explosion remove
+}end
+
+//gnabbedDocs:
+//	$gnabbedDocsTrigger waittill trigger
+//end
+
+//destroyedRadio:
+//	$destroyedRadioTrigger waittill trigger
+//end
+
+//=========================================================================
+doSound local.sound:
+//=========================================================================
+{
+	local.soundorigin = spawn script_model model "fx/dummy.tik"
+	local.soundorigin.origin = self.origin
+	local.soundorigin loopsound local.sound
+	local.soundorigin notsolid
+	self.attachedSound = local.soundorigin
+}end
+
+//=========================================================================
+doRunnerRemove:
+//=========================================================================
+{
+	self remove
+}end
+
+//=========================================================================
+doRunnerGagGuys:
+//=========================================================================
+{
+	if (level.prespawnDone != 1){
+		level waittill prespawn
+	}
+
+	waitthread global/ManSpawnNamed.scr::Init "alliedrunnergagtemp_"
+
+	//chrissstrahl - we don't do slow checks in coop
+	if (level.gametype == 0 && level.slowMachine != 0){
+		end
+	}
+
+	$spawnRunnerGagGuys waittill trigger
+	waitthread global/ManSpawnNamed.scr::Spawn "alliedrunnergagtemp_"
+
+	level.runnerNo = 0
+	$alliedrunnergagtemp_ thread saySomething
+	$reachedBunkerTrigger waittill trigger
+	$alliedrunnergagtemp_ thread doRunnerRemove
+}end
+
+//=========================================================================
+saySomething:
+//=========================================================================
+{
+	local.no = level.runnerNo
+	level.runnerNo++
+
+	$tossguytrigger waittill trigger
+	//while ((self != NULL) && !(vector_within self.origin $player.origin 800) && (isalive self))
+	//	wait 0.25
+
+	if (self == NULL || !(isalive self)){
+		end
+	}
+
+	switch (local.no) {
+		case 0:
+			self say DFRUS_sighted_01h_1268
+			break
+		case 1:
+			wait 0.8
+			self say DFRUS_sighted_01h_1240
+			break
+		case 2:
+			wait 1.6
+			self say DFRUS_supress170
+			break
+	}
+}end
+
+//=========================================================================
+doEndGuys:
+//=========================================================================
+{
+	if (level.prespawnDone != 1){
+		level waittill prespawn
+	}
+
+	waitthread global/ManSpawnNamed.scr::Init "endGuys"
+	// wait for all objectives (except the very last one) to be done
+	$everythingDoneTrigger waittill trigger
+
+	while (1){
+		$endGuysSpawnTrigger waittill trigger
+
+		if (level.radios_objDone != 0 && level.documents_objDone != 0){
+			break
+		}
+	}
+
+	dprintln "end guys!"
+	waitthread global/ManSpawnNamed.scr::Spawn "endGuys"
+	$endGuys thread doEndGuyThink
+}end
+
+//=========================================================================
+doEndGuyThink:
+//=========================================================================
+{
+	$finalDoor thread doOpen
+	wait 0.5
+	self attackplayer
+
+	if (self.target.targetname != NIL && self.target.targetname != NULL){
+		self runto self.target
+	}
+	else{
+		//self runto $player //chrissstrahl
+		self exec coop_mod/replace.scr::runtoClosest //chrissstrahl - coop compatible
+	}
+
+	if (self.enemyname == "lastGuyBlowUp") {
+		self thread doBlowUpGuy 700
+	}
+}end
+
+//=========================================================================
+doOpen:
+//=========================================================================
+{
+	self open
+}end
+
+//=========================================================================
+explodingGuys:
+//=========================================================================
+{
+	if (level.prespawnDone != 1){
+		level waittill prespawn
+	}
+
+	waitthread global/ManSpawnNamed.scr::Init "tossguy"
+	thread tossGuy
+
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "blowUpGuyTrigger"
+	local.trigger waittill trigger
+	wait 0.5
+
+	$blowUpGuy thread doBlowUpGuy
+}end
+
+//=========================================================================
+tossGuy:
+//=========================================================================
+{
+	$tossguytrigger waittill trigger
+	//iprintlnbold "rolling toss guy"
+	waitthread global/ManSpawnNamed.scr::Spawn "tossguy"
+	$tossguy exec global/setdeathanim.scr "death_mortar_high"
+	$tossguy nodamage
+	$tossguy.enableEnemy = 0
+ 	$tossguy waitthread global/SafeMoveTo.scr::SafeRunTo_Wait $tossguydest 50
+	$tossguy takedamage
+	thread maps/e1l1/explosion.scr::big tossguy 0 1
+}end
+
+//=========================================================================
+doBlowUpGuy local.dist:
+//=========================================================================
+{
+	if (local.dist == NIL){
+		local.dist = 400
+	}
+
+	//chrissstrahl - make coop compatible
+	local.player = exec coop_mod/replace.scr::player_closestTo self
+	
+	
+	// wait until I'm close enough to the player
+	while (local.player == NULL || !(vector_within local.player.origin self.origin local.dist)){ //chrissstrahl - coop compatible
+		if(self == NULL){ end } //chrissstrahl - prevent possible error message spam
+		wait 0.2
+		local.player = exec coop_mod/replace.scr::player_closestTo self //chrissstrahl - get cloeset player
+	}
+
+	self exec global/setdeathanim.scr "death_grenade_high"
+	self thread maps/e1l1/explosion.scr::big self 0 1
+}end
+
+//=========================================================================
+lockBunker:
+//=========================================================================
+{
+	//chrissstrahl - coop compatible
+	waitthread coop_mod/replace.scr::waitForPlayer
+
+	$enterbunkerdoor lock
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "bunkerdoorguytrigger"
+	local.trigger nottriggerable
+}end
+
+//=========================================================================
+unlockBunker:
+//=========================================================================
+{
+	$enterbunkerdoor unlock
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "bunkerdoorguytrigger"
+	local.trigger triggerable
+	trigger local.trigger
+	waitframe
+
+	$enterbunkerdoor open
+	wait 0.5
+
+	$cleanup11 attackplayer
+}end
+	
+//=========================================================================
+explode local.origin:
+//=========================================================================
+{
+	local.fx = spawn animate/fx_explosion_mine.tik
+	local.fx.origin = local.origin
+	//local.fx playsound explode_flak88
+	local.fx playsound wall_explode
+	local.fx anim start
+	earthquake 1 4 1 0
+	wait 5
+
+	local.fx remove
+}end
+
+//=========================================================================
+doBunkerExplosion:
+//=========================================================================
+{
+	self waittill trigger
+	
+	for (local.i = 1; local.i <= $bunkerExplosionWaypoint.size; local.i++){
+		if ($bunkerExplosionWaypoint[local.i].set == self.set){
+			thread explode $bunkerExplosionWaypoint[local.i].origin
+		}
+	}
+}end
+
+//=========================================================================
+resetGateRunnersEnemyname:
+//=========================================================================
+{
+	// add the canyon runnsers to cleanup set 3
+	level waittill spawn
+	local.count = 0
+	
+	for (local.i = 1; local.i < level.enemyspawners + 1; local.i++) {
+		if (level.enemyspawner[local.i].set == self.set){
+			level.enemyspawner[local.i].enemyname = "cleanup3"
+		}
+	}
+}end
+	

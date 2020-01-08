@@ -1,0 +1,324 @@
+// enemySet160.scr
+
+//============================================================================
+init: {
+//============================================================================
+	local.paradeConcurrentMax = 3
+	local.paradeDuration = 20
+
+	local.spawnerCount = $parade160origin.size
+	level.live_truckguys = 0
+	level.nodrophealth = 1
+
+	for ( local.i = 0; local.i < local.spawnerCount; local.i++) {
+		local.j = local.i + 1
+		local.spawner[local.i] = $parade160origin[local.j]
+		local.spawner[local.i] hide
+		local.spawner[local.i] notsolid
+	}
+
+	$trigger160 waittill trigger
+	if (level.showTriggerMessages) {
+		// iprintlnbold "TRIGGER 160 HIT!"
+	}
+
+	spawn trigger_relay targetname "truckguys"
+	thread BringTruck
+	waitframe
+
+	$truckguys waittill trigger
+	$truckguys remove
+	wait 1
+
+	$truck2crew thread Charge
+	wait 3
+
+	level.endParade = 0
+	local.spawnedCount = 0
+	level.aliveCount = 0
+
+	local.startTime = level.time
+	while (level.time - local.startTime < local.paradeDuration) {
+		//local.dTime = level.time - local.startTime
+		//iprintlnbold local.dTime " elapsed"
+
+		while (level.aliveCount >= local.paradeConcurrentMax && level.endParade == 0) {
+			wait 0.25
+		}
+
+		if (level.endParade != 0) {
+			break
+		}
+
+		// time to spawn another dude
+		local.touching = $player istouching $trigger160
+		if ( local.touching ) {
+			local.spawnerIndex = local.spawnedCount%local.spawnerCount
+			local.currentSpawner = local.spawner[local.spawnerIndex]
+
+			local.i = local.spawnedCount
+			local.parader_name[local.i] = "parade_soldier" + local.i
+
+			//jsl: spawn local.currentSpawner.model "targetname" (local.parader_name[local.i]) "type_attack" "alarm" "health" level.enemyhealth
+			spawn local.currentSpawner.model "targetname" (local.parader_name[local.i]) "type_attack" "runandshoot" "health" level.enemyhealth
+
+			$(local.parader_name[local.i]) thread paradeCount
+			local.rallyPoint = $(local.currentSpawner.target)
+			$(local.parader_name[local.i]) thread paradeRun local.rallyPoint
+			$(local.parader_name[local.i]).origin = local.currentSpawner.origin
+			$(local.parader_name[local.i]).angles = local.currentSpawner.angles
+			$(local.parader_name[local.i]).mindist = 128
+			$(local.parader_name[local.i]).maxdist = 512
+			$(local.parader_name[local.i]).leash = 4096
+			$(local.parader_name[local.i]).fixedleash = 0
+			$(local.parader_name[local.i]).sight = 2048
+			$(local.parader_name[local.i]).noticescale = 25
+			$(local.parader_name[local.i]).hearing = 2048
+			$(local.parader_name[local.i]).enemysharerange = 2048
+			$(local.parader_name[local.i]).sound_awareness = 100
+			$(local.parader_name[local.i]).interval = 256
+			$(local.parader_name[local.i]) dontdropweapons
+
+			local.random = randomint 100
+			if (local.random <= 75) {
+				$(local.parader_name[local.i]) gun "Moschetto"
+			}
+
+			if (local.random <= 45) {
+				$(local.parader_name[local.i]).ammo_grenade = 4
+			}
+			local.spawnedCount++
+		}
+		else {
+			waitframe
+		}
+	}	
+}end
+
+//============================================================================
+paradeRun local.rallyPoint: {
+//============================================================================
+	if ((local.rallyPoint == NIL) || (local.rallyPoint == NULL)) {
+		// dprintln "no rally point - quitting thread"
+		self.enableEnemy = 1
+		end
+	}
+
+	self forceactivate
+	//self.enableEnemy = 0		JSL-->runandshoot
+	self runto local.rallyPoint
+
+	local.random = randomint 100
+	if (local.random < 50) {
+		// run all the way to the end
+		self waittill movedone
+	}
+	else {
+		// just run for a couple seconds
+		local.random = randomint 4
+		local.random += 3
+		wait local.random
+	}
+
+	self.enableEnemy = 1
+	self favoriteenemy $player
+	self aimat $player
+}end
+
+//============================================================================
+paradeCount: {
+//============================================================================
+	level.aliveCount++
+	self waittill death
+	level.aliveCount--
+}end
+
+//============================================================================
+detectParadeEnd local.trigger: {
+//============================================================================
+	level.lastTriggerTime = level.time
+	thread playerInTriggerClear 
+	thread playerInTrigger local.trigger
+	level.endParade	= 1
+}end
+
+//============================================================================
+playerInTriggerClear: {
+//============================================================================
+	while (1) {
+		wait 1
+		local.dTime = level.time - level.lastTriggerTime
+		
+		// if (local.dTime > 0.5)
+		//	level.endParade	= 1
+	}
+}end
+
+//============================================================================
+playerInTrigger local.trigger: {
+//============================================================================
+	while (1) {	
+		local.trigger waittill trigger
+		level.lastTriggerTime = level.time
+	}
+}end
+
+//============================================================================
+InitTruck: {
+//============================================================================
+	$starttruck2 notsolid
+	$starttruck2 hide
+	$starttruck2.target = $truckcollide
+}end
+
+
+//	try the old spearhead way of doing this...
+//============================================================================
+BringTruck: {
+//============================================================================
+	if ( isAlive $mg42_guy_125 ) {
+		$mg42_guy_125 waittill death
+	}
+
+	$starttruck2.unloaddelay = 1.0				// wait after truck stops
+	$starttruck2.unloaddriverdelay = 1.0		// wait after passengers unload
+
+	$starttruck2 solid
+	$starttruck2 show
+	$starttruck2 thread maps/e2l1/gliderride.scr::KillPassengersOnDeath
+	$starttruck2 thread global/vehicles_thinkers.scr::enemy_truck_think level.truck2_health 1 $starttruckpath2 NIL NIL "models/human/sc_ax_ital_inf" NIL "truck2crew" "truck2driver"
+
+	$starttruck2 waitthread global/vehicles_thinkers.scr::LoadPassenger 5 "models/human/sc_ax_ital_inf" NIL truck2crew
+	//$starttruck2 waitthread global/vehicles_thinkers.scr::LoadPassenger 2 "models/human/sc_ax_ital_inf" NIL truck2crew
+	$starttruck2 waitthread global/vehicles_thinkers.scr::LoadPassenger 6 "models/human/sc_ax_ital_inf" NIL truck2crew
+	$starttruck2 waitthread global/vehicles_thinkers.scr::LoadPassenger 3 "models/human/sc_ax_ital_inf" NIL truck2crew
+
+	$starttruck2 thread monitortruckhealth
+	waitframe
+
+	$truck2crew waitthread truckWeapon
+	$truck2driver.usegun = "beretta"
+	$truck2driver nodamage
+	$truck2driver.targetname = "truck2crew"
+	$truck2crew thread TruckGuyWaitsToDie
+}end
+
+//============================================================================
+truckWeapon: {
+//============================================================================
+	self gun "carcano"
+	self weaponcommand mainhand weaponsubtype 17
+	self.truckexitdelay = 0.25 + randomfloat(0.5)
+}end
+
+//============================================================================
+TruckGuyWaitsToDie: {
+//============================================================================
+	level.live_truckguys++
+	//dprintln "level.liveguys (start)=" level.live_truckguys
+	self waittill death
+	level.live_truckguys--
+	//dprintln "level.liveguys=(died)" level.live_truckguys
+	
+	if ( level.live_truckguys == 2 ) {
+		//dprintln "triggering parade!"
+		trigger $truckguys
+	}
+}end
+
+//============================================================================
+monitortruckhealth: {
+//============================================================================
+	self nodamage
+	self waittill drive
+	self takedamage
+
+	//	level.truck2moving = 1
+	//	thread monitortruckmovement
+	//
+	//	while ( self && (isalive self) && (level.truck2moving == 1) )
+	//	{
+	//		if ( self.health < 200 )
+	//			self.health = 200
+	//		waitframe
+	//	}
+}end
+
+//monitortruckmovement:
+//
+//	self waittill drive
+//	level.truck2moving = 0
+//
+//end
+
+
+/*
+
+	jsl-->Replaced this with above due to truck weirdness in the level...
+
+BringTruck_OLD:
+
+	if ( $mg42_guy_125 != NIL)
+		if ( $mg42_guy_125 != NULL)
+			if ( IsAlive $mg42_guy_125 )
+				$mg42_guy_125 waittill death
+
+	local.passengers = 4
+	$starttruck2 solid
+	$starttruck2 show
+	$starttruck2.health = level.truck2_health 
+	// println "truck health: " $starttruck2.health
+	$starttruck2 thread global/vehicles_thinkers.scr::truck_INIT
+
+	exec global/spotlight.scr::corona $starttruck2 "light left" // Turn on headlight coronas
+	exec global/spotlight.scr::corona $starttruck2 "light right"
+
+	if ( (local.passengers != NIL) && (local.passengers != 0) )
+		$starttruck2 waitthread maps/e3l3/scene1.scr::MyTruckLoad local.passengers "models/human/sc_ax_ital_inf" "carcano"
+
+	$starttruck2 thread NamePassengers "truck2crew"
+
+	$starttruck2 thread global/vehicles_thinkers.scr::truck_drive $starttruckpath2
+	$starttruck2.driver.usegun = "beretta"
+
+	$starttruck2 waittill death
+	$starttruck2 thread maps/e3l3/scene1.scr::PassengersDie
+	$starttruck2 thread global/vehicles_thinkers.scr::truck_killed local.type
+
+	$starttruck2 stop
+	$starttruck2.collisionent disconnect_paths
+
+end
+
+
+NamePassengers local.name:
+	local.i = 0
+	local.ent = NULL
+	for ( local.i = 1; local.i <= 6; local.i++ )
+	{
+		local.ent = self QueryPassengerSlotEntity local.i
+		if ( local.ent != NULL)
+		{
+			local.ent targetname local.name
+			local.ent thread TruckGuyWaitsToDie
+		}
+	}
+end
+*/
+
+//============================================================================
+Charge: {
+//============================================================================
+	// MJG: wait until these guys are off of the truck!
+	while ( self.done_unloading == 0 ) {
+		wait 0.1
+	}
+
+	wait 0.5
+	if ( isAlive self ) {
+		//dprintln "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ charging player now!!!!!"
+		self type_attack "runandshoot"
+		self runto $player
+		self.enableEnemy = 1
+	}
+}end

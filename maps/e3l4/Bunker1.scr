@@ -1,0 +1,833 @@
+//=========================================================================
+InitBunker1:
+//=========================================================================
+{
+	$jeepdriver 	nodamage
+	$jeeppassenger 	nodamage
+	$jeepdriver 	gun "none"
+	$jeeppassenger 	gun "none"
+
+	$startjeep setcollisionentity $jeepcollisionfull
+	
+	$startjeep.turret = $startjeep queryturretslotentity 0
+	$startjeep lock
+	$startjeep.turret lock
+	$startjeep.speed = 400
+	$startjeep nodamage
+	$startjeep vehicleanim idlelights
+	
+	$destroyedgmc notsolid
+	$destroyedgmc hide
+	$deaddriver notsolid
+	$deaddriver hide
+
+	$startplane notsolid
+	$startplane.shooting = 1
+	$startplane.speed 	 = 1500
+	$startplane.accel 	 = 8000
+	
+	$startplane02 notsolid
+	$startplane02.shooting 	= 0
+	$startplane02.speed 	= 1800
+	$startplane02.accel 	= 8000
+	
+	$startplane03 notsolid
+	$startplane03.shooting 	= 0
+	$startplane03.speed 	= 1700
+	$startplane03.accel 	= 8000
+	
+	//	$player threatbias 305
+	$bunker1mg1 thread SetupMG
+	$bunker1mg2 thread SetupMG
+	$bunker1mg3 thread SetupMG
+}end
+
+//=========================================================================
+SetupMG:
+//=========================================================================
+{
+	self burstfiresettings 1 3 1.5 3
+	self convergetime 0.25
+	self aibulletspread 450 275
+}end
+
+//=========================================================================
+SetupMGBadass:
+//=========================================================================
+{
+	self burstfiresettings 5 6 0.5 1
+	self convergetime 0.01
+	self aibulletspread 10 10
+}end
+
+//=========================================================================
+PlayerGetOffJeepHack:
+//=========================================================================
+{
+	while (level.playeronjeep == 1){
+		if ($player.useheld == 1){
+			waitthread PlayerGetOffJeepTurret
+		}
+
+		waitframe
+	}
+}end
+
+//=========================================================================
+DoIntro:
+//=========================================================================
+{
+	if (level.hackskipbunker1 == 1){
+		end
+	}
+
+	$startjeep.turret = $startjeep queryturretslotentity 0
+	$startjeep.turret setAimTarget $starttruck
+
+	level.playeronjeep = 0
+	waitthread maps/e3l4/Bunker1.scr::PlayerGetOnJeepTurret
+	$startjeep.turret psetviewangles ( 0 340 0 )
+
+	if (level.allowplayeroffjeep == 1){
+		thread PlayerGetOffJeepHack
+	}
+	
+	$jeepdriver thread global/LoopAnim.scr::LoopUpperAnim A_34_driver_idle
+	$jeeppassenger thread global/LoopAnim.scr::LoopUpperAnim A_34_jeepPass_idle
+
+	for (local.i = 1; local.i <= $bunker1supplies.size; local.i++){
+		$bunker1supplies[local.i] hide	
+	}
+	wait 2
+
+	thread maps/e3l4.scr::startMusic_e3l4_main
+	wait 1
+
+	//	waitthread maps/e2l1/fog.scr::setFog 4000
+	$jeepdriver say A_34_jeepDriver_1 	//Keep your eyes open.  Those Krauts are gonna be here any minute.
+	$jeepdriver waittill saydone
+	wait .5
+	
+	$jeeppassenger waitthread global/LoopAnim.scr::LoopUpperAnimStop
+	$jeeppassenger upperanim A_34_jeepPass_1	//Yeah, but where is that supply truck?
+	$jeeppassenger waittill upperanimdone
+	//	$jeeppassenger say A_34_jeepPass_1		//Yeah, but where is that supply truck?
+	//	$jeeppassenger waittill saydone
+	
+	$jeeppassenger say A_34_jeepPass_2	//The whole line is running out of ammo.
+	$jeeppassenger waittill saydone
+	$jeeppassenger thread global/LoopAnim.scr::LoopUpperAnim A_34_jeepPass_idle2
+	wait 3
+
+	thread doTruck
+	wait 3
+
+	thread IntroConversation
+	wait 0.5
+
+	/*
+	local.startplanetrigger02 = waitthread global/FindTrigger.scr::FindTrigger "startplanetrigger02"
+	trigger local.startplanetrigger02
+	local.startplanetrigger03 = waitthread global/FindTrigger.scr::FindTrigger "startplanetrigger03"
+	trigger local.startplanetrigger03
+	*/	
+	wait 3
+
+	local.startplanetrigger = waitthread global/FindTrigger.scr::FindTrigger "startplanetrigger"
+	trigger local.startplanetrigger
+	wait 2
+
+	local.startplanetrigger02 = waitthread global/FindTrigger.scr::FindTrigger "startplanetrigger02"
+	trigger local.startplanetrigger02
+	
+	local.startplanetrigger03 = waitthread global/FindTrigger.scr::FindTrigger "startplanetrigger03"
+	trigger local.startplanetrigger03
+	
+	$jeeppassenger thread global/LoopAnim.scr::LoopUpperAnimStop
+	$jeeppassenger say A_34_jeepPass_5		// Look out!
+	$jeeppassenger waittill saydone
+	$jeeppassenger thread global/LoopAnim.scr::LoopUpperAnim A_34_jeepPass_idle3
+	wait 3
+
+	$pgenBunker01 turnon
+	$collectsuppliesparademanager thread global/parade.scr::RunParade
+	$deliversuppliesbunker1parademanager thread global/parade.scr::RunParade
+	$jeeppassenger thread global/LoopAnim.scr::LoopUpperAnimStop
+	waitframe
+
+	$jeeppassenger say A_34_jeepPass_6	// Dammit!  Our guys need that stuff.
+	$jeeppassenger waittill saydone
+	$jeeppassenger say A_34_jeepPass_7	// C'mon Sarge, let's move!
+	$jeeppassenger waittill saydone
+	$jeeppassenger thread global/LoopAnim.scr::LoopUpperAnim A_34_Getin_jeepidle_danger
+	
+	$bunker1mg1 thread global/mg42init.scr::AttachGuyToMG42 $bunker1mgguy1 NIL 1
+	$bunker1mg2 thread global/mg42init.scr::AttachGuyToMG42 $bunker1mgguy2 NIL 1
+	$bunker1mg3 thread global/mg42init.scr::AttachGuyToMG42 $bunker1mgguy3 NIL 1
+	thread startSirens
+	
+	//	waitthread maps/e2l1/fog.scr::setFog 3000
+}end
+
+//=========================================================================
+JeepIdle:
+//=========================================================================
+{
+	//	self waitthread LoopAnimStop
+	if ( $jeeppassenger.loop_upperanim_thread!=NULL && $jeeppassenger.loop_upperanim_thread!=NIL){
+		$jeeppassenger.loop_upperanim_thread delete
+		$jeeppassenger.loop_upperanim_thread = NULL
+	}
+
+	$jeeppassenger.loop_upperanim_thread = local
+
+	while (1){
+		$jeeppassenger upperanim A_34_Getin_jeepidle_danger
+		$jeeppassenger waittill upperanimdone
+	}
+}end
+
+//=========================================================================
+IntroConversation:
+//=========================================================================
+{
+	$jeeppassenger waitthread global/LoopAnim.scr::LoopUpperAnimStop
+	$jeeppassenger say A_34_jeepPass_3	//There it is!
+	$jeeppassenger waittill saydone
+	$jeeppassenger thread global/LoopAnim.scr::LoopUpperAnim A_34_jeepPass_idle2
+	wait 1
+
+	$jeeppassenger waitthread global/LoopAnim.scr::LoopUpperAnimStop
+	$jeeppassenger say A_34_jeepPass_4	// Man, ain't she a sight for sore eyes?"
+	$jeeppassenger waittill saydone
+	$jeeppassenger thread global/LoopAnim.scr::LoopUpperAnim A_34_jeepPass_idle
+}end
+
+//=========================================================================
+doTruck:
+//=========================================================================
+{
+	$starttruck.takedamage = 0
+	$starttruck nodamage
+	$starttruck show
+
+	exec global/spotlight.scr::corona $starttruck "Box01" ( 40 60 250 )
+	exec global/spotlight.scr::corona $starttruck "Box01" ( -40 60 250 )
+	$starttruck drive $starttruck.target 175 175 200 256
+	wait 9.5
+
+	$starttruck thread truckExplode
+}end	 
+
+//=========================================================================
+SupplyTruckSwap:
+//=========================================================================
+{
+	$supplytruckswaptrigger waittill trigger
+	
+	level.destroyedTruck remove
+	$destroyedgmc solid
+	$destroyedgmc show
+	$deaddriver solid
+	$deaddriver show
+}end
+
+//=========================================================================
+ObjectiveDeliverSuppliesBunker1:
+//=========================================================================
+{
+	if (level.hackskipbunker1 == 1){		
+		waitthread PlayerGetOffJeepTurret
+		$player.origin = $bunker2deliverytrigger.origin
+		end
+	}
+
+	//   Player gets on the jeep
+	$startjeep.target = $pickupsuppliespath
+	thread SupplyTruckSwap
+	exec global/autosave.scr 2 // Able Bunker
+	
+	//   Jeep drives out to pick up supplies	
+	//	dprintln "DEBUG:  jeep loaded"
+	$jeepdriver waitthread global/LoopAnim.scr::LoopUpperAnimStop
+	$startjeep setcollisionentity $jeepcollision	
+
+	thread JeepSteering1
+	$startjeep drive $startjeep.target 300 200 200 256
+	wait 2
+
+	$startjeep setcollisionentity $jeepcollisionfull
+	$startjeep waittill drive
+	$startjeep fullstop
+	$startjeep setcollisionentity $jeepcollision
+	
+	//   Guys do their thing
+	$jeepdriver thread doSupplyRunD
+	$jeeppassenger say A_34_JeepPass_Talk_02  // Keep 'em off our backs while we go get the supplies!
+	$jeeppassenger waittill saydone
+	$jeeppassenger anim A_31_GetIn_jeepidle
+	level.gotSupplies = 0
+
+	$startjeep disconnect_paths
+	$jeeppassenger thread global/LoopAnim.scr::LoopUpperAnimStop
+	$jeeppassenger thread doSupplyRunP
+	wait 3
+
+	$startjeep setcollisionentity $jeepcollisionfull
+
+	while (level.gotSupplies < 2){
+		waitframe
+	}
+
+	$jeeppassenger thread global/LoopAnim.scr::LoopUpperAnim A_34_Getin_jeepidle_danger
+
+	//   go go go
+	thread JeepSteering2
+	$startjeep thread dirtFromTheTires
+	$startjeep drive $dropoffpath 300 100 200 256
+	$startjeep waittill drive
+	$startjeep fullstop
+
+	$deliversuppliesmanager thread global/parade.scr::RunParade
+	$collectsuppliesparademanager thread global/parade.scr::DeleteParade 4000
+
+	$jeeppassenger say A_34_Andyboy_01
+	$jeeppassenger thread global/LoopAnim.scr::LoopUpperAnimStop
+
+	// Guys get out and deliver the supplied to the bunkers
+	waitthread deliverSupplies $jeepdriver $jeeppassenger
+	$jeeppassenger thread global/LoopAnim.scr::LoopUpperAnim A_34_Getin_jeepidle_danger
+	wait 1
+}end
+
+//=========================================================================
+JeepSteering1:
+//=========================================================================
+{
+	$jeepdriver anim A_22_driver_turnleft
+	$jeepdriver waittill animdone
+	$jeepdriver anim A_22_driver_turnstraight_fromleft
+	$jeepdriver waittill animdone
+	$jeepdriver anim A_22_driver_turnright
+	$jeepdriver waittill animdone
+	$jeepdriver thread global/LoopAnim.scr::LoopAnim A_22_driver_turnright_idle
+	wait 2
+
+	$jeepdriver thread global/LoopAnim.scr::LoopAnimStop
+	$jeepdriver anim A_22_driver_turnstraight_fromright
+	$jeepdriver waittill animdone
+	$jeepdriver thread global/LoopAnim.scr::LoopAnim A_22_driving_idle
+}end
+
+//=========================================================================
+JeepSteering2:
+//=========================================================================
+{
+	$jeepdriver anim A_22_driver_turnleft
+	$jeepdriver waittill animdone
+	$jeepdriver thread global/LoopAnim.scr::LoopAnim A_22_driver_turnleft_idle
+	wait 2
+
+	$jeepdriver thread global/LoopAnim.scr::LoopAnimStop
+	$jeepdriver anim A_22_driver_turnstraight_fromleft
+	$jeepdriver waittill animdone
+	$jeepdriver thread global/LoopAnim.scr::LoopAnim A_22_driving_idle
+	wait 2.3
+
+	$jeepdriver thread global/LoopAnim.scr::LoopAnimStop
+	$jeepdriver anim A_22_driver_turnleft
+	$jeepdriver waittill animdone
+	$jeepdriver thread global/LoopAnim.scr::LoopAnim A_22_driver_turnleft_idle
+	wait 1.8
+
+	$jeepdriver thread global/LoopAnim.scr::LoopAnimStop
+	$jeepdriver anim A_22_driver_turnstraight_fromleft
+	$jeepdriver waittill animdone
+	$jeepdriver thread global/LoopAnim.scr::LoopAnim A_22_driving_idle
+}end
+
+//=========================================================================
+doSupplyRunD:
+//=========================================================================
+{
+	waitthread global/jeepanim.scr::DriverGetOutJeep $startjeep self
+	self waitthread getSupplies 3 1 "spare_tire" // was dummy09
+	waitthread global/jeepanim.scr::DriverGetInJeep $startjeep self
+	level.gotSupplies++
+}end
+
+//=========================================================================
+doSupplyRunP:
+//=========================================================================
+{
+	waitthread global/jeepanim.scr::PassengerGetOutJeep $startjeep self
+	wait 1
+
+	self waitthread getSupplies 4 2 "spare_tire"
+
+	local.jeepback 	= -250 * (angles_toforward $startjeep.angles)
+	local.jeepright = -200 * (angles_toleft $startjeep.angles)
+	local.runto 	= $startjeep.origin + local.jeepback + local.jeepright
+	self runto local.runto
+
+	while (vector_length(self.origin - local.runto) > 30){
+		waitframe
+	}
+
+	local.jeepback  = -250 * (angles_toforward $startjeep.angles)
+	local.jeepright =  200 * (angles_toleft $startjeep.angles)
+	local.runto 	= $startjeep.origin + local.jeepback + local.jeepright
+	self runto local.runto
+
+	while (vector_length(self.origin - local.runto) > 30){
+		waitframe
+	}
+
+	waitthread global/jeepanim.scr::PassengerGetInJeep $startjeep self
+	wait 1
+
+	level.gotSupplies++
+}end
+
+//=========================================================================
+getSupplies local.box1 local.box2 local.deliveryPosName:
+//=========================================================================
+{
+	local.moveradius 	= self.movedoneradius
+	self.movedoneradius = 120
+	local.deliveryPos 	= $startjeep gettagposition local.deliveryPosName
+	
+	self runto $bunker1supplies[local.box1]
+	self waittill movedone
+	self turnto $bunker1supplies[local.box1]
+	wait 0.5
+
+	//	self waittill turndone
+
+	self anim crate_pickup2
+	$bunker1supplies[local.box1] hide
+	self waittill animdone
+
+	self turnto local.deliveryPos
+	self waittill turndone
+	self anim crate_walk
+
+	while (vector_length (self.origin - $startjeep.origin) > 150){
+		waitframe
+	}
+
+	self anim crate_putdown2
+	self waittill animdone
+	self turnto NULL
+	wait .5
+	
+	self runto $bunker1supplies[local.box2]
+	self waittill movedone
+	self turnto $bunker1supplies[local.box2]
+	self waittill turndone
+	self anim crate_pickup2
+
+	$bunker1supplies[local.box2] hide
+
+	self waittill animdone
+	self turnto local.deliveryPos
+	self waittill turndone
+	self anim crate_walk
+
+	while (vector_length (self.origin - $startjeep.origin) > 150){
+		waitframe
+	}
+
+	self anim crate_putdown2
+	self waittill animdone
+	self turnto NULL
+	self.movedoneradius = local.moveradius
+}end
+
+//=========================================================================
+dirtFromTheTires:
+//=========================================================================
+{
+	for (local.i = 1; local.i <= 2; local.i++){
+		local.temp[local.i] = spawn script_model model models/emitters/JS_wheel_dirt_plume.tik
+		local.temp[local.i] notsolid
+	}
+		
+	local.temp[1] attach self "tire_spew_back_left"
+	local.temp[2] attach self "tire_spew_back_right"
+	
+	for (local.i = 1; local.i <= 2; local.i++){
+		local.temp[local.i] anim start
+		local.temp[local.i] notsolid
+	}
+	wait 2
+	
+	for (local.i = 1; local.i <= 2; local.i++){
+		local.temp[local.i] remove
+	}
+}end
+
+//=========================================================================
+deliverSupplies:
+//=========================================================================
+{
+	level.driverdonedelivery	= 0
+	level.passengerdonedelivery = 0
+	$startjeep setcollisionentity $jeepcollision
+	
+	thread Bunker1CrateDeliveryDriver
+	thread Bunker1CrateDeliveryPassenger
+	wait 3
+
+	$startjeep setcollisionentity $jeepcollisionfull
+		
+	while ( level.driverdonedelivery == 0 || level.passengerdonedelivery == 0){
+		waitframe 	
+	}
+}end
+
+//=========================================================================
+Bunker1CrateDeliveryDriver:
+//=========================================================================
+{
+	waitthread global/jeepanim.scr::DriverGetOutJeep $startjeep $jeepdriver
+
+	local.jeeprear = -130 * (angles_toforward $startjeep.angles)
+	local.jeepleft = -100 * (angles_toleft $startjeep.angles)
+	local.runto    = $startjeep.origin + local.jeeprear + local.jeepleft
+	$jeepdriver runto local.runto
+
+	while (vector_length($jeepdriver.origin - local.runto) > 30){
+		waitframe
+	}
+
+	$jeepdriver turnto $startjeep
+	$jeepdriver waittill turndone
+	$jeepdriver waitthread crateDeliver $cratepath2 $bunker1drivernode 0 "driver_enter"
+	waitthread global/jeepanim.scr::DriverGetInJeep $startjeep $jeepdriver 
+	level.driverdonedelivery = 1
+}end
+
+//=========================================================================
+Bunker1CrateDeliveryPassenger:
+//=========================================================================
+{
+	waitthread global/jeepanim.scr::PassengerGetOutJeep $startjeep $jeeppassenger
+
+	local.jeeprear 	= -130 * (angles_toforward $startjeep.angles)
+	local.jeepright =  100 * (angles_toleft $startjeep.angles)
+	local.runto 	= $startjeep.origin + local.jeeprear + local.jeepright
+	$jeeppassenger runto local.runto
+
+	while (vector_length($jeeppassenger.origin - local.runto) > 30){
+		waitframe
+	}
+
+	$jeeppassenger turnto $startjeep
+	$jeeppassenger waittill turndone
+	$jeeppassenger waitthread crateDeliver $cratepath $bunker1passengernode 0 "passenger_enter0 1"
+
+	local.jeepfront = -180 * (angles_toforward $startjeep.angles)
+	local.jeepright =  180 * (angles_toleft $startjeep.angles)
+	local.runto 	= $startjeep.origin + local.jeepfront + local.jeepright
+	$jeeppassenger runto local.runto
+
+	while (vector_length($jeeppassenger.origin - local.runto) > 30){
+		waitframe
+	}
+
+	waitthread global/jeepanim.scr::PassengerGetInJeep $startjeep $jeeppassenger
+	level.passengerdonedelivery = 1
+}end
+
+//=========================================================================
+crateDeliver local.path local.pathcomplete local.doneDelay local.tag:
+//=========================================================================
+{
+	self anim crate_pickup2
+	self waittill animdone
+	
+	local.nextNode 		= local.path
+	local.pathComplete 	= 0
+	
+	while (local.pathComplete == 0){
+		self turnto local.nextNode
+		self waittill turndone
+
+		while (vector_length (self.origin - local.nextNode.origin) > 20){	
+			self anim crate_walk
+			waitframe
+		}
+		
+		if (local.nextNode.targetname == local.pathcomplete.targetname){
+			local.pathComplete = 1
+			// dprintln ( self.targetname + " at target" )
+		}
+		local.nextNode = local.nextNode.target
+	}	
+	
+	self anim crate_putdown2
+	self waittill animdone
+	
+	// dprintln ( self.targetname + " put down the crate" )
+	wait local.doneDelay		
+}end
+
+//=========================================================================
+PlayerGetOnJeepTurret:
+//=========================================================================
+{
+	if (level.playeronjeep == 0){
+		//unlock the jeep and turret
+		$startjeep.turret = $startjeep queryturretslotentity 0
+		$startjeep unlock
+		$startjeep.turret unlock
+
+		$player.origin = $startjeep.turret.origin
+		$startjeep doUse $player
+
+		$startjeep lock
+		$startjeep.turret lock
+	}
+	level.playeronjeep = 1
+}end
+
+//=========================================================================
+PlayerGetOffJeepTurret:
+//=========================================================================
+{
+	if (level.playeronjeep == 1){
+		//unlock the jeep and turret
+		$startjeep.turret = $startjeep queryturretslotentity 0
+		$startjeep unlock
+		$startjeep.turret unlock
+
+		$player.origin = $startjeep.turret.origin
+		$startjeep doUse $player
+
+		$startjeep lock
+		$startjeep.turret lock
+
+		local.angles 	= $startjeep.angles
+		local.angles[0] = 0
+		local.angles[2] = 0
+		$player.viewangles = local.angles
+	}	
+	level.playeronjeep = 0
+}end
+
+//=========================================================================
+handlePlayerExit:
+//=========================================================================
+{
+	$startjeep unlock
+	$startjeep.turret unlock
+	$startjeep doUse player
+	$startjeep.turret lock
+	$startjeep lock
+	$player.viewangles = "0 0 0"
+}end
+
+//=========================================================================
+truckExplode:
+//=========================================================================
+{
+	local.vel  = self.velocity
+	local.type = "green"
+
+	self show
+	self playsound explode_truck
+	exec global/earthquake.scr .2 4 0 0	
+
+	local.explosion1 		= spawn script_model model models/fx/fx_truck_explosion.tik
+	local.explosion1.origin = self.origin + (0 0 100)
+	local.explosion1.angles = self.angles
+	local.explosion1 scale 0.5
+	local.explosion1 anim start
+	local.explosion1 notsolid
+	wait .4
+			
+	self playsound explode_truck
+	exec global/earthquake.scr .2 4 0 0	
+
+	local.explosion2 		= spawn script_model model models/fx/fx_truck_explosion.tik
+	local.explosion2.origin = self.origin + (0 0 100)
+	local.explosion2.angles = self.angles
+	local.explosion2 anim start
+	local.explosion2 notsolid
+
+	if (self.collisionent != NULL){
+		self.collisionent disconnect_paths
+	}
+
+	local.name 	 = self
+	local.angles = self.angles
+	local.origin = self.origin
+	self remove
+	
+	level.destroyedTruck = thread spawn_damaged_new models/vehicles/gmctruck.tik local.angles local.origin
+	level.destroyedTruck notsolid
+	level.destroyedTruck waitthread newToss
+	thread smokingWreckage
+	
+	//	wait 0.1
+	local.explosion1 remove
+	local.explosion2 remove
+}end 
+
+//=========================================================================
+newToss:
+//=========================================================================
+{
+	//	self setcollisionentity $gmccollision
+	self physics_on
+	self.velocity 	= (000 000 600)  
+	local.avelocity = (0 120 60)
+		
+	self RotateX local.avelocity[0]
+	self RotateY local.avelocity[1]
+	self RotateZ local.avelocity[2]
+
+	self thread ditchSupplies
+	self playsound explode_truck
+	exec global/earthquake.scr .2 4 0 0	
+
+	local.explosion1 		= spawn script_model model models/fx/fx_truck_explosion.tik
+	local.explosion1.origin = self.origin + (0 0 100)
+	local.explosion1.angles = self.angles
+	local.explosion1 anim start
+	local.explosion1 notsolid
+	wait .75
+
+	local.explosion1 remove
+	
+	for (local.i = 1; local.i <= 4; local.i++){
+		$bunker1supplies[local.i] solid
+	}
+		
+	self solid
+	//	self RotateX 0
+	wait .5
+
+	self RotateY 0
+	self RotateZ 0 
+}end
+
+//=========================================================================
+smokingWreckage:
+//=========================================================================
+{
+	level.gmcsmoke = spawn "models/emitters/linger_smoke.tik"
+	level.gmcsmoke.origin = $gmcsmoke.origin
+	level.gmcsmoke notsolid
+	level.gmcsmoke anim start
+}end
+
+//=========================================================================
+ditchSupplies:
+//=========================================================================
+{
+	wait .25
+	
+	$bunker1supplies[1] waitthread tossSupplies self ( -200 300 400 ) self.origin
+	$bunker1supplies[2] waitthread tossSupplies self ( -400 400 300 ) ( self.origin + ( 50 0 0 ) )
+	$bunker1supplies[3] waitthread tossSupplies self ( -100 500 300 ) (self.origin + ( -50 0 0 ) )
+	$bunker1supplies[4] waitthread tossSupplies self ( -400 150 400 ) (self.origin + ( 0 50 0 ) )
+}end
+
+//=========================================================================
+tossSupplies local.truck local.vel local.startpos:
+//=========================================================================
+{
+	self show
+	self physics_on
+	self.origin = local.startpos
+	self.velocity = local.vel	
+}end
+
+//=========================================================================
+spawn_damaged_new local.model local.angles local.origin:
+//=========================================================================
+{
+	local.damaged 		 = spawn script_model model local.model
+	local.damaged.origin = local.origin
+	local.damaged.angles = local.angles
+}end local.damaged
+
+//=========================================================================
+startSirens:
+//=========================================================================
+{
+	for (local.i = 1; local.i <= $siren.size; local.i++){
+		$siren[local.i] thread PlayAlarmSound
+	}
+}end
+
+//=========================================================================
+PlayAlarmSound: 
+//=========================================================================
+{
+	while(1) { 
+		$player playsound den_m2l2_258b 
+
+		if((vector_length ($player.origin - self.origin) < 1024)) { 
+			self playsound den_m2l2_258p 
+		} 
+		wait 1 
+	} 
+}end
+
+//=========================================================================
+CleanupSceneBunker1:
+//=========================================================================
+{
+	//	wait 5.0
+	$deliversuppliesbunker1parademanager thread global/parade.scr::DeleteParade 1000
+	$deliversuppliesmanager thread global/parade.scr::DeleteParade 1000
+	$pgenBunker01 turnoff
+	$gmcsmoke delete
+
+	if(level.gmcsmoke){
+		level.gmcsmoke delete
+	}
+
+	if($deaddriver){
+		$deaddriver delete
+	}
+
+	//	for(local.i = 1; local.i <= $bunker1supplies.size; local.i++)
+	//		$bunker1supplies[local.i] delete
+
+	thread global/EntityCleanup.scr::EntityCleanup $bunker1mgguy1 2000
+	thread global/EntityCleanup.scr::EntityCleanup $bunker1mgguy2 2000
+	thread global/EntityCleanup.scr::EntityCleanup $bunker1mgguy3 2000
+		
+	/*	if($startplane)
+	{
+		if($($startplane.bombtrigger))
+		{
+			local.node = $($startplane.bombtrigger).target
+			while($(local.node) != NIL)
+			{
+				local.temp = $(local.node)
+				local.node = $(local.node).target
+				$(local.temp) delete
+			}
+			$($startplane.bombtrigger) delete
+		
+		}
+		local.node = $startplane.target
+		while($(local.node) != NIL)
+		{
+			local.temp = $(local.node)
+			local.node = $(local.node).target
+			$(local.temp) delete
+		}
+		$startplane delete
+	
+	}
+	*/		
+}end
+
+
+

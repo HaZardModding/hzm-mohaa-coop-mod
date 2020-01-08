@@ -1,0 +1,132 @@
+//*********************************************************************************************************************************************
+//*** minefield script
+//*** The player enters the minefield, and within a short random amount of time
+//*** if he's still in the minefield he'll blow himself up and crush his skull.
+//*** This main thread is called by this script and should not be called by the
+//*** level script itsself.  The level script should call minefield_setup
+//*** syntax ------------------------------------
+//*** minefield <this is the index number for the array of minefield triggers>
+//*********************************************************************************************************************************************
+
+//=========================================================================
+minefield local.index:{
+//=========================================================================
+	while(1){
+		$minefield[local.index] waittill trigger
+
+		local.sucker = parm.other
+		local.sucker playsound mine_trigger
+		wait (randomfloat .5 + .5)
+		
+		local.targetnameRememberer = (level.time + "_mine")//chrissstrahl - have uniqe targetname, sort of
+
+		if (local.sucker istouching $minefield[local.index] == 1){
+			//local.spawn_mine = (local.sucker.targetname + "_mine")//chrissstrahl
+			local.spawn_mine = local.targetnameRememberer //chrissstrahl
+			if ($minefield[local.index].type == "water"){
+					spawn animate/fx_mortar_water targetname local.spawn_mine
+					local.spawn_mine = $(local.targetnameRememberer)//chrissstrahl
+					local.spawn_mine.origin = local.sucker.origin
+					local.spawn_mine anim start
+					local.spawn_mine playsound grenade_exp_water
+					//$player exec global/bullethit.scr (0 -1 0) 1000 50 1
+					radiusdamage local.spawn_mine.origin 4000 256
+				}
+			else{
+					spawn animate/fx_explosion_mine targetname local.targetnameRememberer	//chrissstrahl
+					//local.spawn_mine = $(local.sucker.targetname + "_mine") //chrissstrahl
+					local.spawn_mine = $(local.targetnameRememberer) //chrissstrahl
+					local.spawn_mine.origin = local.sucker.origin
+					local.spawn_mine anim start
+					//$player exec global/bullethit.scr (0 -1 0) 1000 50 1
+					radiusdamage local.spawn_mine.origin 4000 256
+			}
+			
+			//chrissstrahl - make sure player will not respawn inside killzone
+			if(level.gametype != 0){
+				for (local.i = 1;local.i <= $player.size;local.i++){
+					local.player =  $player[local.i]
+					//chrissstrahl - if existing, touching the trigger and alive + active
+					if( local.player != NULL && local.player istouching $minefield[local.index] && local.player.health > 0){					
+						if(local.player.dmteam == "spectator" /* || notActive */){
+							continue
+						}
+					}
+					exec coop_mod/main.scr::resetSpawn local.player
+				}
+			}
+			//*** remove the effect
+			local.spawn_mine thread removeEffect //chrissstrahl - handle this in a thread, so that the minefield is ready right away
+		}
+	}
+}end
+
+//=========================================================================
+removeEffect:{
+//=========================================================================
+	wait 3
+	if(self != NULL){
+		self remove
+	}
+}end
+
+
+
+
+
+
+//single version minefield thread
+//=========================================================================
+minefield_single:{
+//=========================================================================
+	$minefield waittill trigger
+
+	wait (randomfloat .5 + .5)
+	
+	//chrissstrahl - now handle each player
+	local.playerInField = 0
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		//chrissstrahl - if existing, touching the trigger and alive + active
+		if( local.player != NULL && local.player istouching $minefield && local.player.health > 0){
+			//chrissstrahl - multiplayer
+			if(level.gametype != 0){
+				if(local.player.dmteam == "spectator" /* || notActive */){
+					continue
+				}
+			}
+			
+			if(local.player istouching $minefield == 1){
+				local.playerInField++
+				spawn animate/fx_explosion_mine targetname player_mine_of_doom
+				$player_mine_of_doom.origin = local.player.origin
+				
+				$player_mine_of_doom anim start
+				local.player exec global/bullethit.scr (0 -1 0) 1000 50 1
+			}
+		}
+	}
+	if(local.playerInField == 0){
+		goto minefield_single
+	}
+}end
+
+
+//*************************************************
+//*** setup the minefields
+//*** the level scripts should call this thread
+//*************************************************
+minefield_setup:
+	if ($minefield == NULL)
+	{
+		println "^~^~^ There are no minefields in the map!!!"
+		goto minefield_setup_end
+	}
+
+	for (local.i = 1 ; local.i <= $minefield.size ; local.i ++)
+	{
+		thread minefield local.i
+	}
+
+	minefield_setup_end:
+end

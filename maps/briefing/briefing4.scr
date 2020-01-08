@@ -1,0 +1,127 @@
+//=========================================================================
+main:{
+//=========================================================================
+	level.coopNextMap = "maps/m4l1"				//chrissstrahl - set next map (for mom voteing)
+	level.coopPrevMap = "maps/m3l3"				//chrissstrahl - set previouse map (for mom voteing)
+	thread coop_mod/main.scr::main 				//chrissstrahl - start coop mod extensions
+	spawn script_origin targetname coop_playsound origin (0 0 0)	//chrissstrahl - spawn general sound entity
+	
+	level waittill prespawn
+	drawhud 0
+
+	level waittill spawn
+	
+	if(level.gametype == 0){//chrissstrahl - sp only
+		exec global/briefing_save.scr
+		
+		// prevent the player from trying to move around
+		$player physics_off
+	}
+
+	waitthread coop_mod/replace.scr::waitForPlayer	//chrissstrahl - wait for any player to join
+	// spawn the thread that will allow the player to skip the briefing
+	thread briefingskip
+	thread freezeplayerview
+
+	//starts music track for mission briefing
+	//$player stufftext "tmstartloop sound/music/mus_Schmerzen_01a.mp3"
+	$coop_playsound playsound mb4_music
+
+	$coop_playsound playsound slide_advance
+
+	showmenu briefing4a 1
+
+	$coop_playsound playsound mb_401
+	wait 11
+
+	$coop_playsound playsound slide_advance
+
+	showmenu briefing4b 1
+	hidemenu briefing4a 1
+	wait 9
+
+	$coop_playsound playsound slide_advance
+
+	showmenu briefing4b2 1
+	hidemenu briefing4b 1
+
+	$coop_playsound playsound mb_402
+
+	wait 11
+
+	$coop_playsound playsound slide_advance
+
+	showmenu briefing4c 1
+	hidemenu briefing4b2 1
+
+	wait 5
+
+	$coop_playsound playsound mb_403
+	wait 8.5
+
+	$coop_playsound playsound slide_advance
+
+	showmenu briefing4d 1
+	hidemenu briefing4c 1
+
+	wait 8
+
+	$coop_playsound playsound slide_advance
+
+	showmenu briefing4e 1
+	hidemenu briefing4d 1
+
+
+	$coop_playsound playsound mb_404 wait
+	$coop_playsound waittill sounddone
+
+	$coop_playsound playsound slide_advance
+
+
+	showmenu briefing4f 1
+	hidemenu briefing4e 1
+
+	$coop_playsound playsound mb_405 wait
+	$coop_playsound waittill sounddone
+
+	wait 3
+
+	$coop_playsound playsound slide_advance
+
+	thread endbriefing
+}end
+
+
+//=========================================================================
+endbriefing:{
+//=========================================================================
+	if( level.gametype == 0){//chrissstrahl - sp only
+		$player stufftext "spmap m4l1"
+	}else{
+		exec global/missioncomplete.scr "m4l1"
+	}
+}end
+
+//=========================================================================
+briefingskip:{
+//=========================================================================
+	waitexec coop_mod/replace.scr::skip //chrissstrahl - wait for player vote to skip cinematic
+	thread endbriefing
+}end
+
+//=========================================================================
+freezeplayerview:{
+//=========================================================================
+	while(1){//chrissstrahl - modified for coop
+		if(level.gametype != 0){
+			for (local.i = 1;local.i <= $player.size;local.i++){
+				local.player =  $player[local.i]
+				if( local.player != NULL){
+					local.player.viewangles = (0 0 0)
+				}
+			}
+		}
+		waitframe
+	}
+}end
+

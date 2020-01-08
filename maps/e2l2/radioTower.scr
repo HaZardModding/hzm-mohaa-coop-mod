@@ -1,0 +1,101 @@
+// radioTower
+
+//============================================================================
+init: {
+//============================================================================
+	if (level.warpTo == "radioTower")  {
+		$player.origin = ( -2993 -3334 -56 )
+	}
+
+	waitthread doWork
+}end
+
+//============================================================================
+doWork: {
+//============================================================================
+	$towerstopper notsolid
+	$commTower notsolid
+	$towercollapsed notsolid
+	$towerintact solid
+
+	level.CommDestroyed waittill trigger	
+}end
+
+//============================================================================
+blowUp: {
+//============================================================================
+	thread global/items.scr::remove_item "explosives" noprint
+	
+	local.o = $commTower.origin
+	local.a = $commTower.angles
+	$commTower hide
+	$towerintact notsolid
+
+	local.falling = spawn script_model model "animate/sc_p_radiotowerleg.tik" 			
+	local.falling notsolid
+	local.falling.origin = local.o					
+	local.falling.angles = local.a	
+	local.falling anim fall			
+	local.falling waittill animdone
+	waitexec global/earthquake.scr .4 1 0 0
+		
+	//thread DoTowerDust
+	
+	level.radio_tower_kills_player = 1
+	thread TowerKillsPlayer_Thread	
+
+	local.falling hide
+	$towercollapsed solid
+	
+	local.fallen = spawn script_model model "animate/sc_p_radiotowerfallen.tik" 
+	local.fallen.origin = local.o					
+	local.fallen.angles = local.a
+	local.fallen notsolid
+	wait 1
+
+	$commTower remove
+	$towerstopper solid
+
+	local.falling remove
+	level.radio_tower_kills_player = 0	
+	
+	trigger level.CommDestroyed
+	thread maps/e2l2/objectives.scr::transition "commTowerDestroyed"
+}end
+
+//============================================================================
+DoTowerDust: {
+//============================================================================
+	for (local.i=1; local.i<=$RadioTowerFallDust.size; local.i++) {	
+		thread DustMiteThread $RadioTowerFallDust[local.i].origin "models/emitters/tehao_explosionDust.tik"
+	}
+}end
+
+//============================================================================
+DustMiteThread local.origin local.model: {
+//============================================================================
+	local.ent = spawn local.model	
+	local.ent scale .2
+	local.ent.origin = local.origin	
+	//local.ent anim idle	
+	wait .1
+
+	local.ent anim start
+	local.ent notsolid
+	wait 1.5
+
+	//local.ent anim stop
+	local.ent delete
+}end
+
+//============================================================================
+TowerKillsPlayer_Thread: {
+//============================================================================
+	while (level.radio_tower_kills_player == 1) {
+		if( $player isinside $trigger_towerkill ) {	
+			$player damage $world 99999 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+			break
+		}
+		waitframe
+	}
+}end

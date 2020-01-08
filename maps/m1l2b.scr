@@ -1,0 +1,905 @@
+//**************************************************************//
+//			WORLD/PLAYER SETUP			//
+//**************************************************************//
+
+//*********************************************
+// Initialize worker crates
+//*********************************************
+
+
+//=========================================================================
+main:{
+//=========================================================================
+	level.coopPrevMap = "m1l2a"			//chrissstrahl - set previouse map (for mom voteing)
+	level.coopNextMap = "m1l3a"			//chrissstrahl - set next map (for mom voteing)
+	level.coop_aaMap = 1						//chrissstrahl - let global scripts know this is a AA level
+	thread coop_mod/main.scr::main 				//chrissstrahl - start coop mod extensions
+	
+	//chrissstrahl - setup stuff that is needed
+	if(level.gametype != 0){
+		waitthread coop_setupStuff
+	}
+
+	level.disabledtrucks = 0
+	level.opentruck01_disabled = 0
+	level.opentruck02_disabled = 0
+	level.opentruck03_disabled = 0
+	level.bombedtanks = 0
+	level.tank01_bombplanted = 0
+	level.tank02_bombplanted = 0
+	level.tank03_bombplanted = 0
+	level.tank04_bombplanted = 0
+	level.munitionscache_bombplanted = 0
+	level.bombsleft = 5
+	level.scoldsmoker = 0
+
+	exec global/exploder.scr
+	exec global/spotlight.scr
+	exec global/loadout.scr maps/m1l2b.scr
+ 
+	level waittill prespawn
+
+// Global threads
+	thread global/barrel.scr::explosive_barrel
+	exec global/ambient.scr m1l2b
+	
+	//level waittill spawn							//chrissstrahl
+	waitthread coop_mod/replace.scr::waitForPlayer	//chrissstrahl - wait until a player has spawned
+
+// General initialization
+	thread playmusic
+
+	waitthread global/items.scr::add_item "wirecutters" noprint			// Show wirecutters inventory icon
+	waitthread global/items.scr::add_item "radio_explosives" noprint	// Show radio_explosives inventory icon
+
+	waitthread global/objectives.scr::add_objectives 1 2 "Disable Opel trucks. [3 remaining]" $opentruck01.origin
+	waitthread global/objectives.scr::add_objectives 2 2 "Bomb tanks. [4 remaining]" $bomb01.origin
+	waitthread global/objectives.scr::add_objectives 3 2 "Bomb munitions cache." $munitionscache.origin
+	waitthread global/objectives.scr::add_objectives 4 2 "Exfiltrate the facility." $endlevel_trigger.origin
+	waitthread global/objectives.scr::current_objectives 1
+
+	$chase_trigger nottriggerable				// Initialize triggers
+	$jeepsequence_trigger nottriggerable
+	$grillosay_trigger nottriggerable
+	$endlevel_trigger nottriggerable
+	$wrenchguy2_thread_trigger nottriggerable
+
+	$cutwire01 hide						// Initialize entities
+	$cutwire02 hide
+	$cutwire03 hide
+	$crate1_end hide				
+	$crate2_end hide
+	$crate3_end hide
+	$bomb02 hide	//TEMP
+	$door01 lock
+	$door02 lock
+	$radio1 loopsound m1l2b_radio1				// Looping radio sounds
+	$radio2 loopsound m1l2b_radio2
+
+	$truck01 setcollisionentity $opelmap
+	$tank01 thread setup_tank empty_tiger
+	$tank02 thread setup_tank empty_tiger
+	$tank03 thread setup_tank empty_panzer_desert
+	$tank04 thread setup_tank empty_turretless_tiger
+
+	$driver01 exec global/disable_ai.scr			// Disable driver's AI
+	$driver01 notsolid					// Make driver nonsolid
+	$driver01 rendereffects "-shadow"
+	$truck01 attachdriverslot 0 $driver01			// Attach driver to truck driver position
+	$driver01 anim_scripted opel_driver			// Play driver animation
+	thread init_jeep					// Setup jeep and Grillo
+	 
+	thread global/door_locked.scr::lock			// For non-opening doors
+
+	exec global/spotlight.scr::corona $truck01 "light left" // Turn on headlight coronas
+	exec global/spotlight.scr::corona $truck01 "light right"
+
+	local.turret = $tank04 QueryTurretSlotEntity 0		// Hide cannon on 4th tank being assembled
+	local.turret hide
+
+	//$soldierset1 thread alert 1
+	//$scolder thread alert 2
+	//$smoker thread alert 2
+	//$soldierset2 thread alert 2
+	//$soldierset3 thread alert 3
+
+// Print hints at level start
+	thread printhints
+
+// Truck and tank threads
+	$truck01 thread drive_pathtruck $truck01_path 270
+	$tank02 thread drive_pathtank $tank02_path 152 $tank02_drive_trigger
+
+// Custom patrollers
+	$scolder thread global/patrol_path.scr::patrol $patrolpath05
+}end
+
+//=========================================================================
+coop_setupStuff:{
+//=========================================================================
+//chrissstrahl - sets up the crates
+	for(local.i=1;local.i<=9;local.i++){
+		local.ent = $("crate"+local.i+"_end")
+		if( local.ent != NULL ){
+			local.ent notsolid
+			local.ent hide
+		}
+	}
+	for(local.i=1;local.i<=9;local.i++){
+		local.ent = $("crate"+local.i+"_start")
+		if( local.ent != NULL ){
+			local.ent notsolid
+		}
+	}
+	$truckclip notsolid
+	$tankclip notsolid
+//chrissstrahl - make opel triggers bigger and towrads the  direction where the cabel is in mp/coop
+	local.maxentities = int(getcvar("maxentities"))
+	
+	for (local.i = 0; local.i < local.maxentities; local.i++) {
+		local.ent = getentbyentnum local.i
+		if ( local.ent != NULL ){
+			local.entOrigin = local.ent.origin
+			if(local.entOrigin == ( -3775 2802 -208)){//opel 1
+				local.ent setsize ( -4 -20 -40) (4 0 40)
+			}
+			else if(local.entOrigin == ( -3798 4214 -208)){//opel 2
+				local.ent setsize ( -4 -20 -40) (4 0 40)
+			}
+			else if(local.entOrigin == ( -1504 3386 -208)){//opel 3
+				local.ent setsize ( -20 -4 -40) (0 4 40)
+			}
+		}
+	}
+}end
+
+//*********************************************
+// Print hints
+//*********************************************
+printhints:
+	wait 3
+	//chrissstrahl - do this only in mp
+	if( level.gametype != 0){
+		iprintlnbold_noloc ("See your objectives.")
+		wait 5
+		iprintlnbold "Follow the arrow on your compass to reach your objectives."
+		wait 5
+		iprintlnbold_noloc ("Walk when you want to sneak up on enemies.")
+		end
+	}
+	//end chrissstrahl
+	
+	local.firstkey = getboundkey1 "+scores"
+	local.secondkey = getboundkey2 "+scores"
+
+	if (local.firstkey != NIL)
+	{
+		local.key = local.firstkey
+	}
+	else if (local.secondkey != NIL)
+	{
+		local.key = local.secondkey
+	}
+	else
+	{
+		local.key = "NOT BOUND"
+	}
+
+	iprintlnbold_noloc (loc_convert_string "Press ( ") (loc_convert_string local.key) (loc_convert_string " ) to see your objectives.")
+		
+	wait 5
+	iprintlnbold "Follow the arrow on your compass to reach your objectives."
+
+	wait 5
+	local.firstkey = getboundkey1 "+speed"
+	local.secondkey = getboundkey2 "+speed"
+
+	if (local.firstkey != NIL)
+	{
+		local.key = local.firstkey
+	}
+	else if (local.secondkey != NIL)
+	{
+		local.key = local.secondkey
+	}
+	else
+	{
+		local.key = "NOT BOUND"
+	}
+
+	iprintlnbold_noloc (loc_convert_string "Press ( ") (loc_convert_string local.key) (loc_convert_string " ) to walk. Walk when you want to sneak up on enemies.")
+end
+
+//*********************************************
+// Set tank collision and type
+//*********************************************
+setup_tank local.tanktype:
+	if (self.target)
+		self.collisionent = self.target
+
+	switch (local.tanktype)
+	{
+	case empty_panzer_desert:
+		self.type = "empty_panzer_desert"
+		break
+	case empty_tiger:
+		self.type = "empty_tiger"
+		break
+	case empty_turretless_tiger:
+		self.type = "empty_turretless_tiger"
+		break
+	}
+	
+	self nodamage
+end
+
+//*********************************************
+// Generic AI spawning that runs at the player
+//*********************************************
+generic_spawner local.name local.spawner:
+	local.maxdist = (240 + randomint (600))
+	spawn models/human/german_afrika_private "targetname" local.name "type_attack" "cover" "leash" "2048" "maxdist" local.maxdist "mindist" "128"
+	local.name.origin = local.spawner
+	local.name forceactivate
+	local.name exec coop_mod/replace.scr::runtoClosest	//chrissstrahl - made coop compatible
+end
+
+alert local.spotset:
+	local.var = level.spotnervous[local.spotset]
+	while ((level.var == level.spotnervous[local.spotset]) && (level.spotplayer[local.spotset] == 0)){
+		wait 1
+	}
+	
+	for(local.i=1;local.i<self.size+1;local.i++){
+		self[local.i] exec coop_mod/replace.scr::runtoClosest	//chrissstrahl - made coop compatible
+	}
+end
+
+//*********************************************
+// Driving truck thread
+//*********************************************
+drive_pathtruck local.path local.speed:
+	$truckclip disconnect_paths
+// drive Vector position, speed, acceleration, reach_distance, look_ahead
+	self drive local.path local.speed 60 200 256
+	waitframe
+	//self waittill drive //chrissstrahl - not working in BT or MP
+	self waitexec coop_mod/replace.scr::waittilldrive //chrissstrahl - replacement for coop
+	self stop
+	$driver01 remove		// Remove driver
+	self remove			// Remove truck
+	$truckclip connect_paths
+	spawn models/human/german_afrika_private "targetname" "patroller02" "type_idle" "patrol" "hearing" "512" "sight" "1024" "patrolpath" "patrolpath02"
+	$patroller02.origin = $patrolpath02
+	$patroller03 patrolpath patrolpath03b
+	$wrenchguy2_thread_trigger triggerable
+	$door01 unlock
+end
+
+//*********************************************
+// Driving tank thread
+//*********************************************
+drive_pathtank local.path local.speed local.trigger:
+	local.trigger waittill trigger
+	
+	thread coop_mod/spawnlocations.scr::m1l2b_update1 //chrissstrahl - update spawnpoints
+	
+	$tankclip disconnect_paths
+	
+	//chrissstrahl - we need to move the waypoint/path, I guess because some how tag/origin positions of Tank Models are different in BT than in AA
+	//we will come across this sort of issue much more often, I suspect, so it is good to have a note here, just in case somone checks how it was resolved here
+	$t250 origin ( 2016 1920 -224 ) //chrissstrahl - original pos
+	//$t250 origin ( 2016 2060 -224 ) //chrissstrahl - new pos
+	
+// drive Vector position, speed, acceleration, reach_distance, look_ahead
+	self drive local.path local.speed 5 200 256
+
+	//self waittill drive //chrissstrahl - not working in BT or MP
+	self waitexec coop_mod/replace.scr::waittilldrive 3 //chrissstrahl - replacement for coop
+	
+	//chrissstrahl - this won't work right so we need to force the end positions
+	//messes up on lag/block and who knows what else, probably on full moon too
+	 $tank02 origin ( 2036 1659 -257 )
+	 $tank02 angle 270
+	 $tank02_bomb_trigger exec coop_mod/replace.scr::originOffset ( 10 -138 0 )
+	 $bomb02 exec coop_mod/replace.scr::originOffset ( 10 -138 0 )
+	//end chrissstrahl
+	
+	
+	self stop
+	$bomb02 show
+	
+	local.turret = $tank02 QueryTurretSlotEntity 0
+	
+	wait 3
+	$tankclip connect_paths
+	local.turret anim exit
+	wait 1
+	local.turret anim open_idle
+		
+	local.ent = spawn human/german_misc_worker "gun" "Walter P38" "mindist" "128" "maxdist" "1024" "leash" "512" "hearing" "512" "sight" "1024" "noticescale" "100"
+	local.ent.origin = local.turret gettagposition "tag_start"
+	local.ent.angles = local.turret gettagangles "tag_start"
+	
+	local.ent holster
+		
+	local.ent exec global/disable_ai.scr
+	local.ent notsolid
+	local.ent anim_noclip tank_exit_3
+	local.ent waittill animdone
+	wait .7
+	local.ent solid
+	local.ent exec global/enable_ai.scr
+		
+	while(isalive local.ent)
+	{
+		local.ent waitthread global/wrenching.scr::wrench wrench4spot1 wrench4look1
+	}
+end
+
+activate_smoker_sequence:
+	level.scoldsmoker = 1
+end
+
+smoker_sequence:
+	if (level.scoldsmoker == 0)
+		end
+	else
+	{
+		$scolder turnto $smoker
+		wait .5
+		$smoker anim caught_smoking2
+		$scolder anim caught_smoking1
+		level.scoldsmoker = 0
+		$smoker waittill animdone
+	}
+end
+
+//*********************************************
+// Disable truck 1
+//*********************************************
+opentruck01_disabled:
+	$wire01 remove
+	$opentruck01 playsound m1l2b_disabletruck
+	$cutwire01 show
+	level.opentruck01_disabled = 1
+	thread nexttruck
+end
+
+//*********************************************
+// Disable truck 2
+//*********************************************
+opentruck02_disabled:
+	$wire02 remove
+	$opentruck02 playsound m1l2b_disabletruck
+	$cutwire02 show
+	level.opentruck02_disabled = 1
+	thread nexttruck
+end
+
+//*********************************************
+// Disable truck 3
+//*********************************************
+opentruck03_disabled:
+	$wire03 remove
+	$opentruck03 playsound m1l2b_disabletruck
+	$cutwire03 show
+	level.opentruck03_disabled = 1
+	thread nexttruck
+end
+
+//*********************************************
+// Bomb tank 1
+//*********************************************
+tank01_bombed:
+	$bomb01 model "animate//radiobomb.tik"
+	$bomb01 playsound radiobomb
+	level.tank01_bombplanted = 1
+	level.bombsleft = (level.bombsleft - 1)
+	thread nexttank
+end
+
+//*********************************************
+// Bomb tank 2
+//*********************************************
+tank02_bombed:
+	$bomb02 model "animate//radiobomb.tik"
+	$bomb02 playsound radiobomb
+	level.tank02_bombplanted = 1
+	level.bombsleft = (level.bombsleft - 1)
+	thread nexttank
+end
+
+//*********************************************
+// Bomb tank 3
+//*********************************************
+tank03_bombed:
+	$bomb03 model "animate//radiobomb.tik"
+	$bomb03 playsound radiobomb
+	level.tank03_bombplanted = 1
+	level.bombsleft = (level.bombsleft - 1)
+	thread nexttank
+end
+
+//*********************************************
+// Bomb tank 4
+//*********************************************
+tank04_bombed:
+	$bomb04 model "animate//radiobomb.tik"
+	$bomb04 playsound radiobomb
+	level.tank04_bombplanted = 1
+	level.bombsleft = (level.bombsleft - 1)
+	thread nexttank
+end
+
+//*********************************************
+// Bomb weapons cache
+//*********************************************
+munitionscache_bombed:
+	$bomb05 model "animate//radiobomb.tik"
+	$bomb05 playsound radiobomb
+	level.munitionscache_bombplanted = 1
+	level.bombsleft = (level.bombsleft - 1)
+	waitthread global/objectives.scr::add_objectives 3 3 "Bomb munitions cache."		// mark 3 done
+	thread obj1or2or4
+	
+	if (level.bombsleft == 0)
+		thread explode			// Trigger bomb explosion sequence
+	
+end
+
+//*********************************************
+// Determine objective # printing and compass waypoint
+//*********************************************
+nexttruck:
+	level.disabledtrucks = (level.disabledtrucks + 1)
+	
+	if (level.opentruck01_disabled != 1)	// If the 1st truck is not done, point to it. Each case covers printing the # left.
+	{
+		switch level.disabledtrucks
+		{
+		case 1:
+			waitthread global/objectives.scr::add_objectives 1 2 "Disable Opel trucks. [2 remaining]" $opentruck01.origin
+			waitthread global/objectives.scr::current_objectives 1
+			break
+		case 2:
+			waitthread global/objectives.scr::add_objectives 1 2 "Disable Opel trucks. [1 remaining]" $opentruck01.origin
+			waitthread global/objectives.scr::current_objectives 1
+			break
+		}
+		end
+	}
+	else if (level.opentruck02_disabled != 1)	// If the 2nd truck is not done, point to it. Each case covers printing the # left.
+	{
+		switch level.disabledtrucks
+		{
+		case 1:
+			waitthread global/objectives.scr::add_objectives 1 2 "Disable Opel trucks. [2 remaining]" $opentruck02.origin
+			waitthread global/objectives.scr::current_objectives 1
+			break
+		case 2:
+			waitthread global/objectives.scr::add_objectives 1 2 "Disable Opel trucks. [1 remaining]" $opentruck02.origin
+			waitthread global/objectives.scr::current_objectives 1
+			break
+		}
+		end
+	}
+	else if (level.opentruck03_disabled != 1)	// If the 3rd truck is not done, point to it. Each case covers printing the # left.
+	{
+		switch level.disabledtrucks
+		{
+		case 1:
+			waitthread global/objectives.scr::add_objectives 1 2 "Disable Opel trucks. [2 remaining]" $opentruck03.origin
+			waitthread global/objectives.scr::current_objectives 1
+			break
+		case 2:
+			waitthread global/objectives.scr::add_objectives 1 2 "Disable Opel trucks. [1 remaining]" $opentruck03.origin
+			waitthread global/objectives.scr::current_objectives 1
+			break
+		}
+		end
+	}
+	waitthread global/objectives.scr::add_objectives 1 3 "Disable Opel trucks."	// mark 1 done
+	thread obj2or3or4
+end
+
+//*********************************************
+// Determine objective # printing and compass waypoint
+//*********************************************
+nexttank:
+	level.bombedtanks = (level.bombedtanks + 1)
+	
+	if (level.tank01_bombplanted != 1)		// If the 1st tank is not done, point to it. Each case covers printing the # left.
+	{
+		switch level.bombedtanks
+		{
+		case 1:
+			waitthread global/objectives.scr::add_objectives 2 2 "Bomb tanks. [3 remaining]" $bomb01.origin
+			waitthread global/objectives.scr::current_objectives 2
+			break
+		case 2:
+			waitthread global/objectives.scr::add_objectives 2 2 "Bomb tanks. [2 remaining]" $bomb01.origin
+			waitthread global/objectives.scr::current_objectives 2
+			break
+		case 3:
+			waitthread global/objectives.scr::add_objectives 2 2 "Bomb tanks. [1 remaining]" $bomb01.origin
+			waitthread global/objectives.scr::current_objectives 2
+			break
+		}
+		end
+	}
+	else if (level.tank02_bombplanted != 1)	// If the 2nd tank is not done, point to it. Each case covers printing the # left.
+	{
+		switch level.bombedtanks
+		{
+		case 1:
+			waitthread global/objectives.scr::add_objectives 2 2 "Bomb tanks. [3 remaining]" $bomb02.origin
+			waitthread global/objectives.scr::current_objectives 2
+			break
+		case 2:
+			waitthread global/objectives.scr::add_objectives 2 2 "Bomb tanks. [2 remaining]" $bomb02.origin
+			waitthread global/objectives.scr::current_objectives 2
+			break
+		case 3:
+			waitthread global/objectives.scr::add_objectives 2 2 "Bomb tanks. [1 remaining]" $bomb02.origin
+			waitthread global/objectives.scr::current_objectives 2
+			break
+		}
+		end
+	}
+	else if (level.tank03_bombplanted != 1)	// If the 3rd tank is not done, point to it. Each case covers printing the # left.
+	{
+		switch level.bombedtanks
+		{
+		case 1:
+			waitthread global/objectives.scr::add_objectives 2 2 "Bomb tanks. [3 remaining]" $bomb03.origin
+			waitthread global/objectives.scr::current_objectives 2
+			break
+		case 2:
+			waitthread global/objectives.scr::add_objectives 2 2 "Bomb tanks. [2 remaining]" $bomb03.origin
+			waitthread global/objectives.scr::current_objectives 2
+			break
+		case 3:
+			waitthread global/objectives.scr::add_objectives 2 2 "Bomb tanks. [1 remaining]" $bomb03.origin
+			waitthread global/objectives.scr::current_objectives 2
+			break
+		}
+		end
+	}
+	else if (level.tank04_bombplanted != 1)	// If the 4th tank is not done, point to it. Each case covers printing the # left.
+	{
+		switch level.bombedtanks
+		{
+		case 1:
+			waitthread global/objectives.scr::add_objectives 2 2 "Bomb tanks. [3 remaining]" $bomb04.origin
+			waitthread global/objectives.scr::current_objectives 2
+			break
+		case 2:
+			waitthread global/objectives.scr::add_objectives 2 2 "Bomb tanks. [2 remaining]" $bomb04.origin
+			waitthread global/objectives.scr::current_objectives 2
+			break
+		case 3:
+			waitthread global/objectives.scr::add_objectives 2 2 "Bomb tanks. [1 remaining]" $bomb04.origin
+			waitthread global/objectives.scr::current_objectives 2
+			break
+		}
+		end
+	}
+	waitthread global/objectives.scr::add_objectives 2 3 "Bomb tanks."		// mark 2 done
+	thread obj1or3or4
+	
+	if (level.bombsleft == 0)
+		thread explode			// Trigger bomb explosion sequence
+end
+
+//*********************************************
+// Determine next objective 2 or 3 or 4
+//*********************************************
+obj2or3or4:
+	if (level.bombedtanks != 4)
+	{
+		waitthread global/objectives.scr::current_objectives 2		// set 2 active
+	}
+	else if (level.munitionscache_bombplanted != 1)
+	{
+		waitthread global/objectives.scr::current_objectives 3		// set 3 active
+	}
+	else
+	{
+		waitthread activate_jeepsequence_trigger
+	}
+end
+
+//*********************************************
+// Determine next objective 1 or 3 or 4
+//*********************************************
+obj1or3or4:
+	if (level.bombsleft == 0)
+		waitthread global/items.scr::remove_item "radio_explosives"	// Remove inventory bombs
+		
+	if (level.disabledtrucks != 3)
+	{
+		waitthread global/objectives.scr::current_objectives 1		// set 1 active
+	}
+	else if (level.munitionscache_bombplanted != 1)
+	{
+		waitthread global/objectives.scr::current_objectives 3		// set 3 active
+	}
+	else
+		waitthread activate_jeepsequence_trigger
+end
+
+//*********************************************
+// Determine next objective 1 or 2 or 4
+//*********************************************
+obj1or2or4:
+	if (level.bombsleft == 0)
+		waitthread global/items.scr::remove_item "radio_explosives"	// Remove inventory bombs
+	
+	if (level.disabledtrucks != 3)
+	{
+		waitthread global/objectives.scr::current_objectives 1		// set 1 active
+	}
+	else if (level.bombedtanks != 4)
+	{
+		waitthread global/objectives.scr::current_objectives 2		// set 2 active
+	}
+	else
+		waitthread activate_jeepsequence_trigger
+end
+
+activate_jeepsequence_trigger:
+	waitthread global/objectives.scr::add_objectives 4 2 "Exfiltrate the facility." $endlevel_trigger.origin	// pop up 4
+	waitthread global/objectives.scr::current_objectives 4			// set 4 active
+	$jeepsequence_trigger triggerable
+	$incomplete_trigger remove		// Remove objectives incomplete trigger
+end
+
+//*********************************************
+// Print objectives incomplete message
+//*********************************************
+incomplete:
+	$gatesound playsound garagedoor_locked
+	iprintln "You have not completed all your objectives yet."
+end
+
+//*********************************************
+// Bomb explosion sequence
+//*********************************************
+explode:
+	thread coop_mod/spawnlocations.scr::m1l2b_update3 //chrissstrahl - update spawnpoints
+
+	exec coop_mod/replace.scr::loopsound bombtick	//chrissstrahl - made coop compatible
+	exec coop_mod/replace.scr::stopwatch 8	//chrissstrahl - made coop compatible
+	wait 8
+	exec coop_mod/replace.scr::stoploopsound bombtick	//chrissstrahl - made coop compatible
+	
+	$bomb02 playsound explode_tank
+	$bomb02 remove
+	$tank02 thread global/vehicles_thinkers.scr::tank_killed
+	
+	wait 2
+	$bomb01 playsound explode_tank
+	$bomb01 remove
+	$tank01 thread global/vehicles_thinkers.scr::tank_killed
+	
+	wait 1
+	$bomb03 playsound explode_tank
+	$bomb03 remove
+	$tank03 thread global/vehicles_thinkers.scr::tank_killed
+	
+	wait .5
+	exec global/earthquake.scr .23 4 0 0			// Shake the player's view
+	exec global/earthquake.scr .23 4 0 0
+	exec global/earthquake.scr .23 4 0 0
+	$ammocrate thread spawn_fx models/emitters/explosion_tank.tik
+	radiusdamage $bomb05.origin 800 400
+	thread global/exploder.scr::explode 001			// Swap in damaged shelf
+	$bomb05 playsound explode_building_large
+	$bomb05 remove
+	$ammoboxes remove
+	$ammocrate remove
+	$explosion05_damage volumedamage 300
+	
+	wait .5
+	$bomb04 playsound explode_tank
+	$bomb04 remove
+	$tank04 thread global/vehicles_thinkers.scr::tank_killed
+
+	thread bomb_spawn
+end
+
+//*********************************************
+// Swap tanks for damaged versions
+//*********************************************
+spawn_model local.model:
+	local.model = spawn script_model model local.model
+	local.model.origin = self.origin
+	local.model.angles = self.angles
+end local.model
+
+//*********************************************
+// Spawn damage effects
+//*********************************************
+spawn_fx local.fx:
+	local.temp = spawn script_model model local.fx
+	local.temp.origin = self.origin
+	local.temp anim start
+	wait 5
+	local.temp remove
+end
+
+//*********************************************
+// Spawn enemies triggered from explosion
+//*********************************************
+bomb_spawn:
+	$door02 unlock
+
+	thread generic_spawner bomb_spawned1 $bomb_spawner1
+	thread generic_spawner bomb_spawned2 $bomb_spawner2
+	thread generic_spawner bomb_spawned3 $bomb_spawner3
+	
+	$bomb_spawner4.origin = (864 -104 -256)
+	
+	//iprintlnbold_noloc("DEV: bomb_spawn needs fixing")
+	
+	//if !(sighttrace ($player.origin + (0 0 50)) ($bomb_spawner4.origin + (0 0 50)) 1)	//chrissstrahl - fix this
+	if !(waitexec coop_mod/replace.scr sighttrace (0 0 50) ($bomb_spawner4.origin + (0 0 50)) 1 NIL NIL)
+    	thread generic_spawner bomb_spawned4 $bomb_spawner4
+	
+	$bomb_spawner5.origin = (1184 -352 -256)
+	
+	//if !(sighttrace ($player.origin + (0 0 50)) ($bomb_spawner5.origin + (0 0 50)) 1)	//chrissstrahl - fix this
+	if !(waitexec coop_mod/replace.scr sighttrace (0 0 50) ($bomb_spawner5.origin + (0 0 50)) 1 NIL NIL)
+		thread generic_spawner bomb_spawned5 $bomb_spawner5
+end
+
+//*********************************************
+// Room1 trigger AI spawning
+//*********************************************
+room1:
+	thread generic_spawner room1_spawned1 $room1_spawner1
+	thread generic_spawner room1_spawned2 $room1_spawner2
+	thread generic_spawner room1_spawned3 $room1_spawner3
+	thread generic_spawner room1_spawned4 $room1_spawner4
+end
+
+//*********************************************
+// Chase player final sequence
+//*********************************************
+chase:
+	thread generic_spawner chase_spawned1 $chase_spawner1
+	thread generic_spawner chase_spawned2 $chase_spawner2
+	thread generic_spawner chase_spawned3 $chase_spawner3
+	thread generic_spawner chase_spawned4 $chase_spawner4
+end
+
+crateguy1_thread:
+	$crateguy1 waitthread global/movecrate.scr::movecrate crate1_start crate1_end
+	$crateguy1 waitthread global/movecrate.scr::movecrate crate2_start crate2_end
+	$crateguy1 waitthread global/movecrate.scr::movecrate crate3_start crate3_end
+end
+
+crateguy2_thread:
+	thread coop_mod/spawnlocations.scr::m1l2b_update2 //chrissstrahl - update spawnpoints
+
+	$crateguy2 waitthread global/movecrate.scr::movecrate crate4_start crate4_end
+	$crateguy2 waitthread global/movecrate.scr::movecrate crate5_start crate5_end
+	$crateguy2 waitthread global/movecrate.scr::movecrate crate6_start crate6_end
+end
+
+crateguy3_thread:
+	$crateguy3 waitthread global/movecrate.scr::movecrate crate7_start crate7_end
+	$crateguy3 waitthread global/movecrate.scr::movecrate crate8_start crate8_end
+	$crateguy3 waitthread global/movecrate.scr::movecrate crate9_start crate9_end
+end
+
+wrenchguy1_thread:
+	while(isalive $wrenchguy1)
+	{
+		$wrenchguy1 waitthread global/wrenching.scr::wrench wrench1spot1 wrench1look1
+	}
+end
+
+wrenchguy2_thread:
+	while(isalive $wrenchguy2)
+	{
+		$wrenchguy2 waitthread global/wrenching.scr::wrench wrench2spot1 wrench2look1
+	}
+end
+
+wrenchguy3_thread:
+	while(isalive $wrenchguy3)
+	{
+		$wrenchguy3 waitthread global/wrenching.scr::wrench wrench3spot1 wrench3look1
+	}
+end
+
+init_jeep:
+/// Set jeep properties
+	$jeep rendereffects "-shadow"
+	$jeep nodamage
+	$jeep hide
+	$jeep.turret = $jeep QueryTurretSlotEntity 0
+	$jeep.turret hide
+
+/// Set Grillo properties
+	$grillo german
+	$grillo rendereffects "-shadow"
+	$grillo exec global/disable_ai.scr
+	$grillo anim jeep_idle_drive
+	$grillo nodamage
+	$grillo notsolid
+	$grillo gun "none"
+	$grillo immune bullet
+	$grillo immune fast_bullet
+	$grillo immune explosion
+	$grillo immune rocket
+	$grillo.gren_awareness = 0
+	$grillo hide
+
+/// Attach Grillo to jeep driving position
+	$jeep AttachDriverSlot 0 $grillo
+end
+
+gatecrash:
+	$gatecrash_trigger remove
+	thread crashopen_leftgate
+	thread crashopen_rightgate
+	$gatesound playsound fence_crash 
+end
+
+//*********************************************
+// Crash open the left gate
+//*********************************************
+crashopen_leftgate:
+	$leftgate notsolid	//FIX
+	$leftgate time .75
+	$leftgate rotateydown 100
+	$leftgate waitmove
+end
+
+//*********************************************
+// Crash open the right gate
+//*********************************************
+crashopen_rightgate:
+	$rightgate notsolid	//FIX
+	$rightgate time .75
+	$rightgate rotateyup 100
+	$rightgate waitmove
+end
+
+jeepsequence:
+/// Show jeep and Grillo and start on jeep path
+	$jeep show
+	$jeep.turret show
+	$grillo show
+	exec global/spotlight.scr::corona $jeep "light left" // Turn on headlight coronas
+	exec global/spotlight.scr::corona $jeep "light right"
+// drive Vector position, speed, acceleration, reach_distance, look_ahead
+	$jeep drive $jeep_path 300 100 200 256
+	$jeep waittill drive
+	$jeep stop
+	
+	$grillosay_trigger triggerable
+end
+
+grillosay:
+/// Grillo says dialog
+	$grillo exec coop_mod/replace.scr::lookat //chrissstrahl - made coop compatible
+	$grillo say dfr_M1L2_145m_1	// "Hurry, get in. We've got to go."
+	$grillo waittill saydone
+	$endlevel_trigger triggerable
+end
+
+//=========================================================================
+playmusic:{
+//=========================================================================
+	waitframe
+	exec coop_mod/replace.scr::tmstartloop "sound/music/mus_NorthAfrica_01a.mp3"	// Looping music
+}end
+
+endlevel:
+	waitthread global/objectives.scr::add_objectives 4 3 "Exfiltrate the facility."		// mark 4 done
+	exec global/missioncomplete.scr m1l3a transfer
+end

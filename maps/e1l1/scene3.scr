@@ -1,0 +1,1747 @@
+//
+// scene3.scr
+//
+//=========================================================================
+Init:
+//=========================================================================
+{
+	level.tankBaseHealth 			= 400  // enough to not require a zillion PIAT rounds
+	level.godPlayerTank  			= 0
+	level.skipScene3TankConvoy1 	= 0
+	level.skipScene3TruckConvoy1 	= 0
+	level.skipScene3CliffTank1		= 0
+	level.skipScene3BazookaGuys		= 0
+	level.skipScene3Cannon			= 0
+	level.skipScene3TankConvoy2		= 0
+	level.skipScene3TruckConvoy2	= 1
+	level.skipScene3CliffTank2		= 0
+	level.skipScene3TankConvoy3		= 0
+	level.skipScene3Cannon2			= 0
+	level.skipBattleAtTheEnd		= 0
+
+	// Added this to manage tank visibility/ai
+	$gate_switch notsolid
+
+	thread HideTanks
+	if (level.warpToTankRide == 0){
+		thread HidePlayerTank
+	}
+
+	//chrissstrahl - we don't do slow checks in coop
+	if (level.gametype == 0 && level.slowMachine != 0) {
+		$autotrucktrigger nottriggerable
+
+		for (local.i = 1; local.i <= $enemyspawnertrigger.size; local.i++) {
+			//println local.i " spawner trigger : " $enemyspawnertrigger[local.i].set ", " $enemyspawnertrigger[local.i].target
+			if ($enemyspawnertrigger[local.i].target == "canyonrunnerguys") {
+				//println "FOUND"
+				$enemyspawnertrigger[local.i] thread doCanyonTrigger
+			}
+
+			if ($enemyspawnertrigger[local.i].target == "canyonrunnerguys2") {
+				//println "FOUND"
+				$enemyspawnertrigger[local.i] nottriggerable
+			}
+		}
+
+		for (local.i = 1; local.i <= $machinegunnertrigger.size; local.i++) {
+			//println local.i " mg trigger: " $machinegunnertrigger[local.i].gunner
+			if ($machinegunnertrigger[local.i].gunner == "gunnerdude_006699") {
+				//println "FOUND"
+				$machinegunnertrigger[local.i] nottriggerable
+				$gunnerdude_006699  remove
+				$gunnerdude_006699b remove
+			}
+			
+			//chrissstrahl - make it so that it activates upon trigger activation (what a supid way to handle this)
+			if(level.gametype != 0){
+				if ($machinegunnertrigger[local.i].gunner == "gunnerdude_00") {
+					thread coop_mod/spawnlocations.scr::e1l1_update8_prepare $machinegunnertrigger[local.i]
+				}
+			}
+		}		
+		thread thinSpawnerSet 3200 2
+		thread thinSpawnerSet 3300 1
+		thread thinSpawnerSet 1251 2
+	}
+
+	//chrissstrahl - make sure it works in coop, give server some time to digest
+	waitframe
+	
+	thread weed
+	thread InitFlak88s
+	
+	//chrissstrahl - make sure it works in coop, give server some time to digest
+	waitframe
+	
+	thread ambientBattleSounds
+	thread doCannons
+	
+	//chrissstrahl - make sure it works in coop, give server some time to digest
+	waitframe
+	
+	thread bridgeRunners
+
+	$scene3Truck1.done_unloading = 0
+	$scene3Truck1 immune bash crush vehicle
+	thread killBridgeGuys
+
+	if (level.warpToTankRide) {
+		// stick the AI tank near the tank ride
+		local.tank = $scene2AlliedTank2
+		local.tank thread maps/e1l1/scene2.scr::showTank
+		waitframe
+
+		local.tank.origin = ( 800 1348 244 )
+		wait 0.5
+
+		local.tank.angles = ( 2 265.7 356 )
+		level.tank2ReachedPlayerTank = 1
+	}
+
+	// init natural-bridge exploder stuff
+	thread doNaturalBridgeExploding
+
+	// wait for scene begin trigger
+	level.sightdistance = 4048		// how far the enemy tanks can "see"
+	level.playerIsInTank = 0
+
+	if ( level.warpToBunkerEntrance==0 && level.warpToTankRideEnd==0 ){
+		$scene3Trigger waittill trigger
+	}
+	else{
+		level waittill spawn
+	}
+
+	thread startPlayerTankGag
+	thread doExplosions
+	exec global/autosave.scr 2
+
+	if (level.warpToTankRide) {
+		// tank hasn't been initialized yet, so it won't explode right unless
+		//    initialize it right here
+		$scene2AlliedTank2.tankPath = NULL
+		$scene2AlliedTank2 thread maps/e1l1/thinkTank.scr::tankGo
+	}
+
+	if (level.showTriggerMessages){
+		iprintlnbold "Scene 3 Tank Ride Trigger Hit"
+	}
+
+	// enable the tank that is drivable by the player
+	level.playerJumpedOnTank = 0
+	$scene2AlliedTank2.health = 10000
+
+	if ( level.warpToBunkerEntrance==1 ){
+		level.warpToTankRide = 1
+	}
+
+	if ( level.warpToBunkerEntrance==0 && level.warpToTankRideEnd==0 ){
+		thread rollTruckConvoy
+	}
+
+	// make sure the allied tank has reached the player tank
+	thread DoBuddyStuff
+
+	// roll the tank convoy
+	thread rollFirstConvoy
+	thread rollSecondConvoy
+	thread rollThirdConvoy
+	
+	//chrissstrahl - make sure it works in coop, give server some time to digest
+	waitframe
+	
+	thread battleAtTheEnd
+	thread BunkerGunExploderInit
+}end
+
+//=========================================================================
+HideTanks:
+//=========================================================================
+{
+	$scene3AxisTank1 thread HideVehicle
+	$scene3AxisTank4 thread HideVehicle
+	$scene3AxisTank6 thread HideVehicle
+	$tumbleweedtrigger waittill trigger
+	
+	//chrissstrahl - coop mod respawn area
+	if(level.gametype != 0){
+		//chrissstrahl - create spawnpoints for coop
+		waitthread coop_mod/spawnlocations.scr::e1l1_update2
+	}
+	
+	$scene3AxisTank1 thread ShowVehicle
+	$scene3AxisTank4 thread ShowVehicle
+	$scene3AxisTank6 thread ShowVehicle
+}end
+
+//=========================================================================
+HidePlayerTank:
+//=========================================================================
+{
+	$playerTank thread HideVehicle
+	$scene6DeadTruck1 thread HideVehicle
+	$scene2BackTrenchTrigger_1 waittill trigger
+	$playerTank thread ShowVehicle
+	$scene6DeadTruck1 thread ShowVehicle
+}end
+
+//=========================================================================
+HideVehicle:
+//=========================================================================
+{
+	self hide
+	self notsolid
+	self.gun = self QueryTurretSlotEntity 0
+
+	if (self.gun != NIL && self.gun != NULL){
+		self.gun hide
+		self.gun notsolid
+	}
+
+	self.gun2 = self QueryTurretSlotEntity 1
+
+	if (self.gun2 != NIL && self.gun2 != NULL){
+		self.gun2 hide
+		self.gun2 notsolid
+	}
+}end
+
+//=========================================================================
+ShowVehicle:
+//=========================================================================
+{
+	self show
+	self solid
+
+	if (self.gun != NIL && self.gun != NULL){
+		self.gun show
+		self.gun solid
+	}
+
+	if (self.gun2 != NIL && self.gun2 != NULL){
+		self.gun2 show
+		self.gun2 solid
+	}
+}end
+
+// setup bunker entrance buddy.
+//=========================================================================
+DoBuddyStuff:
+//=========================================================================
+{
+	$bunkerallie_speaker thread DoBunkerBuddy
+}end
+
+
+//-----------------------------------------------------------------------------
+
+//detectBeginBattle:
+//	thread checkPlayerTankMoved
+//	$scene3TriggerA waittill trigger
+//	trigger $beginBattle 
+//end
+//
+//checkPlayerTankMoved:
+//	// objectives code updates when this thread ends
+//	while (1) {
+//		if (level.playerIsInTank)
+//			break
+//		wait 0.1
+//	}
+//	trigger $beginBattle 
+//end
+
+//TankReached:
+//	// tank objective is added when this thread ends
+//	$tankCommanderDoneTalking waittill trigger
+//end
+
+//-----------------------------------------------------------------------------
+
+//=========================================================================
+rollFirstConvoy:
+//=========================================================================
+{
+	//	wait 3
+	//	thread axisTank1Go
+	//	thread axisTank2Go
+}end
+
+//=========================================================================
+axisTank1Go:
+//=========================================================================
+{
+	// tank 1, in first convoy
+	//	wait 6
+	thread scene2AlliedTankWaitDeath
+
+	local.tank = $scene3AxisTank1
+	if (level.skipScene3TankConvoy1) {
+		local.tank remove
+		end
+	}
+
+	local.tank.health 			= 100000
+	local.tank.health_set 		= 1
+	local.tank.tankType 		= panzer
+	local.tank.tankSpeed 		= 30
+	local.tank.tankAccel 		= 20
+	local.tank.tankLookAhead 	= 200
+	local.tank.tankPath 		= $scene3AxisTank1Path
+	local.tank.tankPathLoop 	= 0
+	local.tank.tankDriveDelay 	= 0
+	local.tank.tankEngageDelay 	= 0
+	local.tank.tankStunTime 	= 0
+	local.tank.tankGuysJumpOut 	= 0
+	local.tank thread maps/e1l1/thinkTank.scr::tankGo 
+	local.tank thread zapAngles
+	wait 3
+
+	if (level.tank2ReachedPlayerTank == 1) {
+		local.tank.tankTarget = scene2AlliedTank2
+		wait 7
+
+		local.tank modifydrive 3 30 256
+
+		while ( level.scene2AlliedTank2Alive==1 ){
+			wait 0.1
+		}
+	}
+
+	//	if ($scene2AlliedTank2 != NULL && $scene2AlliedTank2 != NIL)
+	//		$scene2AlliedTank2 waittill death
+
+	dprintln "AXISTANK1 Switching target to player!"
+	local.tank.health = level.tankBaseHealth
+	local.tank modifydrive 30 30 256
+	local.tank.tankTarget = player
+	wait 3
+
+	local.tank.tankStunTime = 3
+}end
+
+//=========================================================================
+zapAngles:
+//=========================================================================
+{
+	self waittill drive
+	self fullstop
+	waitframe
+
+	// kill the roll so that our collision is happy
+	local.angles 	= self.angles
+	local.angles[2] = 0
+	self.angles 	= local.angles
+}end
+
+//=========================================================================
+scene2AlliedTankWaitDeath:
+//=========================================================================
+{
+	level.scene2AlliedTank2Alive = 1
+	$scene2AlliedTank2 waittill death
+	level.scene2AlliedTank2Alive = 0
+}end
+
+//=========================================================================
+axisTank2Go:
+//=========================================================================
+{
+	// tank 2, in first convoy
+	//local.tank = $scene3AxisTank2
+	//if (1) {
+	//if (level.skipScene3TankConvoy1) {
+	//	local.tank remove
+	//	end
+	//}
+	//local.tank.health = 1000
+	//local.tank.health_set = 1
+	//local.tank.tankTarget = player
+	//local.tank.tankType = panzer
+	//local.tank.tankSpeed = 10
+	//local.tank.tankAccel = 20
+	//local.tank.tankLookAhead = 200
+	//local.tank.tankPath = $scene3AxisTank2Path
+	//local.tank.tankPathLoop = 0
+	//local.tank.tankDriveDelay = 0
+	//local.tank.tankEngageDelay = 0
+	//local.tank.tankStunTime = 0
+	//local.tank.tankGuysJumpOut = 0
+	//local.tank thread maps/e1l1/thinkTank.scr::tankGo 
+	//local.tank waittill drive
+	//local.tank.health = 500
+}end
+
+//=========================================================================
+doCliffTank1:
+//=========================================================================
+{
+	// tank 3, on the cliff
+	if (level.skipScene3CliffTank1) {
+		$scene3AxisTank3 remove
+		end
+	}
+
+	$scene3Trigger1 waittill trigger
+	println "cliff tank one going"
+
+	local.tank 					= $scene3AxisTank3
+	local.tank.health 			= 1000
+	local.tank.health_set 		= 1
+	local.tank.tankTarget 		= player
+	local.tank.tankType 		= panzer
+	local.tank.tankSpeed 		= 5
+	local.tank.tankAccel 		= 20
+	local.tank.tankLookAhead 	= 200
+	local.tank.tankPath 		= $scene3AxisTank3Path
+	local.tank.tankPathLoop 	= 0
+	local.tank.tankDriveDelay 	= 0
+	local.tank.tankEngageDelay 	= 0
+	local.tank.tankStunTime 	= 0
+	local.tank.tankGuysJumpOut 	= 0
+
+	local.tank thread maps/e1l1/thinkTank.scr::tankGo 
+	local.tank.health = 900
+	local.tank waittill drive
+}end
+
+//=========================================================================
+tankShootOnceAt local.origin local.distance:
+//=========================================================================
+{
+	// wait for player to be within distance of us
+	//chrissstrahl - make coop compatible
+	local.player = exec coop_mod/replace.scr::player_closestTo self
+	while(local.player == NULL && self != NULL){
+		local.player = exec coop_mod/replace.scr::player_closestTo self
+		wait 1
+	}
+	
+	while (self != NULL && !(vector_within self.origin local.player.origin local.distance) && (isalive self)){ //chrissstrahl
+		wait 0.25
+		while(local.player == NULL && self != NULL) {
+			local.player = exec coop_mod/replace.scr::player_closestTo self
+			wait 0.5
+		}
+	}
+
+	if (self == NULL || !(isalive self)){
+		end
+	}
+
+	local.o 		= spawn script_object targetname theTankTarget
+	local.o.origin  = local.origin
+	self.tankTarget = theTankTarget
+	local.shotCount = self.shotCount
+	waitframe
+
+	self thread maps/e1l1/thinkTank.scr::resetAimTarget
+
+	while (local.shotCount == self.shotCount){
+		waitframe
+	}
+	local.o remove
+}end
+
+//=========================================================================
+rollSecondConvoy:
+//=========================================================================
+{
+	// tank 4, in second convoy
+	if (level.skipScene3TankConvoy2) {
+		$scene3AxisTank4 remove
+		end
+	}
+
+	$scene3Trigger2 waittill trigger
+	local.tank 				 	= $scene3AxisTank4
+	local.tank.health 		 	= level.tankBaseHealth
+	local.tank.health_set 	 	= 1
+	local.tank.tankType 	 	= panzer
+	local.tank.tankSpeed 	 	= 10
+	local.tank.tankAccel 	 	= 20
+	local.tank.tankLookAhead 	= 200
+	local.tank.tankPath 	 	= $scene3AxisTank4Path
+	local.tank.tankPathLoop  	= 0
+	local.tank.tankDriveDelay 	= 0
+	local.tank.tankEngageDelay 	= 0
+	local.tank.tankStunTime 	= 0
+	local.tank.tankGuysJumpOut 	= 0
+
+	local.tank thread maps/e1l1/thinkTank.scr::tankGo 
+	local.tank waitthread tankShootOnceAt $tanktarget1.origin 10000
+	local.tank.tankTarget = player
+}end
+
+//=========================================================================
+doCliffTank2:
+//=========================================================================
+{
+	// tank 5, second guy on the cliff
+	if (level.skipScene3CliffTank2) {
+		$scene3AxisTank5 remove
+		end
+	}
+
+	$scene3Trigger3 waittill trigger
+	local.tank 					= $scene3AxisTank5
+	local.tank.health 			= 1000
+	local.tank.health_set 		= 1
+	local.tank.tankTarget 		= player
+	local.tank.tankType 		= panzer
+	local.tank.tankSpeed 		= 5
+	local.tank.tankAccel 		= 20
+	local.tank.tankLookAhead 	= 200
+	local.tank.tankPath 		= $scene3AxisTank5Path
+	local.tank.tankPathLoop 	= 0
+	local.tank.tankDriveDelay 	= 0
+	local.tank.tankEngageDelay 	= 0
+	local.tank.tankStunTime 	= 0
+	local.tank.tankGuysJumpOut 	= 0
+
+	local.tank thread maps/e1l1/thinkTank.scr::tankGo 
+	local.tank waittill drive
+}end
+
+//=========================================================================
+rollThirdConvoy:
+//=========================================================================
+{
+	// tank 6, in third
+	if (level.skipScene3TankConvoy3) {
+		$scene3AxisTank6 remove
+		end
+	}
+
+	$scene3Trigger5 waittill trigger
+	local.tank 					= $scene3AxisTank6
+	local.tank.health 			= level.tankBaseHealth
+	local.tank.health_set 		= 1
+	local.tank.tankType 		= panzer
+	local.tank.tankSpeed 		= 3
+	local.tank.tankAccel 		= 20
+	local.tank.tankLookAhead 	= 200
+	local.tank.tankPath 		= NULL
+	local.tank.tankPathLoop 	= 0
+	local.tank.tankDriveDelay 	= 0
+	local.tank.tankEngageDelay 	= 0
+	local.tank.tankStunTime 	= 0
+	local.tank.tankGuysJumpOut 	= 0
+	local.tank thread maps/e1l1/thinkTank.scr::tankGo 
+
+	local.tank waitthread tankShootOnceAt $tanktarget2.origin 10000
+	local.tank.tankTarget = player
+}end
+
+//=========================================================================
+lastTankDead:
+//=========================================================================
+{
+	$scene3AxisTank6 waittill death
+}end
+	
+//=========================================================================
+rollTruckConvoy:
+//=========================================================================
+{
+	//chrissstrahl - we don't do slow checks in coop
+	if (level.gametype == 0 && level.slowMachine != 0) {
+		wait 1
+		$scene3Truck1 remove
+		$autotrucktrigger remove
+		thread axisTank1Go
+		end
+	}
+
+	if (level.skipScene3TruckConvoy1) {
+		$scene3Truck1 remove
+		//$scene3Truck2 remove
+		end
+	}
+
+	//$tankCommanderDoneTalking waittill trigger
+	//	wait 3
+
+	//chrissstrahl - coop mod respawn area
+	if(level.gametype != 0){
+		//chrissstrahl - create spawnpoints for coop
+		waitthread coop_mod/spawnlocations.scr::e1l1_update3
+	}
+
+	trigger $autotrucktrigger
+	waitframe
+
+	for (local.i=1; local.i<=$scene3Truck1_passenger.size; local.i++){
+		$scene3Truck1_passenger[local.i] thread truckConvoyGuysThink local.i
+	}
+
+	//	for (local.i=1; local.i<=$scene3Truck1_passenger.size; local.i++)
+	//	{
+	//		$scene3Truck1_passenger[local.i].type_attack = "cover"
+	//		$scene3Truck1_passenger[local.i] runto $("truckrunnerpoint" + local.i)
+	//	}
+
+
+	/*
+	$scene3Truck1 thread maps/e1l1/truckThink.scr::init 400 0 "models/human/german_afrika_grenadier.tik"
+	level.truck1GuysCount = 0
+	$scene3TruckTrigger1 waittill trigger
+	waitthread global/ai.scr::spawnset 3050 truck1Guys
+	$truck1Guys thread truck1GuysThink
+	*/	
+	//$scene3Truck1 thread maps/e1l1/truckThink.scr::init 400 5 "models/human/german_afrika_grenadier.tik"
+	////$scene3Truck2 thread maps/e1l1/truckThink.scr::init 400 5 "models/human/german_afrika_grenadier.tik"
+	//level.scene3RollTruckConvoy = 0
+	//thread truckConvoyWaitOnTankDeath
+	//thread truckConvoyWaitOnTrigger
+	//while (level.scene3RollTruckConvoy == 0)
+	//	wait 0.5
+	//iprintlnbold "trucks rolling"
+	//
+	//wait 0.1
+
+	$scene3Truck1 thread maps/e1l1/truckThink.scr::drive $scene3Truck1Path
+
+	//	$tankCommanderDoneTalking waittill trigger
+
+	wait 1
+	thread axisTank1Go
+
+	//$scene3Truck2 thread maps/e1l1/truckThink.scr::drive $scene3Truck2Path
+	//
+	//$scene3Truck1 waittill drive
+	//$scene3Truck2 stop
+}end
+
+//=========================================================================
+truckConvoyGuysThink local.num:
+//=========================================================================
+{
+	self exec global/disable_ai.scr
+
+	while (self && self.done_unloading == 0){
+		waitframe
+	}
+
+	self thread solidHack
+
+	if ( self==NIL || self==NULL ){
+		end
+	}
+
+	self waitthread global/SafeMoveTo.scr::SafeRunTo $("truckrunnerpoint" + local.num)
+
+	while (self.safemoveto_done == 0){
+		waitframe
+	}
+
+	self exec global/enable_ai.scr
+	self.type_attack = "cover"
+}end
+
+//=========================================================================
+solidHack:
+//=========================================================================
+{
+	// HACK--> for some reason the truck driver was being set back to notsolid after he exited the truck.  Can't see why, so this should fix it....
+	while (isAlive self){
+		self solid
+		wait 0.1
+	}
+}end
+
+/*
+truck1GuysThink:
+	self type_attack "alarm"
+	self.enableEnemy = 0
+
+	level.truck1GuysCount++
+	if (level.truck1GuysCount < 3)
+		self gun bazooka
+	else {
+		self.ammo_grenade = 4
+		self gun "mg42"
+		self useweaponclass mg
+	}
+
+	//println self.guyNo " running to " self.target.targetname
+	
+	self runto self.target
+	self waittill movedone
+	if (self != NULL && self != NIL && (IsAlive self))
+		self.enableEnemy = 1
+end			
+*/
+
+//=========================================================================
+truckConvoyWaitOnTankDeath:
+//=========================================================================
+{
+	$scene3AxisTank2 waittill death
+	level.scene3RollTruckConvoy = 1
+}end	
+
+//=========================================================================
+truckConvoyWaitOnTrigger:
+//=========================================================================
+{
+	$scene3Trigger1 waittill trigger
+	
+	//chrissstrahl - coop mod respawn area
+	if(level.gametype != 0){
+		//chrissstrahl - create spawnpoints for coop
+		waitthread coop_mod/spawnlocations.scr::e1l1_update3
+	}
+	
+	
+	level.scene3RollTruckConvoy = 1
+}end	
+
+//=========================================================================
+rollTruckConvoy2:
+//=========================================================================
+{
+	//if (level.skipScene3TruckConvoy2) {
+	//	$scene3Truck3 remove
+	//	$scene3Truck4 remove
+	//	end
+	//}
+	//
+	//$scene3Trigger4 waittill trigger
+	//$scene3Truck3 thread maps/e1l1/truckThink.scr::init 400 3 "models/human/german_afrika_grenadier.tik"
+	//$scene3Truck4 thread maps/e1l1/truckThink.scr::init 400 3 "models/human/german_afrika_grenadier.tik"
+	//wait 0.1
+	//$scene3Truck3 thread maps/e1l1/truckThink.scr::drive $scene3Truck3Path
+	//wait 3
+	//$scene3Truck4 thread maps/e1l1/truckThink.scr::drive $scene3Truck4Path
+	//$scene3Truck3 waittill drive
+	//$scene3Truck4 stop
+}end
+
+//=========================================================================
+rollBridgeTank:
+//=========================================================================
+{
+	// spawn guys first
+	wait 7		// wait how long?
+
+	// go tank!
+	local.tank = $scene3BridgeAxisTank
+
+	//if (level.skipScene3TankConvoy1) {
+	//	local.tank remove
+	//	end
+	//}
+
+	local.tank.health 			= 100000
+	local.tank.health_set 		= 1
+	local.tank.tankType 		= panzer
+	local.tank.tankSpeed 		= 30
+	local.tank.tankAccel 		= 20
+	local.tank.tankLookAhead 	= 200
+	local.tank.tankPath 		= $scene3BridgeAxisTankPath
+	local.tank.tankPathLoop 	= 0
+	local.tank.tankDriveDelay 	= 0
+	local.tank.tankEngageDelay 	= 0
+	local.tank.tankStunTime 	= 0
+	local.tank.tankGuysJumpOut 	= 0
+	local.tank thread maps/e1l1/thinkTank.scr::tankGo 
+	wait 3
+
+	local.tank.tankTarget = player		//scene2AlliedTank2
+
+	//wait 7
+	//local.tank modifydrive 3 30 256
+	//if ($scene2AlliedTank2 != NULL && $scene2AlliedTank2 != NIL)
+	//	$scene2AlliedTank2 waittill death
+	//local.tank.health = 800
+	//local.tank modifydrive 30 30 256
+	//local.tank.tankTarget = player
+	//wait 3
+	//local.tank.tankStunTime = 3
+	//local.tank waittill drive
+}end
+
+
+//=========================================================================
+spawnBazookaGuys:
+//=========================================================================
+{
+	if (level.skipScene3BazookaGuys){
+		end
+	}
+
+	$scene3Trigger1 waittill trigger
+	waitthread global/ai.scr::spawnset 3000 cliffBazookaSet1
+	$cliffBazookaSet1 thread doCliffBazooka
+}end
+
+//=========================================================================
+doCliffBazooka:
+//=========================================================================
+{
+	if (level.skipScene3BazookaGuys){
+		end
+	}
+
+	self gun bazooka
+	self aimat $playerTank
+}end
+
+
+//	spawn in the flak guys and get the flaks shooting at their targets...
+//=========================================================================
+doCannons:
+//=========================================================================
+{
+	//chrissstrahl - we don't do slow checks in coop
+	if (level.gametype == 0 && level.slowMachine != 0){
+		$flak2_guy1 remove
+	}
+
+	level.flak1_shooting = 1
+	level.flak2_shooting = 1
+	level.flak1_guycount = 0
+	level.flak2_guycount = 0
+
+	waitthread coop_mod/replace.scr::waitTillPrespawn //chrissstrahl - coop
+	
+	waitthread global/ManSpawnNamed.scr::Init "flak2_guy1"
+	waitthread global/ManSpawnNamed.scr::Init "flak2_guy2"
+	waitthread global/ManSpawnNamed.scr::Init "flak2_guy3"
+
+	$scene3Trigger6 waittill trigger
+	waitthread global/ai.scr::spawnset 1251 FlakGuys1
+
+	//	waitthread global/ai.scr::spawnset 1252 FlakGuys2
+
+	$FlakGuys1 thread MonitorFlakEnemy1
+	$FlakGuys1 thread MonitorFlakDeath1
+	$FlakGuys1 thread MonitorFlakPain
+
+	//	$FlakGuys2 thread MonitorFlakEnemy2
+	//	$FlakGuys2 thread MonitorFlakDeath2
+
+	waitthread global/ManSpawnNamed.scr::Spawn "flak2_guy1"
+	waitthread global/ManSpawnNamed.scr::Spawn "flak2_guy2"
+	waitthread global/ManSpawnNamed.scr::Spawn "flak2_guy3"
+	$flak2_guy1 thread doFlak2Guy
+	$flak2_guy2 thread doFlak2Guy
+	$flak2_guy3 thread doFlak2Guy
+	waitframe
+
+	$flak2_guy2.origin = ( 965 -3890 464 )
+	$flak2_guy2 turnto $scene3Cannon2
+	$flak2_guy2.no_idle = 1
+	$flak2_guy3.no_idle = 1
+
+	$scene3Cannon1 thread FireFlak88Loop
+	$scene3Cannon2 thread FireFlak88Loop_2 1 5
+}end
+
+//=========================================================================
+doFlak2Guy:
+//=========================================================================
+{
+	self holster
+	self thread MonitorFlakEnemy2
+	self thread MonitorFlakDeath2
+	self thread MonitorFlakPain
+}end
+
+//=========================================================================
+InitFlak88s:
+//=========================================================================
+{
+	level waittill spawn
+	spawn trigger_relay targetname "scene3Flak88Trigger"
+
+	$scene3Cannon1 thread InitFlak88
+	$scene3Cannon2 thread InitFlak88
+}end
+
+//=========================================================================
+InitFlak88:
+//=========================================================================
+{
+	self.gun = self QueryTurretSlotEntity 0
+	self.collisionent 	  = $flak88_collision
+	self.gun.collisionent = $flak88_turret_collision
+
+	self hide
+	self notsolid
+	self.gun hide
+	self.gun notsolid
+	
+	$scene3Flak88Trigger waittill trigger
+
+	self show
+	self solid
+	self.gun show
+	self.gun solid
+	
+	self thread global/stationaryweapons.scr::MountedStationaryWeaponWithCollision "models/statweapons/flak88_d.tik" $flak88_destroyed_collision
+
+	self.gun maxyawoffset 45
+	self.gun turnspeed    15
+	self.gun pitchspeed   7.5
+	self.gun pitchcaps    "-45 20 0"
+	self.gun viewjitter   5
+	self.gun firedelay 	  3
+
+	while (1) {
+		// wait for player to get on this gun
+		while ($player.vehicle != self){
+			waitframe
+		}
+
+		// attach storm to me
+		self waitthread maps/e1l1/storm.scr::AttachStorm
+		waitthread spawnPoorBastard
+
+		// wait for player to get off this gun
+		while ($player.vehicle == self){
+			waitframe
+		}
+
+		$player waitthread maps/e1l1/storm.scr::AttachStorm
+		thread killPoorBastard
+		waitframe
+	}
+}end
+
+//=========================================================================
+spawnPoorBastard:
+//=========================================================================
+{
+	waitframe
+	local.model = spawn models/human/Sc_AL_US_infmask.tik targetname "poorSoul"
+	local.model hide
+	local.model.enableEnemy = 0
+	local.model physics_off
+	local.turret = self QueryTurretSlotEntity 0
+	local.model attach local.turret "eyebone" 0 ( 30 0 0 )
+	local.model notsolid
+	local.model holster
+	local.model nodamage
+}end
+
+//=========================================================================
+killPoorBastard:
+//=========================================================================
+{
+	waitframe
+	$poorSoul remove
+}end
+
+//=========================================================================
+FireFlak88Loop_2 local.min_time local.rand_time:
+//=========================================================================
+{
+	self.shooting = 1
+	self.gun = self QueryTurretSlotEntity 0
+
+	if ( local.min_time==NIL ){
+		local.min_time = 3
+	}
+
+	if ( local.rand_time==NIL ){
+		local.rand_time = 7
+	}
+
+	while ( self.shooting==1 ){
+		// how quickly to fire?  
+		$flak2_guy3 anim 88officer_fire
+		$flak2_guy3 waittill animdone
+		$flak2_guy3 anim 88officer_idle
+		$flak2_guy2 anim 88operator_turnleft
+		$flak2_guy2 waittill animdone
+		$flak2_guy2 anim 88operator_idle
+		$flak2_guy3 anim 88officer_coverears
+		wait 0.5
+
+		$flak2_guy2 anim 88operator_takecover
+		wait 0.3
+
+		self waitthread Fire 0
+		wait 0.5
+
+		self.gun sound flak_snd_reload
+		$flak2_guy3 anim 88officer_idle
+		local.random = local.min_time + ( randomfloat local.rand_time )
+		wait local.random
+	}
+}end
+
+//=========================================================================
+FireFlak88Loop local.min_time local.rand_time:
+//=========================================================================
+{
+	self.shooting = 1
+	self.gun = self QueryTurretSlotEntity 0
+
+	if ( local.min_time==NIL ){
+		local.min_time = 3
+	}
+
+	if ( local.rand_time==NIL ){
+		local.rand_time = 7
+	}
+
+	while ( self.shooting==1 ){
+		// how quickly to fire?  
+		local.random = local.min_time + ( randomfloat local.rand_time )
+		wait local.random
+
+		self waitthread Fire 0
+		wait 0.5
+
+		self.gun sound flak_snd_reload
+	}
+}end
+
+//=========================================================================
+Fire:
+//=========================================================================
+{
+	self.gun setaimtarget self.target
+	self.gun waittill ontarget
+	self.gun anim fire
+}end
+
+//	if any of these guys get hurt, trigger their ai to start...
+//=========================================================================
+MonitorFlakPain:
+//=========================================================================
+{
+	self waittill pain
+	if ( $flakk_startai!=NIL ){
+		trigger $flakk_startai
+	}
+
+}end
+
+//=========================================================================
+MonitorFlakEnemy1:
+//=========================================================================
+{
+	self.enableEnemy = 0
+
+	// turn on enemy checking after the tank goes boom...
+	$flakk_startai waittill trigger
+	//	$scene3AxisTank6 waittill death
+	wait 1
+
+	self.enableEnemy = 1
+	self waittill hasenemy
+
+	// stop the gun
+	$scene3Cannon1.shooting = 0
+}end
+
+//=========================================================================
+MonitorFlakEnemy2:
+//=========================================================================
+{
+	self.enableEnemy = 0
+
+	// turn on enemy checking after the tank goes boom...
+	//	$scene3AxisTank6 waittill death
+	$flakk_startai waittill trigger
+
+	self attackplayer
+	self unholster
+	self turnto NULL
+	wait 1
+
+	self.enableEnemy = 1
+	self waittill hasenemy
+
+	// stop the gun
+	$scene3Cannon2.shooting = 0
+}end
+
+//=========================================================================
+MonitorFlakDeath1:
+//=========================================================================
+{
+	level.flak1_guycount ++
+	self waittill death
+	level.flak1_guycount --
+
+	if (level.flak1_guycount==0 ){
+		thread FlakGunTaken
+	}
+}end
+
+//=========================================================================
+MonitorFlakDeath2:
+//=========================================================================
+{
+	level.flak2_guycount ++
+	self waittill death
+	level.flak2_guycount --
+
+	if (level.flak2_guycount==0 ){
+		thread FlakGunTaken
+	}
+}end
+
+//	switch objective to other gun, or transition the objective away..
+//=========================================================================
+FlakGunTaken:
+//=========================================================================
+{
+	if ( level.flak2_guycount > 0 ){
+		waitthread maps/e1l1/objectives.scr::move_curr_compass_point $scene3Cannon2.origin
+	}
+	else if ( level.flak1_guycount > 0 ){
+		waitthread maps/e1l1/objectives.scr::move_curr_compass_point $scene3Cannon1.origin
+	}
+	else{
+		// we've taken both guns...
+		waitthread maps/e1l1/objectives.scr::transition "seizedFlaks"
+	}
+}end
+
+//=========================================================================
+TrackBunkerBaddies:
+//=========================================================================
+{
+	level.bunkerBaddies++
+	self waittill death
+	level.bunkerBaddies--
+}end
+
+// Monitor for player and be ready to say our dialog when he's nearby and
+// we don't have any enemies...
+//=========================================================================
+DoBunkerBuddy:
+//=========================================================================
+{
+	//iprintlnbold("DoBunkerBuddy")
+	level.bunkerBaddies = 0
+	$spawn_bunkerallie_speaker waittill trigger
+	
+	//chrissstrahl - coop mod respawn area
+	if(level.gametype != 0){
+		//chrissstrahl - create spawnpoints for coop
+		waitthread coop_mod/spawnlocations.scr::e1l1_update9
+	}
+
+	waitthread global/ai.scr::spawnset 1965 BunkerBaddies
+	$BunkerBaddies thread TrackBunkerBaddies
+
+	self show
+	self ai_on
+	self.enableEnemy = 1
+	wait 0.1
+
+	// don't do anything until all these baddies are gone..
+	while ( level.bunkerBaddies>0 ){
+		wait 0.25
+	}
+
+	// turn the MG guys off while I am talking
+	$blokes0011 ai_off
+	$blokes0022 ai_off
+
+	self.enableEnemy 	= 0
+	self.movedoneradius = 175
+	self exec coop_mod/replace.scr::turnto //chrissstrahl - coop compatible
+	self exec coop_mod/replace.scr::lookat //chrissstrahl - coop compatible
+	self exec coop_mod/replace.scr::runtoClosest //chrissstrahl - coop compatible
+	
+	//iprintlnbold("DoBunkerBuddy->movedone")
+	self waittill movedone
+
+	dprintln "TALKING TO PLAYER"
+	self say A_11_Soldier_7A
+	self waittill saydone
+	self say A_11_Soldier_7B
+	self waittill saydone
+	self say A_11_Soldier_7C
+	self waittill saydone
+
+	// turn the MG guys back on
+	$blokes0011 ai_on
+	$blokes0022 ai_on
+
+	iprintlnbold("DoBunkerBuddy->unlockbunker")
+	thread maps/e1l1/scene5.scr::unlockBunker
+
+	self lookat NULL
+	self turnto NULL
+ 	self waitthread global/SafeMoveTo.scr::SafeRunTo_Wait $bunkerBuddyGoto
+	
+	iprintlnbold("DoBunkerBuddy->movedone 2")
+ 	self waittill movedone
+	self turnto $bunkerBuddyAimat 	
+	self thread global/loopanim.scr::LoopAnim rifle_crouch_alert
+	
+	dprintln "DONE TALKING TO PLAYER"
+
+	thread maps/e1l1/objectives.scr::transition "talkedToSoldier"
+	$triggercleanup10 waittill trigger
+	self remove
+}end
+
+/*
+
+doCannon:
+	//$scene3Cannon1_guy ai_off
+	//if (level.skipScene3Cannon)
+	//	end
+	//$scene3Trigger3 waittill trigger
+	//$scene3Cannon1_guy ai_on
+	//$scene3Cannon1 thread maps/e1l1/cannon.scr::init $scene3Cannon1_turret0 $scene3Cannon1_guy 1
+end
+
+
+doCannon2:
+	$scene3Cannon2_guy ai_off
+	$scene3Cannon2_guy hide
+	if (level.skipScene3Cannon2)
+		end
+	$scene3Trigger6 waittill trigger
+	$scene3Cannon2_guy show
+	$scene3Cannon2_guy ai_on
+	$scene3Cannon2 thread maps/e1l1/cannon.scr::init $scene3Cannon2_turret0 $scene3Cannon2_guy 1
+end
+
+  */
+
+//-----------------------------------------------------------------------------
+
+//=========================================================================
+doGuyRemove:
+//=========================================================================
+{
+	self remove
+}end
+
+//=========================================================================
+battleAtTheEnd:
+//=========================================================================
+{
+	if (level.skipBattleAtTheEnd){
+		end
+	}
+
+	$scene3Trigger7 waittill trigger
+	
+	//chrissstrahl - coop mod respawn area
+	if(level.gametype != 0){
+		//chrissstrahl - create spawnpoints for coop
+		waitthread coop_mod/spawnlocations.scr::e1l1_update7
+	}
+	
+	$cleanup1 thread doGuyRemove
+
+	//chrissstrahl - we don't do slow checks in coop
+	if (level.gametype == 0 && level.slowMachine){
+		$cleanup3 thread doGuyRemove
+	}
+
+	waitthread global/ai.scr::spawnset 3200 spawn3200
+	$spawn3200 thread endTrenchGuyThink
+
+	waitthread global/ai.scr::spawnset 3300 spawn3300
+	$spawn3300 thread endRoadGuyThink
+}end
+
+//=========================================================================
+endTrenchGuyThink:
+//=========================================================================
+{
+	self gun "mg42"
+	self.accuracy 		= 40
+	self.ammo_grenade 	= 4
+	self.sight 		  	= 4096
+	self.hearing 		= 4096
+}end
+
+//=========================================================================
+endRoadGuyThink:
+//=========================================================================
+{
+	self type_attack "alarm"
+	self gun "mg42"
+	self.accuracy 	= 40
+	self.sight 		= 4096
+	self.hearing 	= 4096
+	
+	//chrissstrahl - make coop compatible
+	local.player = exec coop_mod/replace.scr::player_closestTo self
+	while(local.player == NULL && self != NULL){
+		local.player = exec coop_mod/replace.scr::player_closestTo self
+		wait 1
+	}
+	
+
+	while ((IsAlive self) && self != NIL && self != NULL) {
+		local.dist = vector_length(self.origin - local.player.origin) //chrissstrahl
+
+		if (local.dist > 400){
+			self.enableEnemy = 0
+			self runto local.player
+		}
+		else{
+			self.enableEnemy = 1
+		}
+		wait 0.5
+		//chrissstrahl - make coop dedicated server compatible
+		local.player = exec coop_mod/replace.scr::player_closestTo self
+		while(local.player == NULL && self != NULL){
+			local.player = exec coop_mod/replace.scr::player_closestTo self
+			wait 0.5
+		}
+	}
+}end
+
+//=========================================================================
+commanderGag:
+//=========================================================================
+{
+	$scene2AlliedTank2 takedamage
+	$scene2AlliedTank2.health = 10
+
+	local.turret = $scene2AlliedTank2 QueryTurretSlotEntity 0
+	local.turret anim hatch_open
+
+	spawn models/human/Sc_Al_US_Tank.tik targetname commander
+	$commander.enableEnemy = 0
+	$commander rendereffects "-shadow"
+	$commander holster
+
+	//$commander.angles = ( 0 -90 0 )
+	//$commander anim mg42_crouch_idle
+	wait 1
+	waitframe
+
+	//$commander attach $scene2AlliedTank2 origin 1 ( -18 -25 80 )
+	$commander attach $scene2AlliedTank2 origin 1 ( 0 0 0 )
+	$commander bind $scene2AlliedTank2
+
+	$commander anim A_11_TankCommander_talk
+	$commander waittill animdone
+	$commander ai_off
+
+	//wait 1.5
+	//$commander lookat $player
+	//wait 0.25
+	//$commander turnto $player
+	//wait 0.5
+	//$commander say dfr_E1L1_tank_1
+	//iprintlnbold "Baker!  Clear that tank out, now!"
+	//$commander waittill saydone
+
+	$scene2AlliedTank2.health = 10
+	trigger $tankCommanderDoneTalking 
+	wait 1
+
+	$commander lookat $playerTank
+	$commander turnto $playerTank
+
+	//wait 5
+	//	$scene2AlliedTank2 waittill damage
+	$scene2AlliedTank2 damage $world 55000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	//	$scene2AlliedTank2 waittill death
+	$commander remove
+}end
+
+//=========================================================================
+doNaturalBridgeExploding:
+//=========================================================================
+{
+	level.nat_bridge_exploded = 0
+	level.bridge_rubble_blown = 0
+
+	level.nat_bridge_exploder_num 		 	= 11011011
+	level.nat_bridge_rubble_exploder_num 	= 110110166
+	level.nat_bridge_rubble_exploder 		= NULL
+
+	spawn trigger_relay "targetname" "NatBridgeBridgeBlown_Trigger"
+	spawn trigger_relay "targetname" "NatBridgeRubbleCleared_Trigger"
+
+	// find bridge rubble exploder
+	for (local.i=1; local.i<=$exploder.size; local.i++){
+		if ($exploder[local.i].set == level.nat_bridge_rubble_exploder_num){
+			level.nat_bridge_rubble_exploder = $exploder[local.i]
+			break
+		}
+	}
+
+	// hide rubble
+	if (level.nat_bridge_rubble_exploder != NULL){
+		level.nat_bridge_rubble_exploder hide
+	}
+
+	// hide throbbing box on rubble
+	if ($NatBridgeRubbleThrobber){
+		$NatBridgeRubbleThrobber hide
+	}
+
+	// wait until scene is triggered
+	$scene3Trigger waittill trigger
+
+	/*
+	// get plunger guy ready
+	$plungerguy ai_on
+	$plungerguy show
+	$plungerguy nodamage
+	$plungerguy.origin = $NatBridgeDetonator gettagposition "tag_origin"
+	$plungerguy.no_idle = 1
+	$plungerguy exec global/disable_ai.scr
+	//$plungerguy exec global/crouch.scr
+	$plungerguy holster
+	wait 1
+	//$plungerguy waittill animdone
+	//$plungerguy gun "None"
+	$plungerguy anim plunger_set
+	$plungerguy waittill animdone
+	*/
+
+	// wait until player passes trigger
+	$NatBridgeDetonate_Trigger waittill trigger
+
+	/*
+	// start plungerguy plunging
+	$plungerguy notsolid
+	$plungerguy anim plunger_fire
+	$NatBridgeDetonator anim fire
+	$plungerguy waittill animdone
+	$plungerguy takedamage
+	*/
+
+	// blow bridge
+	thread global/exploder.scr::explode level.nat_bridge_exploder_num
+	trigger $NatBridgeBridgeBlown_Trigger
+	level.nat_bridge_exploded = 1
+
+	// reveal rubble
+	if (level.nat_bridge_rubble_exploder != NULL){
+		level.nat_bridge_rubble_exploder show
+	}
+
+	// enable new objective
+	//	waitthread maps/e1l1/objectives.scr::transition "needToClearTankPath"
+
+	// release plungerguy
+	//	wait 1
+	//	$plungerguy solid
+	//	$plungerguy unholster
+	//	$plungerguy exec global/enable_ai.scr
+
+	// wait until player finds explosives
+	//	$NatBridgeExplosives_TriggerGet waittill trigger
+	//	$NatBridgeExplosives delete
+	//	waitthread global/items.scr::add_item "explosive"
+
+	// reveal throbbing box
+	//	if ($NatBridgeRubbleThrobber)
+	//		$NatBridgeRubbleThrobber show
+
+	// throbber help text
+	//	thread ThrobberHelpText_Thread
+
+	// re-orient compass
+	//	waitthread maps/e1l1/objectives.scr::move_curr_compass_point $NatBridgeRubbleThrobber
+}end
+
+//=========================================================================
+ThrobberHelpText_Thread:
+//=========================================================================
+{}end
+
+//=========================================================================
+NatBridgeRubbleBlow_Thread:
+//=========================================================================
+{
+	thread global/exploder.scr::explode level.nat_bridge_rubble_exploder_num
+	level.bridge_rubble_blown = 1
+
+	trigger $NatBridgeRubbleCleared_Trigger
+	waitthread maps/e1l1/objectives.scr::transition "clearedTankPath"
+
+	// spawn "round-the-corner" guys
+	waitthread global/ai.scr::spawnset 0123346 "chunkStyle0123346"
+}end
+
+//=========================================================================
+BunkerGunExploderInit:
+//=========================================================================
+{
+	level.bunker_gun_exploder_trigger_1 = NULL
+	level.bunker_gun_exploder_trigger_2 = NULL
+
+	for (local.i=1; local.i<=$explodertrigger.size; local.i++){
+
+		if ($explodertrigger[local.i].set == 9099001){
+			level.bunker_gun_exploder_trigger_1 = $explodertrigger[local.i]
+			thread BunkerGunnerDeath_Single $gunnerdude_006699b level.bunker_gun_exploder_trigger_1
+		}
+		else if ($explodertrigger[local.i].set == 9099002){
+			level.bunker_gun_exploder_trigger_2 = $explodertrigger[local.i]
+			thread BunkerGunnerDeath_Single $gunnerdude_006699 level.bunker_gun_exploder_trigger_2
+		}
+	}
+}end
+
+//=========================================================================
+BunkerGunnerDeath_Single local.guy local.trigger:
+//=========================================================================
+{
+	local.trigger waittill trigger
+	if (local.guy && (isalive local.guy)){
+		local.guy damage $world 99999 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	}
+}end
+
+//=========================================================================
+ambientBattleSounds:
+//=========================================================================
+{
+	/*
+	while (1) {
+		$ambientBattleSoundsStart waittill trigger
+		thread startAmbientBattleSounds
+		$scene2MainExitTrigger waittill trigger
+		thread killAmbientBattleSounds
+	}
+	*/
+}end
+
+//=========================================================================
+startAmbientBattleSounds:
+//=========================================================================
+{
+	if (level.ambientBattleSoundsActive == 1){
+		end
+	}
+
+	level.ambientBattleSoundsActive = 1
+	thread doSpeaker "e1l1_ambient_mp40_" 	 1 2.5 3 8 0.1
+	thread doSpeaker "e1l1_ambient_thompson" 1 2.5 3 8 0.1
+	thread doSpeaker "e1l1_ambient_rifle" 	 0.2 5
+	thread doSpeaker "e1l1_ambient_grenade"  3 7
+}end
+
+//=========================================================================
+doSpeaker local.sound local.minPause local.maxPause local.minRun local.maxRun local.runPause:
+//=========================================================================
+{
+	if (local.minRun == NIL){
+		local.minRun = 1
+	}
+
+	if (local.maxRun == NIL){
+		local.maxRun = 1
+	}
+
+	if (local.runPause == NIL){
+		local.runPause = 1
+	}
+
+	local.randomRun   = (local.maxRun - local.minRun)
+	local.randomPause = (local.maxPause - local.minPause)
+	local.speaker 	  = thread spawnSpeaker
+
+	while (level.ambientBattleSoundsActive == 1) {
+		local.pause = (randomfloat local.randomPause) + local.minPause
+
+		if (local.pause <= 0.0){
+			waitframe
+		}
+		else{
+			wait local.pause
+		}
+
+		if (local.randomRun == 0) {
+			local.speaker playsound local.sound
+		}
+		else{
+			local.run   = (randomint local.randomRun) + local.minRun
+			local.count = 0
+
+			while (local.count < local.run) {
+				local.speaker playsound local.sound
+				wait local.runPause
+				local.count++
+			}
+		}
+	}
+	local.speaker remove
+}end
+
+//=========================================================================
+spawnSpeaker:
+//=========================================================================
+{
+	//iprintlnbold "spawning speaker model"
+	local.speaker = spawn script_model 
+	local.speaker.origin = $ambientBattleSpeaker.origin
+	local.speaker.angles = $ambientBattleSpeaker.angles
+}end local.speaker
+
+//=========================================================================
+killAmbientBattleSounds:
+//=========================================================================
+{
+	level.ambientBattleSoundsActive = 0
+}end
+
+//=========================================================================
+doExplosions:
+//=========================================================================
+{
+	wait 0.5
+	thread maps/e1l1/explosion.scr::big $tankshell1 0 
+	$tankCommanderDoneTalking waittill trigger
+
+	wait 1
+	thread maps/e1l1/explosion.scr::big $tankshell2 0 
+
+	wait 2
+	thread maps/e1l1/explosion.scr::big $tankshell3 0 
+}end
+
+//=========================================================================
+doKillGuy:
+//=========================================================================
+{
+	$self damage $world 55000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+}end
+
+//=========================================================================
+killBridgeGuys:
+//=========================================================================
+{
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "bridge2destroy"
+
+	if (local.trigger != NULL && local.trigger != NIL) {
+		local.trigger waittill trigger
+		$ridgerunner thread doKillGuy
+	}
+}end
+
+//=========================================================================
+startPlayerTankGag:
+//=========================================================================
+{
+	waitthread maps/e1l1/objectives.scr::transition "commanderGagStart"
+
+	// don't let the player get on the tank until the allied tank arrives
+	if (!level.warpToTankRide || level.warpToTankRide==0 ){
+		$tank2ReachedPlayerTank waittill trigger
+	}
+
+	thread commanderGag
+	$playerTank waitthread maps/e1l1/playerTank.scr::init
+
+}end
+
+//=========================================================================
+weed:
+//=========================================================================
+{
+	$tumbleweedtrigger waittill trigger
+	
+	
+	
+	$tumbleweed anim idle
+}end
+
+//=========================================================================
+bridgeRunners:
+//=========================================================================
+{
+	wait 0.5
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "ridgerunnertrigger"
+	local.trigger waittill trigger
+	wait 0.5
+
+	$ridgerunner 	thread doBridgeRunner
+	$scene3Trigger4 waittill trigger
+	
+	//chrissstrahl - coop mod respawn area
+	if(level.gametype != 0){
+		//chrissstrahl - create spawnpoints for coop
+		waitthread coop_mod/spawnlocations.scr::e1l1_update6
+	}
+	
+	$ridgerunner 	thread doBridgeRunnerDie
+}end
+
+//=========================================================================
+doBridgeRunnerDie:
+//=========================================================================
+{
+	self remove
+}end
+
+//=========================================================================
+doBridgeRunner:
+//=========================================================================
+{
+	self.enableEnemy = 0
+
+	while (!(vector_within self.origin self.target.origin 100)) {
+		self runto local.gotoPos
+		self waittill movedone
+		wait 0.25
+	}
+	wait 0.5
+
+	self.enableEnemy = 1
+	self.fixedleash  = 1
+	waitframe
+
+	self.leash = 1
+	waitframe
+
+	self resetleash
+}end
+
+//=========================================================================
+doCanyonTrigger:
+//=========================================================================
+{
+	self waittill trigger
+	wait 0.2
+
+	level.canyon1Guys = 0
+	$cleanup1 thread doCanyon1Guys
+}end
+
+//=========================================================================
+doCanyon1Guys:
+//=========================================================================
+{
+	level.canyon1Guys++
+
+	if (level.canyon1Guys > 2){
+		self remove
+	}
+end
+}	
+
+//=========================================================================
+thinSpawnerSet local.set local.max:
+//=========================================================================
+{
+	level waittill spawn
+	local.count = 0
+
+	for (local.i = 1; local.i < level.enemyspawners + 1; local.i++) {
+		if (level.enemyspawner[local.i].set == local.set){
+			local.count++
+			
+			if (local.count > local.max){
+				level.enemyspawner[local.i] remove
+			}
+		}
+	}
+}end
+

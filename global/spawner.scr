@@ -1,0 +1,260 @@
+//chrissstrahl - modified for coop mod use
+
+//**********************************************************************************
+//*** converts a specified guy into a script_origin
+//*** syntax --------------------------------
+//*** spawner_create <guy>:
+//**********************************************************************************
+//=========================================================================
+spawner_create local.dude:{
+//=========================================================================
+	//*** check to make sure the person exists
+	if (!local.dude){
+		println "^~^~^ SPAWNER CREATE ERROR:  person does not exist in the level, aborting conversion to spawner!!!"
+		end
+	}
+
+	//*** convert AI local.dude into a spawner local.spawner
+	local.spawner = spawn info_waypoint		// jsl-->changed to info_waypoint so we don't use up an entity count.......
+
+	//*** grab all of the AI's properties
+	local.spawner.origin							= local.dude.origin
+	local.spawner.gun								= local.dude.gun
+	local.spawner.type_idle							= local.dude.type_idle
+	local.spawner.type_attack						= local.dude.type_attack
+	local.spawner.type_disguise						= local.dude.type_disguise
+	local.spawner.type_grenade						= local.dude.type_grenade
+	local.spawner.hearing							= local.dude.hearing
+	local.spawner.sight								= local.dude.sight
+	local.spawner.fov								= local.dude.fov
+	local.spawner.leash								= local.dude.leash
+	local.spawner.mindist							= local.dude.mindist
+	local.spawner.maxdist							= local.dude.maxdist
+	local.spawner.health							= local.dude.health
+	local.spawner.sound_awareness					= local.dude.sound_awareness
+	local.spawner.noticescale						= local.dude.noticescale
+	local.spawner.fixedleash						= local.dude.fixedleash
+	local.spawner.enemysharerange					= local.dude.enemysharerange
+	local.spawner.voicetype							= local.dude.voicetype
+	local.spawner.accuracy							= local.dude.accuracy
+	local.spawner.ammo_grenade						= local.dude.ammo_grenade
+	local.spawner.gren_awareness					= local.dude.gren_awareness
+	local.spawner.nosurprise						= local.dude.nosurprise
+	local.spawner.disguise_range					= local.dude.disguise_range
+	local.spawner.disguise_period					= local.dude.disguise_period
+	local.spawner.disguise_accept_thread			= local.dude.disguise_accept_thread
+	local.spawner.disguise_level					= local.dude.disguise_level
+	local.spawner.patrolpath						= local.dude.patrolpath
+	local.spawner.waittrigger						= local.dude.waittrigger
+	local.spawner.turret							= local.dude.turret
+	local.spawner.alarmnode							= local.dude.alarmnode
+	local.spawner.alarmthread						= local.dude.alarmthread
+	local.spawner.spawn_target						= local.dude.target
+	local.spawner.spawn_angle						= local.dude.angle
+	local.spawner.spawn_weapon						= local.dude.weapon
+	local.spawner.set								= local.dude.set
+	local.spawner.group								= local.dude.group
+	local.spawner.healthchance						= local.dude.healthchance
+	local.spawner.area								= local.dude.area
+	local.spawner.enemyname							= local.dude.enemyname
+	local.spawner.playerseek						= local.dude.playerseek
+	local.spawner.fnum								= local.dude.fnum
+	local.spawner.turndoneerror						= local.dude.turndoneerror
+	local.spawner.threatbias						= local.dude.threatbias
+	local.spawner.radnum							= local.dude.radnum
+	local.spawner.balconyheight						= local.dude.balconyheight
+	local.spawner.pause								= local.dude.pause
+	local.spawner.dontdropweapons					= local.dude.dontdropweapons
+
+	local.spawner.spawn_model						= local.dude.model
+	local.spawner.spawn_targetname					= local.dude.targetname
+
+	local.spawner.drophealth                        = local.dude.drophealth
+	local.spawner.dropgun                           = local.dude.dropgun
+
+	local.spawner.forcedropweapon					= local.dude.forcedropweapon
+	local.spawner.forcedrophealth					= local.dude.forcedrophealth
+
+
+	//*** remove the AI
+//chrissstrahl - yes, but dude, not with remove! Remove waits till frame time ends
+//so I get a infinity loop error because the same ai is processed over again in one frame!
+//using delete will resolve this issue
+	//local.dude remove
+	local.dude delete
+
+}end local.spawner
+
+
+//**********************************************************************************
+//*** activates a converted spawner
+//*** syntax --------------------------------
+//*** spawner_activate <spawner>:
+//**********************************************************************************
+
+//=========================================================================
+spawner_activate local.spawner:{
+//=========================================================================
+	if (!local.spawner){
+		println "^~^~^ SPAWNER ACTIVATE ERROR:  spawner does not exist in the level, aborting activation!!!"
+		end
+	}
+
+	local.dude = spawn local.spawner.spawn_model voicetype local.spawner.voicetype origin local.spawner.origin
+
+	//*** set the values into the AI from the spawner
+	if ( local.spawner.type_idle && local.spawner.type_idle!="" ){
+		local.dude.type_idle = local.spawner.type_idle
+	}
+
+	if ( local.spawner.type_attack && local.spawner.type_attack!="" ){
+		local.dude.type_attack = local.spawner.type_attack
+	}
+
+	if ( local.spawner.type_disguise && local.spawner.type_disguise!="" ){
+		local.dude.type_disguise = local.spawner.type_disguise
+	}
+
+	if ( local.spawner.type_grenade && local.spawner.type_grenade!="" ){
+		local.dude.type_grenade = local.spawner.type_grenade
+	}
+
+	if ( local.spawner.gun && local.spawner.gun!="" ){
+		local.dude.gun = local.spawner.gun
+	}
+
+	local.dude.hearing = local.spawner.hearing
+	local.dude.sight = local.spawner.sight
+	local.dude.fov = local.spawner.fov
+	local.dude.leash = local.spawner.leash
+	local.dude.mindist = local.spawner.mindist
+	local.dude.maxdist = local.spawner.maxdist
+//chrissstrahl - make sure this is not a issue in any case
+	if( level.enemyhealthscalar != NIL){
+		local.dude.health = local.spawner.health*level.enemyhealthscalar
+	}else{
+		local.dude.health = local.spawner.health
+	}
+//end chrissstrahl
+	local.dude.sound_awareness = local.spawner.sound_awareness
+	local.dude.noticescale = local.spawner.noticescale
+	local.dude.fixedleash = local.spawner.fixedleash
+	local.dude.enemysharerange = local.spawner.enemysharerange
+	local.dude.accuracy = local.spawner.accuracy
+	local.dude.ammo_grenade = local.spawner.ammo_grenade
+	local.dude.gren_awareness = local.spawner.gren_awareness
+	local.dude.nosurprise = local.spawner.nosurprise
+	local.dude.disguise_range = local.spawner.disguise_range
+	local.dude.disguise_period = local.spawner.disguise_period
+	local.dude.disguise_accept_thread = local.spawner.disguise_accept_thread
+	local.dude.disguise_level = local.spawner.disguise_level
+
+	if (local.spawner.dontdropweapons){
+		local.dude dontdropweapons
+	}
+
+	if ( local.spawner.patrolpath!="" ){
+		local.dude.patrolpath = local.spawner.patrolpath
+	}
+
+	local.dude.waittrigger = local.spawner.waittrigger
+
+	if ( local.spawner.turret!= "" ){
+		local.dude.turret = local.spawner.turret
+	}
+
+	if ( local.spawner.alarmnode!="" ){
+		local.dude.alarmnode = local.spawner.alarmnode
+	}
+
+	local.dude.alarmthread = local.spawner.alarmthread
+	local.dude.target = local.spawner.spawn_target
+	local.dude.angle = local.spawner.spawn_angle
+	if ( local.spawner.spawn_weapon!="" ){ local.dude.weapon = local.spawner.spawn_weapon }
+	local.dude.set = local.spawner.set
+	local.dude.group = local.spawner.group
+	local.dude.healthchance = local.spawner.healthchance
+	local.dude.area = local.spawner.area
+	local.dude.enemyname = local.spawner.enemyname
+	local.dude.playerseek = local.spawner.playerseek
+	local.dude.forcedrophealth = local.spawner.forcedrophealth
+	local.dude.forcedropweapon = local.spawner.forcedropweapon
+
+	if ( local.spawner.fnum!=NIL ){
+		local.dude.fnum = local.spawner.fnum
+	}
+
+	if ( local.spawner.turndoneerror!=NIL ){
+		local.dude.turndoneerror = local.spawner.turndoneerror
+	}
+
+	if ( local.spawner.threatbias!=NIL ){
+		local.dude.threatbias = local.spawner.threatbias
+	}
+
+	if ( local.spawner.radnum!=NIL ){
+		local.dude.radnum = local.spawner.radnum
+	}
+
+	if ( local.spawner.balconyheight!=NIL ){
+		local.dude.balconyheight = local.spawner.balconyheight
+	}
+
+	if ( local.spawner.drophealth != NIL ){
+		if ( local.spawner.drophealth != 0 ){
+//			local.dude thread global/weapondrop.scr::ForceDropHealth
+			// jsl-->Let the engine code do this now...
+			local.dude.forcedrophealth = 1
+		}
+	}
+
+	if ( local.spawner.dropgun != NIL ){
+		if ( local.spawner.dropgun != 0 ){
+//			local.dude thread global/weapondrop.scr::ForceDropGun
+			// jsl-->Let the engine code do this now...
+			local.dude.forcedropweapon = 1
+		}
+	}
+
+	local.dude.pause = local.spawner.pause
+}end local.dude
+
+//**********************************************************************************
+//**********************************************************************************
+
+
+//**********************************************************************************
+//*** converts a specified guy into a script_origin
+//*** syntax --------------------------------
+//*** spawner_create_targetname <guy>:
+//**********************************************************************************
+//=========================================================================
+spawner_create_targetname local.dude:{
+//=========================================================================
+	//*** check to make sure the person exists
+	if (!local.dude){
+		println "^~^~^ SPAWNER CREATE ERROR:  person does not exist in the level, aborting conversion to spawner!!!"
+		end
+	}
+
+	local.spawner = thread spawner_create local.dude
+	local.spawner.targetname = local.spawner.spawn_targetname + "_spawner"
+}end local.spawner
+
+
+//**********************************************************************************
+//*** activates a converted spawner
+//*** syntax --------------------------------
+//*** spawner_activate_targetname <spawner>:
+//**********************************************************************************
+//=========================================================================
+spawner_activate_targetname local.spawner:{
+//=========================================================================
+	if (!local.spawner){
+		println "^~^~^ SPAWNER ACTIVATE ERROR:  spawner does not exist in the level, aborting activation!!!"
+		end
+	}
+
+	local.dude = thread spawner_activate local.spawner
+	local.dude.targetname = local.spawner.spawn_targetname
+}end local.dude

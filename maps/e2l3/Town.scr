@@ -1,0 +1,255 @@
+// Town
+
+//============================================================================
+Init: {
+//============================================================================
+	if (level.skiptown == 1) {
+		$player.origin = ( 4500 -50 0 )
+		waitthread global/ObjMgr.scr::CompleteObj "clearTown"
+		end
+	}
+
+	if (level.skipairdrop == 1) {
+		if ($ParatrooperLeader == NIL || $ParatrooperLeader == NULL) {
+			local.model = spawn models/human/Sc_Al_US_InfWPack.tik
+			local.model.targetname = "ParatrooperLeader"
+			local.model ai_on
+			local.model physics_on
+			local.model.origin = $c47_dude1.origin
+			local.model thread maps/e2l3/JohnsonThinker.scr::Think
+		}
+	}
+
+	level.town_guys = 1
+	level.town_done = 0
+	$wineHouseEntrance nottriggerable
+	$wineHouseExit nottriggerable
+	$deCanonDaJa nodamage
+	$deCanonDaJa thread cannonThink
+
+	thread DoWork
+}end
+
+//============================================================================
+DoWork: {
+//============================================================================
+	$townTrigger waittill trigger
+	thread InitTank
+}end
+
+//============================================================================
+InitTank: {
+//============================================================================
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "townTank"
+	local.trigger waittill trigger
+
+	while ($townTank == NIL || $townTank == NULL) {
+		wait 0.5
+	}
+
+	$townTank.sighttrace = 0
+	$townTank thread tankThink
+}end
+
+//============================================================================
+tankThink: {
+//============================================================================
+	local.invisibletarget = self thread createInvisibleTarget
+
+	// Give this tank a slow turret turning speed
+	local.gun = self QueryTurretSlotEntity 0
+	local.gun turnSpeed 20
+	self projectilevulnerable 2
+
+	waitthread global/ObjMgr.scr::SetObjCompassTarg "clearTown" $deCanonDaJa
+	self.inTown = 1
+
+	local.targets = self waitthread allocateTankEnemies
+
+	while (self != NULL && self.health > 0) {
+		self.myenemy = NULL
+		local.p1 = self.origin + ( 0 0 200 )
+
+		for (local.i = 1; local.i <= local.targets.size; local.i++) {
+			local.ptarget = local.targets[local.i]
+			if (local.ptarget == NULL) {
+				continue
+			}
+
+			if (local.ptarget.health < 1) {
+				continue
+			}
+
+			local.p2 = local.ptarget.origin + ( 0 0 94 )
+			local.canSeePTarget = sighttrace local.p2 local.p1 1
+			if (local.canSeePTarget == 0){
+				continue
+			}
+			self.myenemy = local.ptarget
+			break
+		}
+
+		if (self.myenemy == NULL) {
+			local.p2 = $player.origin + ( 0 0 94 )
+
+			// 50/50 chance to attack player (if we can see him)
+			local.canSeePlayer = sighttrace local.p1 local.p2 1
+			if (local.canSeePlayer) {
+				self.myenemy = $player
+			}
+		}
+
+		// Wait 5 seconds to switch targets, or instantly if target dies
+		local.count = 50
+		if (self.myenemy == NULL) {
+			// if we have no target, attack player, but reconsider in 1 second
+			self.myenemy = $player
+			local.count = 10
+		}
+
+		self waitthread global/autotank.scr::AimAt self.myenemy 1
+		while (self != NULL && local.count > 0 && self.myenemy != NULL && self.myenemy.health > 0) {
+			wait 0.1
+			local.count--
+		}
+		wait 0.1
+	}
+
+	local.invisibletarget delete
+	$wineHouseEntrance thread waitForWineHouseEntrance
+	waitthread global/ObjMgr.scr::SetObjCompassTarg "clearTown" $wineHouseEntrance
+}end
+
+
+//============================================================================
+allocateTankEnemies: {
+//============================================================================
+	local.t = 1
+
+	for (local.i = 1; local.i < 1024; local.i++) {
+		local.ptarget = getentbyentnum local.i
+		if (local.ptarget == NULL){
+			continue
+		}
+
+		if (local.ptarget.classname != "Actor") {
+			continue
+		}
+
+		if (local.ptarget.team != "american") {
+			continue
+		}
+
+		if (local.ptarget.health < 1) {
+			continue
+		}
+
+		if (local.ptarget.targetname == NIL) {
+			continue
+		}
+
+		if (local.ptarget.targetname == NULL) {
+			continue
+		}
+
+		if (local.ptarget.targetname == "") {
+			continue
+		}
+
+		// we can't expose the leader for being Clark Kent
+		if (local.ptarget.targetname == "ParatrooperLeader") {
+			continue
+		}
+		local.retVal[local.t] = local.ptarget
+		local.t++
+	}
+}end local.retVal
+
+//============================================================================
+waitForWineHouseEntrance: {
+//============================================================================
+	self triggerable
+	self waittill trigger
+	$wineHouseExit thread waitForWineHouseExit
+	waitthread global/ObjMgr.scr::SetObjCompassTarg "clearTown" $wineHouseExit
+}end
+
+//============================================================================
+waitForWineHouseExit: {
+//============================================================================
+	self triggerable
+	self waittill trigger
+	waitthread global/ObjMgr.scr::SetObjCompassTarg "clearTown" $mortarWest
+}end
+
+//============================================================================
+createInvisibleTarget: {
+//============================================================================
+	local.invisibleTarget = spawn models/human/Sc_AX_Ital_Inf.tik
+	local.invisibleTarget hide
+	local.invisibleTarget nodamage
+	local.invisibleTarget health 1000
+	local.invisibleTarget notsolid
+	local.invisibleTarget threatbias 50
+	local.invisibleTarget.origin = self.origin + self.getmaxs + self.getmins
+	local.forward = angles_toforward self.angles
+	local.invisibleTarget.origin += vector_scale local.forward 150
+	local.invisibleTarget bind self
+	local.invisibleTarget physics_off
+	local.invisibleTarget waitexec global/disable_ai.scr
+}end local.invisibleTarget
+
+//============================================================================
+cannonThink: {
+//============================================================================
+	self lock
+	local.backward  = -1 * angles_toforward self.angles 
+	
+	while (self) {
+		local.usekey = getboundkey1 "+use"
+		local.playerClose = 0
+		
+		while (1) {
+			while (local.playerClose == 0) {
+				if (vector_length ($player.origin - self.origin) < 200) {
+					local.playerClose = 1
+				}
+				waitframe
+			}
+			
+			while (local.playerClose == 1) {
+				if (vector_length (self.origin - $player.origin) > 200) {
+					local.playerClose = 0
+				}
+				else if ($player.useheld) {
+					local.vObjDir = vector_subtract $player.origin self.origin
+					local.vObjDir = vector_normalize local.vObjDir
+					local.dot = vector_dot local.vObjDir local.backward
+					
+					if (local.dot > .707) {
+						break
+					}
+				}
+				waitframe
+			}
+			if (local.playerClose == 1) {
+				break
+			}
+		}
+		
+		self unlock
+		self doUse $player
+		self lock
+		wait .25
+		
+		while (!($player.useheld)) {
+			waitframe
+		}
+		
+		self unlock
+		self doUse $player
+		self lock
+		$player.viewangles = "0 0 0"
+		wait .25
+	}
+}end

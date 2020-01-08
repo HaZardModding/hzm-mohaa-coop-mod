@@ -1,0 +1,309 @@
+//
+// storm.scr
+//
+//=========================================================================
+init:
+//=========================================================================
+{
+	//iprintlnbold_noloc("init:") //chrissstrahl - dev info
+	//chrissstrahl - this is started first in e1l1
+	if (level.noStorm){
+		end
+	}
+
+	level.stormFadeInTime  = 4
+	level.stormFadeOutTime = 4
+	
+	//chrissstrahl - coop compatible
+	//level waittill spawn
+	waitthread coop_mod/replace.scr::waitForPlayer
+
+	$FinalBunkerDoorStormEffect hide
+	$killstorm thread doKillStormTrigger
+	$startstorm thread doStartStormTrigger
+	level.stormVisible = 1
+}end
+
+//=========================================================================
+createStorm:
+//=========================================================================
+{
+	//iprintlnbold_noloc("createStorm:") //chrissstrahl - dev info
+	//chrissstrahl - this is used just internally
+	
+	//chrissstrahl - handle for singleplayer
+	if(level.gametype == 0){
+		spawn models/emitters/emitters_cube.tik targetname storm
+		$storm notsolid
+
+		if (level.stormVisible){
+			$storm anim fog_normal
+		}
+		else {
+			$storm hide
+		}
+	}
+}end
+
+//=========================================================================
+SwitchTurrets local.turret:
+//=========================================================================
+{
+	//chrissstrahl - compare with original file how is here a parameter but it is called/set with out a paramater ?
+	
+	
+	//iprintlnbold_noloc("SwitchTurrets local.turret:") //chrissstrahl - dev info
+	//chrissstrahl - internal - attaches the storm of the player to the turret of the tank
+	//chrissstrahl - this needs to be handled carefully in mp, the player using the switch needs
+	//to be determinded, his storm removed/deattached and attached to the tank/cannon...
+	
+	//chrissstrahl - handle for singleplayer
+	if(level.gametype == 0){
+		$storm attach local.turret "eyebone" 1 ( 0 0 0 )
+	}
+}end
+
+//=========================================================================
+AttachStorm:
+//=========================================================================
+{
+	//iprintlnbold_noloc("AttachStorm:") //chrissstrahl - dev info
+	if (level.noStorm == 1){
+		end
+	}
+	
+	//chrissstrahl - multiple external calls
+	//chrissstrahl - multiple external calls
+	//chrissstrahl - multiple external calls
+	//chrissstrahl - multiple external calls
+
+	//chrissstrahl - handle for singleplayer
+	//- creates storm if it does not exist
+	//- deattaches, unglues and unbinds storm
+	//- attaches to activator, $player, $playerTank, $jeepCamera, $scene3Cannon1, $scene3Cannon2
+	//- makes storm notsolid
+	
+	//chrissstrahl - this needs to be handled carefully in mp, the player using the switch needs
+	//to be determinded, his storm removed/deattached and attached to the tank/cannon...
+	if(level.gametype == 0){
+		if ($storm == NULL){
+			waitthread createStorm
+		}
+
+		$storm detach
+		$storm unglue
+		$storm unbind
+
+		if (self == $player) {
+			// attach directly to the player
+			$storm attach $player "eyes bone" 1 ( 0 0 0 )
+		}
+		else if (self == $playerTank){
+			// attach to the player while riding on the tank
+			local.turret = self QueryTurretSlotEntity 0
+			local.turret setswitchthread SwitchTurrets
+			$storm attach local.turret "eyebone" 1 ( 0 0 0 )
+		}
+		else if (self == $jeepCamera){
+			// attach to the intro camera
+			$storm glue self
+		}
+		else if (self == $scene3Cannon1 || self == $scene3Cannon2){
+			// attach to flak cannon
+			local.turret = self QueryTurretSlotEntity 0
+			$storm attach local.turret "eyebone" 1 ( 0 0 0 )
+		}
+		$storm notsolid
+	}
+}end
+
+//=========================================================================
+SafeStormTankTransitionStart:
+//=========================================================================
+{
+	//chrissstrahl - external - tank related
+	//chrissstrahl - external - tank related
+	//chrissstrahl - external - tank related
+	
+	//iprintlnbold_noloc("SafeStormTankTransitionStart:") //chrissstrahl - dev info
+	if (level.stormVisible == 1){
+		//chrissstrahl - handle for singleplayer
+		if(level.gametype == 0){
+			$storm hide
+		}
+	}
+}end
+
+//=========================================================================
+SafeStormTankTransitionEnd:
+//=========================================================================
+{
+	//chrissstrahl - external - tank related
+	//chrissstrahl - external - tank related
+	//chrissstrahl - external - tank related
+	
+	//iprintlnbold_noloc("SafeStormTankTransitionEnd:") //chrissstrahl - dev info
+	if (level.stormVisible == 1){
+		//chrissstrahl - handle for singleplayer
+		if(level.gametype == 0){
+			$storm show
+		}
+	}
+}end
+
+//=========================================================================
+killStorm:
+//=========================================================================
+{
+	//iprintlnbold_noloc("killStorm:") //chrissstrahl - dev info
+	if (level.noStorm == 1){
+		end
+	}
+
+	level.stormdest = 0
+
+	if (level.stormVisible == 0){
+		end
+	}
+
+	if (level.stormdelta == -1){
+		end
+	}
+
+	while (level.stormdelta == 1){
+		waitframe
+	}
+
+	if (level.stormdest == 1){
+		end
+	}
+
+	level.stormdelta = -1
+
+	//iprintlnbold "killing"
+	level.stormVisible = 0
+	
+	//chrissstrahl - handle for singleplayer
+	if(level.gametype == 0){
+		$storm alpha 1
+		$storm anim fog_fadeout
+		for (local.alpha=1.0; local.alpha > 0.0; local.alpha -= 0.0125 ){
+			if (level.stormVisible == 1){
+				end
+			}
+			$storm alpha local.alpha
+			waitframe
+		}	
+
+		$storm hide
+		$storm anim fog_normal
+		$storm alpha 0.0
+	}
+
+	level.stormdelta = 0
+}end			
+
+//=========================================================================
+startStorm:
+//=========================================================================
+{
+	//iprintlnbold_noloc("startStorm:") //chrissstrahl - dev info
+	if (level.noStorm == 1){
+		end
+	}
+
+	//chrissstrahl - handle for singleplayer
+	if(level.gametype == 0){
+		if ($storm == NULL){
+			waitthread createStorm
+		}
+	}
+
+	level.stormdest = 1
+
+	if (level.stormVisible == 1){
+		end
+	}
+
+	if (level.stormdelta == 1){
+		end
+	}
+
+	while (level.stormdelta == -1){
+		waitframe
+	}
+
+	if (level.stormdest == 0){
+		end
+	}
+
+	level.stormdelta = 1
+
+	//iprintlnbold "starting"
+	level.stormVisible = 1
+	
+		//chrissstrahl - handle for singleplayer
+	if(level.gametype == 0){
+		$storm alpha 0
+		$storm anim fog_fadein
+		waitframe
+		$storm show
+
+		for (local.alpha=0.0; local.alpha < 1.0; local.alpha += 0.0125 ){
+			if (level.stormVisible == 0){
+				end
+			}
+
+			$storm alpha local.alpha
+			waitframe
+		}	
+
+		$storm alpha 1.0
+	}
+
+	if (level.stormVisible == 1) {
+		//chrissstrahl - handle for singleplayer
+		if(level.gametype == 0){
+			$storm anim fog_normal
+		}
+		//iprintlnbold "start done"
+	}
+
+	level.stormdelta = 0
+}end
+
+//=========================================================================
+doKillStormTrigger:
+//=========================================================================
+{
+	//iprintlnbold_noloc("doKillStormTrigger:") //chrissstrahl - dev info
+	while (1) {
+		self waittill trigger
+		
+		//iprintlnbold_noloc("doKillStormTrigger: killing storm") //chrissstrahl - dev info
+		thread killStorm
+
+		if (self.set == 666){
+			$FinalBunkerDoorStormEffect show			
+		}
+	}
+}end
+
+//=========================================================================
+doStartStormTrigger:
+//=========================================================================
+{
+	//iprintlnbold_noloc("doStartStormTrigger:") //chrissstrahl - dev info
+	while (1) {
+		self waittill trigger
+		
+		//iprintlnbold_noloc("doStartStormTrigger: strting storm") //chrissstrahl - dev info
+		thread startStorm
+		
+		if (self.set == 666){
+			$FinalBunkerDoorStormEffect hide			
+		}
+	}
+}end
+
+ 

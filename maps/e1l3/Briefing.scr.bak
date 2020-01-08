@@ -1,0 +1,985 @@
+// 
+// Briefing.scr
+//
+// by ccaron 5/21/03
+//
+// Entities:
+//   $boat_guy(s)  (guys moving the boat)  
+//   $cover_fire_guy(s)   (array of guys fighting with $wall_attacker(s))
+//   $wall_attacker(s)
+//   $cappy				(da captin)
+//   $start_wall_battle_trigger   (starts the wall battle)
+//   $watermortarbriefingfx (optional)
+//
+// ---------------------------------------------------------
+
+//=========================================================================
+init:
+//=========================================================================
+{
+	println "Initializing Briefing.scr ..."
+	
+ 	waitthread global/ManSpawnNamed.scr::Init "ambientBattleGuy"
+ 	level.wallBattleActive = 1
+
+	if (level.warpTo == "briefing") {
+		// hack warp section
+		$player.origin 			= "1824 -6416 200"
+		$player_tank.origin 	= $player.origin + (400 0 0)
+		$player_tank.origin[2] 	= 0
+		$tank_ride_trigger remove
+	}
+	else{
+		if ((level.warpTo != NIL) && (level.warpTo != "None") && (level.warpTo != "tankRide") && (level.warpTo != "briefing") && (level.warpTo != "boating")  && (level.warpTo != "jailBreak") && (level.warpTo != "conquest") ){
+			// just kill off these huys for convinience
+			$wall_attacker thread Die
+			$cappy thread Die
+			$boat_guy thread Die
+			end		// don't do the briefing when warping to later sections
+		}
+	}
+
+	// Make sure all entities present
+	if ($start_wall_battle_trigger == NULL){
+		iprintlnbold_noloc( "DEV: No $start_wall_battle_trigger, ending gag" )
+		println "No $start_wall_battle_trigger, ending gag"
+		end
+	}
+
+	//if ($axis_reinforcements == NULL)
+	//{
+	//	println "BREIFING >>> No axis reinforcements spawn points!!!!!!!!!"
+	//}
+
+	if ($cover_fire_guy == NULL){
+		println "No $cover_fire_guy (s), quitting gag"
+		end
+	}
+	else{
+		for (local.i = 1; local.i <= $cover_fire_guy.size; local.i++){
+			$cover_fire_guy[local.i] ai_off
+		}
+	}
+
+	if ($wall_attacker == NULL){
+		println "No $wall_attacker (s), quitting gag"
+		end
+	}
+	else{
+		for (local.i = 1; local.i <= $wall_attacker.size; local.i++){
+			$wall_attacker[local.i] ai_off
+		}
+	}
+
+	if ($cappy == NULL){
+		println "No $cappy, quitting gag"
+		end
+	}
+	else{
+		$cappy holster
+		$cappy ai_off
+	}
+
+	// ---------------------------------------
+	//if ($boat_guy == NULL)
+	//{
+	//	println "No $boat_guy (s), quitting gag"
+	//	end
+	//}
+	//else{
+		for (local.i = 1; local.i <= $boat_guy.size; local.i++){
+			$boat_guy[local.i] holster
+			$boat_guy[local.i] exec global/disable_ai.scr	
+		}
+	//}
+
+    $wall_mg42 thread InitMG42
+	$boat_guy thread InitGuy $start_wall_battle_trigger
+	spawn trigger_relay targetname "briefing_trigger"
+
+	// everything copasetic
+	// spawn work thread
+	thread DoBriefing
+	thread CleanUp
+	println "briefing initialized successfully"
+}end
+
+//=========================================================================
+DoBriefing:
+//=========================================================================
+{
+	thread StartBoatGuys
+
+	// find the reanimator start and stop triggers
+	local.start_trig = waitthread global/reanimator.scr::FindTrigger "wall_reanim"
+
+	//local.stop_trig  = waitthread global/reanimator.scr::FindTrigger "wall_reanim_abort"
+	println "start trigger = " local.start_trig
+	//println "stop trigger = " local.stop_trig
+
+	$cappy.enableEnemy = 0
+	$cappy ai_on
+	
+	//chrissstrahl - coop compatible
+	$cappy exec coop_mod/replace.scr::lookat
+	$cappy exec coop_mod/replace.scr::turnto
+	
+	//chrissstrahl - keep for sp
+	if(level.gametype == 0){
+		$player nodamage
+	}
+	
+	$cappy thread global/loopanim.scr::LoopAnim unarmed_crouch_alert
+	$cappy nodamage
+
+	//chrissstrahl - coop compatible
+	$cappy exec coop_mod/replace.scr::turnto
+	
+	if (level.warpTo == "None" || level.warpTo == "tankRide"){
+		//chrissstrahl - don't wait in coop, trigger is outside where player can go
+		//this would get the mission stuck (in sp trigger is reached during glued tankride)
+		if( level.gametype == 0 ){
+			$start_wall_battle_trigger waittill trigger
+		}
+		//chrissstrahl - just wait a moment in coop
+		else{
+			iprintlnbold_noloc("DEV: coop go go go go")
+		}
+	}
+
+	thread StartBriefingBattle
+	thread WaterMortarEffect
+	trigger local.start_trig 	// start the reanimator 
+
+	// wait for player to ride through the archway
+	if (level.warpTo == "None" || level.warpTo == "tankRide"){
+		$briefing_trigger waittill trigger
+	}
+
+	$cappy turnto NULL
+	$cappy lookat NULL
+	println "Starting Briefing"
+
+	//chrissstrahl - skip briefing - playing this for the 50th time makes you go crazy
+	if!(level.coop_skipThisBriefing){
+		if (level.warpTo == "None" || level.warpTo == "tankRide" || level.warpTo == "briefing"){
+			if (level.flythrough != 1) {
+				//chrissstrahl - keep for sp
+				
+				local.spot = spawn script_origin
+				if(level.gametype == 0){
+					local.spot.origin = $player.origin
+					$player physics_off
+					$player notsolid
+					$player.viewangles = ( 0 125 0 )
+				}
+				//chrissstrahl - coop handle
+				else{
+					local.spot.origin = ( 1320 -6050 128 ) //place manually
+				}
+
+				//chrissstrahl - glue player
+				exec coop_mod/replace.scr::glue local.spot 125
+				waitframe
+				
+				local.spot time 0.4
+				local.spot movedown 40
+				local.spot move
+			}
+
+			// Activate AI for guys fighting accross wall
+			// cappy dispatches the boat guys
+			$cappy thread global/loopanim.scr::LoopAnimStop
+			$cappy lookat NULL
+
+			//$cappy waittill animdone
+			$cappy.enableEnemy = 0
+			//wait 2
+
+			$cappy lookat NULL
+			//chrissstrahl - coop compatible
+			$cappy exec coop_mod/replace.scr::turnto
+
+			// Briefing
+			//wait 3.0
+
+			if (level.skip_briefing_spew != 1){
+				$cappy say A_13_BurtonTalk01
+				$cappy waittill saydone
+
+				$cappy say A_13_BurtonTalk02
+				$cappy waittill saydone
+
+				$cappy say A_13_BurtonTalk03
+				$cappy waittill saydone
+
+				$cappy say A_13_BurtonTalk04
+				$cappy waittill saydone
+				wait 0.5
+				//wait 2
+			}
+
+			$cappy turnto NULL
+			$cappy lookat NULL
+			$boat_guy_1 turnto NULL
+			//$boat_guy_2 turnto NULL
+
+			// End Of Scene
+			local.spot moveup 40
+			local.spot waitmove
+
+			//chrissstrahl - coop compatible
+			exec coop_mod/replace.scr::unglue
+			exec coop_mod/replace.scr::show
+			
+			//chrissstrahl - keep for sp
+			if(level.gametype == 0){
+				waitframe
+				$player physics_on
+				$player solid		
+			}
+			local.spot remove
+		}
+	}
+	//chrissstrahl - skip for coop testing
+	else{
+		iprintlnbold_noloc("DEV: BRIEFING was skipped for testing")
+			local.spot = spawn script_origin
+			local.spot.origin = ( 1320 -6050 128 ) //place manually
+			waitframe
+			waitthread coop_mod/replace.scr::glue local.spot 125
+			waitframe
+			exec coop_mod/replace.scr::unglue
+			exec coop_mod/replace.scr::show
+			waitframe
+			local.spot remove
+	}
+
+	$player_tank solid
+	$follow_tank solid
+	$leader_tank solid
+	
+	drawhud 1
+	//chrissstrahl - keep for sp
+	if(level.gametype == 0){
+		$player takedamage
+	}
+	$buddy1.enableEnemy = 1
+	$buddy2.enableEnemy = 1
+	//$buddy1 takedamage
+	//$buddy2 takedamage
+	//$buddy1 thread global/friendly.scr::friendlythink
+	//$buddy2 thread global/friendly.scr::friendlythink
+
+	waitthread maps/e1l3/Objectives.scr::transition "gotBriefing"
+	waitthread maps/e1l3.scr::Autosave1
+
+	trigger $StartBoatingGag_Trigger
+	thread CloseTheWallDoor $wallattackerspawn "wallspawnpoint"
+
+	$buddy1 thread DieBuddy
+	$buddy1 thread DieBuddy
+
+	// Once Player enters the jail we can disable the reanimation
+	if (level.warpTo == "None" || level.warpTo == "tankRide" || level.warpTo == "briefing" || level.warpTo == "boating" || level.warpTo == "jailBreak" ){
+		$PlayerInJail_Trigger waittill trigger
+	}
+
+	if ($leader_tank){
+		$leader_tank.stop_firing = 1
+	}
+	level.semaphore = 0
+}end
+
+//=========================================================================
+makeInvulnerable:
+//=========================================================================
+{
+	self nodamage
+}end
+
+//=========================================================================
+makeVulnerable:
+//=========================================================================
+{
+	self takedamage
+}end
+
+
+/*
+manageWallBattle:
+	level.wallBattleThread = local
+	while (1)
+	{
+		// Once player gets into the courtyard remove all battle stuff
+		$PlayerEnteredArmory_Trigger waittill trigger
+
+		thread DeactivateWallBattle
+
+		//println "------------ Stopping wall battle ---------------"
+		
+		$reactivatewallbattle waittill trigger
+
+		//iprintln " -------- Reactivating wall battle ----------"
+
+		thread RestartWallBattle
+	}
+end
+
+killWallBattle:
+	// kill it for good, so it never comes back
+	waitthread DeactivateWallBattle
+	level.wallBattleThread remove
+end
+*/
+
+//=========================================================================
+DeactivateWallBattle:
+//=========================================================================
+{
+	if (level.wallBattleActive == 0) {
+		//iprintlnbold "wall battle already off"
+		end
+	}
+
+	//iprintlnbold "wall battle turning off"
+	level.wallBattleActive  = 0
+	level.stop_water_mortar = 1
+	
+	//iprintln "BRIEFING >>> Deactivating wall battle"
+	while (level.semaphore != 0){
+		waitframe
+	}
+
+	level.semaphore = 1
+
+	if ($wall_mg_attacker){ //$wall_mg_attacker thread Sleep
+		$wall_mg_attacker thread dieNow
+	}	
+
+	if ($reanimated_attacker){
+		$reanimated_attacker thread Sleep
+	}
+
+	if ($cover_fire_guy){
+		$cover_fire_guy thread Sleep
+	}
+
+	if ($wall_attacker){
+		$wall_attacker thread Sleep
+	}
+
+	if ($boat_guy){
+		$boat_guythread thread Sleep
+	}
+
+	if ($ambientBattleGuy){
+		$ambientBattleGuy thread Sleep
+	}
+
+	level.semaphore = 0
+	thread startAmbientBattleSounds
+}end
+
+//=========================================================================
+dieNow:
+//=========================================================================
+{
+	//iprintlnbold "I die now " self.entnum
+	self damage $world 55000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+}end
+
+//=========================================================================
+RestartWallBattle:
+//=========================================================================
+{
+	thread killAmbientBattleSounds
+
+	if (level.wallBattleActive == 1) {
+	   	//iprintlnbold "wall battle already on"
+		end
+	}
+	
+	//iprintlnbold "wall battle turning on"
+	level.wallBattleActive  = 1
+	level.stop_water_mortar = 0
+	
+	while (level.semaphore != 0){
+		waitframe
+	}
+
+	level.semaphore = 1
+	if ($wall_mg_attacker) {
+		$wall_mg_attacker thread WakeUp
+	}
+
+	if ($reanimated_attacker) {
+		$reanimated_attacker thread WakeUp
+	}
+	
+	if ($cover_fire_guy){
+		$cover_fire_guy thread WakeUp
+		exec global/EntityIterateCommand.scr "cover_fire_guy" threatbias ignoreme
+	}
+	
+	if ($wall_attacker) {
+		$wall_attacker thread WakeUp
+	}
+
+	if ($boat_guy) {
+		$boat_guy thread WakeUp
+	}
+
+	if ($ambientBattleGuy){
+		$ambientBattleGuy thread WakeUp
+	}
+	else{
+	 	waitthread global/ManSpawnNamed.scr::Spawn "ambientBattleGuy"
+		waitframe
+
+		$ambientBattleGuy thread doAmbientBattleGuy
+	}
+
+	level.semaphore = 0
+}end
+
+//=========================================================================
+doAmbientBattleGuy:
+//=========================================================================
+{
+	self nodamage
+	self.sight 		= 4096
+	self.hearing 	= 4096
+}end
+
+//=========================================================================
+RestartWallBattleFinalTime:
+//=========================================================================
+{
+	//iprintlnbold "restart final time"
+	waitthread RestartWallBattle
+	if ($cover_fire_guy){
+		exec global/EntityIterateCommand.scr "cover_fire_guy" threatbias 100
+	}
+
+	// make the MG guys in
+	level.stop_water_mortar 	  = 1
+	level.killAmbientBattleSounds = 1
+
+	// stop the reanimator parades
+	local.stop_trig = waitthread global/reanimator.scr::FindTrigger "wall_reanim_abort"
+	trigger local.stop_trig
+
+	$reanimated_attacker thread makeVulnerable
+}end
+
+//=========================================================================
+DieBuddy:
+//=========================================================================
+{
+	wait (4 + randomint 5)
+	self exec global/bullethit.scr (0 0 0) 500 0 1
+}end
+
+//=========================================================================
+InitGuy local.trig:
+//=========================================================================
+{
+	self ai_off
+	self hide
+
+	local.trig waittill trigger
+
+	self ai_on
+	self show
+}end
+
+// Remove stuff no longer needed
+//=========================================================================
+CleanUp:
+//=========================================================================
+{
+ 	$street1Exit waittill trigger
+	$leader_tank.stop_firing = 1
+	wait 1
+
+	$cappy remove
+	$player_tank remove
+	$leader_tank remove
+	$follow_tank remove
+	$wall_attacker thread Die
+	$cover_fire_guy thread Die
+	$boat_guy thread Die
+	$buddy1 remove
+	$buddy2 remove
+	$ambientBattleGuy thread Die
+
+	if ($wall_mg_attacker) {
+		$wall_mg_attacker thread Die
+	}
+
+	if ($reanimated_attacker){
+		$reanimated_attacker thread Die
+	}
+
+	if ($reanimated_attacker){
+		$reanimated_attacker thread Die
+	}
+
+	if ($CourtyardTruckGuys){
+		$CourtyardTruckGuys thread Die
+	}
+}end
+
+// Start the guys accross water fighting
+//=========================================================================
+WaterMortarEffect:
+//=========================================================================
+{
+	if (!$watermortarbriefingfx){
+		println "No water mortar for briefing!"
+	}else{
+		while (1) {
+			while (level.stop_water_mortar != 1){
+				wait (1 + randomfloat 2)
+				local.rand = 1 + randomint $watermortarbriefingfx.size
+				local.old  = $watermortarbriefingfx[local.rand].origin
+
+				// tweak the position of the mortar effect
+				local.o 	= $watermortarbriefingfx[local.rand].origin
+				local.o[0] += (50 - randomint 100)
+				local.o[1] += (50 - randomint 100)
+
+				$watermortarbriefingfx[local.rand].origin = local.o
+				$watermortarbriefingfx[local.rand] playsound arty_leadin //wait
+				//$watermortarbriefingfx[local.rand] waittill sounddone
+				$watermortarbriefingfx[local.rand] anim start
+				//$watermortarbriefingfx[local.rand] waittill animdone
+				wait 2.0
+
+				$watermortarbriefingfx[local.rand].origin = local.old
+			}
+			wait 2
+		}
+		iprintlnbold_noloc "briefing water mortar over"//chrissstrahl
+		println "briefing water mortar over"
+	}
+	//chrissstrahl - remove stuff no longer needed, because this map is way to overloaded
+	exec coop_mos/butler.scr::e1l3_watermotarBriefingClensing
+}end
+
+//=========================================================================
+InitMG42:
+//=========================================================================
+{
+	self burstfiresettings 	1 3 1.5 3
+	self maxyawoffset 		70.0
+	self pitchcaps 			"-20 20 0"
+	self AIbulletspread 	350 175
+	self convergetime 		0.25
+}end
+
+// Start the guys accross water fighting
+//=========================================================================
+StartBriefingBattle:
+//=========================================================================
+{
+	for (local.i = 1; local.i <= $wall_attacker.size; local.i++){
+		local.rand = 1 + randomint $cover_fire_guy.size
+		wait randomfloat 2
+
+		$wall_attacker[local.i] ai_on
+		$wall_attacker[local.i] aimat $cover_fire_guy[local.rand]
+		$wall_attacker[local.i] favoriteenemy $cover_fire_guy[local.rand]
+	}
+
+	for (local.i = 1; local.i <= $cover_fire_guy.size; local.i++){
+		local.rand = 1 + randomint $wall_attacker.size
+		wait randomfloat 2
+
+		$cover_fire_guy[local.i] ai_on
+		$cover_fire_guy[local.i] aimat $wall_attacker[local.rand]
+		$cover_fire_guy[local.i] favoriteenemy $wall_attacker[local.rand]
+	}
+}end
+
+// Get the boat guys to do their buisness
+//=========================================================================
+StartBoatGuys:
+//=========================================================================
+{
+	$boat_guy_1 thread doBoatGuy1
+	$boat_guy_2 thread doBoatGuy2
+
+	//	$boat_guy[1] ai_on
+	//	$boat_guy[2] ai_on
+	//	$boat_guy[1] thread GoBoatGuyGo
+	//
+	//	$StartBoatingGag_Trigger waittill trigger
+	//
+	//	$boat_guy[2] thread GoBoatGuyGo	
+
+	/*
+	// move out the boat guys
+	for (local.i = 1; local.i <= $boat_guy.size; local.i++)
+	{
+		$boat_guy[local.i] ai_on
+		$boat_guy[local.i].enableEnemy = 0
+		$boat_guy[local.i] holster
+		$boat_guy[local.i] thread GoBoatGuyGo
+	}
+	*/
+}end
+
+//=========================================================================
+doBoatGuy2:
+//=========================================================================
+{
+	self remove
+	/*
+	self nodamage
+	self.enableEnemy = 1
+	self waitthread runner boat_guy_1_path thompson_run_forward 250 0 1 
+	//	self exec global/crouch.scr
+	//	self thread global/loopanim.scr::LoopAnimStop
+	waitframe
+	self turnto $cappy
+
+	self.leash = 0
+	self resetleash
+	self.leash = 0
+	self.fixedleash = 1
+	self.maxdist = 4096
+	self.sight = 4096
+	self.hearing = 4096
+
+	self thread global/loopanim.scr::LoopAnim mg42_crouch_idle
+    $briefing_trigger waittill trigger
+	self thread global/loopanim.scr::LoopAnimStop
+
+	self anim A_13_soldier_listen1
+	self waittill animdone
+	self anim A_13_soldier_listen1
+	self waittill animdone
+	self thread doRunTo $boat_guy_1_goto
+	*/
+}end
+
+//=========================================================================
+doBoatGuy1:
+//=========================================================================
+{
+	self nodamage
+	self threatbias ignoreme
+	wait 0.5
+
+	self.enableEnemy = 0
+	self waitthread runner boat_guy_2_path thompson_run_forward 275 0 1 
+	self thread global/loopanim.scr::LoopAnimStop
+	waitframe
+
+	self turnto $cappy
+	self thread global/loopanim.scr::LoopAnim AA_huddle3_idle
+    $briefing_trigger waittill trigger
+
+	/*
+	self thread global/loopanim.scr::LoopAnimStop
+	self anim A_13_soldier_listen2
+	self waittill animdone
+	self anim A_13_soldier_listen2
+	self waittill animdone
+	*/
+
+	$StartBoatingGag_Trigger waittill trigger
+	self thread global/loopanim.scr::LoopAnimStop
+	self thread doRunTo $boat_guy_2_goto
+	self threatbias 1
+	wait 0.5
+
+	self say DFRUS_E1L3_PF2501
+}end
+
+//=========================================================================
+doRunTo local.gotoNode:
+//=========================================================================
+{
+	self takedamage
+
+	while (!(vector_within self.origin local.gotoNode 200)) {
+		self runto local.gotoNode
+		self waittill movedone
+		wait 0.25
+	}
+
+	self.enableEnemy = 1
+	self damage $world 55000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+}end
+
+//=========================================================================
+runner local.path local.anim local.speed local.holster local.delay local.gun:
+//=========================================================================
+{
+	self ai_on
+	self notsolid
+	self physics_off
+	self.origin = $(local.path).origin
+
+	if (local.holster){
+		self holster
+	}
+
+	else if (local.gun != NULL && local.gun != NIL){
+		self gun local.gun
+	}
+
+	local.model = spawn script_model
+	local.model.origin = $(local.path).origin
+	local.model.angles = self.angles
+	local.model notsolid
+	local.model physics_off
+
+	self.flyModel = local.model
+	self.flyModelSpeed = local.speed
+	self bind local.model
+
+	if (local.anim != NULL){
+		self thread global/loopanim.scr::LoopAnim local.anim
+	}
+
+	local.model flypath local.path local.speed local.speed 100
+	local.model waitmove
+	waitframe
+
+	self unbind
+	self physics_on
+	self solid
+	local.model remove
+}end
+
+//
+//
+//// --------------------------------------------------------------------
+//// --------------------------------------------------------------------
+//// --------------------------------------------------------------------
+//GoBoatGuyGo:
+//
+//	self takedamage
+//	self solid
+//	self thread RunPath
+//	self.enableEnemy = 1
+//	self gun enfield
+//
+//	wait (3 + randomint 3)
+//
+//	self exec global/bullethit.scr (0 0 20) 1000 0 1
+//
+//end
+
+// Make a guy run a series of connected path nodes
+// Run done when thread returns
+// if local.path is not provided, then use the self.target
+//=========================================================================
+RunPath local.path:
+//=========================================================================
+{
+	if (!local.path){
+		local.path = self.target
+	}
+
+	while (self && isalive self && local.path){
+		self runto local.path
+		self waittill movedone
+		local.path = local.path.target
+	}
+}end
+
+//=========================================================================
+Die:
+//=========================================================================
+{
+	self remove
+}end
+
+//=========================================================================
+Sleep:
+//=========================================================================
+{
+	self.asleep 	 = 1
+	self.enableEnemy = 0
+	wait 5
+	
+	//chrissstrahl - stop console spam
+	if(self == NULL){ end }
+
+	if (self.asleep == 1){
+		self ai_off
+		self hide
+		
+		//chrissstrahl - do only in mp
+		if(level.gametype != 0){
+			//chrissstrahl - we get stuck in multi, so make em not solid until wakeup
+			self notsolid
+			iprintlnbold_noloc("DEV:notsolid")
+		}
+	}
+}end
+
+//=========================================================================
+WakeUp:
+//=========================================================================
+{
+	//iprintln "waking up " self
+
+	self.asleep = 0
+	self ai_on
+	self show
+	self.enableEnemy = 1
+	
+	//chrissstrahl - we need to make em solid again in multi
+	//this will make the ai solid as soon as no player is stuck in in
+	//self solid
+	//chrissstrahl - do only in mp
+	if(level.gametype != 0){
+		self exec coop_mod/replace.scr::solidASAP
+		iprintlnbold_noloc("DEV:solidASAP")
+	}
+}end
+
+// Close the battle wall door
+//=========================================================================
+CloseTheWallDoor local.points local.findname:
+//=========================================================================
+{
+	// find the spawn point to delete
+	$lockwalldoortrigger waittill trigger
+	
+	for (local.i=1; local.i<=local.points.size; local.i++){
+		if (local.points[local.i].find_name == local.findname){
+			//iprintln "CONQUEST >>> removing " local.points[local.i]
+			local.points[local.i] remove
+		}
+	}
+	wait 2
+
+	//$RevealWallThrobberTrigger waittill trigger
+	//iprintln "Locking the door!"
+
+	$walldoor close
+	$walldoor lock
+	//iprintln "Locked!!!!"
+}end
+
+//=========================================================================
+startAmbientBattleSounds:
+//=========================================================================
+{
+	end
+	if (level.ambientBattleSoundsActive == 1){
+		end
+	}
+
+	level.ambientBattleSoundsActive = 1
+	thread doSpeaker "mp40_snd_fire" 	 0.05 0.7
+	thread doSpeaker "thompson_snd_fire" 0.15 1
+	thread doSpeaker "m1_snd_fire1" 	 0.3 0.5
+	thread doSpeaker "grenade_explode1"  1 3.5
+	thread doSpeaker "snd_b_zing" 	 	 0.1 0.8
+	thread doSpeaker "snd_bh_stone" 	 0.1 1.5
+	thread doSpeaker "snd_bh_metal" 	 1 2.5
+	thread doSpeaker "snd_bh_wood" 		 2 3.5
+	thread doSpeaker "snd_bh_flesh" 	 0.1 3.5
+}end
+
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//=========================================================================
+doSpeaker local.sound local.minPause local.maxPause:
+//=========================================================================
+{
+	local.randomPause = (local.maxPause - local.minPause)
+	local.speaker 	  = thread spawnSpeaker
+
+	while (level.ambientBattleSoundsActive == 1) {
+		local.speaker playsound local.sound
+		local.pause = (randomfloat local.randomPause) + local.minPause
+
+		if (local.pause <= 0.0){
+			waitframe
+		}
+		else{
+			wait local.pause
+		}
+	}
+	local.speaker remove
+}end
+
+
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//chrissstrahl - this might need attention if there are issues
+//=========================================================================
+spawnSpeaker:
+//=========================================================================
+{
+	local.speaker 		 = spawn script_model 
+	local.speaker.origin = $ambientBattleSpeaker.origin
+	local.speaker.angles = $ambientBattleSpeaker.angles
+}end local.speaker
+
+//=========================================================================
+killAmbientBattleSounds:
+//=========================================================================
+{
+	level.ambientBattleSoundsActive = 0
+}end
+

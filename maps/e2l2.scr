@@ -1,0 +1,364 @@
+// e2l2.scr
+
+//waitexec maps/e2l2/hacks.scr
+
+//============================================================================
+main: {
+//============================================================================
+	println "------------------------------------------------------------------------------------"
+	println "------------------------------------------------------------------------------------"
+	println "------------------------------------------------------------------------------------"
+	
+	exec global/auto.scr "e2l2"
+	exec global/spotlight.scr
+	exec global/bomber.scr	
+	exec global/exploder.scr
+	exec global/cardgame.scr	
+	exec global/barrel.scr
+	
+	level.flyplane			= 1
+	level.nodropweapons		= 1
+	setcvar g_mission 2
+	
+	level waittill prespawn
+	fadeout .5 0 0 0 1
+	level waittill spawn
+	
+	level.script			= "maps/e2l2.scr"	
+	thread global/music.scr::StopSong 2
+	fadein 5 0 0 0 1
+	
+	//Setup the finalgate flags
+	$finalgate spawnflags 160
+	$finalgate time 3.0
+	$finalgate sound_open_start door_metal_open_move1
+	$finalgate sound_open_end door_metal_open_stop1
+	
+	//waitthread initEnvironment
+	waitthread initPlayer
+	
+	//Init the bridge bombing..
+	$bombertrigger thread BlowBridge
+
+	//Init the communication tower destroy trigger
+	level.CommDestroyed = spawn trigger_relay "targetname" "CommTowerDestroyedTrigger"
+	
+	thread npc_deletes_init
+
+	$classtrigger thread DoClassGag
+	$getvickers nottriggerable
+	$getvickers thread maps/e2l2/planegags.scr::GiveVickers
+	$vickerswindow thread maps/e2l2/planegags.scr::WindowDeath
+	$allhell_vehicles thread GoAllHellVehicles
+
+	$vickersincase notsolid
+	$GuardPostJeep setcollisionentity $jeephull
+
+	$takeit thread DoTakeIt
+	
+	thread RemoveLyndon
+
+	$spawnlyndon thread InitFinalJeep
+	$EndLevelTrigger thread LevelEnd	
+
+	$player fullheal
+
+	waitthread maps/e2l2/briefing.scr::init
+	waitthread maps/e2l2/objectives.scr::init
+	waitthread maps/e2l2/guardPost.scr::init
+	waitthread maps/e2l2/radioTower.scr::init
+	waitthread maps/e2l2/trucks.scr::init
+	waitthread maps/e2l2/bikegags.scr::init
+	waitthread maps/e2l2/planeGags.scr::init			
+}end
+
+//============================================================================
+LevelEnd: {
+//============================================================================
+	self waittill trigger
+
+	//turn off the looping alarm
+	level.playAlarm = 0
+
+	thread maps/e2l2/objectives.scr::transition "escapedTheBase"
+	waitframe
+
+	//Do End dialog
+	$brit waitthread DoEndDialog
+
+	//End cinematic... 
+	waitthread maps/e2l2/cinematic.scr::DoOutro
+}end
+
+//============================================================================
+initEnvironment: {
+//============================================================================
+	if (level.nofog == 0){
+		waitthread setFog 2000 0 
+	}
+	else {
+		waitthread setFog 150000 150000 ( 1 1 1 )
+	}
+}end
+
+//============================================================================
+setFog local.distance local.bias local.color: {
+//============================================================================
+	$world farclipoverride local.distance
+	$world farplane local.distance
+	$world farplane_bias local.bias
+
+	if (local.color == NIL) {
+		// fog color is controlled by the worldspawn file
+	}
+	else {
+		$world farplane_color local.color
+	}
+}end
+
+//============================================================================
+initPlayer: {
+//============================================================================	
+	$lyndon gun "vickers"
+	exec global/loadout.scr	
+	thread global/items.scr::add_item "explosives" noprint	
+
+	$allhell_vehicles nottriggerable
+	$spawnlyndon nottriggerable
+
+	//init the warehouse door
+	$warehousedoor sound_open_start gate_iron_open1 
+	$warehousedoor sound_open_end door_metal_open_stop1
+	$warehousedoor sound_close_start gate_iron_open1
+	$warehousedoor sound_close_end door_metal_open_stop1
+}end
+
+//============================================================================
+BlowBridge: {
+//============================================================================
+	self waittill trigger
+	thread global/exploder.scr::explode 98
+}end
+
+//============================================================================
+DestroyRadioTower: {
+//============================================================================
+	thread maps/e2l2/radiotower.scr::blowUp
+}end
+
+//============================================================================
+control_tower: {
+//============================================================================
+	$beam1 bind $beamcenter	
+	$beamcenter rotatey 20
+}end
+
+//Autosaves
+//============================================================================
+Autosave1: {
+//============================================================================
+	waitexec global/autosave.scr 1
+}end
+
+//============================================================================
+Autosave2: {
+//============================================================================
+	waitexec global/autosave.scr 2
+}end
+
+//============================================================================
+Autosave3: {
+//============================================================================
+	waitexec global/autosave.scr 3
+}end
+
+//============================================================================
+Autosave4: {
+//============================================================================
+	waitexec global/autosave.scr 4
+}end
+
+//============================================================================
+npc_deletes_init: {
+//============================================================================
+	$housebadguysdelete thread delete_axis1
+	$endhousebadguysdelete thread delete_axis2
+	$midguardpostguysdelete thread delete_axis3
+	$windowhousedudesdelete thread delete_axis4
+	$bunker1guysdelete thread delete_axis5
+	$mg1_2trigger thread delete_mgtower1_2
+	$mg3trigger thread delete_mgtower3
+}end
+
+//============================================================================
+delete_axis1: {
+//============================================================================
+	self waittill trigger	
+	$axis1 thread DeleteMe
+}end
+
+//============================================================================
+delete_axis2: {
+//============================================================================
+	self waittill trigger
+	$axis2 thread DeleteMe
+}end
+
+//============================================================================
+delete_axis3: {
+//============================================================================
+	self waittill trigger
+	$axis3 thread DeleteMe
+}end
+
+//============================================================================
+delete_axis4: {
+//============================================================================
+	self waittill trigger
+	$axis4 thread DeleteMe
+}end
+
+//============================================================================
+delete_axis5: {
+//============================================================================
+	self waittill trigger
+	$axis5 thread DeleteMe
+}end
+
+//============================================================================
+delete_mgtower1_2: {
+//============================================================================
+	self waittill trigger
+
+	if( $t4949 != NULL && t4949 != NIL ) {
+		$t4949 thread DeleteMe
+	}
+
+	if( $t1186 != NULL && $t1186 != NIL ) {
+		$t1186 thread DeleteMe
+	}
+}end
+
+//============================================================================
+delete_mgtower3: {
+//============================================================================
+	self waittill trigger
+
+	if( $t4997 != NULL && $t4997 != NIL ) {
+		$t4997 thread DeleteMe
+	}
+}end
+
+//============================================================================
+DeleteMe: {
+//============================================================================
+	if( isAlive self ) {
+		self delete
+	}
+}end
+
+//============================================================================
+GoAllHellVehicles: {
+//============================================================================
+	self waittill trigger
+	waitthread maps/e2l2/bikegags.scr::GoBike10
+	$truck10 thread maps/e2l2/trucks.scr::truck10go
+}end
+
+//============================================================================
+DoEndDialog: {
+//============================================================================
+	self.no_idle = 1
+
+	thread global/loopanim.scr::LoopAnimStop
+	self upperanim A_22_TerryTalk00
+	self waittill upperanimdone
+	self upperanim A_22_TerryTalk02
+	self waittill upperanimdone
+	wait .5
+
+	self upperanim A_22_TerryTalk03
+	self waittill upperanimdone
+}end
+
+//============================================================================
+InitFinalJeep: {
+//============================================================================
+	self waittill trigger
+	
+	$brit nodamage
+	$FinalJeep show
+	$FinalJeep setcollisionentity $jeephull
+	$FinalJeep nodamage
+	$brit show
+	$brit ai_on	
+
+	// put lyndon in jeep
+	$brit holster
+	wait 1	
+
+	$brit notsolid	
+	$FinalJeep attachdriverslot 0 $brit
+	$brit thread global/loopanim.scr::LoopAnim AV_jeep_passenger_idle
+}end
+
+//============================================================================
+DoClassGag: {
+//============================================================================
+	self waittill trigger
+	
+	//Spawn in our class guys
+	waitthread global/ai.scr::spawnset 8000 classguys
+	waitthread global/ai.scr::spawnset 8001 sci1
+	waitthread global/ai.scr::spawnset 8002 sci2
+	waitthread global/ai.scr::spawnset 8003 patroller
+	waitthread global/ai.scr::spawnset 8004 colonel
+
+	$colonel.sight = 512
+	thread maps/e2l2/class_gag.scr::init $sci1 $sci2 $classguys $board
+}end
+
+//============================================================================
+DoMusic local.where: {
+//============================================================================
+	if( local.where == NIL || local.where == NULL ) {
+		end
+	}
+
+	switch( local.where ) {
+		case "start":
+			thread global/music.scr::PlaySongLoop "sound/music/mus_Stat_t1.mp3"
+			break
+
+		case "jeepride":
+			waitthread global/music.scr::StopSong 5
+			thread global/music.scr::PlaySongLoop "sound/music/Labyrinth.mp3"
+			break
+
+		case "airfield":
+			waitthread global/music.scr::StopSong 5
+			thread global/music.scr::PlaySongLoop "sound/music/Gotha.mp3"
+			break
+
+		case "end":			
+			thread global/music.scr::PlaySongLoop "sound/music/Sturmgeist.mp3"
+			break
+	}
+}end
+
+//============================================================================
+DoTakeIt: {
+//============================================================================
+	self waittill trigger
+	$player playsound DFRUS_E2L2_JP2751a
+}end
+
+//============================================================================
+RemoveLyndon: {
+//============================================================================
+	$FinalJeep hide	
+	$brit exec global/disable_ai.scr
+	$brit hide
+	$brit ai_off
+	$brit nodamage
+}end

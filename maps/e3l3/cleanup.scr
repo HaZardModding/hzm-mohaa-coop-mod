@@ -1,0 +1,216 @@
+// This is going to go through enemyspawnertriggers 
+// of the level and call another thread waittill 
+// that trigger goes off, then use its targetname
+//=========================================================================
+InitCleanup: {
+//=========================================================================
+	for (local.i=1;local.i<$enemyspawnertrigger.size+1;local.i++){
+		//iprintlnbold "SO you are in Clean up and you have run " local.i "times"
+	    $enemyspawnertrigger[local.i] thread GoAfterTrigger
+	}
+}end
+
+//=========================================================================
+GoAfterTrigger: {
+//=========================================================================
+	self waittill trigger
+    
+    // iprintlnbold "The Trigger went off"
+	if(self.target != NIL){
+		thread deleteAI_far_frm_player self.target 100
+		// iprintlnbold "the target of that trigger = " self.target
+	}
+}end
+
+//=========================================================================
+Delete_deleteguy: {
+//=========================================================================
+	// iprintlnbold "Delete_deleteguy"
+	if ( $deleteme ){
+		thread deleteAI_far_frm_player $deleteme 2048
+	}
+
+	if ( $deleteguy ){
+		thread deleteAI_far_frm_player $deleteguy 2048
+	}
+
+	if ( $aaguntruck_passenger ){
+		thread deleteAI_far_frm_player $aaguntruck_passenger 2048
+	}
+
+	if ( $k5jumper ){
+		thread deleteAI_far_frm_player $k5jumper 2048
+	}
+
+	if ( $k5faller){
+		thread deleteAI_far_frm_player $k5faller 2048
+	}
+
+	if ( $k5balcony ){
+		thread deleteAI_far_frm_player $k5balcony 2048
+	}
+
+	if ( $k5slider ){
+		thread deleteAI_far_frm_player $k5slider 2048
+	}
+
+	if ( $bunkergunner ){
+		thread deleteAI_far_frm_player $bunkergunner 2048
+	}
+
+	if ( $turretgunner1 ){
+		thread deleteAI_far_frm_player $turretgunner1 2048
+	}
+
+	if ( $turretgunner2 ){
+		thread deleteAI_far_frm_player $turretgunner2 2048
+	}
+
+	if ( $mg42guy1 ){
+		thread deleteAI_far_frm_player $mg42guy1 2048
+	}
+
+	if ( $mg42guy1b ){
+		thread deleteAI_far_frm_player $mg42guy1b 2048
+	}
+}end
+
+//	wait for trigger to clean up AB41 ride, part 1
+//=========================================================================
+cleanup1: {
+//=========================================================================
+	if ( $cleanup1 ){
+		$cleanup1 waittill trigger
+
+		if ( $ab41runners ){
+			thread deleteAI_far_frm_player $ab41runners 1024
+		}
+
+		if ( $istcaveguys ){
+			thread deleteAI_far_frm_player $istcaveguys 1024
+		}
+
+		if ( $necorner ){
+			thread deleteAI_far_frm_player $necorner 1024
+		}
+	}
+}end
+
+//	wait for trigger to clean up AB41 ride, part 2
+//=========================================================================
+cleanup2: {
+//=========================================================================
+	if ( $cleanup2 ){
+		$cleanup2 waittill trigger
+
+		if ( $1strun ) {
+			thread deleteAI_far_frm_player $1strun 1024
+		}
+
+		if ( $firsthouseguys ) {
+			thread deleteAI_far_frm_player $firsthouseguys 1024
+		}
+
+		if ( $secondhouseguys ) {
+			thread deleteAI_far_frm_player $secondhouseguys 1024
+		}
+
+		if ( $k5guys2 ) {
+			thread deleteAI_far_frm_player $k5guys2 1024
+		}
+	}
+}end
+
+//	Can call this to delete a group of AI by name.
+//  Also checks to see if distance for player
+//  example of it being called:
+//    	thread deleteAI_far_frm_player $start_allies 1048
+//=========================================================================  
+deleteAI_far_frm_player local.name local.dist: {
+//=========================================================================
+	// println ("Are you in DeleteAI and we are deleting " + local.name)
+ 	// print   (" " + local.name.size + " guys")
+	local.groupsize = local.name.size
+
+	if ( local.groupsize > 0 ) {
+		for ( local.i = local.groupsize; local.i > 0; local.i-- ){
+			local.distance = vector_length($player.origin-local.name[local.i].origin)
+			//iprintlnbold("Player distance from guy = " + local.distance )
+			
+			local.vObjDir	= vector_subtract local.name[local.i].origin $player.origin
+			local.vObjDir	= vector_normalize local.vObjDir
+			local.vForward  = angles_toforward ( $player.angles )
+
+			//println("foward direction" + local.vForward)
+			//println("direction: " + local.vObjDir)
+			local.dot		= vector_dot local.vForward local.vObjDir
+			
+			//println("dot angle: " + local.dot)
+			//local.result = $player waitthread global/vehicle_warning.scr::CanSeeTarget local.name[local.i] 1000 0.707
+
+			if ( ( local.dot < 0.707 ) && ( local.distance > local.dist ) ) {
+				//iprintlnbold( " Deleting guy ")
+				local.name[local.i] delete
+			}
+		}
+	}
+}end
+
+//=========================================================================
+FindTrigger local.find_name: {
+//=========================================================================
+	for (local.i=1;local.i<$enemyspawnertrigger.size+1;local.i++) {
+		if ($enemyspawnertrigger[local.i].find_name == local.find_name) {
+			local.returntrigger = $enemyspawnertrigger[local.i]
+			goto FindTriggerEnd
+		}
+	}
+
+	FindTriggerEnd:
+}end local.returntrigger
+
+// Called with self trigger
+//=========================================================================
+DeleteSpawner local.name local.dist: {
+//=========================================================================
+	if(self == NULL){
+	   local.whatever = thread FindTrigger "local.name"
+	   local.whatever waittill trigger
+	}
+	else {
+	   self waittill trigger
+	}
+
+	if(self.enemyname == NIL && local.name != NIL) {
+		thread deleteAI_far_frm_player local.name local.dist
+	}
+	else {
+		thread deleteAI_far_frm_player self.enemyname local.dist
+	}
+}end
+
+
+// CHANGE THIS TO FIT WITH WHAT WE DO
+//=========================================================================
+//	Delete enemy spawners with the passed in enemy name and set number....
+//	Added by Jeff Leggett 7/1/2002
+//=========================================================================
+DeleteEnemySpawner local.enemyname local.set: {
+//=========================================================================
+	if (local.enemyname == NULL) {
+		// println "DeleteEnemySpawner: Enemyname is NULL"
+		end
+	}
+
+	if ( local.enemyname.size<1 ) {
+		// println "DeleteEnemySpawner: Size<0 for:" local.enemyname
+		end
+	}
+	
+	for (local.i=local.enemyname.size;local.i>0;local.i--){
+		if ( local.enemyname[local.i].set == local.set ){
+			local.enemyname[local.i] bedead
+			local.enemyname[local.i] delete
+		}
+	}
+}end

@@ -1,0 +1,101 @@
+//
+// escape.scr
+//
+
+InitEscape:
+	level.escaped = 0
+end
+
+//-----------------------------------------------------------------------------
+
+Escape:
+	if (level.skipescapetown == 1) {
+		$player.origin = ( 3024 -4560 96 )
+		$spy.origin = ( 3024 -4464 96 )
+	}
+
+	// Chris needs to:
+	//  - move the nextleveltrigger to the area around the gate
+	//  - give the townescapeguys12 enemy names same as target names
+	//  - the the trigger that spawns the townescapeguys12 a $find_name of townescapeguys12Trigger
+	//
+	//	Erik needs to:
+	// 	- add e1l4 to the DFRGM_E1L3_CK4011 alias
+
+	// lock gate $endGate
+	$endGate lock
+
+	// wait for the last set of guys to spawn
+	local.spawnTrigger = waitthread global/FindTrigger.scr::FindTrigger "townescapeguys12Trigger"
+	local.spawnTrigger waittill trigger
+
+	// let them all get in the map
+	wait 1
+
+	// now latch on to each one
+	spawn trigger_relay targetname "allEscapeGuysDead"
+	level.escapeGuysAlive = 0
+	$townescapeguys12 thread trackEscapeGuys
+
+	// wait for all $townescapeguys12 to be dead
+	$allEscapeGuysDead waittill trigger
+	$spy waitthread global/friendly.scr::friendlystop
+
+	// run Klaus to $klausFinalGateNode
+	$spy waitthread global/safeMoveTo.scr::SafeRunTo_Wait $klausFinalGateNode
+	$spy lookat $player
+
+	// wait for player to hit the trigger $nextleveltrigger
+	$nextleveltrigger waittill trigger
+
+	// Klaus delivers line "this way"
+	$spy lookat NULL
+	$spy say DFRGM_E1L3_CK4006_02
+	wait 1
+
+	// unlock gate $endGate
+	$endGate unlock
+
+	// open gate $endGate
+	waitframe
+	$endGate open $player
+
+	$spy thread global/safeMoveTo.scr::SafeRunTo_Wait $klausLevelEndNode
+	//wait 1.5
+
+	// run Klaus to $klausLevelEndNode
+	// level ends
+	level.escaped = 1
+end
+
+trackEscapeGuys:
+	if (self && isalive self) {
+		level.escapeGuysAlive++
+		self waittill death
+		level.escapeGuysAlive--
+		if (level.escapeGuysAlive == 0)
+			trigger $allEscapeGuysDead
+	}
+end
+
+toss:
+	$smokey_generator2 thread doTurnOn
+end
+
+doTurnOn:
+	self TurnOn
+end
+
+//-------------------------------
+//	Added 8.18.2003 by Benson Russell
+//	This will set klaus' threatbias to ignoreme so the panzershreck dudes don't shoot at him
+//	This is triggered from a trigger_once in the map
+//-------------------------------
+setKlausThreatBias:
+
+	println( "SETTING KLAUS' THREATBIAS" )
+
+	//--- set the thread bias for klaus
+	$spy threatbias ignoreme
+
+end

@@ -1,0 +1,336 @@
+//=========================================================================
+InitJeepRidePart3: {
+//=========================================================================
+	$chasetruck[1].speed = 400
+	$chasetruck[2].speed = 400
+	$chasetruck[1].accel = 1000
+	$chasetruck[2].accel = 1000
+	$chasetruck[1].passengers = 0
+	$chasetruck[2].passengers = 4
+	$chasetruck[1].passengername = "chasetruck1driver"
+	$chasetruck[2].passengername = "chasetruckpassenger"
+	$chasetruck[1].takedamage = 0
+	$chasetruck[2].takedamage = 0
+	$chasetruck[1].takedamagewhendone = 1
+	$chasetruck[2].takedamagewhendone = 1
+	$chasetruck[1].headlights = 1
+	$chasetruck[2].headlights = 1
+	$chasetruck[1].passengermodel = "models/human/german_wehrmact_officer.tik"
+	$chasetruck[2].passengermodel = "models/human/german_wehrmact_officer.tik"
+	$chasetruck[1].drivermodel = "models/human/german_wehrmact_officer.tik"
+	$chasetruck[2].drivermodel = "models/human/german_wehrmact_officer.tik"
+
+	$paradetruck.speed = 500
+	$paradetruck.accel = 500
+	$paradetruck.passengers = 3
+	$paradetruck.takedamage = 0
+	$paradetruck.takedamagewhendone = 1
+	$paradetruck.headlights = 1
+	$paradetruck.passengermodel = "models/human/german_wehrmact_officer.tik"
+	$paradetruck.drivermodel = "models/human/german_wehrmact_officer.tik"
+	$paradetruck.dontdropweapons = 1
+
+	$guybehindcar ai_off
+	$guybehindcrate exec global/crouch.scr
+	$guybehindcrate ai_off
+	level.ridedone = 0
+}end
+
+//=========================================================================
+wakeguybehindcar: {
+//=========================================================================
+	$guybehindcar ai_on
+	$guybehindcar favoriteenemy $player
+	$guybehindcar exec global/enable_ai.scr
+	wait 2
+
+	$guybehindcrate ai_on
+	$guybehindcrate favoriteenemy $player
+	$guybehindcrate exec global/stand.scr
+}end
+
+//=========================================================================
+PlayerGetOut: {
+//=========================================================================
+	local.usekey = getboundkey1 "+use"
+	local.msg = (loc_convert_string ("Press " + local.usekey + " to exit the Jeep."))
+	thread global/throbtext.scr::throbtext local.msg 0
+
+	while (!($player.useheld)) {
+		waitframe
+	}
+
+	thread global/throbtext.scr::throbtext_off
+}end
+
+//=========================================================================
+KillEffects: {
+//=========================================================================
+	if($introemitter) {
+		$introemitter delete
+	}
+
+	if($campemitter) {
+		for(local.i = 1; local.i <= $campemitter.size; local.i++) {
+			$campemitter[local.i] delete
+		}
+	}
+
+	if($car1) {
+		$car1 delete
+	}
+
+	if($houseemitter) {
+		for(local.i = 1; local.i <= $houseemitter.size; local.i++) {
+			$houseemitter[local.i] delete
+		}
+	}
+
+	if($car2) {
+		$car2 delete
+	}
+
+	if($jeepstopemitter) {
+		for(local.i = 1; local.i <= $jeepstopemitter.size; local.i++) {
+			$jeepstopemitter[local.i] delete
+		}
+	}
+
+	if($fire6) {
+		$fire6 delete
+	}
+		
+	if($paradetruck.damaged) {
+		$paradetruck.damaged remove
+	}
+
+	if($paradetruckdamaged) {
+		$paradetruckdamaged remove
+	}
+
+	/*
+	if($endingemitter)
+		for(local.i = 1; local.i <= $endingemitter.size; local.i++)
+			$endingemitter[local.i] delete
+	*/
+}end
+
+//=========================================================================
+WaitToGetOutOfJeep: {
+//=========================================================================
+	thread startRain
+	thread StopSecondChaseTruck
+
+	$pinnedbrit01 ai_on
+	$pinnedbrit02 ai_on
+	$pinnedbrit03 ai_on
+	$pinnedbrit04 ai_on
+	$pinnedbrit01 show
+	$pinnedbrit02 show
+	$pinnedbrit03 show
+	$pinnedbrit04 show
+
+	// turn on fake fire, big aagun in courtyard is projectile generator
+	$endguysfire TurnOn
+	thread maps/e3l1/Courtyard.scr::TurnOnSnipers
+	level.ridedone = 1
+
+	waitthread PlayerGetOut
+	thread KillEffects
+	thread maps/e3l1/JeepStuck.scr::JeepStuckCleanup
+	
+	exec global/autosave.scr level.autosave	
+	level.autosave++
+	waitframe
+
+	$medic.no_idle = 0
+	$medic waitthread global/LoopAnim.Scr::LoopAnimStop
+	$jeep unlock
+	$jeep.turret unlock
+	$jeep doUse player
+	//	$jeep.turret lock
+	$jeep lock
+	
+	//$jeep disconnect_paths
+	$player.viewangles = "0 0 0"
+
+	$pinnedbrit01 ai_on
+	$pinnedbrit02 ai_on
+	$pinnedbrit03 ai_on
+	$pinnedbrit04 ai_on
+	$pinnedbrit01 show
+	$pinnedbrit02 show
+	$pinnedbrit03 show
+	$pinnedbrit04 show
+	
+	thread jeepUseLoop
+}end
+
+//=========================================================================
+StopSecondChaseTruck: {
+//=========================================================================
+	// Reset the players health scale
+	waitthread maps/e3l1.scr::SetPlayerHealthScale 1.0
+	$player removeimmune vehicle
+
+	// Hacky, but the path is in the wall, and the truck won't finish driving
+	$chasetruck[1] fullstop
+	
+	/*
+	local.i = 0
+	while(local.i < 11)
+	{
+		$chasetruck[1].angles = $chasetruck[1].angles - (0 local.i 0 )
+		local.i += 0.2
+		wait 0.2
+	}
+	*/
+
+	wait 2
+	// $chasetruck[1] waitthread global/autotruck.scr::StopTruck
+
+	$chasetruck[1].driver exec global/bullethit.scr (0 -1 90) 1000 50 1
+	$chasetruck[1] disconnect_paths
+	$chasetruck[2] disconnect_paths
+	$chasetruck[1].health = $chasetruck[1].originalhealth
+	$chasetruck[2].health = $chasetruck[2].originalhealth
+	$chasetruck[1].driver takedamage
+	$chasetruck[2].driver takedamage
+
+	for (local.i = 1; local.i <= $chasetruckpassenger.size; local.i++) {
+		$chasetruckpassenger[local.i] takedamage
+	}
+}end
+
+//=========================================================================
+GetOutAndHide: {
+//=========================================================================
+	$medic waitthread global/LoopAnim.scr::LoopAnimStop
+	$woundedguy waitthread global/LoopAnim.scr::LoopAnimStop
+	$jeep notsolid
+	thread WoundedGuyGetOut
+	waitframe
+
+	waitthread global/jeepanim.scr::DriverGetOutJeep $jeep $medic	
+	level.medicGo = 1
+	$medic.direction = 4
+
+	//	$medic turnto $player
+	//	$medic waittill turndone
+
+	//TEMP VO
+	//iprintln "(DFRUS_E3L1_PW2314) I'm gonna take cover, let me know when it's all clear."
+	//$medic say A_31_MedTalk_08
+	//$medic waittill saydone
+
+	// need ai_nodes at (41 3455 111)
+	// $jeep disconnect_paths
+	$medic anim idle
+	$medic runto $mediccovernode
+	$medic exec global/crouch.scr
+	$jeep solid
+	waitframe
+	
+	$medic.avoidplayer = 0
+	$medic waittill movedone
+	$medic exec global/crouch.scr
+	//	$woundedguy thread global/LoopAnim.scr::LoopAnim AA_huddle2
+}end
+
+//=========================================================================
+WoundedGuyGetOut: {
+//=========================================================================
+	waitthread global/jeepanim.scr::PassengerGetOutJeep $jeep $woundedguy
+	
+	$woundedguy waitthread global/LoopAnim.scr::LoopAnimStop
+	$woundedguy anim idle
+	$woundedguy  runto ($medichidespot.origin + (0 20 0))
+	$woundedguy  waittill movedone
+	$woundedguy gun "sten"
+	$woundedguy dontdropweapons
+	$woundedguy.enableEnemy = 1
+	$woundedguy runto $jeep
+	$woundedguy.health = 1
+	$woundedguy takedamage
+	$woundedguy threatbias 10000
+	wait 2.0
+
+	$woundedguy exec global/bullethit.scr (0 -1 0) 1000 0 0
+}end
+
+//=========================================================================
+startRain: {
+//=========================================================================	
+	level.windtime = 5
+	level.shuttertime = 0.3
+	level.rainvolume = 0.2
+	level.raindensity = 0.8
+	level.thundertime = 0
+	exec global/weather.scr	
+}end
+
+//=========================================================================
+CleanupJeepRidePart3: {
+//=========================================================================
+	$commander remove
+	$badguy7674 remove
+
+	for (local.i=1;local.i<=$t2373.size;local.i++) {
+		$t2373[local.i] remove
+	}
+
+	for (local.i=1;local.i<=$badguys5565.size;local.i++) {
+		$badguys5565[local.i] remove
+	}
+
+	for (local.i=1;local.i<=$badguys6538.size;local.i++) {
+		$badguys6538[local.i] remove
+	}
+
+	for (local.i=1;local.i<=$tank1.size;local.i++) {
+		$tank1[local.i] remove
+	}
+
+	$bunkergunner remove
+}end
+
+//=========================================================================
+jeepUseLoop: {
+//=========================================================================
+	while (1) {
+		local.usekey = getboundkey1 "+use"
+		local.msg = (loc_convert_string ("Press " + local.usekey + " to board the Jeep.") )
+		waitexec global/DistanceUse.scr $jeep 200 local.msg
+		
+		$player physics_on
+		$player takedamage
+		
+		//unlock the jeep and turret
+		$jeep.turret = $jeep queryturretslotentity 0
+		$jeep unlock
+		$jeep.turret unlock
+		$jeep attachturretslot 0 $player
+		$jeep.turret lock
+		$jeep lock
+		wait 1.5
+		
+		local.usekey = getboundkey1 "+use"
+		local.msg = (loc_convert_string ("Press " + local.usekey + " to exit the Jeep.") )
+		thread global/throbtext.scr::throbtext local.msg 0
+		
+		while (!($player.useheld)) {
+			waitframe
+		}
+		
+		thread global/throbtext.scr::throbtext_off
+		
+		$jeep unlock
+		$jeep.turret unlock
+		$jeep doUse player
+		$jeep.turret lock
+		$jeep lock
+		
+		$player.viewangles = "0 0 0"
+		wait 1.5
+	}
+}end

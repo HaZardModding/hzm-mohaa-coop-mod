@@ -1,0 +1,613 @@
+//chrissstrahl - modified for coop on 2019.08.25
+//=========================================================================
+InitHideout:
+//=========================================================================
+{
+	level.thisPartIsDone = 0
+	
+	$opendoordoor lock
+
+	level.gotminesweeper = 1
+	
+	spawn trigger_relay targetname "magazineBlown"
+
+	//$opengrate hide
+	//$closedgrate show
+
+	$mg42guy3 ai_off
+	$mg42guy4 ai_off
+
+	//thread TurnOnMG42s
+
+	$magazinecharge setusethread SetCharge
+	$magazinecharge setthread ExplodeCharge
+	$magazinecharge stopwatchduration 30
+	$enterbunkerdoor lock
+	
+	if ($deadend){
+		$deadend hide
+		$deadend notsolid
+	}
+
+	thread CleanupBunker
+}end
+
+//=========================================================================
+DoHideoutIntro:
+//=========================================================================
+{
+	if (level.hackDoHideoutIntro == 1){ //chrissstrahl - this is developer stuff, we can leave it
+		//iprintln "HACKhideoutIntro"
+		$tank2.origin = $tank2postrepair.origin
+		$tank2 fullstop
+
+		$tank3.origin = $tank3postrepair.origin
+		$tank3 fullstop
+
+		$jeep.origin = $tank4postrepair.origin
+		$jeep fullstop
+
+		$player.origin = $tank2.origin + "200 0 0"
+
+		for (local.i=1;local.i<=$infantry.size;local.i++){
+			$infantry[local.i].origin = $tank2.origin + ((local.i * 20) 0 100)
+		}
+		end
+	}
+
+	$jeep notsolid
+	waitthread global/jeepanim.scr::DriverGetOutJeep $jeep $jeep_passenger
+	$jeep safesolid
+
+	$commander waitthread global/LoopAnim.scr::LoopAnimStop
+	waitthread global/jeepanim.scr::PassengerGetOutJeep $jeep $commander
+	$commander exec coop_mod/replace.scr::holster //chrissstrahl - fix for multiplayer
+	$commander runto (1516 4132 225)
+	$commander waittill movedone
+	//$commander turnto $tank2
+	$jeep_passenger turnto $tank2
+
+	$commander anim A_12_FuchesTalk06 // Daniels:  Captain!  Get your crew up here bloody right quick, and repair this tread!
+	$commander waittill animdone
+
+	//crew approaches and begins to work on tread
+	for (local.i = 1; local.i <= 2; local.i++){
+		$infantry[local.i] thread InfantryWorkOnTank local.i
+	}
+
+	waitthread CommanderGiveOrders
+
+	//	$opengrate show
+	//	$closedgrate hide
+	//	$closedgrate notsolid
+
+	$enterbunkerdoor unlock
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "holespawner"
+	trigger local.trigger
+}end
+
+//=========================================================================
+CommanderGiveOrders:
+//=========================================================================
+{
+	//chrissstrahl - coop mod compatible
+	$commander exec coop_mod/replace.scr::turnto
+	$commander exec coop_mod/replace.scr::lookat
+
+	// If the player goes near the commander, he gives orders to destroy the hideout
+	//chrissstrahl - coop compatible
+	local.keepWaiting = 1
+	while (local.keepWaiting){
+		waitframe
+		local.player = exec coop_mod/replace.scr::player_closestTo $commander
+		if( local.player != NULL && vector_length(local.player.origin - $commander.origin) < 200){
+			local.keepWaiting = 0
+		}
+	}
+	
+	$commander anim A_12_Fuches_1A
+	$commander waittill animdone
+	
+	$commander turnto NULL
+	$commander lookat NULL
+	$commander exec global/enable_ai.scr
+	$commander exec coop_mod/replace.scr::unholster //chrissstrahl - fix for multiplayer
+
+	$jeep_passenger turnto NULL
+	$jeep_passenger lookat NULL
+	$jeep_passenger exec global/enable_ai.scr
+	$jeep_passenger gun "thompson"
+	$jeep_passenger exec coop_mod/replace.scr::unholster //chrissstrahl - fix for multiplayer
+	
+	//chrissstrahl - give players new weapon
+	if( level.gametype != 0 ){
+		local.model = "models/weapons/thompsonsmg.tik"
+		level.coop_forcePrimary = NIL //reset primary weapon for respawn
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player =  $player[local.i]
+			if(local.player != NULL && local.player.health > 0 ){
+				if( level.gametype == 0 || local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+					exec coop_mod/main.scr::playerForcePrimary local.player local.model
+				}
+			}
+		}
+	}
+}end
+
+//=========================================================================
+InfantryWorkOnTank local.repairindex:
+//=========================================================================
+{
+	//	iprintln "DEBUG: InfantryWorkOnTank"
+
+	switch (local.repairindex){
+		case 1:
+			local.anim = "A_11_mechanic3"                 // This is the guy working on the tank at the back of the turret 
+			local.dest = (1696 4365 195)
+			break
+		case 2:
+			local.anim = "A_12_tankrepair2"              // GUY IN FRONT MIDDLE
+			local.dest = (1500 4100 225)
+			break
+	}
+	
+	if (level.gorepairthetankyouworthlessbastard == 1){
+		self.origin = local.dest
+		self waitthread global/friendly.scr::friendlystop
+		self exec global/disable_ai.scr
+	}		
+	else{
+		self.movedoneradius = 300
+		self waitthread global/friendly.scr::friendlystop
+		self exec global/disable_ai.scr
+		self runto local.dest
+		
+		//chrissstrahl - fixed error upon null entity
+		while (self != NULL && vector_length(self.origin - local.dest) > 300){
+			waitframe
+		}
+	}
+	wait 2
+	
+	local.result  = 0
+	local.result2 = 0
+
+//chrissstrahl - this needs fixing, but i have no idea what it is suppose to do
+//chrissstrahl - this needs fixing, but i have no idea what it is suppose to do
+//chrissstrahl - this needs fixing, but i have no idea what it is suppose to do
+//chrissstrahl - this needs fixing, but i have no idea what it is suppose to do
+//chrissstrahl - this needs fixing, but i have no idea what it is suppose to do
+//chrissstrahl - this needs fixing, but i have no idea what it is suppose to do
+//chrissstrahl - this needs fixing, but i have no idea what it is suppose to do
+//chrissstrahl - this needs fixing, but i have no idea what it is suppose to do
+//chrissstrahl - this needs fixing, but i have no idea what it is suppose to do
+//chrissstrahl - this needs fixing, but i have no idea what it is suppose to do
+//chrissstrahl - this needs fixing, but i have no idea what it is suppose to do
+//chrissstrahl - this needs fixing, but i have no idea what it is suppose to do
+//chrissstrahl - this needs fixing, but i have no idea what it is suppose to do
+	while(self && local.result != 1 || local.result2 != 1){
+
+		if (level.thisPartIsDone == 1){
+			end
+		}
+		waitframe
+
+		local.vObjDir	= vector_subtract self.origin $player.origin
+		local.vObjDir	= vector_normalize local.vObjDir
+		local.vForward  = angles_toforward ( $player.angles )
+		local.dot 		= vector_dot local.vForward local.vObjDir
+
+		//println("dot angle: " + local.dot)
+		if ( local.dot < 0.707 ){
+			local.result = 1
+		}
+		else{
+			local.result = 0
+		}
+			
+		local.vObjDir	= vector_subtract level.bustedtank.origin $player.origin
+		local.vObjDir	= vector_normalize local.vObjDir
+		local.vForward  = angles_toforward ( $player.angles )
+		local.dot		= vector_dot local.vForward local.vObjDir
+
+		//println("dot angle: " + local.dot)
+		if ( local.dot < 0.707 ){
+			local.result2 = 1
+		}
+		else{
+			local.result2 = 0			
+		}
+	}
+	
+	if (self){
+		self waitexec global/disable_ai.scr
+		self physics_off
+		self.angles = $tank2.angles
+		self.origin = $tank2.origin
+		self thread global/LoopAnim.scr::LoopAnim local.anim
+		waitframe
+				
+		//spawn invisible guy to fix clipping problem - IPC
+		waitthread makeInvisibleHelper local.repairindex
+	}
+}end
+
+//=========================================================================
+makeInvisibleHelper local.i:
+//=========================================================================
+{
+	//chrissstrahl - coop compatible
+	local.player = NULL
+	while(local.player == NULL){
+		wait 0.5
+		local.player = exec coop_mod/replace.scr::player_random
+	}
+	local.placetospawn = local.player.origin + (0 -1000 0)
+	local.person = spawn models/human/allied_uk_paratrooper1.tik origin local.placetospawn 
+	local.person hide
+	local.person solid
+	local.person physics_on
+	local.person ai_off
+
+	if (local.i == 1){
+		local.offset = ( 20 65 100 )
+	}
+	else if (local.i == 2){
+		local.offset = ( -80 -60 0 )
+	}
+
+	local.vector 		 = $tank2.origin + local.offset
+	local.person.origin  = local.vector
+	self.invisibleHelper = local.person
+}end
+
+//=========================================================================
+CleanUpTanks:
+//=========================================================================
+{
+	level.thisPartIsDone = 1  //refers to the tank fixing animations
+	
+	// NO  explosions no nothing
+	if($barricade4)	{
+		$barricade4 remove
+	}
+	
+	// Fix the tank
+	$tank2 show
+	level.bustedtank remove
+	// $tank2 thread aimAtNothingYou
+	$tank2.mineclearing anim spin
+
+	// Fix the infantry
+	$mrinvisible2 delete
+
+	for (local.i = $infantry.size; local.i >= 1; local.i--){
+		if (local.i == 1){
+			$infantry[local.i] waitthread global/friendly.scr::friendlystop
+			$infantry[local.i] waitthread global/LoopAnim.scr::LoopAnimStop
+			$infantry[local.i].invisibleHelper delete
+			$infantry[local.i] physics_on
+			$infantry[local.i] thread global/LoopAnim.scr::LoopAnimStop
+
+			local.spot = (3300 3600 230)
+
+			$infantry[local.i].origin = local.spot
+			$infantry[local.i] turnto $deletetrigger4
+			$infantry[local.i] exec global/LoopAnim.scr::LoopAnimStop
+			$infantry[local.i] exec global/disable_ai.scr
+			$infantry[local.i] nodamage
+		}
+		else{
+			if ($infantry[local.i].invisibleHelper){
+				$infantry[local.i].invisibleHelper delete
+			}
+
+			$infantry[local.i] delete
+		}	
+	}
+	
+	//the tanks will start rolling to the rendezvous point
+	//$postrepairgo waittill trigger
+
+	$tank2 drive $tank2postrepair 350 100 256 256
+	$tank3 drive $tank3postrepair 345 100 256 256
+	level.infantryfollow = $jeep
+
+	$commander turnto NULL
+	$commander lookat NULL
+	$commander exec global/disable_ai.scr
+	$commander gun "none"
+	$commander physics_off
+	$commander thread global/LoopAnim.scr::LoopAnim A_31_GetIn_jeepidle
+	$commander angles ( 0 0 0 )
+	$commander attach $jeep passenger0 1
+	
+	$tank2.mineclearing.angles = (0 0 0)
+	$tank2.mineclearing attach $tank2 origin 1
+	$tank2.mineclearing anim stop
+	//wait 2
+
+	$jeep drive $tank4postrepair 170 200 256 256
+	thread maps/e1l2/Intro.scr::jeepGo
+	//	$jeep anim start_wheels
+	$jeep anim jeep_idle_drive
+
+	$tank2 waittill drive
+	$tank2 fullstop
+
+	while (vector_length ($tank2.origin - $tank3.origin) > 500){
+		waitframe
+	}
+
+	$tank3 fullstop
+	
+	while (vector_length ($tank3.origin - $jeep.origin) > 400){
+		waitframe
+	}
+
+	$jeep fullstop
+	thread maps/e1l2/Intro.scr::jeepStop
+	//	$jeep anim stop_wheels
+	$jeep anim jeep_idle_still
+}end
+
+
+//=========================================================================
+ObjectiveDestroyHideout:
+//=========================================================================
+{
+	if (level.hackDestroyHideout == 1){
+		end
+	}
+
+	exec global/autosave.scr level.autosave // "Destroy the hideout"
+	level.autosave++
+	level.chargeset = 0
+
+	while (level.chargeset == 0){
+		waitframe
+	}
+	
+	thread maps/e1l2.scr::startMusic_e1l2_Escape
+	$enterbunkerdoor lock
+	
+	if ($deadend){
+		$deadend show
+		$deadend solid
+	}
+}end
+
+//=========================================================================
+SetCharge:
+//=========================================================================
+{
+	level.chargeset = 1
+
+	// Spawn a set of guys back the way we came from
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "spawnblockerguys"
+	trigger local.trigger
+}end
+
+//=========================================================================
+ExplodeCharge:
+//=========================================================================
+{
+	$explosionstart thread ChainExplosion
+
+	//and the nazis go away
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "magazinedeletetrigger"
+	trigger local.trigger	
+
+	thread CleanupHideout
+	wait 7
+
+	thread doExplosions
+}end
+
+//=========================================================================
+ChainExplosion:
+//=========================================================================
+{
+	// Ramp up explosion with dist to player
+	if(level.gametype == 0){ //chrissstrahl - coop compatible
+		local.dist = vector_length($player.origin - self.origin)
+	}else{
+	//chrissstrahl - make coop compatible
+		local.player = exec coop_mod/replace.scr::player_closestTo self
+		while(local.player == NULL && self != NULL){
+			local.player = exec coop_mod/replace.scr::player_closestTo self
+			wait 1
+		}
+		local.dist = vector_length(local.player.origin - self.origin)
+	}
+	
+	if (local.dist < 400){
+		local.magnitude = 1.5
+	}
+	else{
+		local.magnitude = 400 / local.dist
+	}
+
+	local.waittime = 0.4 + randomfloat (0.2)
+	exec global/earthquake.scr local.waittime local.magnitude 0 0
+
+	// Spawn the FX
+	local.explosion = spawn "models/emitters/tehao_explosionDust.tik" origin self.origin
+	local.explosion scale .5
+	local.explosion anim start
+	radiusdamage self.origin 4000 600
+
+	// Wait to explode our children
+	wait local.waittime
+
+	// Explode our children
+	if (self.target){
+		for (local.i=1;local.i<=$(self.target).size;local.i++){
+			$(self.target)[local.i] thread ChainExplosion
+		}
+	}
+
+	// Wait to remove our FX
+	wait 3
+	local.explosion remove
+}end	
+
+//=========================================================================
+ObjectiveEscape:
+//=========================================================================
+{
+	//	$opengrate hide
+	//	$closedgrate show
+	//	$closedgrate solid
+
+	$commander rendereffects "-shadow"
+	$commander exec global/disable_ai.scr
+	$commander physics_off
+	$commander thread global/LoopAnim.scr::LoopAnim A_31_GetIn_jeepidle
+	$commander angles ( 0 0 0 )
+	$commander attach $jeep passenger0 1
+
+	$jeep_passenger exec coop_mod/replace.scr::holster //chrissstrahl - fix for multiplayer
+	$jeep_passenger rendereffects "-shadow"
+	$jeep_passenger exec global/disable_ai.scr
+	$jeep_passenger physics_off
+	$jeep_passenger thread global/LoopAnim.scr::LoopAnim A_31_GetIn_jeepidle //jeep_idle_still
+	$jeep_passenger angles ( 0 0 0 )
+	$jeep_passenger attach $jeep driver 1
+
+	wait 2 //this should be a trigger somewhere in the hallway the player triggers
+	$opendoordoor unlock
+	
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "opendoortrigger"
+	trigger local.trigger
+	thread CleanUpTanks
+	
+	$deletetrigger4 waittill trigger
+	$opendoordoor lock
+}end
+
+//=========================================================================
+DoOutro:
+//=========================================================================
+{
+	while (vector_length ($player.origin - $commander.origin) > 800){
+		waitframe
+	}
+	
+	$commander lookat $player
+	$commander.no_idle = 1
+	wait 1.0
+
+	$commander waitthread global/LoopAnim.scr::LoopAnimStop
+	$commander thread global/LoopAnim.scr::LoopUpperAnim A_12_Fuches_idle2
+	$commander say A_12_FuchesTalk08
+	wait 3
+
+	//$commander waittill saydone
+	$commander waitthread global/LoopAnim.scr::LoopUpperAnimStop
+	$commander anim A_12_FuchesTalk09
+	$commander waittill animdone
+	//$commander waitthread global/LoopAnim.scr::LoopUpperAnimStop
+	$commander thread global/LoopAnim.scr::LoopAnim A_12_Fuches_idle
+	wait 2
+			
+	fadeout 3 0 0 0 1
+}end
+
+//=========================================================================
+doExplosions:
+//=========================================================================
+{
+	local.firstExplosion  = waitthread global/FindTrigger.scr::FindTrigger "finaleblasttrigger1"
+	local.secondExplosion = waitthread global/FindTrigger.scr::FindTrigger "finaleblasttrigger2"
+	local.thirdExplosion  = waitthread global/FindTrigger.scr::FindTrigger "finaleblasttrigger3"
+	local.fourthExplosion = waitthread global/FindTrigger.scr::FindTrigger "finaleblasttrigger4"
+	
+	exec global/earthquake.scr 1 1 0 0
+	trigger local.firstExplosion
+
+	$finaleblast1 playsound bunker_explo1
+	$finaleblast1 thread bunkerSmoke
+
+	for (local.i=1;local.i<=$explosionguys.size;local.i++){
+		$explosionguys[local.i] exec global/bullethit.scr (0 -1 0) 1000 50 1
+	}
+
+	for (local.i=1;local.i<=$caveguys.size;local.i++){
+		$caveguys[local.i] exec global/bullethit.scr (0 -1 0) 1000 50 1
+	}
+
+	thread guysCheer
+	wait 1
+
+	exec global/earthquake.scr 1 2 0 0
+	trigger local.secondExplosion
+	thread global/exploder.scr::explode 10
+	$finaleblast2 playsound bunker_explo2
+	$finaleblast2 thread bunkerSmoke
+	wait 1
+
+	exec global/earthquake.scr 1 3 0 0
+	trigger local.thirdExplosion
+	$finaleblast3 playsound bunker_explo3
+	$finaleblast3 thread bunkerSmoke
+	wait 1
+
+	exec global/earthquake.scr 1 1 0 0
+	trigger local.fourthExplosion
+	thread global/exploder.scr::explode 20
+	$finaleblast4 playsound bunker_explo4
+	$finaleblast4 thread bunkerSmoke
+}end
+
+//=========================================================================
+guysCheer:
+//=========================================================================
+{
+	$infantry[1] thread global/LoopAnim.scr::LoopAnim 00A001_victory
+	wait 5
+	$infantry[1] thread global/LoopAnim.scr::LoopAnimStop
+}end
+
+//=========================================================================
+CleanupBunker:
+//=========================================================================
+{
+	while (level.chargeset == 0){
+		waitframe
+	}
+
+	thread global/EntityCleanup.scr::EntityCleanup "mg42guy3" 1000
+	thread global/EntityCleanup.scr::EntityCleanup "mg42guy4" 1000
+	thread global/EntityCleanup.scr::EntityCleanup "magazineparade_paradeguy" 1000
+	thread global/EntityCleanup.scr::EntityCleanup "caveguys" 1000
+}end
+
+//=========================================================================
+CleanupHideout:
+//=========================================================================
+{
+	$deletetrigger4 waittill trigger
+	thread global/EntityCleanup.scr::EntityCleanup "opendoorguys" 1000
+}end
+
+//=========================================================================
+TurnOnMG42s:
+//=========================================================================
+{
+	$bunkermg42spawntrigger waittill trigger
+	$mg42guy3 ai_on
+	$mg42guy4 ai_on
+}end
+
+//=========================================================================
+bunkerSmoke:
+//=========================================================================
+{
+	wait 4
+	local.temp = spawn script_model model models/emitters/linger_smoke.tik
+	local.temp notsolid
+	local.temp.origin = self.origin
+	local.temp anim start
+}end
+

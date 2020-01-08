@@ -1,0 +1,575 @@
+//println "killed.scr"
+
+// Location values:
+// -2 false positive: should return a miss
+// -1 General
+// 0  head
+// 1  helmet
+// 2  neck
+// 3  upper torso
+// 4  middle torso
+// 5  lower torso
+// 6  pelvis
+// 7  right upper arm
+// 8  left upper arm
+// 9  right upper leg
+// 10 left upper leg
+// 11 right lower arm
+// 12 left lower arm
+// 13 right lower leg
+// 14 left lower leg
+// 15 right hand
+// 16 left hand
+// 17 right foot
+// 18 left foot
+
+//println "Killed by " self.fact.damage " damage in location " self.fact.location
+
+self notsolid	//chrissstrahl - make sure they are not solid, otherwhise they block players in mp for a moment
+
+
+waitexec anim/smoking.scr::SmokeRemoveCigarette
+
+//chrissstrahl - trace back which player killed the ai
+/*
+	local.vec2 = self.fact.direction
+	local.vec2[0] = local.vec2[0] * -1
+	local.vec2[1] = local.vec2[1] * -1
+	local.vec2[2] = local.vec2[2] * -1
+//iprintlnbold_noloc ( "killed from: " + self.fact.direction )
+*/
+
+//self.normal_health = 0 // He is dead
+
+// Make Some Damage Smokey Poofs
+if(0) // This is handled in the code, no need to do it again here
+{
+	local.vec2 = self.fact.direction
+	local.vec2[0] = local.vec2[0] * -1
+	local.vec2[1] = local.vec2[1] * -1
+	local.vec2[2] = local.vec2[2] * -1
+	self damagepuff self.fact.position local.vec2
+}
+
+// Need a fast blendtime so the animation begins snappily
+self.blendtime = 0.3
+
+
+// Facial animation/sound
+// Boon 9-11-01 Moved this back up so it would happen for the special death animation case  (moved that back up because
+// calling two animations in one frame is an error.  Jason had moved it to the bottom and I'm not sure if the condition
+// that required that is gone now.  If death sounds stop playing then this may be the culprit.
+self setsay death_generic	// Death facial animation/sound
+
+
+////////
+// Pop off the helmet
+if ( (self.fact.location == 0) || (self.fact.location == 1) )
+{
+	self pophelmet
+}
+
+// Special death animation
+if (self.deathanim != NIL)
+{
+//	println "Playing special death animation " self.deathanim
+	self setmotionanim self.deathanim
+	self waittill flaggedanimdone
+	end
+}
+
+
+
+//exec global/sethelmetfalloff.scr "false"
+
+// The direction the bullet/damage came from is useful more often than not.
+local.yaw = self GetLocalYawFromVector self.fact.direction
+
+// Explosive deaths give a -1 hit location
+if (self.fact.location == -1)
+{
+	//println "Unknown location, assuming explosive death"
+	// If we really got it bad, play a flying through the air animation
+	if (self.fact.damage > 75)
+	{
+		local.randnum = randomint 100
+		if (local.randnum > 70)
+		{
+			self setmotionanim death_grenade_high
+		}
+		if (local.yaw > -45 && local.yaw < 45)
+		{
+			self setmotionanim death_backgrenade
+		}
+		else
+		{
+			self setmotionanim death_grenade
+		}
+		local.randnum = randomint 100
+		if (local.randnum > 40)
+		{
+			self pophelmet
+		}
+	}
+	else if (self.fact.damage > 50)
+	{
+		if (local.yaw > -45 && local.yaw < 45)
+		{
+			self setmotionanim death_back
+		}
+		else if (local.yaw > 45 && local.yaw < 135)
+		{
+			self setmotionanim death_right
+		}
+		else if (local.yaw > -135 && local.yaw < -45)
+		{
+			self setmotionanim death_left
+		}
+		else
+		{
+			self setmotionanim death_run
+		}
+		local.randnum = randomint 100
+		if (local.randnum > 60)
+		{
+			self pophelmet
+		}
+	}
+	else
+	{
+		//println "falling down"
+		local.randnum = randomint 100
+		if (local.randnum > 70)
+		{
+			self setmotionanim death_crotch
+		}
+		else if (local.randnum > 30)
+		{
+			self setmotionanim death_chest
+		}
+		else
+		{
+			self setmotionanim death_frontchoke
+		}
+	}
+	self waittill flaggedanimdone
+	self.position = "dead"
+	end
+}
+
+
+switch (self.position)
+{
+dead:
+	break
+knees:
+crouch:
+crouchwalk:
+	if (local.yaw > 135 && local.yaw < 225)
+	{
+		self setmotionanim death_frontcrouch
+	}
+	else
+	{
+		switch(self.weapontype)
+		{
+			grenade:
+	//			println "Fatal Shot While On Knees/Has Grenade"
+	 			//self setmotionanim grenade_pain_kneestodeath		// don't have
+				self setmotionanim rifle_pain_kneestodeath			// temp default
+				break
+			rifle:
+	//			println "Fatal Shot While On Knees/Has Rifle"
+				self setmotionanim rifle_pain_kneestodeath
+				break
+			smg:
+	//			println "Fatal Shot While On Knees/Has SMG"
+	 			self setmotionanim thompson_pain_kneestodeath
+				break
+			bazooka:
+	//			println "Fatal Shot While On Knees/Has Bazooka"
+				//self setmotionanim bazooka_pain_kneestodeath		// Don't have
+				self setmotionanim rifle_pain_kneestodeath		// Temp default
+				break
+			default:
+	//			println "Fatal Shot While On Knees/Default Case - this is a bug in killed.scr"
+				self setmotionanim rifle_pain_kneestodeath		// Play the default
+				break
+		}
+	}
+	break
+
+prone:
+// Need different animations for prone!!!!
+floor:
+	switch(self.weapontype)
+	{
+		grenade:
+//			println "Fatal Shot While On Floor/Has Grenade"
+			//self setmotionanim grenade_pain_floortodeath		// Don't have
+			self setmotionanim death_prone		// Temp default
+			break
+		rifle:
+//			println "Fatal Shot While On Floor/Has Rifle"
+			self setmotionanim death_prone
+			break
+		smg:
+//			println "Fatal Shot While On Floor/Has SMG"
+			self setmotionanim death_prone
+			break
+		bazooka:
+//			println "Fatal Shot While On Floor/Has Bazooka"
+	 		//self setmotionanim bazooka_pain_floortodeath		// Don't have
+			self setmotionanim death_prone		// Temp default
+			break
+		default:
+//			println "Fatal Shot While On Floor/Default Case - this is a bug in killed.scr"
+			self setmotionanim death_prone		// Default
+			break
+	}
+	break
+
+run:
+	local.forwardvelocity = self.velocity * self.forwardvector
+	println "Forward velocity: " local.forwardvelocity
+	if ( local.forwardvelocity > 130 )
+	{
+		if ( (local.yaw > -45) && (local.yaw < 45) && (self.fact.damage > 50) )
+		{
+			local.randnum = randomint 100
+			if (local.randnum > 70)
+			{
+				self setmotionanim death_knockedup
+			}
+			else
+			{
+				self setmotionanim death_chest
+			}
+		}
+		else
+		{
+			self setmotionanim death_run
+		}
+		local.randnum = randomint 100
+		if (local.randnum > 60)
+		{
+			self pophelmet
+		}
+		break
+	}
+	// else flow through to the stand case
+walk:
+stand:
+crouchrun:
+pronewalk:
+default:
+	switch (self.fact.location)
+	{
+	// Lower torso)
+	case 6: // pelvis
+	case 5: // lower torso
+		//println "Fatal Stomach Shot"
+
+		// If the blow came from in front, fall back
+		local.randnum = randomint 100
+		if ( (local.yaw > -45) && (local.yaw < 45) && (local.randnum > 40) )
+		{
+			self setmotionanim death_back
+		}
+		else if ( (local.yaw > 135) && (local.yaw < 225) && (local.randnum > 70) )
+		{
+			local.randnum = randomint 100
+			if (local.randnum > 50)
+			{
+				// knockedup is good for shots from behind in the lower body, or in front in the upper.
+				self setmotionanim death_knockedup
+			}
+			else
+			{
+				self setmotionanim death_run
+			}
+		}
+		else
+		{
+			local.randnum = randomint 100
+			if (local.randnum > 40)
+			{
+				self setmotionanim death_crotch
+			}
+			else
+			{
+				self setmotionanim death_chest
+			}
+		}
+		break
+
+	// Upper torso
+	case 4: // middle torso
+	case 3: // upper torso
+		//println "Fatal Chest Shot"
+		// If the blow came from in front, fall back
+		local.randnum = randomint 100
+		if ( (local.yaw > -45) && (local.yaw < 45) && (local.randnum > 40) )
+		{
+			if (local.randnum > 70)
+			{
+				// knockedup is good for shots from behind in the lower body, or in front in the upper.
+				self setmotionanim death_knockedup
+			}
+			else
+			{
+				self setmotionanim death_back
+			}
+		}
+		else if ( (local.yaw > 135) && (local.yaw < 225) && (local.randnum > 60) )
+		{
+			self setmotionanim death_run
+		}
+		else
+		{
+			local.randnum = randomint 100
+			if (local.randnum > 70)
+			{
+				self setmotionanim death_frontchoke
+			}
+			else if (local.randnum > 40)
+			{
+				self setmotionanim death_shoot
+			}
+			else
+			{
+				self setmotionanim death_chest
+			}
+		}
+		break
+
+	// Neck - choke
+	case 2: // neck
+		//Println "fatal neck shot"
+		local.randnum = randomint 100
+		if (local.randnum > 50)
+		{
+			self setmotionanim death_frontchoke
+		}
+		else
+		{
+			self setmotionanim death_choke
+		}
+		break
+
+	// Head
+	case 1: // helmet
+	case 0: // head
+		//Println "fatal head shot"
+
+//		exec global/sethelmetfalloff.scr "true"
+
+		local.randnum = randomint 100
+		if ( (local.yaw > -45) && (local.yaw < 45) && (local.randnum > 50) )
+		{
+			self setmotionanim death_back
+		}
+		else if ( (local.yaw > 135) && (local.yaw < 225) && (local.randnum > 70) )
+		{
+			self setmotionanim death_head_flyforward
+		}
+		else
+		{
+			local.randnum = randomint 100
+			if (local.randnum > 80)
+			{
+				self setmotionanim death_headpistol
+			}
+			else if (local.randnum > 60)
+			{
+				self setmotionanim death_twist
+			}
+			else if (local.randnum > 40)
+			{
+				self setmotionanim death_shoot
+			}
+			else if (local.randnum > 20)
+			{
+				self setmotionanim death_fall_to_knees
+			}
+			else
+			{
+				self setmotionanim death_collapse
+			}
+		}
+		break
+
+	// Right arm - we could fudge it here so you can't kill someone by shooting them
+	// in the arm...
+	case 7: // right upper arm
+	case 11: // right lower arm
+	case 15: // right hand
+		//println "Fatal right arm shot"
+		local.randnum = randomint 100
+		if ( (local.yaw > 135) && (local.yaw < 225) && (local.randnum > 50) )
+		{
+			self setmotionanim death_twist
+		}
+		else
+		{
+			local.randnum = randomint 100
+			if (local.randnum > 70)
+			{
+				self setmotionanim death_fall_back
+			}
+			else if (local.randnum > 40)
+			{
+				self setmotionanim death_shoot
+			}
+			else
+			{
+				self setmotionanim death_chest
+			}
+		}
+		break
+
+	// Left  arm - we could fudge it here so you can't kill someone by shooting them
+	// in the arm...
+	case 8: // left upper arm
+	case 12: // left lower arm
+	case 16: // left hand
+		//println "Fatal left arm shot"
+		local.randnum = randomint 100
+		if ( (local.yaw > -45) && (local.yaw < 45) && (local.randnum > 50) )
+		{
+			self setmotionanim death_twist
+		}
+		else
+		{
+			local.randnum = randomint 100
+			if (local.randnum > 70)
+			{
+				self setmotionanim death_fall_back
+			}
+			else if (local.randnum > 40)
+			{
+				self setmotionanim death_shoot
+			}
+			else
+			{
+				self setmotionanim death_chest
+			}
+		}
+		break
+
+	// Right leg - we could fudge it here so you can't kill someone by shooting them
+	// in the leg...
+	case 9: // right upper leg
+	case 13: // right lower leg
+	case 17: // right foot
+		//println "Fatal right leg shot"
+		local.randnum = randomint 100
+		if ( (local.yaw > 135) && (local.yaw < 225) && (local.randnum > 50) )
+		{
+			self setmotionanim death_knockedup
+		}
+		else
+		{
+			if (local.randnum > 70)
+			{
+				self setmotionanim death_twist
+			}
+			else if (local.randnum > 40)
+			{
+				self setmotionanim death_shoot
+			}
+			else
+			{
+				self setmotionanim death_collapse
+			}
+		}
+		break
+
+	// Left leg - we could fudge it here so you can't kill someone by shooting them
+	// in the leg...
+	case 10: // left upper leg
+	case 14: // left lower leg
+	case 18: // left foot
+		//println "Fatal left leg shot"
+		local.randnum = randomint 100
+		if ( (local.yaw > 135) && (local.yaw < 225) && (local.randnum > 50) )
+		{
+			self setmotionanim death_knockedup
+		}
+		else
+		{
+			if (local.randnum > 70)
+			{
+				self setmotionanim death_fall_to_knees
+			}
+			else if (local.randnum > 40)
+			{
+				self setmotionanim death_shoot
+			}
+			else
+			{
+				self setmotionanim death_collapse
+			}
+		}
+		break
+
+	default:
+//println "Warning: Fatal Shot in unknown body part!  (Part " self.fact.location ")"
+		self setmotionanim death_chest
+		break
+	}
+}
+
+self waittill flaggedanimdone
+self.position = "dead"
+
+// Helmet popped off depending on where you got hit, not on some variable anymore.
+//if (self.losehelmet == true)
+//{
+//	// Ping the helmet off
+//	//println "ejecting helmet"
+//	self pophelmet
+//}
+
+end
+
+
+//---------------------------
+killed_chair:
+
+	// Facial animation/sound
+	self setsay death_generic	// Death facial animation/sound
+
+
+	// Pop off the helmet
+	if ( (self.fact.location == 0) || (self.fact.location == 1) )
+	{
+		self pophelmet
+	}
+
+	// Special death animation
+	if (self.deathanim != NIL)
+	{
+	//	println "Playing special death animation " self.deathanim
+		self setmotionanim self.deathanim
+		self waittill flaggedanimdone
+		end
+	}
+
+
+	// Play either death forward or backwards depending on the direction of the shot
+	local.yaw = self GetLocalYawFromVector self.fact.direction
+
+	if ( (local.yaw > 90) && (local.yaw < 270) )
+	{
+		self setmotionanim chair_death_forwards
+	}
+	else
+	{
+		self setmotionanim chair_death_backwards
+	}
+
+	self waittill flaggedanimdone
+	self.position = "dead"
+
+end

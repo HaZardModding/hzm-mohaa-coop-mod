@@ -1,0 +1,3572 @@
+//=========================================================================
+main:{ // MACKEY MAY HAVE BEEN HERE, YOU BE THE JUDGE
+//=========================================================================
+	level.coopPrevMap = "m1l1"			//chrissstrahl - set previouse map (for mom voteing)
+	level.coopNextMap = "m1l2b"			//chrissstrahl - set next map (for mom voteing)
+	level.coop_aaMap = 1				//chrissstrahl - let global scripts know this is a AA level
+	thread coop_mod/main.scr::main 	//chrissstrahl - start coop mod extensions
+	
+	exec global/spotlight.scr
+	exec global/cardgame.scr
+	exec global/loadout.scr maps/m1l2a.scr
+	exec global/exploder.scr
+	exec global/ai.scr
+	$introdoorL notsolid
+	$introdoorR notsolid
+	$introclip notsolid
+	//		$oldtruckclip notsolid
+	exec global/disc.scr $enddoor
+	exec global/disc.scr $ossdoor
+	exec global/disc.scr $doorB
+	exec global/disc.scr $doorA
+	exec global/disc.scr $left_gate
+	exec global/disc.scr $right_gate
+	//		$introclip delete	
+	$interchair notsolid
+
+	$lock notsolid
+	$pow_gun notsolid
+	//		exec global/disc.scr $ossdoorbar
+	$ossdoorbar notsolid
+	level waittill prespawn
+	exec global/ambient.scr m1l2a
+
+	$introdoorL solid
+	$introdoorR solid
+	$introclip solid
+	level.bombnum = 0
+	thread cacher
+
+	exec global/door_locked.scr
+	exec global/friendly.scr
+	/*
+
+	for (local.i=1;local.i<level.exploders;local.i++)
+	{
+	level.exploders[local.i] notsolid
+	level.explodersmasheds[local.i] notsolid
+	}
+	*/
+	level.friendly1.leashvalue = 450
+	level.friendly1 leash level.friendly1.leashvalue
+	level.friendly1 tether level.friendly1
+	level.friendly1.fixedleash = 1
+
+	level.friendly1 exec global/disable_ai.scr
+	level.friendly3 exec global/disable_ai.scr
+	level.friendly3 threatbias ignoreme
+	//		level.friendly3 german
+
+
+	// Initialize some initial stuff
+	level.friendly1 gun "none"
+
+	//chrissstrahl - make sure players don't kill him in coop
+	//chrissstrahl - add clip to prevent players from leaving the sas agent behind
+	if( level.gametype != 0){
+		level.friendly1 nodamage
+		//rescue jury
+		//exec coop_mod/replace.scr::spawnclip (1270 2220 100) ( -50 -50 0) (50 50 120) coop_clipExplosives 0.5 90 "You need to be accompanied by the SAS Agent, to continue here." level.friendly1 250
+		exec coop_mod/replace.scr::spawnclip (2205 3222 110) ( -50 -50 0) (50 50 120) coop_clipExplosives 0.5 90 "You need to be accompanied by the SAS Agent, to rescue the hostage." level.friendly1 250
+		//get explosives
+		exec coop_mod/replace.scr::spawnclip (1970 3200 -460) ( -50 -50 0) (50 50 120) coop_clipExplosives 0.7 90 "You need to be accompanied by the SAS Agent, to get explosives." level.friendly1 250
+	}
+	//end chrissstrahl
+
+	// Variables!
+	level.explosivecount = 0
+	level.oldtrucktime = -1
+	level.chatdistance = 500
+
+	// Flags!
+	level.flags[POW_damage] = 0
+	level.flags[truckride] = 0
+	level.flags[prisoner] = 0
+	level.flags[choice] = 0
+	level.flags[playerchoice] = -1
+	level.flags[door] = 0
+	level.flags[flak] = 0
+	level.flags[friendlyflak] = 0
+	level.flags[papers] = 0
+	level.flags[explosives] = 0
+	level.flags[choicechange] = -666
+	level.flags[sniper] = 1 // Took this out
+	level.flags[hostage] = 0
+	level.flags[botch] = 0 // Tried to follow truck in
+	level.flags[friendlyspoke] = 0
+	level.flags[notorture] = 0
+	// Hide Stuff!
+	$explosives100 hide
+	$explosives100 notsolid
+	$explosives101 hide
+	$explosives101 notsolid
+	$explosives102 hide
+	$explosives102 notsolid
+
+
+	$explosivespulse100 hide
+	$explosivespulse101 hide
+	$explosivespulse102 hide
+
+	$explosivespulse100 notsolid
+	$explosivespulse101 notsolid
+	$explosivespulse102 notsolid
+
+	level.debug = 1
+	level waittill spawn
+//	$lock.origin = $lock.origin + (0 0 4)
+	
+	if (getcvar(debug) == "1"){
+		local.o = $lock gettagposition "tag_pick"
+		local.ent = spawn script_model
+		local.ent model animal/cockroach.tik
+		local.ent.origin = local.o
+		local.ent scale 80
+		local.ent notsolid
+	}
+
+	thread explosivespulse
+	thread follow_the_friend
+	$flak88a_d hide
+	$flak88b_d hide
+//		$chairclip delete
+
+	println (game.skill + " is the game skill")
+
+
+//	$playersniper notsolid
+//	$health1 notsolid
+//	$health2 notsolid
+
+		$endtrigger thread endtrigger		
+
+		level.usedrange = 2
+
+		$sentry delete
+
+		exec coop_mod/replace.scr::tmstartloop "sound/music/mus_NorthAfrica_01a.mp3"//chrissstrahl - make compatible to coop
+
+		for (local.i=1;local.i<level.exploders;local.i++){
+			level.exploders[local.i] solid
+		}
+
+		$doorR time 1
+		$doorL time 1
+		$doorR thread rotateup 85
+		$doorL thread rotatedown 85
+
+		$introdoorL time 1
+		$introdoorL time 1
+		$introdoorL thread rotateup 85
+		$introdoorR thread rotatedown 85
+
+
+		thread objectives
+	//	$player thread playertoy
+
+		thread lockup 452 // 600
+
+		/*
+			level.gameskip = "mid-game"
+			level.gameskip = "endgame"
+			level.gameskip = "crossroads"
+			level.gameskip = "start"
+			level.gameskip = "lock"
+		*/
+
+		level.gameskip = "lock"
+		level.gameskip = getcvar(start)
+
+		if ((level.gameskip != "lock") && (level.gameskip != "midgame") && (level.gameskip != "endgame") && (level.gameskip != "mid-game") && (level.gameskip != "crossroads")){
+			level.gameskip = "start"
+		}
+
+//		if ((getcvar(debug) == "1") && (level.gameskip != "start"))
+		if (level.gameskip != "start"){
+			thread skip
+		}
+		else{
+			level.friendly2 remove
+		}
+		
+
+		if (isalive $spot2owned){
+			$spot2owned delete
+		}
+
+		thread spotlight
+
+		local.lasttime = level.time
+		for (local.i=1;local.i<level.spotlights+1;local.i++){
+			level.spotlight[local.i].spotter threatbias ignoreme
+		}
+		
+		//chrissstrahl - oh my god mackey why the hell would you do something like that ?
+		end
+
+		tempfr:
+
+		if (isalive level.friendly3){
+			if (level.time > local.lasttime + 5){
+				println ("Friendly3 is kickin it at " + level.time)
+				local.lasttime = level.time
+			}
+			waitframe
+			goto tempfr
+		}
+		println ("Friendly3 kicked it at " + level.time)
+}end
+
+//=========================================================================
+spotshow:{
+//=========================================================================
+// println "SPOTSHOW"
+
+	//chrissstrahl - we don't do this in mp
+	if( level.gametype != 0){
+		//iprintlnbold_noloc ( "not showing spotlights in mp" )
+		end
+	}
+	//end chrissstrahl
+
+	for (local.i=1;local.i<level.spotlights+1;local.i++){
+		if (isalive level.spotlight[local.i].spotter){
+			if (level.spotlight[local.i].flare){
+				level.spotlight[local.i].flare show
+			}
+
+			if ((level.spotlight[local.i].spotter) && (level.spotlight[local.i].spotter.health == 1)){
+				level.spotlight[local.i].spotter show
+				level.spotlight[local.i].spotter.visible = 1
+				level.spotlight[local.i].spotter solid
+				level.spotlight[local.i].spotter.gun show
+				level.spotlight[local.i].spotter.gun notsolid
+			}
+
+			if (level.spotlight[local.i].bulb){
+				level.spotlight[local.i].bulb show
+				level.spotlight[local.i].bulb notsolid
+			}
+
+			level.spotlight[local.i] show
+			level.spotlight[local.i] notsolid
+
+			if (level.spotdamage[local.i]){
+				level.spotdamage[local.i] takedamage
+			}
+		}
+		else{
+			println ("spottah health " + level.spotlight[local.i].spotter.health)
+		}
+	}
+}end
+
+//=========================================================================
+spothide:{
+//=========================================================================
+// println "SPOTHIDE"
+
+	//chrissstrahl - we don't do this in mp
+	if( level.gametype != 0){
+		//iprintlnbold_noloc ( "not hiding spotlights in mp" )
+		end
+	}
+	//end chrissstrahl
+
+	for (local.i=1;local.i<level.spotlights+1;local.i++){
+		if (level.spotlight[local.i].spotter){
+			if (level.spotlight[local.i].flare){
+				level.spotlight[local.i].flare hide
+			}
+
+			if ((isalive level.spotlight[local.i].spotter) && (level.spotlight[local.i].spotter.health == 1)){
+				level.spotlight[local.i].spotter.visible = 0
+				level.spotlight[local.i].spotter hide
+				level.spotlight[local.i].spotter notsolid
+				level.spotlight[local.i].spotter.gun hide
+				level.spotlight[local.i].spotter.gun notsolid
+			}
+
+			if (level.spotlight[local.i].bulb){
+				level.spotlight[local.i].bulb hide
+				level.spotlight[local.i].bulb notsolid
+			}
+
+			level.spotlight[local.i] hide
+			level.spotlight[local.i] notsolid
+
+			if (level.spotdamage[local.i]){
+				level.spotdamage[local.i] nodamage
+			}
+		}
+		else{
+			println level.spotlight[local.i].spotter.health
+		}
+	}
+}end
+
+
+//=========================================================================
+testprint local.o:{
+//=========================================================================
+	local.t = level.time + 4
+	while (local.t > level.time){
+		print3d local.o 2 "000"
+		waitframe
+	}
+}end
+
+//=========================================================================
+lookpast local.see:{
+//=========================================================================
+	thread global/friendly.scr::lookpast local.see
+}end
+
+//=========================================================================
+lookpastlow local.see:{
+//=========================================================================
+	thread global/friendly.scr::lookpastlow local.see
+}end
+
+//=========================================================================
+hint_door:{
+//=========================================================================
+	iprintlnbold "Press USE to open doors. If you cannot open the door, you will be able to hear the handle rattle."
+}end
+
+//=========================================================================
+getsniper:{
+//=========================================================================
+	if ($playersniper){
+		$playersniper delete
+		level.flags[sniper] = 1
+		$player take weapons/KAR98.tik
+		$player item weapons/springfield.tik
+
+		$player ammo rifle 1000
+		$player useweaponclass rifle
+	}
+}end
+
+//=========================================================================
+spotlight:{
+//=========================================================================
+	//chrissstrahl - this seams to handle the spot targets friendly and $player on this map
+	//chrissstrahl - decativated for testing - fixme removeme testing
+	end
+	println "wtf!!"
+	
+	local.i = 0
+	while (level.flags[hostage] == 0){
+		if (level.spotplayer[1] == 0){
+			if (isalive level.friendly1){
+				local.i++
+				if (local.i == 1){
+						level.spottarget = level.friendly1
+				}
+				else{
+					level.spottarget = $player
+					local.i = 0
+				}
+			}
+			else{
+				level.spottarget = $player
+			}
+		}
+
+		waitframe
+		if (getcvar(spottarget) == "1"){
+			println ("Target is " + level.spottarget.entref + " with name " + level.spottarget.targetname)
+		}
+	}
+	
+
+	while (isalive $player){
+		if (level.spotplayer[1] == 0){
+			local.i++
+			if (local.i == 1){
+				if (isalive level.friendly3){
+					level.spottarget = level.friendly3
+				}
+			}
+			else if (local.i == 2){
+				if (isalive level.friendly1){
+					level.spottarget = level.friendly1
+				}
+			}
+			else{
+				level.spottarget = $player
+				local.i = 0
+			}
+		}
+
+		waitframe
+		if (getcvar(spottarget) == "1"){
+			println ("Target is " + level.spottarget.entref + " with name " + level.spottarget.targetname)
+		}
+	}
+}end
+
+
+//=========================================================================
+objectives:{
+//=========================================================================
+	waitthread global/objectives.scr::add_objectives 1 2 "Find and rescue the SAS Agent." level.friendly1.origin
+//	waitthread global/objectives.scr::add_objectives 2 1 "Follow the SAS Agent." $osspapers.origin
+//	waitthread global/objectives.scr::add_objectives 3 1 "Steal explosives from the fortress." $explosive[1].origin
+//	waitthread global/objectives.scr::add_objectives 4 1 "Use explosives to escape." $explosives100.origin
+//	waitthread global/objectives.scr::add_objectives 5 1 "Use explosives to destroy a Flak88." $flak88b.origin
+
+	set_objective_pos level.friendly1.origin
+}end
+
+//=========================================================================
+follow_the_friend:{
+//=========================================================================
+	while (isalive level.friendly1){
+		set_objective_pos level.friendly1.origin
+		waitframe
+	}
+}end
+
+//=========================================================================
+newobjective:{
+//=========================================================================
+	end
+//=========================================================================
+
+	if (level.objectivethread){
+		level.objectivethread delete
+	}
+		
+	level.objectivethread = local
+		 
+	while (level.flags[papers] == 0){
+		set_objective_pos level.friendly1.origin
+		waitframe
+	}
+	
+	if (level.flags[explosives] == 0){
+		set_objective_pos $explosive[1].origin
+	}
+	else if (level.flags[door] == 0){
+		set_objective_pos $explosives100.origin
+	}
+	else if (level.flags[flak] == 0){
+		set_objective_pos $flak88b.origin
+	}
+	else{
+		while (isalive level.friendly1)
+		{
+			set_objective_pos level.friendly1.origin
+			waitframe
+		}
+	}
+}end
+
+//=========================================================================
+earlyalert:{
+//=========================================================================
+	if (level.flags[truckride] == 0){
+		exec global/ai.scr::spawn 110
+	}
+}end
+
+//=========================================================================
+killself:{
+//=========================================================================
+	wait 0.5
+	self damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+}end
+
+//=========================================================================
+skip:{
+//=========================================================================
+	level.friendly1 damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	level.friendly1 = level.friendly2
+	level.friendly1 exec global/enable_ai.scr
+
+	if (level.gameskip == "lock"){
+		$lock_enemy thread killself
+		
+		thread coop_mod/spawnlocations.scr::m1l2a_update1	//chrissstrahl - update spawnpoints for coop
+		
+		$player.origin = ( 5832 -2120 48 )
+		level.friendly1.origin = ( 5680 -2080 24 )
+		thread PUREfillused 100
+		level.flags[prisoner] = 1
+	}
+	else if (level.gameskip == "mid-game"){
+		$player.origin = ( 2876 -708 -80 )
+		level.friendly1.origin = ( 3028 -604 -112 )
+		thread PUREfillused 160
+		level.flags[prisoner] = 1
+	}
+	else if (level.gameskip == "midgame"){
+		$player.origin = (1488 3784 -64)
+		thread PUREfillused 420
+		level.flags[prisoner] = 1
+		level.explosivecount = 20
+	}
+	else if (level.gameskip == "endgame"){
+		level.flags[papers] = 1
+		level.flags[door] = 1
+		level.flags[prisoner] = 1
+	
+		$player.origin = ( -197 -1126 -22)
+		level.friendly1.origin = (89 -979 -42)
+
+		for (local.i=1;local.i<level.friendlynodes+1;local.i++)
+		if (level.friendlynode[local.i].set < 700)
+			level.friendlyused[local.i] = 1
+			else
+			level.friendlyused[local.i] = 0
+
+		level.explosivecount = 10
+
+	}
+	else if (level.gameskip == "earlygame"){
+		level.flags[prisoner] = 1
+	
+		$player.origin = ( 4252 -68 -160)
+		level.friendly1.origin = (5180 -348 -64)
+
+		thread clearused
+
+		thread PUREfillused 140
+	}
+	else if (level.gameskip == "crossroads"){
+		$player.origin = ( 1696 4088 -184 )
+		level.friendly1.origin = ( 1760 4024 -184 )
+
+		level.flags[prisoner] = 1
+		level.flags[explosives] = 1
+		thread explosivespulse
+
+		level.flags[papers] = 1
+		level.explosivecount++
+		level.explosivecount++
+		level.explosivecount++
+		level.explosivecount++
+		level.explosivecount++
+		level.explosivecount++
+		
+		thread clearused
+		thread PUREfillused 460
+	}
+	wait 1
+
+	thread setupfriendly
+	level.friendly1 thread global/friendly.scr::friendlythink
+	level.friendly1 gun "MP40"
+}end
+
+explosivespulse:
+	if ($explosivespulse100 != NIL)
+		$explosivespulse100 show
+
+	if ($explosivespulse101 != NIL)
+		$explosivespulse101 show
+
+	if ($explosivespulse102 != NIL)
+		$explosivespulse102 show
+end
+
+cacher:
+	spawn human/German_afrika_private "targetname" "cacher" "origin" "0 0 -2000"
+	$cacher damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+
+	spawn human/allied_oss_man_m1 "targetname" "cacher" "origin" "0 0 -2000"
+	$cacher damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+
+	spawn human/1st-ranger_private_prisoner "targetname" "cacher" "origin" "0 0 -2000"
+	$cacher damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+end
+ 
+use_gate:
+end
+	println used_door
+	$left_gate time 0.8
+	$right_gate time 0.9
+	$left_gate thread rotateup 85
+	$right_gate waitthread rotatedown 85
+	$left_gate connect_paths
+	$right_gate connect_paths
+end
+
+
+
+osslife:
+	self waittill death
+	iprintlnbold "Major Grillo has been killed in action."
+	iprintlnbold "The SAS Agent was killed. You failed the mission."
+//	fadeout 3 0 0 0 1
+	wait 3
+	missionfailed
+end
+
+setupfriendly:
+
+	level.friendly1.turndoneerror = 90
+	level.friendly1.oldsight = level.friendly1.sight
+	level.friendly1.oldhearing = level.friendly1.hearing
+	level.friendly1.leashvalue = 450
+	level.friendly1.noticescale = 1
+	level.friendly1.fov = 360
+	level.friendly1.friendtype = 4
+	level.friendly1.health = 750
+	level.friendly1.distance = 250
+	level.friendly1 accuracy 100
+	level.friendly1 mindist 16
+	level.friendly1 maxdist 1024
+	level.friendly1 type_attack "turret"
+	level.friendly1.sight = 384
+	level.friendly1.hearing = 1
+	//level.friendly1 lookat $player	//chrissstrahl
+	level.friendly1 lookat NULL			//chrissstrahl - made coop compatible
+	level.friendly1.waittime = 0.5
+end
+
+//=========================================================================
+killgrillo:{
+//=========================================================================
+	local.maxdist	= 3000
+	if(level.gametype != 0){ local.maxdist = 1000 }	//chrissstrahl - make sure players stick close in coop
+
+	while (isalive level.friendly1){
+		//if ((!(sighttrace ($player.origin + (0 0 50)) (level.friendly1.origin + (0 0 50)) 1)) && (vector_length ($player.origin - level.friendly1.origin) > 3000)){
+		if (	((exec coop_mod/replace.scr::sighttrace (0 0 50) (level.friendly1.origin + (0 0 50)) 1) != 1) && 	//chrissstrahl - made coop compatible
+				((exec coop_mod/replace.scr::withinDistanceOf level.friendly1 local.maxdist) != 1))					//chrissstrahl - made coop compatible
+		{
+			if (getcvar(debug) != "1")
+			{
+				//chrissstrahl - we don't want him to die in coop (perhaps on hard settings or something later on)
+				if(level.gametype != 0){
+					while( (exec coop_mod/replace.scr::player_numActive) < 1 ){
+						wait 5
+					}
+					iprintlnbold( "Follow the SAS Agent." )
+					wait 20
+					continue
+				}
+				//end chrissstrahl
+				
+				if (isalive level.friendly1){
+					level.friendly1 damage $world 3500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+				}
+			}
+			else{
+				println "GRILLO WOULD HAVE DIED"
+			}
+		}
+		wait 3
+	}
+}end
+
+//=========================================================================
+ossdoor:{
+//=========================================================================
+	thread mom/mom.scr::setup "coop_mod/mom_actions.scr" 0.1 "coop_mom" //chrissstrahl - set coop mod specific mom file
+	
+	if (getcvar(debug) == "1" || level.gametype != 0){//chrissstrahl - make sure the mission does not fail so fast
+		level.friendly1 nodamage
+	}
+//	println (level.spottime["spot1_1"])
+//	self delete
+
+	level.friendly1 exec global/disable_ai.scr
+	thread killgrillo
+
+	//$player threatbias -500					//chrissstrahl
+	exec coop_mod/replace.scr::threatbias -500	//chrissstrahl - made coop compatible
+	level.friendly1 threatbias 5000
+	level.friendly1.health = 1
+	level.friendly1 thread osslife
+
+	$ossdoor dmg 0	
+	$ossdoor playsound door_vault_open
+	$ossdoorbar time 1
+	$ossdoorbar rotatexdown 90
+	$ossdoorbar waitmove
+	wait 0.3
+	$ossdoor time 1
+	$ossdoor rotateydown 80
+	$ossdoor waitmove
+	$ossdoor connect_paths
+//	$ossdoorbar connect_paths
+//	wait 0.8
+
+	waitthread global/objectives.scr::add_objectives 1 3 "Find and rescue the SAS Agent." level.friendly1.origin
+	waitthread global/objectives.scr::add_objectives 2 2 "Follow the SAS Agent." $osspapers.origin //  and recapture OSS documents." 
+//	waitthread global/objectives.scr::add_objectives 3 2 "Steal explosives from the fortress." $explosive[1].origin
+//	waitthread global/objectives.scr::add_objectives 4 1 "Use explosives to escape." $explosives100.origin
+//	waitthread global/objectives.scr::add_objectives 5 1 "Use explosives to destroy a Flak88." $flak88b.origin
+	waitthread global/objectives.scr::current_objectives 2
+
+	level.flags[prisoner] = 1
+	thread newobjective
+
+
+
+	$introdoorL time 1
+	$introdoorL time 1
+	$introdoorL thread rotateup 85
+	$introdoorR thread rotatedown 85
+	$introclip connect_paths
+	$introclip delete
+
+	wait 0.3
+	level.friendly1 exec coop_mod/replace.scr::lookat //chrissstrahl - made coop compatible
+	wait 0.5
+	level.friendly1 exec coop_mod/replace.scr::lookat //chrissstrahl - made coop compatible - look again maybe players have moved
+	level.friendly1 exec coop_mod/replace.scr::turnto //chrissstrahl - made coop compatible
+	
+	level.friendly1 waittill turndone
+	level.friendly1 say dfr_m1l2_111m_1 // How did you find me?
+	level.friendly1 waittill saydone
+	level.friendly1 turnto NULL
+
+
+	level.friendly1 thread lookpastlow $oss_looks_here
+	level.friendly1 runto $oss_looks_here
+	level.friendly1 waittill movedone
+
+	level.friendly1 thread lookpastlow $ossgunspot
+	wait 0.45
+	level.friendly1 runto $ossgunspot
+//	level.friendly1 thread lookpast $ossgunspot
+	level.friendly1.movedoneradius = 50
+	level.friendly1 waittill movedone
+
+
+
+	if (getcvar(debug) == "1")
+		println ("# of guns left: " + $ossgun.size)
+	if ($ossgun.size == 1)
+	{
+		level.friendly1 thread lookpast $ossgun
+		level.friendly1 turnto $ossgun
+		level.friendly1 upperanim pickup_obj
+		wait 0.33
+		level.friendly1 playsound mp40_snd_pickup
+		level.friendly1 gun "MP40"
+		$ossgun delete
+		level.friendly1 turnto NULL
+	}
+	else
+	{
+		level.friendly1.no_idle = 1
+		level.friendly1 thread lookpast $ossgun[2]
+		level.friendly1 turnto $ossgun[2]
+		level.friendly1 upperanim pickup_obj
+		level.friendly1 turnto NULL
+		wait 0.33
+		level.friendly1 gun "MP40"
+		$ossgun[2] hide
+		level.friendly1 playsound mp40_snd_pickup
+	}
+
+		thread setupfriendly
+		level.friendly1 exec global/enable_ai.scr
+		level.friendly1.no_idle = 0
+		level.friendly1 threatbias 0
+		exec coop_mod/replace.scr::threatbias 0
+
+	level.friendly1 thread friendlyspeak
+	level.friendly1 thread global/friendly.scr::friendlythink
+
+	if (level.gametype != 0 || ($player cansee level.friendly1) || (level.friendly1 cansee $player)){//chrissstrahl spawn them in coop anyway
+		exec global/ai.scr::spawn 113
+	}
+}end
+
+
+
+//=========================================================================
+friendlyspeak:{
+//=========================================================================
+	wait 3
+	//local.dist = 250 //chrissstrahl
+	local.dist = 150 //chrissstrahl - keep it teight
+	local.baseint = 3
+	local.random = 3
+
+	if (level.flags[friendlyspoke] == 1){
+		end
+	}
+
+	//while ((vector_length (self.origin - $player.origin) > local.dist) || (self.thinkstate != "idle"))		//chrissstrahl
+	while ( (exec coop_mod/replace.scr::withinDistanceOf self local.dist) != 1 || (self.thinkstate != "idle")){	//chrissstrahl - if no valid player is within given distance
+		wait 0.1
+	}
+
+
+	if (level.flags[friendlyspoke] == 1){
+		end
+	}
+
+	self say dfr_m1l2_add01 // Stick close to me at all times
+	self waittill saydone
+	wait (local.baseint + randomint (local.random))
+
+
+	//while ((vector_length (self.origin - $player.origin) > local.dist) || (self.thinkstate != "idle")){		//chrissstrahl
+	while ((exec coop_mod/replace.scr::withinDistanceOf self local.dist) != 1 || (self.thinkstate != "idle")){	//chrissstrahl - if no valid player is within given distance
+		wait 0.1
+	}
+
+	if (level.flags[friendlyspoke] == 1){
+		end
+	}
+
+	self say dfr_m1l2_112m_2 // Well, there's no time to lose
+	self waittill saydone
+	wait (local.baseint + randomint (local.random))
+}end
+
+
+//=========================================================================
+getossgun:{
+//=========================================================================
+	$ossgun[1] delete
+	
+	//chrissstrahl - give ammo to all players
+	if( level.gametype == 0 ){
+		$player item weapons/MP40.tik
+		$player useweaponclass smg
+	}
+	exec coop_mod/replace.scr::ammo smg 100 mp40_snd_pickup //chrissstrahl - made coop compatible
+}end
+
+
+prisonertruck:
+	exec global/spotlight.scr::corona $truck "light left" 
+	exec global/spotlight.scr::corona $truck "light right"
+
+
+	if ($truck.target)
+		$truck setcollisionentity $latertruck.target
+
+	$latertruck immune grenade
+	$latertruck immune bullet
+	$latertruck immune fast_bullet
+	$latertruck immune explosion
+	$latertruck immune rocket
+
+	$truck immune grenade
+	$truck immune bullet
+	$truck immune fast_bullet
+	$truck immune explosion
+	$truck immune rocket
+
+
+	local.angles = $truck.angles
+	local.angles[1] = 180
+	$truck.angles = local.angles
+
+
+	level.bombnum++
+	local.num = level.bombnum + 3110
+	local.num2 = local.num
+//	local.tempnum = 270
+	local.tempnum = 0
+
+	local.origin = $truck gettagposition "passenger7"
+	local.angles = $truck gettagangles "passenger7"
+	local.angles = $truck.angles
+	local.angles[1] += local.tempnum
+
+	spawn human/1st-ranger_private_prisoner.tik "targetname" ("prisoner" + local.num)
+
+	$("prisoner" + local.num) german
+	$("prisoner" + local.num).no_idle = 1
+	$("prisoner" + local.num).origin = local.origin
+	$("prisoner" + local.num).angles = local.angles
+	$("prisoner" + local.num) exec global/disable_ai.scr
+	$("prisoner" + local.num) notsolid
+	$("prisoner" + local.num) gun "none"
+	$("prisoner" + local.num) anim_noclip "prisoner_1"
+
+	local.prisoner1 = $("prisoner" + local.num)
+
+	level.bombnum++
+	local.num = level.bombnum + 3110
+
+	local.origin = $truck gettagposition "passenger8"
+	local.angles = $truck gettagangles "passenger8"
+	local.angles = $truck.angles
+	local.angles[1] += local.tempnum
+
+	spawn human/1st-ranger_private_prisoner.tik "targetname" ("prisoner" + local.num)
+	$("prisoner" + local.num) german
+	$("prisoner" + local.num).no_idle = 1
+	$("prisoner" + local.num).origin = local.origin
+	$("prisoner" + local.num).angles = local.angles
+	$("prisoner" + local.num) exec global/disable_ai.scr
+	$("prisoner" + local.num) notsolid
+	$("prisoner" + local.num) gun "none"
+	$("prisoner" + local.num) anim_noclip "prisoner_2"
+
+	local.prisoner2 = $("prisoner" + local.num)
+
+	local.prisoner2 playsound prisoner
+
+
+
+
+	level.bombnum++
+	local.num = level.bombnum + 3110
+
+	local.origin = $truck gettagposition "tag_guard_1"
+	local.angles = $truck gettagangles "tag_guard_1"
+	local.angles = $truck.angles
+	local.angles[1] += local.tempnum
+
+	spawn human/German_afrika_private.tik "targetname" ("guard" + local.num)
+	$("guard" + local.num) german
+	$("guard" + local.num).no_idle = 1
+	$("guard" + local.num).origin = local.origin
+	$("guard" + local.num).angles = local.angles
+	$("guard" + local.num) exec global/disable_ai.scr
+	$("guard" + local.num) notsolid
+	$("guard" + local.num) anim_scripted "guard_1"
+	$("guard" + local.num) thread awaken
+
+
+
+
+	level.bombnum++
+	local.num = level.bombnum + 3110
+
+	local.origin = $truck gettagposition "tag_guard_1"
+	local.angles = $truck gettagangles "tag_guard_1"
+	local.angles = $truck.angles
+	local.angles[1] += local.tempnum
+
+	spawn human/German_afrika_private.tik "targetname" ("guard" + local.num)
+	$("guard" + local.num) german
+	$("guard" + local.num).origin = local.origin
+	$("guard" + local.num).angles = local.angles
+	local.guard2 = $("guard" + local.num) 
+
+	$truck AttachPassengerSlot 6 local.guard2
+
+//	$truck AttachPassengerSlot 2 local.prisoner1
+//	$truck AttachPassengerSlot 3 local.prisoner2
+
+
+
+//	$("prisoner" + local.num) bind $truck
+
+//	$("prisoner" + local.num2) waittill animdone
+	wait 6.5
+
+	$truck AttachPassengerSlot 9 local.prisoner1
+	$truck AttachPassengerSlot 10 local.prisoner2
+
+//	local.prisoner1 thread showorg	
+
+
+
+	if (getcvar(debug) == "1")
+		println "**** driving"
+	$truck drive $truckpath1 160 60 40 128 // ideal speed, accelleration/deceleration, close to nodes,  lookahead
+	wait 12
+	$introdoorL time 1
+	$introdoorR time 1
+	$introdoorL thread rotatedown 85
+	$introdoorR thread rotateup 85
+	level.flags[truckride] = 1
+
+	println "TRUCK IS GOING"
+	$truck waitTill drive
+	println "TRUCK IS STOPPING"
+	$truck fullstop
+	println "TRUCK IS STOPPED"	
+
+	local.prisoner1 thread coop_damageMe	//chrissstrahl - made coop compatible - might get killed at the start by a player
+	local.prisoner2 thread coop_damageMe	//chrissstrahl - made coop compatible - might get killed at the start by a player
+	local.guard2 thread coop_damageMe		//chrissstrahl - made coop compatible - might get killed at the start by a player
+	wait 3
+
+	$truck damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+
+	$doorR time 1
+	$doorL time 1
+	$doorR thread rotatedown 85
+	$doorL thread rotateup 85
+end
+
+
+
+rotatedown local.amount:
+	self rotateydown local.amount
+	self waitmove
+end
+
+rotateup local.amount:
+	self rotateyup local.amount
+	self waitmove
+end
+
+
+
+awaken:
+	wait 3
+	self.no_idle = 0
+	self anim "idle"
+//	self waittill animdone
+	if (getcvar(debug) == "1")
+		println "awaken"
+	self solid
+	self exec global/enable_ai.scr
+	self type_attack "turret"
+	self walkto $guardstand
+
+	if !(level.flags[earlyenemies])
+	{
+		level.flags[earlyenemies] = 1
+		wait 1
+		$earlyenemies1 thread earlyrest
+		wait 2
+		$earlyenemies2 thread earlyrest
+	}
+	
+	self waittill movedone
+
+	//if !(sighttrace (self.origin + (0 0 35)) ($player.origin + (0 0 35)) 1){			//chrissstrahl
+	if !(exec coop_mod/replace.scr::sighttrace (0 0 35) (self.origin + (0 0 35)) 1){	//chrissstrahl - made coop compatible
+		self delete
+	}
+	else{
+		println ("I can see the player")
+	}
+end
+
+//=========================================================================
+earlyrest:{
+//=========================================================================
+	self walkto $ossgunspot
+	self waittill movedone
+	//if ((parm.movedone == 1) && (self.thinkstate == "idle") && !(self cansee $player)){					//chrissstrahl
+	if ((parm.movedone == 1) && (self.thinkstate == "idle") && !(self exec coop_mod/replace.scr::cansee)){	//chrissstrahl - made coop compatible
+		self remove
+	}
+}end
+
+//=========================================================================
+showorg:{
+//=========================================================================
+	if (getcvar(debug) == "1"){
+		println (self + "'s origin is " + self.origin)
+	}
+	wait 0.5
+	thread showorg
+}end
+
+
+spawnguy local.start local.path:
+
+	level.bombnum++
+	local.num = level.bombnum + 3110
+			spawn human/German_afrika_private "targetname" ("spawnedguy" + local.num)
+
+			$("spawnedguy" + local.num) model "human/German_afrika_private.tik"
+
+			if (randomint(100) > 65)
+			$("spawnedguy" + local.num) type_attack "cover" // was turret
+			else
+			$("spawnedguy" + local.num) type_attack "turret" // was turret
+
+
+			$("spawnedguy" + local.num) forceactivate
+			$("spawnedguy" + local.num) ammo_grenade (randomint(2))
+			
+//			if (randomint(100) > 70)
+//			$("spawnedguy" + local.num) item items/item_50_healthbox.tik 50
+
+
+			$("spawnedguy" + local.num) type_disguise "salute"
+			$("spawnedguy" + local.num) type_grenade "grenade"
+			$("spawnedguy" + local.num) type_idle "patrol"
+
+			$("spawnedguy" + local.num) sight 2000
+
+
+//			$("spawnedguy" + local.num) weapon models/weapons/KAR98.tik
+			$("spawnedguy" + local.num) useweaponclass rifle
+
+			local.dist = randomint(400)
+			$("spawnedguy" + local.num) mindist local.dist
+			local.dist = local.dist + randomint(400)
+			$("spawnedguy" + local.num) maxdist local.dist
+
+					$("spawnedguy" + local.num) exec global/enable_ai.scr
+
+
+					$("spawnedguy" + local.num).origin = local.start.origin
+					$("spawnedguy" + local.num) patrolpath local.path
+end
+
+//=========================================================================
+restartai:{
+//=========================================================================
+	iprintlnbold_noloc ( "this was disabled by chrissstrahl" ) //chrissstrahl - reason: because!
+	end//chrissstrahl
+	
+	local.health = self.health
+	local.playerhealth = $player.health
+	while (	(local.health == self.health) &&
+			($player.health == local.playerhealth) &&
+			(level.spotplayer[1] == 0) &&
+			(level.spotlight[1].spotterdeath == 0) &&
+			(level.spotlight[2].spotterdeath == 0) &&
+			(level.spotlight[3].spotterdeath == 0))
+	{
+		wait 0.15
+	}
+
+	thread PUREfillused 370
+
+	self.friendtype = 4
+	println "RESTARTED THE AI"
+	self exec global/enable_ai.scr
+}end
+
+//=========================================================================
+gethealth local.string local.amount:{
+//=========================================================================
+	self.friendtype = -1
+	if ($(local.string).size == 1){
+		self turnto $(local.string)
+		wait 0.5
+		self upperanim pickup_obj
+		wait 0.33
+
+		level.friendly1 playsound med_kit
+		if $(local.string)
+			$(local.string) remove
+			
+		self.health = local.amount
+	}
+	else if ($(local.string).size == 2){
+		self turnto $(local.string)[2]
+		wait 0.5
+		self upperanim pickup_obj
+		wait 0.33
+
+		level.friendly1 playsound med_kit
+
+		if $(local.string)[2]
+		$(local.string)[2] remove
+		self.health = local.amount
+	}
+	self.friendtype = 4
+}end
+
+flagthread-1:
+//	if (self.restartthread)
+//		self.restartthread delete
+
+//	thread fillused 370
+
+	self sight self.oldsight
+	self sight self.oldhearing
+
+	self.friendtype = 4
+	wait 5
+	self exec global/enable_ai.scr
+	
+
+end
+
+flagthread0:
+//	local.ent = spawn script_origin
+//	local.ent.origin = self.origin
+//	self tether local.ent
+//	self leash 0
+//	self.oldsight = self.sight
+//	self.oldhearing = self.hearing
+//	self sight 64
+//	self hearing 64
+	self.friendtype = -1
+
+//	self exec global/disable_ai.scr
+
+	while (self.thinkstate != "idle")
+		waitframe
+
+	self thread lookpast $latertruck
+
+	if ((thread checkspotlights != 1) && (level.spotplayer[1] != 1))
+	//if (vector_length (self.origin - $player.origin) < level.chatdistance) //chrissstrahl
+	if (exec coop_mod/replace.scr::withinDistanceOf self level.chatdistance){ //chrissstrahl - coop compatible //[200] chrissstrahl - fixed bad type parameter 1
+		self turnto level.spotlight[1]
+		self say dfr_m1l2_add03 // Normally we would shoot.. Don't shoot them out, that would just alert the guards.
+		self lookat level.spotlight[1]
+		self waittill saydone
+	}
+
+//	thread restartai
+//	self.restartthread = parm.previousthread
+
+	while ((level.time < level.oldtrucktime) || (level.oldtrucktime == -1))
+	{
+//		if (getcvar(debug) == "1")
+			println ("level.time is " + level.time + " and oldtrucktime is " + level.oldtrucktime)
+		wait 0.25
+	}
+	wait 3
+
+	
+	self.friendtype = 4
+	self exec coop_mod/replace.scr::lookat //chrissstrahl - coop mod compatible
+//	self tether $player
+//	self leash self.leashvalue
+
+//	wait 3
+//	self exec global/enable_ai.scr
+//	local.ent delete
+
+
+end
+
+//=========================================================================
+canteen:{
+//=========================================================================
+	while (self.thinkstate == "attack"){
+		waitframe
+	}
+	local.friendtype = self.friendtype
+	self.friendtype = -1
+	
+	self exec coop_mod/replace.scr::holster //chrissstrahl - fix holster bug
+	wait 1
+	self lookat NULL
+	self nodamage
+	self upperanim pass_canteen_drink
+	self waittill upperanimdone
+	if (getcvar(debug) != "1" ){
+		if( level.gametype == 0 || level.gametype != 0 && self != level.friendly1 ){//chrissstrahl - prevent the SAS AGENT from getting killed in coop
+			self takedamage
+		}
+	}
+	if (self.health < self.maxhealth * 0.75){
+		self.health = self.maxhealth
+	}
+	self.friendtype = local.friendtype
+	self exec coop_mod/replace.scr::unholster //chrissstrahl - fix holster bug
+}end
+
+checkspotlights:
+	if (level.spotlight[1].spotterdeath == 1)
+		end 1
+	if (level.spotlight[2].spotterdeath == 1)
+		end 1
+	if (level.spotlight[3].spotterdeath == 1)
+		end 1
+
+end -1
+
+flagthread1:
+
+	for (local.i=1;local.i<level.spotlights+1;local.i++)
+		if ((level.spotlight[local.i].set == 1) && (level.spotlight[local.i].group == 1))
+			local.spotlight = level.spotlight[local.i]
+
+	if ((thread checkspotlights == 1) || (level.spotplayer[1] == 1))
+	{
+		self say dfr_m1l2_add04  // Great, well we might as well just go in the front door now.
+		thread PUREfillused 330
+//		thread flagthread-1
+		end
+	}
+	println "01"
+	self.friendtype = -1
+	self.avoidplayer = 0
+
+	if ((thread checkspotlights == 1) || (level.spotplayer[1] == 1))
+	{
+		self say dfr_m1l2_add04  // Great, well we might as well just go in the front door now.
+		thread PUREfillused 330
+		self.friendtype = 4
+		self.avoidplayer = 1
+		end
+	}
+	
+
+
+	if ((thread checkspotlights == 1) || (level.spotplayer[1] == 1))
+	{
+		self say dfr_m1l2_add04  // Great, well we might as well just go in the front door now.
+		thread PUREfillused 330
+		self.friendtype = 4
+		self.avoidplayer = 1
+		end
+	}
+
+	self exec coop_mod/replace.scr::turnto //chrissstrahl - coop
+	self exec coop_mod/replace.scr::lookat //chrissstrahl - coop
+
+	
+	//if (vector_length (self.origin - $player.origin) < level.chatdistance) //chrissstrahl
+	if (exec coop_mod/replace.scr::withinDistanceOf self level.chatdistance){ //chrissstrahl - coop compatible //[200] chrissstrahl - fixed bad type parameter 1
+		println "02a"
+		self say dfr_m1l2_118m_1 // I'll show you how to avoid the spotlights.
+//		wait 4
+		self waittill saydone
+		println "02a2"
+	}
+
+	waitthread canteen
+	println "02"
+
+		
+	self turnto local.spotlight
+	self lookat local.spotlight.currentaim
+	while ((level.spottime["spot1_1"] == NIL) && (thread checkspotlights != 1) )
+	{	
+		println "02b"
+		waitframe
+	}
+
+	println "03"
+
+	if ((thread checkspotlights == 1) || (level.spotplayer[1] == 1))
+	{
+		self say dfr_m1l2_add04  // Great, well we might as well just go in the front door now.
+		thread PUREfillused 330
+		self.friendtype = 4
+		self.avoidplayer = 1
+		end
+	}
+
+	while ((level.spottime["spot1_1"] < level.time - 0.05) && (thread checkspotlights != 1))
+		waitframe
+	println "04"
+
+
+	if ((thread checkspotlights == 1) || (level.spotplayer[1] == 1))
+	{
+		self say dfr_m1l2_add04  // Great, well we might as well just go in the front door now.
+		thread PUREfillused 330
+		self.friendtype = 4
+		self.avoidplayer = 1
+		end
+	}
+	if !(isalive self)
+		end
+
+	local.node = -1
+
+	for (local.i=1;local.i<level.friendlynodes+1;local.i++)
+		if (level.friendlynode[local.i].set == 250)
+			local.node = level.friendlynode[local.i]
+
+	println "05"
+	self lookat local.spotlight
+
+	self runto local.node
+	self waittill movedone
+
+	if ((thread checkspotlights == 1) || (level.spotplayer[1] == 1))
+	{
+		self say dfr_m1l2_add04  // Great, well we might as well just go in the front door now.
+		thread PUREfillused 330
+		self.friendtype = 4
+		self.avoidplayer = 1
+		end
+	}
+
+	local.node.flag = NIL
+
+//	centerprint "Am I a pretty ballerina?"
+
+	if !(isalive self)
+		end
+
+	println "06"
+
+	local.node = -1
+
+	for (local.i=1;local.i<level.friendlynodes+1;local.i++)
+		if (level.friendlynode[local.i].set == 260)
+			local.node = level.friendlynode[local.i]
+
+	println "07"
+
+	self lookat local.spotlight.currentaim
+	wait 5.5 // was 4.5
+	if !(isalive self)
+		end
+
+
+	if ((thread checkspotlights == 1) || (level.spotplayer[1] == 1))
+	{
+		self say dfr_m1l2_add04  // Great, well we might as well just go in the front door now.
+		thread PUREfillused 330
+		self.friendtype = 4
+		self.avoidplayer = 1
+		end
+	}
+
+	self lookat local.spotlight
+	self runto local.node
+	thread fillused 260
+	self waittill movedone
+
+
+	if ((thread checkspotlights == 1) || (level.spotplayer[1] == 1))
+	{
+		self say dfr_m1l2_add04  // Great, well we might as well just go in the front door now.
+		thread PUREfillused 330
+		self.friendtype = 4
+		self.avoidplayer = 1
+		end
+	}
+
+	println "08"
+
+	self.friendtype = 4
+	self.avoidplayer = 1
+
+end
+
+flagthread2:
+end
+
+flagthread3:
+	self.friendtype = -1
+//	while (self cansee $player) && (vector_length (self.origin - $player.origin) > 
+//		wait 1
+
+		wait 1
+
+		wait 0.25
+	self.friendtype = 4
+end
+
+flagthread4:
+end
+
+flagthread5:
+	self.friendtype = -1
+
+		self lookat $friendlyexplosive
+		wait 0.25
+		self say dfr_m1l2_134m_4 // Ah good here are the explosives
+		self waittill saydone
+		self turnto $friendlyexplosive
+		self waittill turndone
+		$friendlyexplosive playsound pickup_explosives	
+		$friendlyexplosive hide
+		wait 0.5
+		self turnto NULL
+
+		self.friendtype = 4
+//		self.destination = $player
+//		self.distance = 250
+
+
+
+end
+
+flagthread13:
+	self.friendtype = -1
+
+	thread clearused
+	thread lockup 600
+	thread lockdown 452
+
+	if (level.explosivecount < 2)
+		self say dfr_m1l2_add06 // Get the explosives.
+
+		while (level.explosivecount < 2)
+			wait 1
+
+		self say dfr_m1l2_add07 // Let's go!
+
+//	centerprint "now let's get out of here!"
+
+//		waitthread global/objectives.scr::add_objectives 5 2 "Use explosives to destroy a Flak88" $flak88b.origin
+
+		self.friendtype = 4
+//		self.destination = $player
+//		self.distance = 250
+
+
+
+end
+
+printused local.num:
+	for (local.i=1;local.i<level.friendlynodes+1;local.i++)
+		if (level.friendlynode[local.i].set == local.num)
+			println ("USED for friendlynode with set " + local.num + " is " + level.friendlyused[local.i])
+end
+
+flagthread6:
+//	self.friendtype = 1
+//	level.flags[playerchoice] = 0
+	if (level.flags[playerchoice] == -1)
+	
+	
+	//if (vector_length (self.origin - $player.origin) > 800) //chrissstrahl
+	if !(exec coop_mod/replace.scr::withinDistanceOf self 800){ //chrissstrahl - coop compatible //[200] chrissstrahl - fixed bad type parameter 1
+		level.flags[playerchoice] = 2
+		println "distance chose 2"
+	}
+
+//	self.friendtype = -1
+	thread clearused
+	thread CROSSfillused 600
+
+	thread printused 565
+
+	if (getcvar(debug) == "1")
+	println ("========= playerchoice is " + level.flags[playerchoice])
+	
+	while (level.flags[playerchoice] == -1){
+		waitframe
+	}
+
+
+	thread CROSSclearused
+
+	if (level.flags[playerchoice] == 1){
+			thread fillused 490
+			println "playerchoice 1 is a go"
+	//		self.friendtype = -1
+	//		wait 0.25
+	//		self thread runtoset 490
+	//		self waittill movedone
+	//		self.friendtype = 4
+	}
+	else{
+			thread CROSSfillused 610 // was 610 // was 565
+			println "playerchoice 2 is a go"
+//			self.friendtype = 4
+	}
+
+end
+
+papersthread:
+end
+
+	iprintlnbold_noloc("DEV: papersthread this is bad")//chrissstrahl - test - removeme
+	iprintlnbold_noloc("DEV: papersthread this is bad")
+	iprintlnbold_noloc("DEV: papersthread this is bad")
+	iprintlnbold_noloc("DEV: papersthread this is bad")
+	if (level.flags[papers] == 0)
+	{
+		$osspapers playsound pickup_papers
+		$osspapers hide
+		level.flags[papers] = 1
+
+		waitthread global/objectives.scr::add_objectives 2 3 "Follow the SAS Agent." $osspapers.origin
+
+		if (level.flags[explosives] == 0){
+			//while ((vector_length (level.friendly1.origin - $player.origin) > 300) || (level.friendly1.thinkstate != "idle") && (level.flags[explosives] == 0)){ //chrissstrahl
+			while (!(exec coop_mod/replace.scr::withinDistanceOf self 300) || (level.friendly1.thinkstate != "idle") && (level.flags[explosives] == 0)){ //chrissstrahl - coop //[200] chrissstrahl - fixed bad type parameter 1
+				wait 0.1
+			}
+		}
+
+		if (level.flags[explosives] == 0){
+//			waitthread global/objectives.scr::add_objectives 2 3 "Follow the SAS Agent." $osspapers.origin
+//			waitthread global/objectives.scr::add_objectives 3 2 "Steal explosives from the fortress" $explosive[1].origin
+			waitthread global/objectives.scr::current_objectives 3
+		//	waitthread global/objectives.scr::add_objectives 4 1 "Use explosives to escape" $explosives100.origin
+		//	waitthread global/objectives.scr::add_objectives 5 1 "Use explosives to destroy a Flak88" $flak88b.origin
+
+			thread newobjective
+			if (level.friendly1.friendtype == 4){
+//				level.friendly1 turnto 
+				level.friendly1.friendtype = -1
+				level.friendly1 say dfr_m1l2_133m_1 // We have to recover the explosives they took from me.
+				level.friendly1 waittill saydone
+				level.friendly1.friendtype = 4
+			}
+			else{
+				level.friendly1 say dfr_m1l2_133m_1 // We have to recover the explosives they took from me.
+			}
+		}
+		else if (level.flags[door] == 0){
+			waitthread global/objectives.scr::current_objectives 4
+		}
+		else if (level.flags[flak] == 0){
+				waitthread global/objectives.scr::current_objectives 5
+		}
+		else{
+			waitthread global/objectives.scr::current_objectives 6
+		}
+	}
+end
+
+
+flagthread7:
+	self.friendtype = -1
+	//if (vector_length (self.origin - $player.origin) > 600)
+	if !(exec coop_mod/replace.scr::withinDistanceOf self.origin 600)
+		local.timer = level.time - 5
+	else
+		local.timer = level.time + 5
+
+	//while (!(self cansee $player) && (local.timer > level.time)){ //chrissstrahl
+	while (!(exec coop_mod/replace.scr::cansee) && (local.timer > level.time)){ //chrissstrahl - coop
+		wait 0.1
+	}
+
+	wait 0.3
+//	while (self.thinkstate != "idle")
+//		waitframe
+
+	if (level.flags[papers] == 0){
+		level.friendly1.turndoneerror = 10
+		level.friendly1 turnto $osspapers
+		level.friendly1 lookat $osspapers
+
+		wait 0.33
+		level.friendly1 upperanim pickup_obj
+		wait 0.33
+
+		$osspapers playsound pickup_papers
+		$osspapers hide
+		level.flags[papers] = 1
+		if (level.debug == 2)
+		centerprint "I got the papers, now, let's find the explosives!"
+
+		
+		self say dfr_m1l2_132m_2 // This is it, there are the papers. Lets go.
+		self waittill saydone
+		self exec coop_mod/replace.scr::lookat //chrissstrahl - coop
+		self exec coop_mod/replace.scr::turnto //chrissstrahl - coop
+		wait 0.35
+		self.friendtype = 4
+		self say dfr_m1l2_133m_1 // We have to recover the explosives they took from me.
+		self waittill saydone
+
+
+		thread newobjective
+	//	waitthread global/objectives.scr::add_objectives 1 2 "Find and Rescue the SAS Agent." level.friendly1.origin
+		waitthread global/objectives.scr::add_objectives 2 3 "Follow the SAS Agent." $osspapers.origin
+	//	waitthread global/objectives.scr::add_objectives 3 2 "Steal explosives from the fortress" $explosive[1].origin
+	//	waitthread global/objectives.scr::add_objectives 4 1 "Use explosives to escape" $explosives100.origin
+	//	waitthread global/objectives.scr::add_objectives 5 1 "Use explosives to destroy a Flak88" $flak88b.origin
+
+		if (level.flags[explosives] == 0){
+			waitthread global/objectives.scr::add_objectives 3 2 "Steal explosives from the fortress." $explosive[1].origin
+			waitthread global/objectives.scr::current_objectives 3
+		}
+		else if (level.flags[door] == 0){
+			waitthread global/objectives.scr::add_objectives 4 2 "Use explosives to escape." $explosives100.origin
+			waitthread global/objectives.scr::current_objectives 4
+		}
+		else if (level.flags[flak] == 0){
+			waitthread global/objectives.scr::add_objectives 5 2 "Use explosives to destroy a Flak88." $flak88b.origin
+			waitthread global/objectives.scr::current_objectives 5
+		}
+		else if (level.flags[flak] == 1){
+			waitthread global/objectives.scr::add_objectives 6 2 "Meet Grillo by the gate and exfiltrate." $endtrigger.origin
+			waitthread global/objectives.scr::current_objectives 6
+		}
+	}
+	self.friendtype = 4
+end
+
+
+flagthread8:
+
+	waitthread gethealth "health" 750
+end
+
+playerdist local.dist:
+	//while (vector_length (self.origin - $player.origin) > local.dist){ //chrissstrahl
+	while !(exec coop_mod/replace.scr::withinDistanceOf self local.dist){ //chrissstrahl - coop //[200] chrissstrahl - fixed bad type parameter 1
+		wait 0.1
+	}
+end
+
+fillup_330:
+	thread PUREfillused 340
+end
+
+
+sayflaks:
+	self say dfr_M1L2_138m_2 // We need to destroy these flak88s, I'll take care of this one.
+	self waittill saydone
+	wait 0.25
+
+	if (level.flags[flak] != 0)
+		end
+
+	self say dfr_M1L2_139m_2 // You get that one
+	self waittill saydone
+
+end
+
+
+flagthread9:
+
+	level.friendly1.friendtype = -1
+	level.flags[friendlyflak] = 1
+	println "test01"
+	if (level.flags[flak] == 0)
+	{
+		self say dfr_M1L2_138m_2 // We need to destroy these flak88s, I'll take care of this one.
+		self waittill saydone
+		wait 0.25
+	}
+
+	println "test02"
+	
+	if (level.flags[flak] == 0)
+	{
+		self say dfr_M1L2_139m_2 // You get that one
+		self waittill saydone
+	}
+
+	println "test03"
+
+
+	while (level.flags[flak] == 0)
+		wait 0.1
+
+	println "test04"
+
+	wait 0.5
+	local.ent = spawn script_origin
+	local.ent thread explosives 102
+	if (getcvar(debug) == "1")
+		println "setting explosives on 102"
+	wait 0.5
+	self runto $avoidflak
+	self waittill movedone
+	level.friendly1.friendtype = 4
+
+
+end
+
+flagthread10:
+
+	if (!(isalive level.friendly3) || (level.flags[botch] == 1) || (level.flags[hostage] == 1))
+		end
+
+	self lookat level.friendly3
+	level.friendly1.friendtype = -1
+
+	thread fillused 8000
+	
+	if (getcvar(debug) == "1")
+		println "unfillup in flagthread10"
+
+	thread unfillup 566
+		
+	level.flags[choice] = 2
+
+	$decision1 delete
+	$decision2 delete
+	
+	while ((level.flags[hostage] == 0) && (level.friendlynode[self.destinationnum].set > level.playernodset - 20))
+		wait 0.1
+
+	/*
+	wait 3
+
+	if (getcvar(debug) == "1")
+		println "time to run!"
+
+	wait 3
+	*/
+	level.friendly1.friendtype = 4
+	
+end
+
+flagthread11:
+
+	if (level.flags[door] == 2)
+	end
+
+	self.friendtype = -1
+	//while ((vector_length (self.origin - $player.origin) > level.chatdistance) && (level.flags[door] == 0)){ //chrissstrahl
+	while (!(exec coop_mod/replace.scr::withinDistanceOf self level.chatdistance) && (level.flags[door] == 0)){ //[200] chrissstrahl - fixed bad type parameter 1
+		wait 0.1
+	}
+
+	if (level.flags[door] == 0){
+		self say dfr_M1L2_135m_2 // Place some explosives on that
+		while (level.flags[door] == 0)
+			waitframe
+
+		wait 0.25
+
+		self runto $ossflee
+		self waittill movedone
+		self turnto $explosives100
+		wait 1
+
+	}
+	else if (level.flags[door] == 1){
+		self runto $ossflee
+		self waittill movedone
+		self turnto $explosives100
+		wait 1
+	}
+	self.friendtype = 4
+
+	/*
+
+	while (level.flags[door] == 0)
+		wait 0.1
+
+	level.friendly1 runto $ossflee
+	self waittill movedone
+
+	while (level.flags[door] == 1)
+		wait 0.1
+
+		wait 1.5
+
+	*/
+end
+
+
+flagthread12:
+	self.friendtype = -1
+	while (level.flags[flak] == 0){
+		wait 1
+	}
+	self.friendtype = 4
+end
+
+
+flagthread14:
+
+//	end
+	self exec global/enable_ai.scr
+	self.avoidplayer = 0
+
+	local.ent = spawn script_origin
+	local.ent.origin = self.origin
+	self tether local.ent
+	self leash 0
+
+	local.runorigin = self.origin
+		
+	for (local.i=1;local.i<level.spotlights+1;local.i++){
+		if ((level.spotlight[local.i].set == 1) && (level.spotlight[local.i].group == 2)){
+			local.spotlight = level.spotlight[local.i]
+		}
+	}
+
+
+//	if ((thread checkspotlights == 1) || (level.spotplayer[1] == 1))
+	if ((local.spotlight.spotterdeath == 1) || (level.spotplayer[1] == 1)){
+		self.friendtype = -1
+		level.friendly1 thread runtoset 650
+		wait 1
+		self lookat NULL
+		self waittill movedone
+
+		thread lockdown 650
+		self.friendtype = 4
+
+		self tether level.friendly1
+		self leash self.leashvalue
+		local.ent delete
+		self.avoidplayer = 1
+		end
+	}
+
+	println ("spotter death is " + local.spotlight.spotterdeath)
+
+	while (self.thinkstate != "idle"){
+		waitframe
+	}
+
+	if ((local.spotlight.spotterdeath == 1) || (level.spotplayer[1] == 1)){
+		self.friendtype = -1
+		level.friendly1 thread runtoset 650
+		wait 1
+		self lookat NULL
+		self waittill movedone
+
+		thread lockdown 650
+		self.friendtype = 4
+
+		self tether level.friendly1
+		self leash self.leashvalue
+		local.ent delete
+		self.avoidplayer = 1
+		end
+	}
+
+	self exec global/disable_ai.scr
+
+	waitthread canteen
+
+	if ((local.spotlight.spotterdeath == 1) || (level.spotplayer[1] == 1)){
+		self.friendtype = -1
+		level.friendly1 thread runtoset 650
+		wait 1
+		self lookat NULL
+		self waittill movedone
+
+		thread lockdown 650
+		self.friendtype = 4
+
+		self tether level.friendly1
+		self leash self.leashvalue
+		local.ent delete
+		self.avoidplayer = 1
+		end
+	}
+
+	self.friendtype = -1
+	self lookat local.spotlight.spotlight
+	while ((level.spottime["spot1_2"] == NIL) && (thread checkspotlights != 1)){
+		waitframe
+	}
+
+//	println ("Prep time for spotlight: " + (level.time - level.spottime["spot1_2"]))
+
+	while ((level.spottime["spot1_2"] < level.time - 0.05) || (level.time - level.spottime["spot1_2"] > 1.2) && (thread checkspotlights != 1)){
+//		println ("waiting for the right time: " + (level.time - level.spottime["spot1_2"]))
+		waitframe
+	}
+
+	if ((local.spotlight.spotterdeath == 1) || (level.spotplayer[1] == 1)){
+		level.friendly1 thread runtoset 650
+		wait 1
+		self lookat NULL
+		self waittill movedone
+
+		thread lockdown 650
+
+		self.friendtype = 4
+		self tether level.friendly1
+		self leash self.leashvalue
+		local.ent delete
+		self.avoidplayer = 1
+		end
+	}
+	
+	if !(isalive self)
+		end
+
+	if (local.spotlight.spotterdeath == 1){
+		level.friendly1 thread runtoset 650
+		wait 1
+		self lookat NULL
+		self waittill movedone
+
+		thread lockdown 650
+
+		self.friendtype = 4
+		self tether level.friendly1
+		self leash self.leashvalue
+		local.ent delete
+		self.avoidplayer = 1
+		end
+	}
+
+	wait 1.2
+	local.node = -1
+
+	level.friendly1 thread runtoset 650
+	wait 1
+	self lookat NULL
+	self waittill movedone
+
+	thread lockdown 650
+
+	self.friendtype = 4
+	self exec global/enable_ai.scr
+	self tether level.friendly1
+	self leash self.leashvalue
+	local.ent delete
+	self.avoidplayer = 1
+
+end
+
+
+//=========================================================================
+flagthread15:{
+//=========================================================================
+	thread gethealth "health1" 1500
+}end
+
+
+//=========================================================================
+flagthread16:{
+//=========================================================================
+	self.friendtype = -1
+
+	//if (vector_length (self.origin - $player.origin) > 650){			//chrissstrahl
+	if ((exec coop_mod/replace.scr::withinDistanceOf self 650) != 1){	//chrissstrahl - made coop compatible
+		local.timer = level.time - 1
+	}
+	else{
+		local.timer = level.time + 8
+	}
+
+	//while (((vector_length (self.origin - $player.origin) > 200) || !(sighttrace self.origin $player.origin 1)) && (level.time < local.timer)){ //chrissstrahl
+	//chrissstrahl - made coop compatible
+	local.player = exec coop_mod/replace.scr::player_closestTo self
+	while ( local.player == NULL || ((vector_length (self.origin - local.player.origin) > 200) || !(sighttrace self.origin local.player.origin 1)) && (level.time < local.timer)){
+		local.player = exec coop_mod/replace.scr::player_closestTo self
+		if(local.player == NULL){
+			wait 2
+			continue
+		}
+		
+		self turnto local.player
+		waitframe
+	}
+	//end chrissstrahl
+	self.friendtype = 4
+}end
+
+//=========================================================================
+flagthread17:{
+//=========================================================================
+	self.chairsound = 0
+	println "chairsound is now 0"
+	if ((level.flags[botch] == 0) && (level.flags[notorture] == 0)){
+		$interchair playsound interrogation wait
+		$interchair waittill sounddone
+	}
+
+	self.chairsound = 1
+	println "chairsound is now 1"
+}end
+
+//=========================================================================
+resetter:{
+//=========================================================================
+	level.friendly1.friendtype = 4
+}end
+
+//=========================================================================
+flagthread18:{
+//=========================================================================
+	if ((level.flags[botch] == 1) || (level.flags[notorture] == 1)){
+		goto resetter
+	}
+
+	self lookat $vent
+	self.friendtype = -1
+	println "inter 01"
+	
+	//while (((vector_length (level.friendly1.origin - $player.origin) > 250) || (level.friendly1.thinkstate != "idle")) && (self.chairsound == 0)){
+	while (((exec coop_mod/replace.scr::withinDistanceOf level.friendly1 250) != 1 || (level.friendly1.thinkstate != "idle")) && (self.chairsound == 0)){
+		wait 0.2
+	}
+	wait 1
+
+	self.turndoneerror = 15
+	self turnto $vent
+
+	if ((level.flags[botch] == 1) || (level.flags[notorture] == 1)){
+		goto resetter
+	}
+
+	println "inter 02"
+	level.friendly1 say dfr_m1l2_add02 // It looks like they took more American prisoners.  We should rescue them when we get the chance.
+
+	println "inter 03"
+
+	//while ((vector_length (level.friendly1.origin - $player.origin) < 300) && (self.chairsound == 0)){		//chrissstrahl
+	while ((exec coop_mod/replace.scr::withinDistanceOf level.friendly1 300) != 1 && (self.chairsound == 0)){	//chrissstrahl - made coop compatible
+		wait 0.2
+	}
+
+	println "inter 04"
+
+	level.friendly1.friendtype = 4
+}end
+
+//=========================================================================
+locker local.o local.a:{
+//=========================================================================
+//chrissstrahl - added NULL check
+	while (self != NULL){
+		self.origin = local.o
+		self.angles = local.a
+		waitframe
+	}
+}end
+
+//=========================================================================
+flagthread19:{
+//=========================================================================
+	level.flags[friendlyspoke] = 1
+	self.no_idle = 1
+	self.friendtype = -1
+//	self turnto (5880 -1752 48)
+	self.turndoneerror = 15
+	self turnto (5880 -1632 56)
+	
+	//while ((self.thinkstate == "attack") || (vector_length ( $player.origin - self.origin) > level.chatdistance))			//chrissstrahl
+	while ((self.thinkstate == "attack") || (exec coop_mod/replace.scr::withinDistanceOf self level.chatdistance)  != 1 ){	//chrissstrahl - made compatible to coop
+		wait 0.5
+	}
+		
+//	self waittill turndone
+	wait 1
+	self nodamage
+	self lookat NULL
+//	self thread lookpast $lock
+	self exec global/disable_ai.scr
+	local.o = $lock gettagposition "tag_pick"
+	local.a = $lock gettagangles "tag_pick"
+	self.movedoneradius = 1
+	
+	while (vector_length (self.origin - local.o) > 34){ // 25
+		println (vector_length (self.origin - local.o))
+		self runto local.o
+		self waittill movedone
+		waitframe
+	}
+
+	local.o = local.o + (0 0 -13) // -17
+	self exec coop_mod/replace.scr::holster //chrissstrahl - fix holster bug
+
+	self turnto NULL
+	waitframe
+	self.origin = local.o
+	self.angles = local.a // + (0 5 0) // + (0 180 0)
+	self thread locker local.o local.a	//chrissstrahl - added self, because the called fucntion requires this
+	local.thread = parm.previousthread
+	waitframe
+//	println "--------------------"
+//	println self.origin
+//	local.o = $lock gettagposition "tag_pick"
+//	println local.o
+//	println "--------------------"
+
+	self anim_scripted picklock_intro
+	self waittill animdone
+	
+	self setsynctime 0
+	self anim_scripted picklock_loop
+	wait 0.5
+	
+	if (getcvar(debug) == "1"){
+		println ("01")
+	}
+	self say dfr_m1l2_113m_1 // I had some important papers with me when I was captured.
+	self waittill saydone
+	if (getcvar(debug) == "1"){
+		println ("02")
+	}
+	wait 1
+	
+	self say dfr_m1l2_114m_1 // We have to recover those documents at all cost.
+	self waittill saydone
+	if (getcvar(debug) == "1"){
+		println ("03")
+	}
+	wait 1
+	
+	waitthread global/objectives.scr::add_objectives 2 2 "Follow the SAS Agent." $osspapers.origin
+	waitthread global/objectives.scr::add_objectives 3 2 "Steal explosives from the fortress." $explosive[1].origin
+	waitthread global/objectives.scr::current_objectives 2
+
+	thread newobjective
+
+	self say dfr_m1l2_115m_1 // They're in the fortress
+	self waittill saydone
+	if (getcvar(debug) == "1"){
+		println ("04")
+	}
+	wait 1
+
+	self anim_scripted picklock_end
+
+	$walk_guy walkto $walk_path
+
+	$lock bind $right_gate
+	println used_door
+	$left_gate time 0.4
+	$right_gate time 0.6
+	$left_gate playsound gate_iron_open
+	$left_gate thread rotateup 85
+	$right_gate waitthread rotatedown 85
+	$left_gate connect_paths
+	$right_gate connect_paths
+
+	local.thread delete
+	self exec global/enable_ai.scr
+	self exec coop_mod/replace.scr::unholster //chrissstrahl - fix holster bug
+	self.no_idle = 0
+
+	self.friendtype = 4
+	//chrissstrahl - we don't want him to die in coop
+	if( level.gametype == 0 ){
+		if (getcvar(debug) != "1"){
+			self takedamage
+		}
+	}
+	//end chrissstrahl
+}end
+
+//=========================================================================
+flagthread20:{
+//=========================================================================
+	self.friendtype = -1
+	self exec coop_mod/replace.scr::lookat //chrissstrahl - make coop compatible
+}end
+
+
+
+//=========================================================================
+checkattack:{
+//=========================================================================
+	while (1){
+		if (self == NULL){
+			end
+		}
+
+		if ((self.father.thinkstate != "idle") && (self.father.thinkstate != "curious")){
+			self.was_attacked = 1
+		}
+		wait 0.1
+	}
+}end
+
+//=========================================================================
+lockpick local.said:{
+//=========================================================================
+	local.breaker = 0
+
+	while (local.breaker == 0){
+		local.ent = spawn script_origin
+		local.ent.father = self
+		local.ent.was_attacked = 0
+		local.ent thread checkattack
+
+		self.movedoneradius = 10
+		if (vector_length (self.origin - self.stayput.origin) > 90){
+			self runto self.stayput
+			self waittill movedone
+		}
+
+		if (local.ent.was_attacked == 0){
+			if (vector_length (self.origin - self.stayput.origin) < 80){
+				//if ((vector_length (self.origin - $player.origin) < 250) && (self.thinkstate == "idle")){		//chrissstrahl
+				if ((exec coop_mod/replace.scr::withinDistanceOf $entity 250) && (self.thinkstate == "idle")){	//chrissstrahl - made coop compatible
+					self say local.said 
+					self waittill saydone // was anim
+
+					if (local.ent.was_attacked == 0){
+						local.breaker = 1
+					}
+				}
+			}
+		}
+		local.ent delete
+		waitframe
+	}
+
+	wait (1 + randomint (1))
+}end
+
+//=========================================================================
+flagthread19old:{
+//=========================================================================
+	iprintlnbold_noloc ( "DEV: WARNING USED OLD" ) //chrissstrahl - make sure we know when this happens
+	level.flags[friendlyspoke] = 1
+
+	self.friendtype = -1
+	local.ent = spawn script_origin
+	local.ent.origin = self.origin
+	self.stayput = local.ent
+
+	local.dist = 250
+	local.baseint = 0.5
+	local.random = 1
+
+	$walk_guy walkto $walk_path
+	local.ent delete
+
+	println used_door
+	$left_gate time 0.8
+	$right_gate time 0.9
+	$left_gate thread rotateup 85
+	$right_gate waitthread rotatedown 85
+	$left_gate connect_paths
+	$right_gate connect_paths
+
+	self.friendtype = 4
+}end
+
+
+//=========================================================================
+friendchoice:{
+//=========================================================================
+	if (level.flags[explosives] != 1){
+		end
+	}
+
+	level.flags[playerchoice] = 1
+	println "player chose 1 (friendchoice)"
+}end
+
+//=========================================================================
+friendchoice2:{
+//=========================================================================
+	if (level.flags[explosives] != 1){
+		end
+	}
+
+	level.flags[playerchoice] = 2
+	println "player chose 2 (friendchoice2)"
+}end
+
+//=========================================================================
+runtoset local.set:{
+//=========================================================================
+	for (local.i=1;local.i<level.friendlynodes+1;local.i++){
+		if (level.friendlynode[local.i].set == local.set){
+			self runto level.friendlynode[local.i]
+			end
+		}
+	}
+}end
+
+//=========================================================================
+friendchoice3:{
+//=========================================================================
+	if (level.flags[explosives] == 0){
+		end
+	}
+
+	if (self.waiting == NIL){
+		self.waiting = level.time - 1
+	}
+
+	if (level.time > self.waiting){
+		level.flags[playerchoice] = 2
+		println "player chose 2 (friendchoice3)"
+
+		self.waiting = level.time + 1
+
+		if (getcvar(debug) == "1"){
+			println ("2playerchoice is " + level.flags[playerchoice] + " and choice is " + level.flags[choice])
+		}
+
+		if (level.flags[choicechange] != level.flags[choice]){
+			if (level.flags[choice] == 1){
+				level.flags[choicechange] = level.flags[choice]
+				if (getcvar(debug) == "1"){
+					println ("Clearin stuff up in friendchoice2")
+				}
+
+				if ((level.flags[papers] != 0) && (level.flags[explosives] != 0)){
+					thread CROSSclearused
+					thread CROSSfillused 600 // was 565
+				}
+				level.friendly1.friendtype = 4
+			}
+		}
+	}
+}end
+
+//=========================================================================
+clearused:{
+//=========================================================================
+	for (local.i=1;local.i<level.friendlynodes+1;local.i++){
+		if (level.friendlynode[local.i].flag == NIL){
+			level.friendlyused[local.i] = 0
+		}
+	}
+}end
+
+//=========================================================================
+clearunlocked:{
+//=========================================================================
+	for (local.i=1;local.i<level.friendlynodes+1;local.i++){
+		if (level.friendlynode[local.i].flag == NIL){
+			if (level.friendlyused[local.i] != 2){
+				level.friendlyused[local.i] = 0
+			}
+		}
+	}
+}end
+
+//=========================================================================
+unfillup local.num:{
+//=========================================================================
+	for (local.i=1;local.i<level.friendlynodes+1;local.i++){
+		if (level.friendlynode[local.i].flag == NIL){
+			if (level.friendlynode[local.i].set >= local.num){
+				if (level.friendlyused[local.i] != 2){
+					level.friendlyused[local.i] = 0
+					print "B"
+				}
+			}
+		}
+	}
+}end
+
+//=========================================================================
+lockup local.num:{
+//=========================================================================
+	for (local.i=1;local.i<level.friendlynodes+1;local.i++){
+		if (level.friendlynode[local.i].flag == NIL){
+			if (level.friendlynode[local.i].set >= local.num){
+				level.friendlyused[local.i] = 2
+			}
+		}
+	}
+}end
+
+//=========================================================================
+lockdown local.num:{
+//=========================================================================
+	for (local.i=1;local.i<level.friendlynodes+1;local.i++){
+		if (level.friendlynode[local.i].flag == NIL){
+			if (level.friendlynode[local.i].set <= local.num){
+				level.friendlyused[local.i] = 2
+			}
+		}
+	}
+}end
+
+//=========================================================================
+fillup local.num:{
+//=========================================================================
+	for (local.i=1;local.i<level.friendlynodes+1;local.i++){
+		if (level.friendlynode[local.i].flag == NIL){
+			if (level.friendlyused[local.i] != 2){
+				if (level.friendlynode[local.i].set >= local.num){
+					level.friendlyused[local.i] = 1
+				}
+			}
+		}
+	}
+}end
+
+//=========================================================================
+fillused local.num:{
+//=========================================================================
+	if (getcvar(debug) == "1"){	println ("Filled used to " + local.num) }
+	
+	for (local.i=1;local.i<level.friendlynodes+1;local.i++){
+		if (level.friendlynode[local.i].flag == NIL){
+			if (level.friendlyused[local.i] != 2){
+				if (level.friendlynode[local.i].set <= local.num){
+					level.friendlyused[local.i] = 1
+				}
+			}
+		}
+	}
+}end
+
+
+CROSSfillup local.num:
+
+	for (local.i=1;local.i<level.friendlynodes+1;local.i++){
+		if (level.friendlynode[local.i].set == 565){
+			level.friendlyused[local.i] = 1
+		}
+	}
+
+	thread fillup local.num
+end
+	for (local.i=1;local.i<level.friendlynodes+1;local.i++){
+		if (level.friendlynode[local.i].set >= local.num){
+			if (level.friendlynode[local.i].flag){
+				level.friendlyused[local.i] = 3
+			}
+			else{
+				level.friendlyused[local.i] = 1
+			}
+		}
+	}
+end
+
+CROSSclearused:
+	for (local.i=1;local.i<level.friendlynodes+1;local.i++){
+		if (level.friendlynode[local.i].set == 565){
+			if (level.friendlynode[local.i].flag){
+				level.friendlyused[local.i] = 0
+			}
+		}
+	}
+	thread clearused
+end
+	for (local.i=1;local.i<level.friendlynodes+1;local.i++){
+		if ((level.friendlyused[local.i] == 3) || (level.friendlynode[local.i].flag == NIL)){
+			level.friendlyused[local.i] = 0
+		}
+	}
+end
+
+CROSSfillused local.num:
+	for (local.i=1;local.i<level.friendlynodes+1;local.i++){
+		if (level.friendlynode[local.i].set == 565){
+			level.friendlyused[local.i] = 1
+			println "found 565"
+		}
+	}
+	thread fillused local.num
+end
+
+	if (getcvar(debug) == "1"){
+		println ("Filled used to " + local.num)
+	}
+	for (local.i=1;local.i<level.friendlynodes+1;local.i++){
+		if (level.friendlynode[local.i].set <= local.num){
+			if (level.friendlynode[local.i].flag){
+				level.friendlyused[local.i] = 3
+			}
+		}
+		else{
+			level.friendlyused[local.i] = 1
+		}
+	}
+end
+
+
+PUREfillused local.num:
+	if (getcvar(debug) == "1"){
+		println ("Filled used to " + local.num)
+	}
+	for (local.i=1;local.i<level.friendlynodes+1;local.i++){
+		if (level.friendlynode[local.i].set <= local.num){
+			level.friendlyused[local.i] = 1
+			level.friendlynode[local.i].flag = NIL
+		}
+	}
+end
+
+
+//=========================================================================
+gotfriend:{
+//=========================================================================
+	level.friendly1.friendtype = 1
+}end
+
+
+//=========================================================================
+blowdoor:{
+//=========================================================================
+	//chrissstrahl - let us make sure that the players can't spam here
+	if(level.gametype != 0){
+		if( level.flags[explosives] != 1 ){
+			level.varname = "coop_exploMessage"
+			if(parm.other.flags[level.varname] == NIL){ parm.other.flags[level.varname] = 0}
+			parm.other.flags[level.varname]++
+			if(parm.other.flags[level.varname] > 3){
+				end
+			}	
+		}
+		else{
+			if(	vector_length(self.origin - level.friendly1.origin) > 270 ){
+				level.varname = "coop_sasMessage"
+				if(parm.other.flags[level.varname] == NIL){ parm.other.flags[level.varname] = 0}
+				parm.other.flags[level.varname]++
+				if(parm.other.flags[level.varname] > 3){
+					end
+				}
+				iprintlnbold_noloc ("You need to be accompanied by the SAS Agent, to blow up the gate.")
+				end
+			}
+		}
+	}
+	//end chrissstrahl
+	
+	thread explosives 100
+}end
+
+//=========================================================================
+blowflak:{
+//=========================================================================
+	if(	vector_length(self.origin - level.friendly1.origin) > 650 ){
+		level.varname = "coop_flakMessage"
+		if(parm.other.flags[level.varname] == NIL){ parm.other.flags[level.varname] = 0}
+		parm.other.flags[level.varname]++
+		if(parm.other.flags[level.varname] > 3){
+			end
+		}
+		iprintlnbold_noloc ("You need to be accompanied by the SAS Agent, to blow up the flak.")
+		end
+	}
+	thread explosives 101
+}end
+
+//=========================================================================
+avoidflak:{
+//=========================================================================
+	if ((level.friendly1.friendtype == 4) && (level.friendlynode[level.friendly1.destinationnum].set > 730)){
+		level.friendly1.friendtype = -1
+		wait 1
+		level.friendly1 runto $avoidflak
+		if (getcvar(debug) == "1"){
+			println "friendly is running to avoid flak"
+		}
+		level.friendly1 waittill movedone
+		wait 2
+		level.friendly1.friendtype = 4
+	}
+}end
+
+//=========================================================================
+fleeboom local.flee:{
+//=========================================================================
+	self.friendtype = -1
+	self.movedoneradius = 100
+	self runto local.flee
+	self waittill movedone
+	self exec coop_mod/replace.scr::turnto	//chrissstrahl - made coop compatible
+	self exec coop_mod/replace.scr::lookat	//chrissstrahl - made coop compatible
+	self exec global/stand.scr
+	wait 2
+	self.friendtype = 1
+}end
+
+//=========================================================================
+explosives local.set:{
+//=========================================================================
+	if (self.checkertime == NIL){
+		self.checkertime = level.time - 1
+	}
+
+
+	if (level.time > self.checkertime){
+		self.checktime = level.time + 0.2
+
+		if (getcvar(debug) == "1"){
+			println ("explosives are " + level.explosivecount)
+		}
+
+		if (((local.set == 100) && (level.explosivecount > 0)) || ((local.set == 101) && (level.explosivecount > 0)) || (local.set == 102)){
+			self.checktime = level.time + 5
+
+			if (local.set == 101){
+				level.flags[flak] = 1
+			}
+
+			if (local.set == 100){	
+				thread openenddoor
+				level.flags[door] = 1
+				if (level.friendly3)
+				if (level.friendly3.friendtype == 1)
+				level.friendly3 thread fleeboom $POWflee
+			}
+			else if (local.set == 101){
+				if (isalive level.friendly3)
+				if (level.friendly3.friendtype == 1)
+				level.friendly3 thread fleeboom $POWfleeflak
+			}
+
+
+
+			if (getcvar(debug) == "1"){
+				println ("local set is " + local.set + " and friendly flak is " + level.flags[friendlyflak] ) 
+			}
+
+			if ((local.set == 101) && (level.flags[friendlyflak] == 0)){
+				thread avoidflak
+			}
+
+			if ((local.set == 100) || (local.set == 101)){
+				level.explosivecount--
+				thread coop_mod/spawnlocations.scr::m1l2a_update3	//chrissstrahl - update spawnpoints for coop
+			}
+
+			self delete
+			$("explosivespulse" + local.set) delete
+			$("explosives" + local.set) show
+			$("explosives" + local.set) playsound plantbomb
+			$("explosives" + local.set) loopsound bombtick
+			
+			if (level.debug == 2){
+				level.friendly1 say dfr_cover_01m_ // take cover!
+			}
+			
+			exec coop_mod/replace.scr::stopwatch 5	//chrissstrahl - made coop compatible
+			wait 5
+			
+			if ((local.set == 101) || (local.set == 102)){
+				exec global/model.scr $("explosives" + local.set).origin "emitters/mortar_higgins.tik"
+				//println "higgins!"
+			}
+
+			$("explosives" + local.set) stoploopsound bombtick
+			$("explosives" + local.set) hide
+			thread global/exploder.scr::explode local.set
+
+			radiusdamage $("explosives" + local.set).origin 300 300
+
+			if (local.set == 100){
+
+//				thread fillused 695
+
+			//	waitthread global/objectives.scr::add_objectives 1 2 "Find and Rescue the SAS Agent." level.friendly1.origin
+			//	waitthread global/objectives.scr::add_objectives 2 3 "Follow the SAS Agent." $osspapers.origin
+			//	waitthread global/objectives.scr::add_objectives 3 2 "Steal explosives from the fortress" $explosive[1].origin
+				waitthread global/objectives.scr::add_objectives 4 3 "Use explosives to escape." $explosives100.origin
+				waitthread global/objectives.scr::add_objectives 5 2 "Use explosives to destroy a Flak88." $flak88b.origin
+				if (level.flags[papers] == 1){
+					waitthread global/objectives.scr::current_objectives 5
+				}
+
+				thread newobjective
+			}
+
+			if (local.set == 101){
+//				level.flags[flak] = 2
+				waitthread global/objectives.scr::add_objectives 5 3 "Use explosives to destroy a Flak88." $flak88b.origin
+				waitthread global/objectives.scr::add_objectives 6 2 "Meet Grillo by the gate and exfiltrate." $endtrigger.origin
+				if (level.flags[papers] == 1){
+					waitthread global/objectives.scr::current_objectives 6
+				}
+				thread newobjective
+
+				thread friend3end
+			}
+
+			level.flags[door] = 2
+
+			if (local.set == 100){
+				
+				//chrissstrahl - make sure we don't leave him behind easily, he tends to stay back there
+				if(isAlive level.friendly1){
+					level.friendly1 runto (528 -684 -42)
+					waittill movedone
+				}
+				level.friendly1.friendtype = 4
+			}
+
+			if (local.set == 102){
+				$flak88a playsound explode_flak88
+				$flak88a hide
+				$flak88a_d show
+				level.flags[friendlyflak] = 2
+			}
+
+			if (local.set == 101){
+				thread lockdown 750
+				$flak88b playsound explode_flak88
+				$flak88b hide
+				$flak88b_d show
+				if (level.flags[friendlyflak] == 0){
+					level.friendly1 waittill movedone
+					level.friendly1.friendtype = 4
+		
+					thread fillused 740
+				}
+			}
+		}
+		else{
+			//chrissstrahl make sure only the player using it gets the message
+			local.player = exec coop_mod/replace.scr::player_closestTo self
+			local.player iprint "You have no explosives." 1
+		}
+	}
+}end
+
+//=========================================================================
+stage2:{
+//=========================================================================
+	level.friendly1.friendtype = 4
+	thread fillused 175
+}end
+
+
+//=========================================================================
+friend3end:{
+//=========================================================================
+	wait 2
+
+	if (isalive level.friendly3){
+		level.friendly3.friendtype = -1
+		level.friendly3.movedoneradius = 300
+		level.friendly3 runto $avoidflak
+		level.friendly3.avoidplayer = 0
+
+		//while (((isalive level.friendly3) && (vector_length (level.friendly3.origin - $player.origin) > 350)) || (level.friendly3.thinkstate == "attack")){	//chrissstrahl
+		while (((isalive level.friendly3) && (exec coop_mod/replace.scr::withinDistanceOf level.friendly3 350) != 1 ) || (level.friendly3.thinkstate == "attack")){	//chrissstrahl - made coop compatible
+			wait 1
+		}
+
+		if (isalive level.friendly3){
+			level.friendly3 exec coop_mod/replace.scr::lookat //chrissstrahl - made coop compatible
+			level.friendly3 exec coop_mod/replace.scr::turnto //chrissstrahl - made coop compatible
+			level.friendly3 waittill turndone
+
+			local.timer = level.time - 5
+			while (isalive level.friendly3){	
+				level.friendly3.avoidplayer = 0
+				level.friendly3.friendtype = -1
+				if (level.time > local.timer)
+				if ( (exec coop_mod/replace.scr::withinDistanceOf level.friendly3 350) != 1 ){ //chrissstrahl - made coop compatible
+					local.timer = level.time + 8
+					level.friendly3 say dfr_m1l2_cover // I'll cover this area
+				}
+				wait 0.5
+			}
+		}
+
+	}
+}end
+
+//=========================================================================
+gotexplosives:{
+//=========================================================================
+	$explosive hide
+	
+	exec coop_mod/replace.scr::playsound pickup_explosives
+	waitthread global/items.scr::add_item "explosive"	// Show explosive inventory icon
+
+	thread clearused
+	thread lockup 600
+	thread lockdown 452
+
+	level.explosivecount = 20
+	level.flags[explosives] = 1
+
+	thread newobjective
+	waitthread global/objectives.scr::add_objectives 3 3 "Steal explosives from the fortress." $explosive[1].origin
+	waitthread global/objectives.scr::add_objectives 4 2 "Use explosives to escape." $explosives100.origin
+	if (level.flags[papers] == 1){
+		waitthread global/objectives.scr::current_objectives 4
+	}
+}end
+
+//=========================================================================
+spawnenemies:{
+//=========================================================================
+	level waittill spawn
+
+	local.spotsearch = level.spotsearch
+
+	if (game.skill == "hard"){
+		level.maxenemies = 6
+	}
+	else{
+		level.maxenemies = 4
+	}
+
+	level.currentenemies = 0
+
+	local.timer = 0
+
+	enemyspawnpoint:
+	while (level.spotplayer == 0){
+		if (level.spotsearch != local.spotsearch){	
+			local.spotsearch = level.spotsearch
+			while (level.currentenemies < level.maxenemies - 2){
+				thread spawnalarmguy
+				wait 3
+			}
+		}
+		wait 0.5
+	}
+
+	if ((level.time > local.timer) && (exec coop_mod/replace.scr::isPlayer level.spottarget)){	//chrissstrahl - made coop compatible
+		if (isalive level.friendly1) {
+			level.friendly1 say dfr_m1l2_121m_2 // "Quickly! Get behind cover and they will lose you."
+		}
+		local.timer = level.time + 5 + randomint(4)
+	}
+
+	while (level.currentenemies < level.maxenemies){
+		thread spawnalarmguy
+		wait 0.8
+	}
+
+	wait 1
+
+	goto enemyspawnpoint
+}end
+
+//=========================================================================
+spawnalarmguy:{
+//=========================================================================
+	local.ent = spawn human/German_afrika_private
+	level.currentenemies++
+
+	local.ent thread checkenemydeath
+	
+	local.player = NULL //chrissstrahl - added for coop compatibility
+	
+	//if (sighttrace $player.origin $enemyspawner2.origin 1){						//chrissstrahl
+	if ((exec coop_mod/replace.scr::sighttrace (0 0 0) $enemyspawner2.origin 1)){	//chrissstrahl - made coop compatible
+		local.ent.origin = $enemyspawner1.origin
+	}
+	else{
+		local.ent.origin = $enemyspawner2.origin
+	}
+
+	local.ent exec coop_mod/replace.scr::runtoClosest //chrissstrahl - made coop compatible
+	local.ent waittill movedone
+	local.ent runto $enemyspawnpath
+}end
+
+//=========================================================================
+checkenemydeath:{
+//=========================================================================
+	self waittill death
+	level.currentenemies--
+}end
+
+//=========================================================================
+doorA:{
+//=========================================================================
+	$doorA connect_paths
+	$doorA time 0.5
+//	$doorA notsolid
+	$doorA waitthread rotateup 85
+	$doorA disconnect_paths
+}end
+
+//=========================================================================
+doorB:{
+//=========================================================================
+	$doorB connect_paths
+	$doorB time 0.5
+//	$doorB notsolid
+	$doorB waitthread rotatedown 85
+	$doorB disconnect_paths
+}end
+
+//=========================================================================
+doorC:{
+//=========================================================================
+	for (local.i=1;local.i<$fortfriend.size+1;local.i++){
+		if ((isalive $fortfriend[local.i]) && ($fortfriend[local.i].set) && ($fortfriend[local.i].set == 3)){
+			$fortfriend[local.i] forceactivate
+			$fortfriend[local.i] exec coop_mod/replace.scr::runtoClosest //chrissstrahl - made coop compatible
+		}
+	}
+
+	self exec coop_mod/replace.scr::runtoClosest	//chrissstrahl - made coop compatible
+}end
+
+//=========================================================================
+fortbody:
+//=========================================================================
+end
+
+//=========================================================================
+playertoy:{
+//=========================================================================
+
+	if (self.toy == NIL){
+		self.toy = spawn script_origin
+//		self.toy model "projectiles/m2fgrenade.tik"
+//		self.toy scale 25
+	} 
+
+	local.distance = 500
+
+	while (isalive self){
+		local.vec = self.angles
+		local.vec[0] = 0
+		local.vec[2] = 0
+
+		local.vec = angles_toforward (local.vec)
+		local.vec = vector_scale local.vec local.distance
+		local.vec = local.vec + $self.origin + (0 0 (local.distance/2))
+
+		local.vec2 = trace (self.origin + (0 0 50)) local.vec 0
+		local.vec2 = 0.1 * (self.origin + (0 0 50)) + 0.9 * local.vec2
+
+		self.toy.origin = trace local.vec2 (local.vec2 + (0 0 -5000)) 0
+		waitframe
+	}
+}end
+
+//=========================================================================
+gotruck:{
+//=========================================================================
+	exec global/spotlight.scr::corona $latertruck "light left" 
+	exec global/spotlight.scr::corona $latertruck "light right"
+
+	level.oldtrucktime = level.time + 5
+	if ($latertruck.target){
+		$latertruck setcollisionentity $latertruck.target
+	}
+
+	$latertruck notsolid
+
+	local.truck = $latertruck
+
+	local.prisoner1 = spawn human/1st-ranger_private_prisoner.tik
+	local.prisoner1 threatbias ignoreme
+	local.prisoner1 american
+//	local.prisoner1.no_idle = 1
+	local.prisoner1 exec global/disable_ai.scr
+	local.prisoner1 notsolid
+//	local.prisoner1 anim_scripted "prisoner_1"
+	local.prisoner1 physics_off
+	
+	local.prisoner2 = spawn human/1st-ranger_private_prisoner.tik
+	local.prisoner2 threatbias ignoreme
+	local.prisoner2 american
+//	local.prisoner2.no_idle = 1
+	local.prisoner2 exec global/disable_ai.scr
+	local.prisoner2 notsolid
+//	local.prisoner2 anim_scripted "prisoner_2"
+	local.prisoner2 physics_off
+
+	local.guard = spawn human/German_afrika_private.tik
+	local.guard nodamage
+	local.guard exec global/disable_ai.scr
+	local.guard threatbias ignoreme
+	local.guard german
+	local.guard.no_idle = 1
+	local.guard physics_off
+
+	local.truck AttachPassengerSlot 6 local.guard
+	local.truck AttachPassengerSlot 2 local.prisoner1
+	local.truck AttachPassengerSlot 3 local.prisoner2
+
+//	$latertruck drive $latertruckpath 260 80 40 128 // ideal speed, accelleration/deceleration, close to nodes,  lookahead
+//	$latertruck drive $latertruckpath 280 90 40 128 // ideal speed, accelleration/deceleration, close to nodes,  lookahead
+	$latertruck drive $latertruckpath 280 200 40 128 // ideal speed, accelleration/deceleration, close to nodes,  lookahead
+	wait 10
+	
+	thread coop_mod/spawnlocations.scr::m1l2a_update3	//chrissstrahl - update spawnpoints for coop
+	thread coop_spawnUpdate4
+	
+	local.prisoner1 german
+	local.prisoner2 german
+	local.guard german
+
+	$latertruck waitTill drive
+	$latertruck fullstop
+	$latertruck disconnect_paths
+	$latertruck anim idlenolights
+	$latertruck.corona = 0
+
+
+
+	//if (($player istouching $botcher) || (sighttrace (local.prisoner2.origin + (0 0 85)) ($player.origin + (0 0 35)) 1) || (sighttrace (local.guard.origin + (0 0 85)) ($player.origin + (0 0 35)) 1)){ //chrissstrahl
+	if (	(exec coop_mod/replace.scr::istouching $botcher) ||											//chrissstrahl - made coop compatible
+			(exec coop_mod/replace.scr::sighttrace (0 0 35) (local.prisoner2.origin + (0 0 85)) 1) ||	//chrissstrahl - made coop compatible
+			(exec coop_mod/replace.scr::sighttrace (0 0 35) (local.guard.origin + (0 0 85)) 1) )		//chrissstrahl - made coop compatible
+	{
+		level.flags[botch] = 1
+		local.prisoner1 solid
+		local.prisoner2 solid
+		local.prisoner1 american
+		local.prisoner2 american
+		local.prisoner1.health = 3
+		local.prisoner2.health = 3
+		local.guard.health = 150
+		local.prisoner1 threatbias 50000
+		local.prisoner2 threatbias 49999
+		local.guard exec global/aimat.scr local.prisoner1
+		wait 0.25
+		local.guard exec global/shoot.scr
+		
+		if (isalive local.prisoner1){
+			local.prisoner1 damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+		}
+		
+		wait 0.5
+		local.guard exec global/aimat.scr local.prisoner2
+		wait 0.25
+		local.guard exec global/shoot.scr
+		
+		if (isalive local.prisoner2){
+			local.prisoner2 damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+		}
+		local.guard takedamage
+	}
+	else{
+		local.prisoner1 remove
+		local.prisoner2 remove
+		local.guard remove
+	}
+}end
+
+//=========================================================================
+chairstart:{
+//=========================================================================
+	if (level.flags[botch] == 1){
+		level.friendly3 delete
+//		$chairclip delete
+		$pow_gun delete
+		end
+	}
+
+	if (isalive level.friendly3){
+		level.friendly3 nodamage
+	}
+
+	level.flags[notorture] = 1
+//	if (level.flags[notorture] == 1)
+	$interchair stopsound interrogation
+
+	local.o = $interchair gettagposition "tag_oss"
+	level.friendly3.origin = local.o
+	level.friendly3.angles = $interchair.angles
+	level.friendly3 exec global/disable_ai.scr
+	
+	level.friendly3 solid
+	level.friendly3 waitexec anim/smoking.scr::SmokeRemoveCigarette
+
+	local.o = $interchair gettagposition "tag_german"
+	local.a = $interchair gettagangles "tag_german"
+	
+
+	spawn human/German_afrika_private "targetname" "chairenemy"
+	$chairenemy.angles = $interchair.angles
+	$chairenemy exec global/disable_ai.scr
+	$chairenemy threatbias ignoreme
+	local.a2 = $chairenemy.angles
+	local.a2[1] = local.a2[1] + 180
+	
+	$chairenemy.origin = local.o
+	$chairenemy.angles = local.a2
+
+	level.friendly3 gun "none"
+
+	$chairenemy gun "Mauser KAR 98K"
+	$chairenemy exec coop_mod/replace.scr::holster //chrissstrahl - fix holster bug
+
+	local.last = 1
+	local.randnum = 1
+
+
+	$chairenemy anim_scripted "German_hit_idle"
+//		level.friendly3 delete
+
+	thread chairanim local.o
+	local.thread = parm.previousthread
+	thread chairhealth local.thread
+}end
+
+//=========================================================================
+chairanim local.o:{
+//=========================================================================
+	$chairenemy.no_idle = 1
+	level.friendly3.no_idle = 1
+
+	while (1==1){
+		$chairenemy.origin = local.o
+
+		if (randomint(100) > 85){
+			$chairenemy anim_scripted "German_hit_idle"
+			waitframe
+			level.friendly3 anim_scripted "OSS_hit_idle"
+			wait 0.9
+//			level.friendly3 waittill animdone
+		}
+		else{
+			while (local.randnum == local.last){
+				local.randnum = randomint(3) + 1
+			}
+			local.last = local.randnum
+
+			$chairenemy anim_scripted ("German_hit_" + local.randnum)
+			waitframe
+			level.friendly3 anim_scripted ("OSS_hit_" + local.randnum)
+			wait 0.25
+			level.friendly3 waittill animdone
+		}
+	}
+}end
+
+//=========================================================================
+chairsolid:{
+//=========================================================================
+	while ((isalive level.friendly3) && (vector_length (self.origin - level.friendly3.origin) < 100)){
+		wait 0.3
+	}
+
+	//while (vector_length (self.origin - $player.origin) < 100){	//chrissstrahl
+	while (exec coop_mod/replace.scr::withinDistanceOf self 100){	//chrissstrahl - made coop compatible
+		wait 0.3
+	}
+	self solid
+}end
+
+//=========================================================================
+POW_damage:{
+//=========================================================================
+	level.flags[POW_damage] = 1
+	self delete
+}end
+
+//=========================================================================
+deathmessage:{
+//=========================================================================
+	self waittill death
+	iprintlnbold "Private Jury has been killed in action."
+}end
+
+//=========================================================================
+chairhealth local.thread:{
+//=========================================================================
+	local.health = $chairenemy.health
+
+	//while ((level.flags[POW_damage] == 0) && ($chairenemy.health == local.health) && (vector_length ($player.origin - $interchair.origin) > 200))	//chrissstrahl
+	while (	(level.flags[POW_damage] == 0) &&
+			($chairenemy.health == local.health) &&
+			((exec coop_mod/replace.scr::withinDistanceOf  $interchair 200) != 1)) //chrissstrahl - made coop compatible
+	{
+		waitframe
+	}
+
+	local.thread delete
+	$chairenemy anim stop
+	level.friendly3 anim stop
+
+	$chairenemy exec coop_mod/replace.scr::unholster //chrissstrahl - fix holster bug
+
+	$chairenemy exec coop_mod/replace.scr::lookat //chrissstrahl - made coop compatible
+	$chairenemy exec coop_mod/replace.scr::turnto //chrissstrahl - made coop compatible
+	$chairenemy threatbias 1000
+	$chairenemy exec global/enable_ai.scr
+
+	while ((isalive $chairenemy) || (isalive $pow_guard)){
+		level.friendly3 anim_scripted "OSS_hit_idle"
+		level.friendly3 waittill animdone
+	}
+	
+	local.dist = 80
+	
+	$interchair notsolid
+	
+	//while (vector_length (level.friendly3.origin - $player.origin) < local.dist){	//chrissstrahl
+	while (exec coop_mod/replace.scr::withinDistanceOf level.friendly3 local.dist){	//chrissstrahl - made coop compatible
+		wait 0.4
+	}
+
+	level.friendly3 anim_noclip oss_getup
+	level.friendly3 waittill animdone
+	level.friendly3 exec coop_mod/replace.scr::lookat //chrissstrahl - made coop compatible
+		
+	level.flags[hostage] = 1
+//		level.friendly3 american
+	level.friendly3 thread deathmessage
+	level.friendly3.friendtype = 1
+	if(level.gametype == 0){ //chrissstrahl - sp
+		level.friendly3.olddestination = $player
+		level.friendly3.destination = $player
+	}else{ //chrissstrahl - coop
+		level.friendly3 exec coop_mod/main.scr::destination //chrissstrahl - coop
+	}
+	
+	level.friendly3.turndoneerror = 5
+	level.friendly3 exec coop_mod/replace.scr::lookat //chrissstrahl - made coop compatible
+	level.friendly3 exec coop_mod/replace.scr::turnto //chrissstrahl - made coop compatible
+	level.friendly3 waittill turndone
+	level.friendly3 say dfr_M1L2_thankyou
+	level.friendly3 waittill saydone
+
+	//while (vector_length (level.friendly3.origin - $player.origin) < local.dist){	//chrissstrahl
+	while (exec coop_mod/replace.scr::withinDistanceOf level.friendly3 local.dist){	//chrissstrahl - made coop compatible
+		wait 0.4
+	}
+
+	level.friendly3 thread lookpastlow $pow_gun 
+	wait 0.25
+	level.friendly3 turnto $pow_gun
+	level.friendly3 runto $pow_node
+	$interchair thread chairsolid
+	level.friendly3 waittill movedone
+	level.friendly3 turnto NULL
+	level.friendly3 upperanim pickup_obj
+	wait 0.5
+	level.friendly3 exec coop_mod/replace.scr::turnto //chrissstrahl - made coop compatible
+	$pow_gun hide
+	println "01"
+	level.friendly3 gun "Mauser KAR 98D Sniper"
+	level.friendly3 playsound kar98sniper_snd_pickup
+	println "02"
+	level.friendly3 threatbias 0
+	println "03"
+	level.friendly3 exec global/enable_ai.scr
+	println "04"
+	level.friendly3 thread global/friendly.scr::friendlythink
+	level.friendly3 takedamage
+
+//		level.friendly3 item weapons/colt45.tik
+	println "05"
+
+	println "06"
+	level.friendly3.distance = 150
+	println "07"
+//		level.friendly3.leash = 150
+	println "08"
+	level.friendly3.no_idle = 0
+//		level.friendly3 tether $player
+	wait 2
+	if (isalive level.friendly3)
+		level.friendly3 exec coop_mod/replace.scr::lookat //chrissstrahl - made coop compatible
+	println "09"
+
+//		thread lockdown 565
+//		thread PUREfillused 565
+	thread fillused 565
+
+	println ("friendtype is " + level.friendly3.friendtype)
+}end
+
+//=========================================================================
+endtrigger:{
+//=========================================================================
+	self waittill trigger
+
+	while ((level.flags[papers] == 0) || (level.flags[flak] == 0) || (level.flags[door] == 0) || (level.flags[prisoner] == 0) || (level.flags[friendlyflak] == 0)){
+		println ("Needed to complete: papers: " + level.flags[papers] + " flak: " + level.flags[flak] + " door: " + level.flags[door] + " prisoner: " + level.flags[prisoner] + " friendlyflak: " + level.flags[friendlyflak])
+		wait 2
+	}
+
+	//while !(self istouching $player){						//chrissstrahl
+	while !(exec coop_mod/replace.scr::istouching self){	//chrissstrahl - made coop compatible
+		wait 1
+	}
+
+	level.friendly1.friendtype = -1
+	level.friendly1.distance = 180
+	//level.friendly1 lookat $player					//chrissstrahl
+	level.friendly1 exec coop_mod/replace.scr::lookat	//chrissstrahl - made coop compatible
+
+	//while (vector_length ($player.origin - level.friendly1.origin) > 250){		//chrissstrahl
+	while ((exec coop_mod/replace.scr::withinDistanceOf level.friendly1 250) != 1){	//chrissstrahl - made coop compatible
+		wait 0.1
+	}
+
+	level.friendly1.avoidplayer = 0
+
+	//level.friendly1 lookat $player_closestTo			//chrissstrahl
+	level.friendly1 exec coop_mod/replace.scr::lookat	//chrissstrahl - made coop compatible
+	level.friendly1 say dfr_M1L2_142m_2
+	level.friendly1 waittill saydone
+
+	//while (vector_length ($player.origin - level.friendly1.origin) > 250)			//chrissstrahl
+	while ((exec coop_mod/replace.scr::withinDistanceOf level.friendly1 250) != 1){	//chrissstrahl - made coop compatible
+		wait 0.1
+	}
+	wait 1
+
+	//level.friendly1 lookat $player					//chrissstrahl
+	level.friendly1 exec coop_mod/replace.scr::lookat	//chrissstrahl - made coop compatible
+	level.friendly1 say dfr_M1L2_143m_2
+	level.friendly1 waittill saydone
+
+	//while (vector_length ($player.origin - level.friendly1.origin) > 250){		//chrissstrahl
+	while ((exec coop_mod/replace.scr::withinDistanceOf level.friendly1 250) != 1){	//chrissstrahl - made coop compatible
+		wait 0.1
+	}
+	wait 1
+
+	//level.friendly1 lookat $player					//chrissstrahl
+	level.friendly1 exec coop_mod/replace.scr::lookat	//chrissstrahl - made coop compatible
+	level.friendly1 say dfr_M1L2_144m_2
+	level.friendly1 waittill saydone
+
+	waitthread global/objectives.scr::add_objectives 6 3 "Meet Grillo by the gate and exfiltrate." $endtrigger.origin
+	wait 1
+
+	if ((level.flags[hostage] == 1) && (isalive level.friendly3)){
+		setcvar g_medal2 "1"
+	}
+	
+	exec global/missioncomplete.scr m1l2b 1
+}end
+
+//=========================================================================
+earlyenemies:{
+//=========================================================================
+	if (level.flags[earlyenemies]){ end }
+
+	level.flags[earlyenemies] = 1
+	exec global/ai.scr::spawn 111
+
+	$earlyenemies1 thread attackplayer
+	$earlyenemies2 thread attackplayer
+}end
+
+//=========================================================================
+attackplayer:{
+//=========================================================================
+	self sight 2048
+	//self runto $player
+	self exec coop_mod/replace.scr::runtoClosest //chrissstrahl make coop compatible
+}end
+
+
+torture:
+end
+
+//=========================================================================
+torture2:{
+//=========================================================================
+	$interchair stopsound interrogation
+	level.flags[notorture] = 1
+}end
+
+openenddoor:
+	wait 7
+	thread enddoor
+end
+
+
+enddoor:
+	if (level.enddoornum == NIL)
+	{
+		level.enddoornum = 1
+		$enddoor connect_paths
+		$enddoor time 0.5
+		$enddoor thread rotateup 85
+	//	$enddoor disconnect_paths
+
+		wait 0.8
+	//	exec global/ai.scr::spawn 115
+	}
+end
+
+sentryalarm:
+	while (level.currentenemies < level.maxenemies - 1){
+		thread spawnalarmguy
+		wait 3
+	}
+end
+
+door_early:
+	$door_early time 3
+	$door_early thread rotatedown 85
+	$door_early playsound slow_gate
+	self delete
+end
+
+door_early2:
+	$door_early2 time 3
+	$door_early2 thread rotatedown 85
+	$door_early2 playsound slow_gate
+	self delete
+end
+
+hint1:
+	end
+	if (self.hinttime == NIL){
+		self.hinttime = level.time - 1
+	}
+
+	if (level.time > self.hinttime){
+		self.hinttime = level.time + 5
+		iprintlnbold "Sometimes an objective may be located directly above or below where the compass appears to indicate."
+	}
+end
+
+large_door:
+	if (level.flags[door] == 1){
+		self delete
+		end
+	}
+
+	if (self.timer == NIL)
+		self.timer = level.time - 5
+
+	if (level.time > self.timer){
+		self.timer = level.time + 5
+		self playsound gate_large_locked wait
+		self waittill sounddone
+		self.timer = level.time - 5
+	}
+end
+
+//=========================================================================
+save1:{
+//=========================================================================
+	//chrissstrahl we don't do this in coop
+	if( level.gametype != 0){
+		thread coop_mod/spawnlocations.scr::m1l2a_update1	//chrissstrahl - update spawnpoints for coop
+		thread coop_spawnUpdate2
+		end
+	}
+	//end chrissstrahl
+	
+	while ($lock_enemy.size > 1){
+		wait 0.5
+	}
+
+	if !(isalive level.friendly1){
+		end
+	}
+
+	local.timer = level.time + 60
+	while (level.friendly1.health < 50){
+		wait 0.5
+	}
+
+	if (level.time < local.timer){
+		exec global/autosave.scr 1
+	}
+}end
+
+//=========================================================================
+coop_damageMe:{
+//=========================================================================
+	if(self != NULL){
+		self damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	}
+}end
+
+//=========================================================================
+coop_spawnUpdate2:{
+//=========================================================================
+	while!(exec coop_mod/replace.scr::withinDistanceOf $t784 756){
+		wait 1
+	}	
+	thread coop_mod/spawnlocations.scr::m1l2a_update2	//chrissstrahl - update spawnpoints for coop
+}end
+
+//=========================================================================
+coop_spawnUpdate4:{
+//=========================================================================
+	while!(exec coop_mod/replace.scr::withinDistanceOf $t694 1750){
+		wait 1
+	}	
+	thread coop_mod/spawnlocations.scr::m1l2a_update4	//chrissstrahl - update spawnpoints for coop
+}end
+
+
+/*  flags
+	hint1/vent
+
+	0	Prespotlight
+	1	spotlight
+	2	at rock
+	3	bout to run by
+	4	ran by
+	5	bombs
+	6	decision
+	7	papers
+	8	health
+	9	flakks
+	10	gotfriend
+	11	blow door
+
+
+	sets
+	100 enddoor
+	110	introguys
+	111 earlyenemies
+
+	113 freed OSS guy
+	
+	115 endenemies
+
+	120 captain punishment
+
+	fortalarm, fortfoe, fortfriend
+	oldtruckclip on latertruck
+	doorA set1, doorB set2
+	fortfoe path_01
+
+	endtrigger
+
+	gate_iron_locked
+	gate_large_locked
+*/
+

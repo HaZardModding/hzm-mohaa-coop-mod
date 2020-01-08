@@ -1,0 +1,690 @@
+//
+// final_section_pows.scr
+//
+
+// InitSection
+//=========================================================================
+InitSection: {
+//=========================================================================
+	// find the exploder for the doorway
+	level.blowDoorTrigger = NULL
+	for (local.i = 1; local.i < level.explodertriggers + 1; local.i++) {
+		if (level.explodertrigger[local.i].set == 4) {
+			level.blowDoorTrigger = level.explodertrigger[local.i]
+			// immune bullet
+			break
+		}
+	}
+	level.blowDoorTrigger thread ModelloExploderTriggerThread
+
+	// hide the gun on the tank that is under the crane
+	local.hideGun = $tank04 QueryTurretSlotEntity 0
+	local.hideGun hide
+
+	$lightsout1.collisionent = $MiniCourtTruck.target
+	$lightsout1.collisionent disconnect_paths
+	$lightsout1 nodamage
+	$lightsout1 vehicleanim idlenolights
+	//$lightsout2 vehicleanim idlenolights
+
+	// if ($prisoner)
+	// 	$prisoner thread doPrisonerRun
+
+	level.fs_pows_running_for_it = 0
+	level.fs_a_pow_died = 0
+	level.fs_getting_away = 0
+
+	if (!$FinalPowsCompassTarg) {
+		spawn script_origin "targetname" "FinalPowsCompassTarg"  origin ( -400 4436 -160 )
+	}
+
+	$tank3 hide
+	$tank3 notsolid
+	$tank3.gun = $tank3 QueryTurretSlotEntity 0
+	$tank3.gun hide
+	$tank3.gun notsolid
+	$tank4 hide
+	$tank4 notsolid
+	$tank4.gun = $tank4 QueryTurretSlotEntity 0
+	$tank4.gun hide
+	$tank4.gun notsolid
+
+	thread DoSection
+}end
+
+//=========================================================================
+ModelloExploderTriggerThread: {
+//=========================================================================
+	self nottriggerable
+	$finalScenePOWTrigger waittill trigger
+
+	while (self && !level.killedCannon3) {
+		while (self && !level.killedCannon3 && !$Cannon3.playerinturret) {
+			waitframe
+		}
+
+		if (!self || level.killedCannon3) {
+			break
+		}
+
+		self triggerable
+
+		while (self && $Cannon3.playerinturret) {
+			waitframe
+		}
+
+		if (!self || level.killedCannon3) {
+			break
+		}
+
+		self nottriggerable
+	}
+
+	if (self) {
+		self nottriggerable
+	}
+}end
+
+// DoPrisonerRun
+//=========================================================================
+doPrisonerRun: {
+//=========================================================================
+	if (level.warp_to_section != "FinalScene" && level.warp_to_section != "FinalSceneGetaway") {
+		end
+	}
+
+	// warping to end, make the prisoner run as if he was just rescued
+	//    so that any related bugs will be emulated during the warp-to
+	self.origin = $PrisonerRunForCoverNode.origin
+	self thread maps/e3l2.scr::doRunTo $PrisonerRunForHomeNode
+	local.runThread = parm.previousthread
+	wait 2
+
+	while (1) {
+		if (!(vector_within self.origin $player.origin 2000)) {
+			break
+		}
+		wait 2
+	}
+
+	local.runThread remove
+	self hide
+	self ai_off
+}end
+
+// DoSection
+//=========================================================================
+DoSection: {
+//=========================================================================
+	level.nextPOWInTruck = 1
+	if (level.warp_to_section != "FinalSceneGetaway") {
+		$FinalSectionTrigger waittill trigger
+	}
+
+	level.finalScenePOWCount = 0
+	spawn trigger_once targetname "runningToDownstairsTrigger"
+	spawn trigger_once targetname "getInTruckTrigger"
+	thread spawnGetawayGuys
+	thread CompleteFindPowsObjThread
+	$finalScenePOWSpawner thread powSpawn
+
+	// wait for the player to blow the door
+	level.blowDoorTrigger waittill trigger
+	if (level.warp_to_section == "FinalSceneGetaway") {
+		waitthread global/ManSpawnNamed.scr::Spawn "prisoner"
+	}
+
+	// show the explosive box on the modello
+	$Cannon3_Throb show
+	$Cannon3.noexplode = 0
+
+	// wait for the player to go up the stairs
+	$finalScenePOWTrigger2 waittill trigger
+
+	// spawn first set of enemy attackers
+	waitthread global/ai.scr::spawnset 2051 spawn2051
+	waitthread rollTruck1
+	// waitthread global/ObjMgr.scr::SetObjDesc "protectPOWs" "Cover Allied Prisoners' Escape"
+	waitthread global/ObjMgr.scr::SetObjCompassTarg "protectPOWs" $Truck1 1
+
+	// update objectives
+	// waitthread maps/e3l2/objectives.scr::Transition "LiberatedFinalPows"
+
+	$Truck1 nodamage
+
+	// wait for the player to get close to the truck AFTER destroying all modellos
+	while (1) {
+		if (level.nextPOWInTruck <= 3) {
+			waitthread global/ObjMgr.scr::SetCurrObj "protectPOWs"
+		}
+		else if (level.num_cannons_remaining > 0) {
+			waitthread global/ObjMgr.scr::SetCurrObj "killModellos"
+		}
+		else {
+			waitthread global/ObjMgr.scr::SetCurrObj "escape"
+		}
+
+		if (level.warp_to_section == "FinalScene" || level.warp_to_section == "FinalSceneGetaway") {
+
+			// if we warped here, then we'll let the player get away with only detroying
+			// the one cannon
+			if (level.num_cannons_remaining == 2 && level.nextPOWInTruck > 3) {
+				break
+			}
+		}
+
+		if (level.num_cannons_remaining == 0 && level.nextPOWInTruck > 3) {
+			break
+		}
+
+		wait 0.5
+	}
+
+	// stick the player in the truck & drive away
+	thread theGrandGetaway
+}end
+
+
+// CompleteFindPowsObjThread
+//=========================================================================
+CompleteFindPowsObjThread: {
+//=========================================================================
+	if ($runningToDownstairsTrigger) {
+		$runningToDownstairsTrigger waittill trigger
+	}
+
+	// $finalScenePOWTrigger waittill trigger
+	waitthread global/ObjMgr.scr::CompleteObj "findPOWs"
+	waitthread global/ObjMgr.scr::SetObjCompassTarg "protectPOWs" $Truck1 1
+	// waitthread global/ObjMgr.scr::SetObjCompassTarg "protectPOWs" $FinalPowsCompassTarg
+	waitthread global/ObjMgr.scr::RevealObj "protectPOWs"
+	waitthread global/ObjMgr.scr::SetCurrObj "protectPOWs"
+}end
+
+// powSpawn
+//=========================================================================
+powSpawn: {
+//=========================================================================
+	self hide
+	self notsolid
+	self physics_off
+	$finalScenePOWTrigger waittill trigger
+
+	local.pow = spawn self.model targetname finalScenePOW
+	local.pow.origin = self.origin
+	local.pow.angles = self.angles
+	local.pow thread powThink
+	self remove
+}end
+
+// powThink
+//=========================================================================
+powThink: {
+//=========================================================================
+	self thread powDontDie
+	self droptofloor
+	level.finalScenePOWCount++
+
+	self.powNo = level.finalScenePOWCount 
+	self gun none
+	self.enableEnemy = 0
+	self.talker = 0
+
+	switch (self.powNo) {
+		case 3:
+			self.crouchAnim = unarmed_crouch_alert
+			self.standAnim =  unarmed_squat_outtro
+			self.talker = 1
+			level.finalPOWTalker = self
+			break
+		case 2:
+			self.crouchAnim = unarmed_pain_kneesidle
+			self.standAnim = unarmed_pain_standstraight
+			break
+		case 1:
+			self.crouchAnim = unarmed_squat
+			self.standAnim = NULL
+			break
+	}
+
+	if (self.talker) {
+		self turnto $player
+		self lookat $player
+		self say A_32_Gage_1
+		self waittill saydone
+		wait 1
+
+		self say A_32_Gage_2
+		self waittill saydone
+		// self say DFRUK_E3L2_PG3802 // "Sergeant, use that cannon to open a hole in the wall ..."
+		// self waittill saydone
+	}
+
+	self thread global/loopanim.scr::LoopAnim self.crouchAnim
+	$finalScenePOWTrigger2 waittill trigger
+
+	self lookat $player
+	wait ((self.powNo*0.2) + (randomfloat 0.5))
+	self thread global/loopanim.scr::LoopAnimStop
+
+	if (self.standAnim != NULL) {
+		self anim self.standAnim
+		self waittill animdone
+	}
+	else {
+		wait 1.5
+	}
+
+	self turnto $player
+
+	if (self.talker) {
+		wait 0.5
+		self turnto $player
+		self waittill turndone
+		self say A_32_Gage_3
+		self waittill saydone
+		wait 0.5
+
+		$player stufftext "tmstop; tmstartloop sound/music/Monte_Cassino.mp3"
+		self lookat $Truck1
+		wait 0.5
+
+		self say A_32_Gage_4
+		self waittill saydone
+		// self anim A_32_PvtGageTalk_01 // "Sergeant!  We need cover fire to make.. "
+		// self waittill animdone
+		wait 1
+
+		self lookat NULL
+		self turnto NULL
+		level.fs_pows_running_for_it = 1
+		trigger $runningToDownstairsTrigger
+	}
+	else {
+		wait 2
+		wait ((randomint 10)*0.1)
+		self lookat level.finalPOWTalker
+		wait ((randomint 30)*0.1)
+		self turnto level.finalPOWTalker
+		$runningToDownstairsTrigger waittill trigger
+	}
+
+	thread exitStageLeft
+}end
+
+// exitStageLeft
+//=========================================================================
+exitStageLeft: {
+//=========================================================================
+	self nodamage
+	self threatbias ignoreme
+	//	self thread powDontDie		// now done earlier
+	self exec global/disable_ai.scr
+
+	// run downstairs and stay until all the truck guys are dead
+	//iprintlnbold self.powNo ", running downstairs"
+	local.goto = "finalScenePOWGoto" + self.powNo
+	self waitthread maps/e3l2.scr::doRunTo $(local.goto)
+
+	if (self.powNo == 4) {
+		self turnto $Truck1
+	}
+	else {
+		self turnto $player
+		self lookat $player
+	}
+
+	self thread global/loopanim.scr::LoopAnim self.crouchAnim
+
+	// run
+	self lookat NULL
+	self turnto NULL
+	self thread global/loopanim.scr::LoopAnimStop
+
+	// wait for our turn to run to the truck
+	while (1) {
+		if (level.nextPOWInTruck == self.powNo) {
+			// now, go, go go!
+			break
+		}
+		wait 1
+	}
+
+	if (level.fe_prisoners_are_nodamage != 1) {
+		self takedamage
+	}
+
+	self threatbias 0
+
+	// spawn my own wave of enemies
+	switch (self.powNo) {
+		// Done earlier on
+		// case 1:
+		// 	waitthread global/ai.scr::spawnset 2051 spawn2051
+		// 	break
+		case 2:
+			waitthread global/ai.scr::spawnset 2052 spawn2052
+			break
+		case 3:
+			waitthread global/ai.scr::spawnset 2053 spawn2053
+			break
+	}
+
+	// say my line, if I have one
+	if (self.powNo == 1) {
+		self say A_32_POW_2
+	}
+
+	// if there is a guy in our seat in the truck, get rid of him
+	local.slot = self.powNo
+	local.ent = $Truck1 QueryPassengerSlotEntity local.slot
+
+	if (local.ent != NULL) {
+		local.ent remove
+	}
+
+	local.v = angles_toforward $Truck1.angles
+	local.v = vector_scale local.v -205		//-200
+	local.pos = $Truck1.origin + local.v
+	local.s = spawn script_origin
+	local.s.origin = local.pos
+
+	self lookat $Truck1
+	self waitthread maps/e3l2.scr::doRunTo local.s 20
+
+	// get in the truck
+	self turnto $Truck1
+	wait 0.25
+
+ 	self rendereffects "-shadow"
+
+	// ......SAFE!!
+	self nodamage
+	self threatbias ignoreme
+
+	self notsolid
+	self anim_noclip ("A_32_Geton_opel" + self.powNo)
+	self waittill animdone
+	self thread global/loopanim.scr::LoopAnim ("A_32_Geton_opel" + self.powNo + "_idle")
+	$Truck1 AttachPassengerSlot self.powNo self
+	self safesolid
+
+
+	level.nextPOWInTruck++
+	if (level.nextPOWInTruck > 3) {
+		waitthread global/ObjMgr.scr::CompleteObj "protectPOWs"
+		waitthread global/ObjMgr.scr::RevealObj "escape"
+
+		if (level.num_cannons_remaining > 0) {
+			waitthread global/ObjMgr.scr::SetCurrObj "killModellos"
+		}
+		else {
+			waitthread global/ObjMgr.scr::SetCurrObj "escape"
+		}
+	}
+
+	// off we go...
+}end
+
+//=========================================================================
+powDontDie: {
+//=========================================================================
+	self waittill death
+	level.fs_a_pow_died = 1
+
+	if (level.fs_pows_running_for_it == 1) {
+		$prisoner say A_32_Terry_yellC
+	}
+
+	iprintlnbold "A POW was killed in action."
+	wait 1
+
+	iprintlnbold "Mission Failed."
+	wait 1
+
+	missionfailed
+}end
+
+// rollTruck1
+//=========================================================================
+rollTruck1: {
+//=========================================================================
+	thread RoadblockPlayerClipThread
+
+	$Truck1 show
+    $Truck1.health = 100000
+	$Truck1 nodamage
+
+	exec global/spotlight.scr::corona $Truck1 "light left" // Turn on headlight coronas
+	exec global/spotlight.scr::corona $Truck1 "light right"
+	$prisoner show
+	$prisoner ai_on
+	$prisoner holster
+	$prisoner.enableEnemy = 0
+
+	$Truck1 AttachDriverSlot 0 $prisoner
+	$prisoner threatbias ignoreme
+	$prisoner.enableEnemy = 0
+	$prisoner nodamage
+	$prisoner anim 00A004_driversitstill
+	$Truck1 drive $Truck1Path 400 400 200 256
+	//$Truck1 waittill drive
+	//$prisoner lookat $player
+
+	$prisoner thread truckDriverThink
+	$Truck1 waittill drive
+	$Truck1 stop
+	$Truck1 setcollisionentity $Truck1.target
+	$Truck1.collisionent disconnect_paths
+}end
+
+//=========================================================================
+RoadblockPlayerClipThread: {
+//=========================================================================
+	if (!$rescue_truck_clip) {
+		end
+	}
+
+	local.trig = NULL
+	for (local.i=1; local.i<=$explodertrigger.size; local.i++) {
+		if ($explodertrigger[local.i].set == 512) {
+			local.trig = $explodertrigger[local.i]
+			break
+		}
+	}
+
+	if (!local.trig) {
+		end
+	}
+
+	local.trig waittill trigger
+	$rescue_truck_clip delete
+}end
+
+//=========================================================================
+truckDriverThink: {
+//=========================================================================
+	$prisoner lookat $FinalPowsCompassTarg
+	wait (5 + (randomfloat 8))
+
+	while ((level.fs_a_pow_died != 1) && (level.nextPOWInTruck <= 3)) {
+		if ((randomint 2) == 0) {
+			self say A_32_Terry_yellA
+		}
+		else {
+			self say A_32_Terry_yellB
+		}
+
+		self waittill saydone
+		wait (5 + (randomfloat 8))
+	}
+
+	$prisoner lookat NULL
+
+	while (level.fs_getting_away == 0) {
+		waitframe
+	}
+
+	self playsound DFRUK_E3L2_TS3613
+	wait 3
+	self playsound DFRUK_E3L2_TS3614
+}end
+
+// Whatever is that shit. - Criminal.
+// detectPlayerUseTruck
+//=========================================================================
+detectPlayerUseTruck: {
+//=========================================================================
+	level.playerUsedTruck = 0
+	// while (level.playerUsedTruck == 0) {
+		$playerGetInTruckTrigger waittill trigger
+		// level.playerInUseTruckTrigger = 1
+		// $playerGetInTruckTrigger thread truckTriggerDetectOff
+		// 
+		// local.usekey = getboundkey1 "+use"
+		// local.msg = (loc_convert_string "Press ") + local.usekey + (loc_convert_string " to get in the truck.")
+		// thread global/throbtext.scr::throbtext local.msg 1000
+		// 
+		// while (level.playerUsedTruck == 0 && level.playerInUseTruckTrigger == 1) {
+		// 	if ($player.useheld)
+				wait 1
+				level.playerUsedTruck = 1
+		//		waitframe
+		//	}
+		// thread global/throbtext.scr::throbtext_off
+	//}
+}end
+
+//=========================================================================
+truckTriggerDetectOff: {
+//=========================================================================
+	self thread truckTriggerTimer
+	self.lastTriggerTime = level.time
+
+	while (1) {
+		if (level.time - self.lastTriggerTime > 0.5) {
+			self.timerThread remove
+			level.playerInUseTruckTrigger = 0
+			break
+		}
+		waitframe
+	}
+}end
+
+//=========================================================================
+truckTriggerTimer: {
+//=========================================================================
+	self.timerThread = local
+
+	while (1) {
+		self.lastTriggerTime = level.time
+		self waittill trigger
+	}
+}end
+
+// theGrandGetaway
+//=========================================================================
+theGrandGetaway: {
+//=========================================================================
+	// wait for player to get in the truck
+	waitthread detectPlayerUseTruck
+	waitthread global/ObjMgr.scr::CompleteObj "escape"
+
+	// stick the player in the truck
+	$player physics_off
+	$player notsolid
+
+	$Truck1 AttachPassengerSlot 4 $player
+	// spawn script_object targetname "toGlue"
+	// $toGlue attach $Truck1 origin 0 ( -25 -60 25 )
+	// $player glue $toGlue	
+	//thread maintainAngles
+
+	level.fs_pows_running_for_it = 0
+	level.fs_getting_away = 1
+
+	$tank3 thread rollTank3
+	wait 5
+
+	$Truck1 drive $Truck1Escape 300 150 200 200 
+	$tank4 thread rollTank4
+	$Truck1 waittill drive
+	exec global/missioncomplete.scr e3l3 1
+}end
+
+// maintainAngles
+//=========================================================================
+maintainAngles: {
+//=========================================================================
+	local.angles = $Truck1.angles
+	$player.angles = $Truck1.angles
+	$player.viewangles = $Truck1.angles
+
+	while (1) {
+		local.delta = $Truck1.angles - local.angles
+		local.angles = $Truck1.angles
+		$player.viewangles += local.delta
+		waitframe
+	}
+}end
+
+// rollTank3
+//=========================================================================
+rollTank3:{
+//=========================================================================
+	self show
+	self solid
+	self.gun show
+	self.gun solid
+	self.health = 3000
+	self.health_set = 1
+	self.tankType = panzer
+	self.tankSpeed = 300
+	self.tankAccel = 20
+	self.tankLookAhead = 200
+	self.tankPath = $Truck2Path
+	self.tankPathLoop = 0
+	self.tankDriveDelay = 0
+	self.tankEngageDelay = 0
+	self.tankStunTime = 3
+	self.tankGuysJumpOut = 0
+	self.tankReloadTime = 4
+	level.tankDebugPrint = 0
+	self thread maps/e3l2/thinkTank.scr::tankGo 
+}end
+
+// rollTank4
+//=========================================================================
+rollTank4: {
+//=========================================================================	
+	self show
+	self solid
+	self.gun show
+	self.gun solid
+	self.health = 3000
+	self.health_set = 1
+	self.tankType = panzer
+	self.tankSpeed = 300
+	self.tankAccel = 20
+	self.tankLookAhead = 200
+	self.tankPath = $Truck1Path
+	self.tankPathLoop = 0
+	self.tankDriveDelay = 0
+	self.tankEngageDelay = 0
+	self.tankStunTime = 3
+	self.tankGuysJumpOut = 0
+	self.tankReloadTime = 4
+	level.tankDebugPrint = 0
+	self thread maps/e3l2/thinkTank.scr::tankGo 
+}end
+
+// spawnGetawayGuys
+//=========================================================================
+spawnGetawayGuys:{
+//=========================================================================
+	// wait for the pow to finish gabbing
+	$runningToDownstairsTrigger waittill trigger
+
+	// spawn the guys
+	waitthread global/ai.scr::spawnset 2050 spawn2050
+}end 

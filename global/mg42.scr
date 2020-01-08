@@ -1,0 +1,201 @@
+//dont forget to set "playerusable" "0" in the editor (if the player cant use the turret) or
+// set "maxYawOffset" "x" in the editor to limit the number of degrees of freedom the palyer can 
+//turn the turret. note 180 allows 360 degrees of freedom.
+
+
+
+//////////////////////////////////
+main local.target local.path local.first_trigger local.second_trigger local.gunner local.accuracy:
+	println local.target " " local.path " " local.first_trigger " " local.second_trigger " " local.gunner " " local.fire_time
+	if (local.first_trigger == NULL) 
+		println self  " local.trigger1  is nil"
+	if (local.second_trigger == NULL) 
+		println self  " local.trigger2  is nil"
+	if (local.gunner == NULL) 
+		println self  " local.gunner  is nil"
+
+	waitthread INIT local.gunner
+	if (local.accuracy)
+		local.gunner accuracy local.accuracy
+	self setAimTarget local.target
+
+	if ( (int (getcvar developer)) )
+	{
+		local.chair = spawn script_model model models/items/explosive
+		local.chair glue local.target
+	}
+
+	if (local.second_trigger != 0)
+		thread turret_second_trigger local.second_trigger
+	if (local.path != 0)
+		local.target thread turret_target local.path
+
+local.first_trigger waittill trigger
+
+	self startFiring
+end
+
+/////////////////
+turret_second_trigger local.second_trigger:
+local.second_trigger waittill trigger
+	
+	if(level.gametype != 0){//chrissstrahl - inform us of issues
+		iprintlnbold_noloc("DEV: mg42.scr::turret_second_trigger using $player")
+	}
+	
+	self startFiring
+	self setaimtarget $player
+end
+
+///////////////
+turret_target local.path:
+while (1)
+{
+//	self flypath local.path
+	self followpath local.path
+	self waitmove
+}
+end
+
+///////////
+INIT local.gunner:
+	local.gunner accuracy 100
+	self TurnSpeed 45
+	self burstFireSettings 10 15 4 5
+	self tracerFrequency 1
+end
+
+/////////////
+multi_trigger local.target local.path local.first_trigger local.second_trigger local.gunner:
+	if (local.first_trigger == NULL) 
+		println self  " local.trigger1  is nil "
+	if (local.second_trigger == NULL) 
+		println self  " local.trigger2  is nil"
+	if (local.gunner == NULL) 
+		println self  " local.gunner  is nil"
+	println local.target " " local.path " " local.first_trigger " " local.second_trigger " " local.gunner
+
+	//spawn script_model model models/furniture/simplechair "targetname" (local.target + "_test")
+	//(local.target + "_test") glue local.target
+	//(local.target + "_test") notsolid
+
+	waitthread INIT local.gunner
+	local.target thread turret_target local.path
+	thread turret_second_trigger_loop local.second_trigger
+
+	while (1)
+	{
+		local.first_trigger waittill trigger
+		self setAimTarget local.target
+		self startFiring
+		wait 1
+		self stopFiring
+	}
+end
+
+
+/////////////
+extra_trigger local.target local.path local.first_trigger:
+	println local.first_trigger " " local.target " " local.path 
+	if (local.first_trigger == NULL) 
+		println self  " local.trigger1  is null for "  local.target local.path 
+
+	local.target thread turret_target local.path
+	//spawn script_model model models/furniture/simplechair "targetname" (local.target + "_test")
+	//(local.target + "_test") glue local.target
+	//(local.target + "_test") notsolid
+
+	while (1)
+	{
+		local.first_trigger waittill trigger
+		self setAimTarget local.target
+		self startFiring
+		wait 1
+		self stopFiring
+	}
+end
+
+/////////////////
+turret_second_trigger_loop local.second_trigger:
+
+while (1)
+{
+	println local.second_trigger
+	local.second_trigger waittill trigger
+	if(level.gametype != 0){//chrissstrahl - inform us of issues
+		iprintlnbold_noloc("DEV: mg42.scr::turret_second_trigger_loop using $player")
+	}
+	self setaimtarget $player
+	self burstFireSettings 0 0 0 0
+	self startFiring
+	wait 1
+	self burstFireSettings 4 6 1 2
+	self stopFiring
+}
+end
+
+/////////////////
+JEEP_SETUP local.trigger1 local.trigger2 local.gunner local.target:
+//$mg42_1 thread global/mg42.scr::JEEP_SETUP $mg42_1_trigger1 $mg42_1_trigger2 $mg42_1_gunner level.playertanktarget
+	println local.trigger1 " " local.trigger2 " " local.gunner " " local.target
+	if (local.trigger1 == NULL) 
+		println self  " local.trigger1 is NULL"
+	if (local.trigger2 == NULL) 
+		println self  " local.trigger2 is NULL"
+	if (local.gunner == NULL) 
+		println self  " local.gunner is NULL"
+	if (local.target == NULL) 
+		println self " local.target is NULL"
+
+	local.gunner accuracy 100
+	self TurnSpeed 45
+	self burstFireSettings 10 15 4 5
+	self tracerFrequency 1
+
+	local.trigger1 waittill trigger
+	
+	//chrissstrahl - get closest player in coop (updateing)
+	thread coop_mg42GetPlayerTarget local.gunner local.target
+	waitframe
+
+	if (local.trigger2 != 0){
+		local.trigger2 waittill trigger
+		self stopfiring
+	}
+end
+
+//============================================================================
+coop_mg42GetPlayerTarget local.gunner local.target:{
+//============================================================================
+	if(level.gametype == 0){
+		self setAimTarget local.target
+		self startFiring
+		end
+	}
+
+	//handle coop
+	while(local.target == NULL){
+		wait 1
+	}
+
+	if(local.target.targetname != "player"){
+		self setAimTarget local.target
+		self startFiring
+		end
+	}
+	
+	local.lastTarget = NULL
+	while(isAlive local.gunner){
+		local.player = local.gunner exec coop_mod/replace.scr::canseeGetClosest
+		if(local.player != local.lastTarget){
+			self stopfiring
+		}
+		self setAimTarget local.player
+		wait 0.15
+		if(local.player != local.lastTarget){
+			self startFiring
+			local.lastTarget = local.player
+		}
+	}
+}end
+

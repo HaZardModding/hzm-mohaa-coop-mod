@@ -1,0 +1,281 @@
+// E3L2 - Cannons
+
+//$Cannon<x> refers to the script cannon x
+//$Cannon<x>_Use refers to the usable cannon x
+//$Cannon<x>_Throb refers to cannon x's throbbing box
+//=========================================================================
+InitCannons: {
+//=========================================================================
+	level.mgopc_help_text_only_first_time = 1
+	$Cannon1 waitthread InitACannon $Cannon1_Use $Cannon1_Throb
+	$Cannon2 waitthread InitACannon $Cannon2_Use $Cannon2_Throb
+	$Cannon3 waitthread InitACannon $Cannon3_Use $Cannon3_Throb
+}end
+
+//=========================================================================
+InitACannon local.usable_cannon local.throbber: {
+//=========================================================================
+	local.throbber hide
+	local.throbber.cannon = self
+	local.throbber.usecannon = local.usable_cannon
+
+	//booleans used by UseOrExplode.  
+	//	0: throbbing box is visible
+	//	1: throbbing box is hidden
+	self.noexplode = 1
+	self nodamage
+
+	self.turret = local.usable_cannon queryturretslotentity 0
+	self.turret nodamage
+
+	local.usable_cannon nodamage
+	local.usable_cannon maxuseangle 20
+
+	self.usable_cannon = local.usable_cannon
+	self.throbber = local.throbber
+	self.throbber thread HoldChargePlace self.turret self
+
+	self thread GunOrExplosive local.usable_cannon local.throbber
+	self.use_thread = parm.previousthread
+}end
+
+//=========================================================================
+HoldChargePlace local.turret local.vis_cannon: {
+//=========================================================================
+	self.origin = local.vis_cannon.origin + ( 16 -50 40 )
+	self.exploded = 0
+
+	local.angles    = vector_subtract local.turret.angles self.angles
+	local.neworigin = ( 0 0 0 )
+	local.rotatedOffset = ( 0 0 0 )
+
+	local.fwd  = angles_toforward local.turret.angles
+	local.left = angles_toleft local.turret.angles
+	local.up   = angles_toup local.turret.angles
+	local.offset = vector_subtract self.origin local.turret.origin
+
+	local.rotatedOffset[0] = vector_dot local.offset local.fwd
+	local.rotatedOffset[1] = vector_dot local.offset local.left
+	local.rotatedOffset[2] = vector_dot local.offset local.up
+
+	//iprintln ( "HI, I should be at " + local.rotatedOffset )
+	while ( self.exploded == 0 ) {
+		local.fwd  = angles_toforward local.turret.angles
+		local.left = angles_toleft local.turret.angles
+		local.up   = angles_toup local.turret.angles
+		local.scratch = vector_scale local.left local.rotatedOffset[1]
+
+		local.neworigin = vector_scale local.fwd local.rotatedOffset[0]
+		local.neworigin = vector_add local.neworigin local.scratch
+		local.scratch = vector_scale local.up local.rotatedOffset[2]
+		local.neworigin = vector_add local.neworigin local.scratch
+		local.neworigin = vector_add local.neworigin local.turret.origin
+
+		self origin local.neworigin
+		self angles (vector_add local.angles local.turret.angles)
+
+		//iprintln ( "HI, I am at " + local.neworigin )
+		waitframe
+	}
+}end
+
+//=========================================================================
+CannonFire local.targ_name local.targ_closest_to_player: {
+//=========================================================================
+	println "modello firing!!!!!!!!!!!!!!!!!!!!!"
+	//println "I am at " self.origin
+
+	self anim fire
+
+	if (local.targ_name && $(local.targ_name)) {
+
+		// pick an origin based on the passed-in set name
+		if ($(local.targ_name).size > 1) {
+			if (local.targ_closest_to_player) {
+				local.nearest = waitexec global/FindNearestEntity.scr $player.origin local.targ_name
+				local.dest = local.nearest.origin
+			}
+			else {
+				local.dest = $(local.targ_name)[1 + (randomint $(local.targ_name).size)].origin
+			}
+		}
+		else {
+			local.dest = $(local.targ_name)
+		}
+	}
+	else {
+		// pick an origin in fron of the modello
+		local.vec = angles_toforward self.angles
+		local.vec = vector_normalize(local.vec)
+
+		local.vec = vector_scale local.vec (randomint(400) + 1300)
+		local.dest = self.origin + local.vec
+		local.dest[2] += 20
+
+		//local.dest = $player.origin
+		//local.dest[0] += randomint(100) - 50
+		//local.dest[1] += randomint(100) - 50
+	}
+
+	waitthread big local.dest
+	wait 2.0
+}end
+
+//=========================================================================
+big local.origin: {
+//=========================================================================
+	local.emitter = spawn script_simplestrafinggunfire
+	local.emitter.origin = local.origin
+	local.emitter on
+
+	radiusdamage local.origin 30 128
+
+	//local.exp = spawn  "models/fx/m18_smoke_grenadeexplosion.tik" 
+	//local.exp.origin = local.origin
+	//local.exp solid
+	//local.exp anim start
+
+	thread pocketFlashFx models/fx/fx_pocketflash_grow.tik local.origin
+	//waithread pocketExplosionFx "models/fx/bazookaexplosion_dm.tik" local.origin
+	earthquake 0.5 2 1 0
+
+	//wait 0.1
+	local.emitter remove
+	//local.exp remove
+}end
+
+//=========================================================================
+pocketFlashFx local.fx local.origin: {
+//=========================================================================
+	local.temp = spawn script_model model local.fx
+	waitframe
+
+	local.temp notsolid
+	local.temp.origin = local.origin
+	local.temp anim start
+	//local.temp notsolid
+	waitframe
+
+	local.temp remove
+}end
+
+/*
+pocketExplosionFx local.fx local.origin:
+	
+	local.temp = spawn script_model model local.fx
+	local.temp notsolid
+	local.temp.origin = local.origin  
+	local.temp anim start
+	//local.temp solid
+	wait 7
+	local.temp remove
+end
+*/
+
+// GunOrExplosive is a use function for the modellos.
+// Completely re-done.  Severed nearly all ties with previous incarnations.
+//=========================================================================
+GunOrExplosive local.usable_cannon local.cannon_throb: {
+//=========================================================================
+	//self.helpactiveturret = 0
+	//self.helpactiveexplosive = 0
+	self.playerinturret = 0
+	self.explosiveset = 0
+
+	local.turret = local.usable_cannon queryturretslotentity 0
+	local.turret setusable 0
+
+	local.usable_cannon setcollisionentity local.usable_cannon.target
+	local.usable_cannon lock
+	local.turret lock
+	waitframe		// this is weird, weird, weird [stuff], but I assure thee:  this waitframe [appears to be] necessary...
+					//		without it, the setcollisionentity above does not "kick in" until *after* the player uses 
+					//		the weapon
+
+	local.usable_cannon hide
+	local.turret hide
+
+	level.cannonInUse = NULL
+	self exec global/MountGunOrPlantCharge.scr self local.cannon_throb 250 100 "Modello" "maps/e3l2/Cannons.scr" "PlayerMountCannon" "PlayerDismountCannon" "SetCannonExplosives" local.usable_cannon
+}end
+
+//=========================================================================
+PlayerMountCannon: {
+//=========================================================================
+	self.playerinturret = 1
+	self hide
+	self.usable_cannon show
+	self.turret show
+
+	self.usable_cannon unlock
+	self.turret unlock
+
+	self.turret setusable 1
+	self.usable_cannon douse $player
+	self.turret setusable 0
+
+	self.usable_cannon lock
+	self.turret lock
+	level.cannonInUse = self.usable_cannon.targetname
+
+	self takedamage
+	self.turret takedamage
+	self.usable_cannon takedamage
+}end
+
+//=========================================================================
+PlayerDismountCannon: {
+//=========================================================================
+	self nodamage
+	self.turret nodamage
+	self.usable_cannon nodamage
+
+	self.playerinturret = 0
+	local.angles = self.turret.angles
+	local.angles[0] = 0
+	self.usable_cannon unlock
+	self.turret unlock
+
+	self.turret setusable 1
+	self.usable_cannon douse $player
+	self.turret setusable 0
+	self.usable_cannon lock
+	self.turret lock
+
+	self show
+	self.origin = self.usable_cannon.origin
+	self.angles = local.angles
+	self.usable_cannon.collisionent.origin = self.origin
+	self.usable_cannon.collisionent.angles = self.angles
+	self.collisionent.origin = self.origin
+	self.collisionent.angles = self.angles
+
+	self.usable_cannon hide
+	self.turret hide
+	level.cannonInUse = NULL
+
+	local.player_detach_dist = 128
+	local.rel_pos = ((angles_toforward self.angles) * -local.player_detach_dist)
+	$player.origin = ( (self.origin[0] + local.rel_pos[0]) (self.origin[1] + local.rel_pos[1]) (self.origin[2] + 32) )
+}end
+
+//=========================================================================
+SetCannonExplosives: {
+//=========================================================================
+	self.explosiveset = 1
+
+	//jsl->invalid command					self.throbber setusable 1
+	self.throbber doUse
+	self.throbber.exploded = 1
+}end
+
+//=========================================================================
+SetupDeadCannonCollision: {
+//=========================================================================
+	local.brushmodel = $Cannon_Collision_Destroyed.brushmodel
+	local.collision = spawn script_object model local.brushmodel
+	local.collision.origin = self.origin
+	local.collision.angles = self.angles
+	local.collision safesolid
+	local.collision disconnect_paths
+}end

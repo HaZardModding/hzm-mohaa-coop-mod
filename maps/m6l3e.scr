@@ -1,0 +1,971 @@
+//============================================================================
+main:{
+//============================================================================
+	level.coopNextMap = "briefing/briefing1"	//Pasted by Criminal for coop comp. - set next map (for mom voteing)
+	level.coopPrevMap = "m6l3d"			//Pasted by Criminal for coop comp. - set previouse map (for mom voteing)
+	level.coop_aaMap = 1				//Pasted by Criminal for coop comp. - let global scripts know this is a AA level
+	thread coop_mod/main.scr::main     //Pasted by Criminal for coop comp. - start coop mod extensions
+
+	//*** Give Weapons
+	exec global/loadout.scr maps/m6l3e.scr
+
+	level waittill prespawn
+
+	//*** Exploder Setup
+	thread global/exploder.scr::main
+
+	//*** Ambience Script
+	exec global/ambient.scr m6l3e
+	
+	//*** set the soundtrack
+	soundtrack music/m6l3e.mus
+	
+	//*** Setup Threads
+	thread level_setup
+
+	//*** Music
+	//$player stufftext "tmstartloop sound/music/mus_Schmerzen_01a.mp3" //Criminal - not my fault - disabled by original devs.
+		
+	//*** init variables
+	level.end_level = 0
+}end
+
+// Setup Level
+//============================================================================
+level_setup:{
+//============================================================================
+	$ranger1 hide
+	$ranger2 hide
+	$ranger3 hide
+	
+	//chrissstrahl - this was moved from the individual threads here to work right in mp/coop
+	$blast_seq1_model1 hide
+	$blast_seq1_model2 hide
+	$blast_seq2_hurt1 nottriggerable
+	$blast_seq2_model1 hide
+	$blast_seq2_model2 hide
+	$blast_seq2_model3 hide
+	$blast_seq3_firedeath1 nottriggerable
+	$blast_seq4_firedeath1 nottriggerable
+	$blast_seq4_hurt1 nottriggerable
+	$blast_seq4_hurt2 nottriggerable
+	$blast_seq4_hurt3 nottriggerable
+	$blast_seq4_hurt4 nottriggerable
+	$blast_seq4_hurt5 nottriggerable
+	$blast_seq4_model1 hide
+	$blast_seq4_model2 hide
+	$blast_seq4_model3 hide
+	$blast_seq4_model4 hide
+	//eof chrissstrahl
+
+	thread objectives_setup
+	thread heavy_door_setup
+	thread train_setup
+	thread weather_effects
+	
+	//level waitTill spawn //chrissstrahl
+	waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl - coop mod replacement
+	wait 2
+
+	thread blast_seq1_setup
+	thread blast_seq2_setup
+	thread blast_seq3_setup
+	thread blast_seq4_setup
+}end
+
+// Setup Weather Effects
+//============================================================================
+weather_effects:{
+//============================================================================
+	$world farplane 2500
+	$world farplane_color ".1 .1 .12"
+
+	setcvar "cg_rain_shader" "textures/snow"
+	setcvar "cg_rain_numshaders" "12"
+	setcvar "cg_rain_speed" "240"
+	setcvar "cg_rain_speed_vary" "100"
+	setcvar "cg_rain_min_dist" "3072"
+	setcvar "cg_rain_length" "2"
+	setcvar "cg_rain_width" "2"
+	setcvar "cg_rain_density" ".4"
+	setcvar "cg_rain_slant" "300"
+	setcvar "cg_rain" "1"
+}end
+
+// Setup Objectives
+//============================================================================
+objectives_setup:{
+//============================================================================
+	//waitthread global/objectives.scr::reset_objectives
+	//waitthread global/objectives.scr::blank_objectives
+	waitthread global/objectives.scr::add_objectives 1 2 "Escape Fort Schmerzen." $player_anchor.origin 
+	waitthread global/objectives.scr::current_objectives 1
+
+	//$player playsound objective_text					//Criminal.
+	exec coop_mod/replace.scr::playsound objective_text	//Criminal - coop comp.
+}end
+
+// Setup Train
+//============================================================================
+train_setup:{
+//============================================================================
+	$train_engine notsolid
+	$train_engine bind $train_engine_clip
+
+	$train_cars bind $train_engine_clip
+	$train_cars_door bind $train_cars
+
+	$player_anchor bind $train_engine_clip
+	$ranger1_anchor bind $train_engine_clip
+	$ranger2_anchor bind $train_engine_clip
+	$ranger3_anchor bind $train_engine_clip	
+}end
+
+//============================================================================
+train_move:{
+//============================================================================	
+	//*** start the music playing
+	//$player playsound credits2 wait //Criminal.
+	exec coop_mod/replace.scr::playsound credits2 wait	//Criminal - coop comp.
+
+	waitthread global/objectives.scr::add_objectives 1 3 "Escape Fort Schmerzen." $player_anchor.origin
+	waitthread global/objectives.scr::current_objectives 0
+
+	local.trainspeed = 18		//initial speed of train (original 128)
+	local.nodenumbers = 16		//number of script_origins on tracks
+	local.stepspeed = 2			//increment speed by this amount at each script_origin 'node'
+	local.stageupnode1 = 2		//first acceleration tweak at this 'node'
+	local.stageupnode2 = 4		//second acceleration tweak at this 'node'
+	local.stageupspeed1 = 24	//new acceleration step size at first tweak
+	local.stageupspeed2 = 30 	//new acceleration step size at second tweak
+
+	$train_engine_clip loopsound armoredtrain_rolling
+	
+	//$player threatbias ignoreme					//Criminal.
+	//drawhud 0										//Criminal.
+	//$player glue $player_anchor					//Criminal.
+	//$player forcelegsstate STAND 					//Criminal.
+	//$player physics_off 							//Criminal.
+	//$player takeall 								//Criminal.
+
+	exec coop_mod/replace.scr::threatbias ignoreme	//Criminal - coop comp.
+	drawhud 0										//Criminal - coop comp.
+	exec coop_mod/replace.scr::glue $player_anchor	//Criminal - coop comp.
+	exec coop_mod/replace.scr::forcelegsstate STAND //Criminal - coop comp.
+	exec coop_mod/replace.scr::takeAll 				//Criminal - coop comp.
+	
+	for (local.i=1;local.i<local.nodenumbers+1;local.i++){
+		local.trainspeed = local.trainspeed + local.stepspeed
+		if (local.i == local.startsoundnode){
+			$train_engine_clip loopsound armoredtrain_rolling
+		}
+
+		if (local.i == local.stageupnode1){
+			local.stepspeed = local.stageupspeed1
+		}
+
+		if (local.i == local.stageupnode2){
+			local.stepspeed = local.stageupspeed2
+		}
+
+		//println "TRAINSPEED IS " local.trainspeed		
+		//println "CURRENT NODE IS " local.i
+		$train_engine_clip moveto $("trainnode" + local.i).origin
+		$train_engine_clip speed local.trainspeed
+		$train_engine_clip waitmove
+	}
+}end
+
+//============================================================================
+ranger_yells:{
+//============================================================================
+	$ranger1 say dfr_M6L3_620a_1
+}end
+
+//============================================================================
+ranger_talks:{
+//============================================================================
+	$ranger1 say dfr_M6L3_621a_1
+}end
+
+// Heavy Flywheel Door
+//============================================================================
+heavy_door_setup:{
+//============================================================================
+	$heavy_door1 thread moveYup48
+	$heavy_door2 thread moveYdown48
+	$flywheel notsolid
+	$flywheel thread flywheel_x360_close
+}end
+
+//============================================================================
+moveYup48:{
+//============================================================================
+	self time 3
+	self playsound door_vault_roll_close
+	self moveNorth 48
+	self waitmove
+}end
+
+//============================================================================
+moveYdown48:{
+//============================================================================
+	self time 3
+	self moveSouth 48
+	self waitmove
+}end
+
+//============================================================================
+flywheel_x360_close:{
+//============================================================================
+	self time 3
+	self rotateXdown 360
+	self playsound flywheel
+	self waitmove
+}end
+
+// Blast Sequence 1 - Heavy Door Closing
+//============================================================================
+blast_seq1_setup:{
+//============================================================================
+	//$blast_seq1_model1 hide //chrissstrahl
+	//$blast_seq1_model2 hide //chrissstrahl
+
+	$blast_seq1_exploder1 anim start
+	$blast_seq1_fire1 anim start
+	thread jitter_large 0	
+	wait .5
+
+	$blast_seq1_exploder2 anim start
+	$blast_seq1_model1 anim start
+	$blast_seq1_fire2 anim start
+	wait .25
+
+	$blast_seq1_exploder3 anim start
+	$blast_seq1_fire3 anim start
+	wait .5
+
+	$blast_seq1_exploder4 anim start
+	wait .25
+
+	$blast_seq1_exploder5 anim start
+	$blast_seq1_model2 anim start
+}end
+
+// Blast Sequence 2 - Cell Block
+//============================================================================
+blast_seq2_setup:{
+//============================================================================
+	//$blast_seq2_hurt1 nottriggerable //chrissstrahl
+	//$blast_seq2_model1 hide //chrissstrahl
+	//$blast_seq2_model2 hide //chrissstrahl
+	//$blast_seq2_model3 hide //chrissstrahl
+	wait 1.5
+
+	$blast_seq2_exploder1 anim start
+	wait .5
+
+	$blast_seq2_exploder2 anim start
+	$blast_seq2_fire1 anim start
+	wait 1
+
+	$blast_seq2_exploder3 anim start
+	thread jitter_large 0
+	wait .5
+
+	$blast_seq2_exploder4 anim start
+	wait .5
+
+	$blast_seq2_exploder5 anim start
+	wait .5
+
+	$blast_seq2_exploder6 anim start
+	wait .5
+
+	$blast_seq2_exploder7 anim start
+	wait .5
+
+	$blast_seq2_exploder8 anim start
+	$blast_seq2_fire2 anim start
+	wait .5
+
+	$blast_seq2_exploder9 anim start
+	$blast_seq2_fire3 anim start
+	wait .5
+
+	$blast_seq2_exploder10 anim start
+	thread global/exploder.scr::explode 1
+	wait .25
+
+	$blast_seq2_exploder11 anim start
+	$blast_seq2_fire4 anim start
+	$blast_seq2_model2 show
+	wait .25
+
+	$blast_seq2_exploder12 anim start
+	$blast_seq2_fire5 anim start
+	thread global/exploder.scr::explode 2
+	thread global/exploder.scr::explode 3
+	$blast_seq2_exploder15 anim start
+	$blast_seq2_hurt1 triggerable
+	wait .25
+
+	$blast_seq2_exploder13 anim start
+	$blast_seq2_fire5 anim start
+	wait .25
+
+	$blast_seq2_exploder14 anim start
+}end
+
+// Blast Sequence 3 - Armory Room
+//============================================================================
+blast_seq3_setup:{
+//============================================================================
+	//$blast_seq3_firedeath1 nottriggerable //chrissstrahl
+	wait 2
+
+	$blast_seq3_firedeath1 triggerable
+	$blast_seq3_exploder1 anim start
+	$blast_seq3_fire1 anim start
+	thread jitter_large 0
+	wait .5
+
+	$blast_seq3_exploder2 anim start
+	wait .5
+
+	$blast_seq3_exploder3 anim start
+	wait .5
+
+	$blast_seq3_exploder4 anim start
+	wait .5
+
+	$blast_seq3_exploder5 anim start
+	wait .5
+
+	$blast_seq3_exploder6 anim start
+	wait .5
+
+	$blast_seq3_exploder7 anim start
+}end
+
+// Blast Sequence 4 - Exit Room
+//============================================================================
+blast_seq4_setup:{
+//============================================================================
+	//$blast_seq4_firedeath1 nottriggerable//chrissstrahl
+	//$blast_seq4_hurt1 nottriggerable//chrissstrahl
+	//$blast_seq4_hurt2 nottriggerable//chrissstrahl
+	//$blast_seq4_hurt3 nottriggerable//chrissstrahl
+	//$blast_seq4_hurt4 nottriggerable//chrissstrahl
+	//$blast_seq4_hurt5 nottriggerable//chrissstrahl
+	//$blast_seq4_model1 hide//chrissstrahl
+	//$blast_seq4_model2 hide//chrissstrahl
+	//$blast_seq4_model3 hide//chrissstrahl
+	//$blast_seq4_model4 hide//chrissstrahl
+	wait 5
+
+	$blast_seq4_exploder1 anim start
+	thread jitter_large 0
+	wait .5
+
+	$blast_seq4_hurt1 triggerable
+	$blast_seq4_exploder2 anim start
+	$blast_seq4_fire1 anim start
+	wait .5
+
+	$blast_seq4_exploder3 anim start
+	$blast_seq4_fire2 anim start
+	$blast_seq4_model1 show
+	wait 1
+
+	$blast_seq4_hurt2 triggerable
+	$blast_seq4_exploder4 anim start
+	$blast_seq4_fire3 anim start
+	$blast_seq4_fire4 anim start
+	wait .5
+
+	$blast_seq4_exploder5 anim start
+	$blast_seq4_fire5 anim start
+	$blast_seq4_model2 show
+	wait .5
+
+	$blast_seq4_hurt3 triggerable
+	$blast_seq4_exploder6 anim start
+	$blast_seq4_fire6 anim start
+	wait 1
+
+	$blast_seq4_hurt4 triggerable
+	$blast_seq4_exploder7 anim start
+	$blast_seq4_fire7 anim start
+	$blast_seq4_fire8 anim start
+	$guy1 exec global/bullethit.scr (0 -1 0) 1000 0 0
+	$blast_seq4_model3 show
+	thread jitter_large 0
+	wait .5
+
+	$blast_seq4_hurt5 triggerable
+	$blast_seq4_exploder8 anim start
+	$blast_seq4_fire9 anim start
+	$blast_seq4_fire10 anim start
+	wait 1
+
+	$blast_seq4_exploder9 anim start
+	$blast_seq4_fire11 anim start
+	thread jitter_large 0
+	wait .5
+
+	$blast_seq4_exploder10 anim start
+	$blast_seq4_fire12 anim start
+	wait .5
+
+	$blast_seq4_exploder11 anim start
+	$blast_seq4_model4 show
+	$guy2 exec global/bullethit.scr (0 -1 0) 1000 0 0
+	wait 2
+
+	$blast_seq4_firedeath1 triggerable
+}end
+
+// Blast Sequence 5 - Exterior 1
+//============================================================================
+blast_seq5:{
+//============================================================================
+	$blast_seq5_exploder1 anim start
+	thread jitter_medium 0
+	wait 1
+
+	$blast_seq5_exploder2 anim start
+	wait 1
+
+	$blast_seq5_exploder3 anim start
+	wait 2
+
+	$blast_seq5_exploder4 anim start
+	thread jitter_large 0
+	wait 2
+
+	$blast_seq5_exploder5 anim start
+	wait 1
+
+	$blast_seq5_exploder6 anim start
+	thread jitter_medium 0
+	wait 1
+
+	$blast_seq5_exploder7 anim start
+	wait 2
+
+	$blast_seq5_exploder8 anim start
+	thread jitter_large 0
+	wait 1
+
+	$blast_seq5_exploder9 anim start
+	wait 1
+
+	thread jitter_medium 0
+	$blast_seq5_exploder10 anim start
+	wait 2
+
+	$blast_seq5_exploder11 anim start
+	thread jitter_large 0
+	wait 1
+
+	$blast_seq5_exploder12 anim start
+	wait 1
+
+	$blast_seq5_exploder13 anim start
+	wait 2
+
+	$blast_seq5_exploder14 anim start
+	thread jitter_large 0
+	wait 1
+
+	$blast_seq5_exploder15 anim start
+	wait 2	
+
+	$blast_seq5_exploder16 anim start
+	wait 1
+
+	$blast_seq5_exploder17 anim start
+	wait 2
+
+	$blast_seq5_exploder18 anim start
+	wait 2
+
+	$blast_seq5_exploder19 anim start
+	wait 1
+
+	$blast_seq5_exploder20 anim start
+
+	if (level.end_level == 0){
+		goto blast_seq5
+	}
+}end
+
+// Blast Sequence 6 - Exterior 2
+//============================================================================
+blast_seq6:{
+//============================================================================
+	$blast_seq6_exploder1 anim start
+	wait 2
+
+	$blast_seq6_exploder2 anim start
+	thread jitter_medium 0
+	wait 2
+
+	$blast_seq6_exploder3 anim start
+	wait 2
+
+	$blast_seq6_exploder4 anim start
+	thread jitter_medium 0
+	wait 2
+
+	$blast_seq6_exploder5 anim start
+	wait 2
+
+	$blast_seq6_exploder6 anim start
+	thread jitter_medium 0
+	wait 2
+
+	if (level.end_level == 0){
+		goto blast_seq6
+	}
+}end
+
+// Train Car Open
+//============================================================================
+train_open:{
+//============================================================================
+	wait 20
+
+	thread blast_seq5
+	thread die	
+	wait 1
+
+	thread blast_seq6
+	$ranger1 glue $ranger1_anchor
+	$ranger2 glue $ranger2_anchor
+	$ranger3 glue $ranger3_anchor
+
+	$ranger1 show
+	$ranger2 show
+	$ranger3 show
+
+	level.train_open = 1
+	$train_cars_door MoveSouth 128
+	$train_cars_door speed 48
+	$train_cars_door playsound door_railcar_open
+	$train_cars_door move 
+
+	thread ranger_yells
+}end
+
+// Kill the remaining bad dudes
+//============================================================================
+die:{
+//============================================================================
+	if (isalive $guy1){
+		$guy1 damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	}
+	wait .1
+
+	if (isalive $guy2){
+		$guy2 damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	}
+	wait .2
+
+	if (isalive $guy3){
+		$guy3 damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	}
+	wait .1
+
+	if (isalive $guy4){
+		$guy4 damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	}
+	wait .2
+
+	if (isalive $guy5){
+		$guy1 damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	}
+	wait .1
+
+	if (isalive $guy6){
+		$guy6 damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	}
+	wait .2
+
+	//if (isalive $guy7)
+	//{
+	//	$guy7 damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	//}
+
+	//wait .1
+
+	if (isalive $guy8){
+		$guy8 damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	}
+	wait .2
+
+	if (isalive $guy9){
+		$guy9 damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	}
+	wait .1
+
+	if (isalive $guy10){
+		$guy10 damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	}
+	wait .2
+
+	if (isalive $guy11){
+		$guy11 damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	}
+}end
+
+// Runners
+//============================================================================
+runners_start:{
+//============================================================================
+	trigger $e1x1
+	$e1x1 forceactivate
+	wait 1
+
+	trigger $e1x2
+	$e1x2 forceactivate
+	wait 2
+
+	trigger $e1x3
+	$e1x3 forceactivate
+}end
+
+// Fire Death
+//============================================================================
+firedeath:{
+//============================================================================
+	local.poorbastard = parm.other
+	wait (randomfloat .5 + .5)
+
+	if (local.poorbastard istouching self){
+		local.poorbastard playsound firetouch
+		local.ent = spawn script_model
+		local.ent model "animate/explosion_conflagration.tik"
+		local.ent.origin = local.poorbastard.origin
+		local.ent anim start
+
+		radiusdamage local.ent.origin 4000 256
+		wait 1
+
+		local.ent remove
+	}
+}end
+
+// Volume Damage
+//============================================================================
+hurt_5:{
+//============================================================================
+	local.self volumedamage 5
+	//$player playsound firetouch //Criminal
+	parm.other playsound firetouch	//chrissstrahl - coop compatible
+}end
+
+//============================================================================
+hurt_10:{
+//============================================================================
+	local.self volumedamage 10
+	//$player playsound firetouch //Criminal
+	parm.other playsound firetouch	//chrissstrahl - coop compatible
+}end
+
+//============================================================================
+hurt_20:{
+//============================================================================
+	local.self volumedamage 20
+	//$player playsound firetouch //Criminal
+	parm.other playsound firetouch	//chrissstrahl - coop compatible
+}end
+
+//============================================================================
+hurt_50:{
+//============================================================================
+	local.self volumedamage 50
+	//$player playsound firetouch //Criminal
+	parm.other playsound firetouch	//chrissstrahl - coop compatible
+}end
+
+//============================================================================
+hurt_500:{
+//============================================================================
+	local.self volumedamage 500
+	//$player playsound firetouch //Criminal
+	parm.other playsound firetouch	//chrissstrahl - coop compatible
+}end
+
+// Screen Shake Effects
+//============================================================================
+jitter_medium local.time:{
+//============================================================================
+	if (local.time) {wait local.time}
+
+	waitexec global/earthquake.scr .23 .7 0 0
+	waitexec global/earthquake.scr .8 .6 0 0
+	waitexec global/earthquake.scr 1 .6 0 .5
+}end
+
+//============================================================================
+jitter_large local.time:{
+//============================================================================
+	if (local.time) {wait local.time}
+
+	waitexec global/earthquake.scr .4 .9 0 0
+	waitexec global/earthquake.scr .7 .6 0 0
+	waitexec global/earthquake.scr 1 1 0 0
+	waitexec global/earthquake.scr 1 .5 0 .3
+}end
+
+// Move Object - move_object <distance to move to|vector> <time to take>
+//============================================================================
+move_object local.distance local.time:{
+//============================================================================
+	local.index = local.time / .05
+
+	local.move_distance_x = local.distance[0] / local.index
+	local.move_distance_y = local.distance[1] / local.index
+	local.move_distance_z = local.distance[2] / local.index
+
+	for (local.i = 0 ; local.i <= local.time ; local.i += .05){
+		local.newx = local.self.origin[0] + local.move_distance_x
+		local.newy = local.self.origin[1] + local.move_distance_y
+		local.newz = local.self.origin[2] + local.move_distance_z
+		local.self.origin = (local.newx local.newy local.newz)
+		
+		if(level.gametype == 0){ //chrissstrahl - singleplayer
+			if (vector_length(local.self.origin - $player.origin) < 125){
+				$player exec global/bullethit.scr (0 0 250) 500 25 1
+			}
+		}else{ //chrissstrahl - multiplayer
+			local.origin = local.self.origin
+			for (local.i = 1; local.i <= $player.size; local.i++) {
+				local.player = $player[local.i]
+				if ( local.player != NULL && local.player.health > 0 vector_length(local.origin - local.player.origin) < 125 && local.player.dmteam != "spectator" ){
+					local.player exec global/bullethit.scr (0 0 250) 500 25 1
+				}
+			}
+		}
+		wait .05
+	}
+}end
+
+// Roll Credits
+//============================================================================
+roll_credits:{
+//============================================================================
+//*** set the level variable to stop the explosions
+	level.end_level = 1
+
+	//*** fade the screen out
+	fadeout 3 0 0 0 1
+
+	thread end_medals
+	wait 4
+	
+	//chrissstrahl - remove the gasmask huds - Thanks to Todesengel on discord
+	huddraw_alpha 200 0
+
+	//*** stop the existing music
+	$train_engine_clip stoploopsound
+
+	//$player stufftext "tmstop" 		//Criminal.
+	exec coop_mod/replace.scr::tmstop	//Criminal - coop comp.
+	forcemusic aux2 aux2
+
+	//*** show 'THE END'
+	showmenu credits1
+	hidemouse
+	wait 3.5
+
+	//*** hide 'THE END'
+	hidemenu credits1
+	
+//*** when the player wins the game, play the the deisred credits music
+//$player playsound credits2
+	
+//*************************************************************************************************
+//*************************************************************************************************
+//*** - These are variables used to set defaults for the credits script
+//*** - These are all commented out, to change one, un-comment it and change it's value
+//*** - A double slash '//' denotes something as a comment, to uncomment, remove the double slash
+//*************************************************************************************************
+//*************************************************************************************************
+
+//*** position variables on where to position the text on the screen
+//level.section_xpos = 150      //*** section x position, where to place labels such as 'CAST'
+//level.header_xpos = 150       //*** entry header x position, where to place labels such as 'Art Director'
+//level.body_xpos = 340         //*** entry body x position, where to place the entry for lables such as 'Tadd Whomever'
+
+//*** set the default colors for section text.  Defaults to white
+//level.credits_section_red = 0
+//level.credits_section_green = 0
+//level.credits_section_blue = 0
+
+//*** set the default colors for sub_section text.  Defaults to white
+//level.credits_sub_section_red = 0
+//level.credits_sub_section_green = 0
+//level.credits_sub_section_blue = 0
+
+//*** set the default colors for entry header text.  Default is grey
+//level.credits_entry_header_red = 0
+//level.credits_entry_header_green = 0
+//level.credits_entry_header_blue = 0
+
+//*** set the default colors for entry body text.  Default is grey
+//level.credits_entry_body_red = .2
+//level.credits_entry_body_green = .2
+//level.credits_entry_body_blue = .2
+
+//*** set the default font for section text.  Default is handle-23
+//level.credits_section_font = "handle-23"
+
+//*** set the default font for sub_section text.  Default is handle-22
+//level.credits_sub_section_font = "handle-22"
+
+//*** set the default font for entry header text.  Default is handle-18
+//level.credits_entry_header_font = "handle-18"
+
+//*** set the default font for entry body text.  Default is handle-18
+//level.credits_entry_body_font = "handle-18"
+
+//*** sets the time it takes for an entry to scroll up the screen in seconds
+//*** this is based on going up 480 units, so this includes the time it takes to clear the borders.
+//*** Default is 15 seconds
+//level.credits_scrolltime = 17
+
+//************************************************************************************
+//************************************************************************************
+
+
+	//*** launch the credits setup thread first
+	waitthread global/credits.scr::credits_setup
+
+	//*** this script file contains all the data to display on the screen
+	waitthread global/credits_data.scr::credits_start 
+
+//$player waittill sounddone		//Criminal.
+
+//wait 2							//Criminal.
+//$player playsound credits1 wait 	//Criminal.
+//$player waittill sounddone		//Criminal.
+
+//$player playsound credits1 wait 	//Criminal.
+//$player waittill sounddone		//Criminal.
+
+//$player playsound credits1 wait 	//Criminal.
+//$player waittill sounddone 		//Criminal.
+
+//$player playsound credits1 wait 	//Criminal.
+//$player waittill sounddone		//Criminal.
+
+//$player playsound credits1 wait 	//Criminal.
+//$player waittill sounddone		//Criminal.
+
+	//chrissstrahl - I don't think I quite understand what the plan was here
+	//for (local.i = 1; local.i <= $player.size; local.i++) { //Criminal/
+		//local.player = $player[local.i]
+		//local.player waitTill sounddone
+	//}
+
+	wait 2
+	waitexec coop_mod/replace.scr::playsound credits1 //Criminal - coop comp - waits for sounddone by default. //chrissstrahl - only if executed with waitexec or waitthread
+	waitexec coop_mod/replace.scr::playsound credits1 //Criminal - coop comp - waits for sounddone by default. //chrissstrahl - only if executed with waitexec or waitthread
+	waitexec coop_mod/replace.scr::playsound credits1 //Criminal - coop comp - waits for sounddone by default. //chrissstrahl - only if executed with waitexec or waitthread
+	waitexec coop_mod/replace.scr::playsound credits1 //Criminal - coop comp - waits for sounddone by default. //chrissstrahl - only if executed with waitexec or waitthread
+	waitexec coop_mod/replace.scr::playsound credits1 //Criminal - coop comp - waits for sounddone by default.	//chrissstrahl - only if executed with waitexec or waitthread
+
+}end
+
+
+
+// Award Medals
+//============================================================================
+end_medals:{
+//============================================================================
+level.skill = getcvar (skill)
+
+	if (level.skill == "0"){
+		setcvar "g_eogmedal2" "1" //Bronze Star
+	}else if (level.skill == "1"){
+		setcvar "g_eogmedal1" "1" //Silver Star 
+	}else if (level.skill == "2"){
+		setcvar "g_eogmedal0" "1" //Distinguished Service Cross
+	}
+}end
+
+
+
+//=========================================================================
+coop_playerJustSpawned local.i:{
+//=========================================================================
+//chrissstrahl - handle gasmask for player
+	if( level.end_level == 1){ end } //credits are running now, don't add gasmask anymore
+
+	local.player = $player[local.i]
+	if(local.player != NULL){
+		if(local.player.dmteam != "spectator" && local.player.health > 0 && local.player.flags["coop_isActive"] == 1){
+			// JBW - moved huddraw stuff out of refresh since refresh never happens
+			huddraw_shader 200 "textures/hud/gasmask_overlay"
+			huddraw_align 200 left top
+			huddraw_rect 200 0 0 640 480
+			huddraw_virtualsize 200 1
+			huddraw_color 200 1 1 1
+			huddraw_alpha 200 1
+		}
+	}
+}end
+
+//=========================================================================
+coop_playerJustSpawned1:{
+//=========================================================================
+	thread coop_playerJustSpawned 1
+}end
+
+//=========================================================================
+coop_playerJustSpawned2:{
+//=========================================================================
+	thread coop_playerJustSpawned 2
+}end
+
+//=========================================================================
+coop_playerJustSpawned3:{
+//=========================================================================
+	thread coop_playerJustSpawned 3
+}end
+
+//=========================================================================
+coop_playerJustSpawned4:{
+//=========================================================================
+	thread coop_playerJustSpawned 4
+}end
+
+//=========================================================================
+coop_playerJustSpawned5:{
+//=========================================================================
+	thread coop_playerJustSpawned 5
+}end
+
+//=========================================================================
+coop_playerJustSpawned6:{
+//=========================================================================
+	thread coop_playerJustSpawned 6
+}end
+
+//=========================================================================
+coop_playerJustSpawned7:{
+//=========================================================================
+	thread coop_playerJustSpawned 7
+}end
+
+//=========================================================================
+coop_playerJustSpawned8:{
+//=========================================================================
+	thread coop_playerJustSpawned 8
+}end
+
+
+

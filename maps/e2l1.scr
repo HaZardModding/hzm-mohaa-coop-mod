@@ -1,0 +1,421 @@
+// e2l1.scr
+
+exec global/auto.scr e2l1
+//exec global/spotlight.scr
+exec global/ambient.scr e2l1
+setcvar g_mission 2
+exec global/searchlight.scr
+level waittill prespawn
+exec global/fadein.scr
+
+level waittill spawn
+
+musicvolume 0.0 0.1
+waitexec maps/e2l1/hacks.scr
+
+//----------------------------------------------------------------------------
+// fog settings for the various phases of the level
+level.farclipOverride			= 3000
+
+// while being towed by the C47
+level.fogDistanceTow			= 3000
+level.fogBiasTow				= 200
+level.fogColorTow				= ( 0.118 0.118 0.176)
+
+// when glider starts descent on the spline path
+level.fogDistanceDescent		= 2500
+level.fogBiasDescent			= 200
+level.fogColorDescent			= level.fogColorTow
+
+// when the player is on the ground
+level.fogDistanceGround			= 1500
+level.fogBiasGround				= 0
+level.fogColorGround			= level.fogColorTow
+
+level.truck1_health				= 1800
+level.truck2_health				= 200
+
+level.nodrophealth				= 1
+level.nodropweapons				= 1
+
+level.aipronechance				= 40
+level.aicrouchchance			= 50
+
+level.damaged_truck_thread		= "e2l1_manager"
+//----------------------------------------------------------------------------
+
+// syncrhonization variables:
+// TODO: change these to triggers!
+level.ejectedFromGlider = 0
+
+// this is required for the auto-saves to work right
+level.script = "maps/e2l1.scr"
+
+//============================================================================
+main: {
+//============================================================================
+	thread startMusic_e2l1_main
+	// println "------------------------------------------------------------------------------------"
+	// println "------------------------------------------------------------------------------------"
+	// println "------------------------------------------------------------------------------------"
+
+	thread InitPlayer
+	thread InitLights
+
+	waitthread InitFriends
+	waitthread InitObjectives
+	waitthread InitEnemies
+	wait 2 
+
+	thread maps/e2l1/pocketflash.scr::StartPocketFlashes
+
+	// start sparky1 at the beginning of the level.
+	thread maps/e2l1/effectVisibility.scr::Init
+	$sparky1.on = 0
+	$sparky2.on = 0
+	$sparky1 thread sparky
+
+	// MJG: plane fire is managed in the effectVisibility.scr script now
+	//	$plane anim fire_off
+
+	local.soundorigin = spawn script_model model "fx/dummy.tik"
+	local.soundorigin.origin = $plane.origin
+	local.soundorigin loopsound fire_med1
+	local.soundorigin notsolid
+}end
+
+//============================================================================
+startMusic_e2l1_main: {
+//============================================================================
+	$player stufftext "tmstop; tmstart sound/music/E2L1_Streets_of_Paris.mp3"
+	//thread global/music.scr::PlaySong "sound/music/E2L1_Streets_of_Paris.mp3"
+}end
+
+//============================================================================
+InitPlayer: {
+//============================================================================
+	exec global/loadout.scr
+
+	if (level.giveAllWeapons) {
+		$player give all
+		$player useweaponclass mg
+	}
+
+	if (level.skipGliderRide == 0) {
+		$player waitthread maps/e2l1/gliderride.scr::StartRide
+	}
+	else {
+		fadein 0.1 0 0 0 1
+		drawhud 1
+	}
+
+	// the player has ejected from the airplane
+	level.ejectedFromGlider = 1
+
+	if (level.spewPlayerOrigin) {
+		$player thread originSpew
+	}
+	
+	if (level.warpToFinalBattle) {
+		$player.origin = ( -2580 -1768 340 )
+		wait 3
+
+		thread maps/e2l1/FinalBattle.scr::ShowFinalBattleStuff
+		//thread maps/e2l1/objectives.scr::StartFinalBattleObjective
+		drawhud 1
+	}
+	else if (level.warpToParatrooper) {
+		$player.origin = ( 4863 -1530 308 )
+	}
+	else if (level.warpToMG160) {
+		$player.origin = ( 458 2263 235 )
+	}
+
+	thread maps/e2l1/fog.scr::setFog level.fogDistanceGround level.fogBiasGround level.fogColorGround
+}end
+
+//============================================================================
+InitLights: {
+//============================================================================
+	level waittill prespawn
+	waitexec maps/e2l1/light_e2l1.scr
+}end
+
+//============================================================================
+InitObjectives: {
+//============================================================================
+	thread maps/e2l1/objectives.scr::init
+	$end_dialog nottriggerable
+}end
+
+//============================================================================
+InitFriends: {
+//============================================================================	
+	// HACK!!!!!! change this in the map
+	$leroy.targetname = "hudson"
+
+	// this is the squad leader at the parahang
+	$hudson.fullname = "Private Hudson"
+
+	// McMartin is the paratrooper that hangs from the telephone pole
+	//level.friendly1.targetname = mcmartin
+	$mcmartin.fullname = "Private McMartin"
+
+	// Phillips is the Lieutenant that is waiting at the water tower
+	$phillips.fullname = "Lieutenant Phillips"
+
+	// Johnson and Gobs are privates that are waiting at the water tower with Phillips
+	$johnson.fullname = "Private Johnson"
+	$gobs.fullname = "Private Gobs"
+	$michaels.fullname = "Private Michaels"
+
+	// track the death of these guys
+	$mcmartin thread DeathMessage
+	$phillips thread DeathMessage
+	$johnson thread DeathMessage
+	$gobs thread DeathMessage
+	$michaels thread DeathMessage
+	$hudson thread DeathMessage
+
+	// these guys should occupy no cpu cycles intitially
+	$phillips ai_off
+	$johnson ai_off
+	$gobs ai_off
+}end
+
+//============================================================================
+DeathMessage: {
+//============================================================================
+	self.isVeryDead = 0
+	self waittill death
+	// iprintlnbold self.fullname " has been killed in action."
+
+	// only phillips gets personally named.
+	if ( self==$phillips ) {
+		iprintlnbold self.fullname " has been killed in action."
+	}
+	else {
+		iprintlnbold "A squadmate has been killed in action."
+	}
+
+	self.isVeryDead = 1
+
+	if (self == $phillips) {
+		// Phillips can't die!
+		wait 4
+		missionfailed
+	}
+}end
+
+//============================================================================
+InitEnemies: {
+//============================================================================
+	// setup the run-n-gun triggers
+	thread maps/e2l1/enemySet125.scr::init
+	thread maps/e2l1/enemySet150.scr::init
+	thread maps/e2l1/enemySet160.scr::init
+	thread maps/e2l1/enemySet170.scr::init
+	thread maps/e2l1/enemySet325.scr::init
+	thread maps/e2l1/enemySet350.scr::init
+	thread maps/e2l1/enemySet400.scr::init
+	thread maps/e2l1/enemySet809.scr::init
+	thread maps/e2l1/ab41_scene.scr::init
+	thread maps/e2l1/gliders.scr::init
+
+    // println "trying to init para battle"
+	thread maps/e2l1/paraBattle.scr::initParachuteBattle
+    // println "para battle loaded"
+
+	for (local.i=1;local.i<$mg42.size+1;local.i++) {
+		// level.spot_burstmin level.spot_burstmax level.spot_burstdownmin level.spot_burstdownmax	
+		$mg42[local.i] burstfiresettings 2 4 1.5 3
+		$mg42[local.i] maxyawoffset 60.0
+		$mg42[local.i] pitchcaps "-20 20 0"
+		$mg42[local.i] convergetime 0.25
+
+		switch (level.skill) {
+			case 0:
+				$mg42[local.i] aibulletspread 450 275
+				break;
+			case 1:
+				$mg42[local.i] aibulletspread 400 225
+				break;
+			case 2:
+				$mg42[local.i] aibulletspread 300 125
+				break;
+		}
+	}
+
+	thread maps/e2l1/WaterTower.scr::FixPitchCaps
+
+	for (local.i=1;local.i<=$searchparty.size;local.i++) {
+		$searchparty[local.i] exec global/disable_ai.scr	
+	}
+
+	$AB41 setcollisionentity $AB41.target
+	waitthread maps/e2l1/aaguns.scr::initAA
+
+	if (level.enableFinalBattleTrigger == 1) {
+		$fifthflybytrigger triggerable
+		waitthread maps/e2l1/FinalBattle.scr::ShowFinalBattleStuff
+	}
+	else {
+		$fifthflybytrigger nottriggerable
+		waitthread maps/e2l1/FinalBattle.scr::HideFinalBattleStuff
+	}
+
+	$AB41 nodamage
+	level.ab41ready = 0
+	//level.barricadetrigger = waitthread global/FindTrigger.scr::FindTrigger "ab41explodertrigger"
+
+	for (local.i=1;local.i<=$watertowermg42guy.size;local.i++) {
+		$watertowermg42guy[local.i] ai_off
+	}
+
+	$mg42_guy_350_a thread setgun "beretta"
+	$mg42_guy_350_a.aipronechance = 0
+	$mg42_guy_350_a.aicrouchchance = 0
+	$mg42_guy_350_c thread setgun "beretta"
+	$mg42_guy_350_c.aipronechance = 0
+	$mg42_guy_350_c.aicrouchchance = 0
+}end
+
+//============================================================================
+setgun local.gun: {
+//============================================================================
+	self gun local.gun
+}end
+
+//============================================================================
+SpawnOnTrigger local.trigger local.set local.enemyname: {
+//============================================================================
+	// generic routine for causing a trigger to spawn a set of guys
+	local.trigger waittill trigger
+	thread global/ai.scr::spawnset local.set local.enemyname
+}end
+
+//BridgeAutoSave:
+	//exec global/autosave.scr 3
+//end
+
+//============================================================================
+TurnOnWaterTowerGuys: {
+//============================================================================
+	for (local.i=1;local.i<=$watertowermg42guy.size;local.i++) {
+		$watertowermg42guy[local.i] ai_on
+	}
+}end
+
+// Use this thread to turn emmitters on and off
+// when not visible by the player
+//============================================================================
+EmmitterCheck:
+//============================================================================
+	while (1) {
+		if ($player cansee self 120 4000){
+	  		self show
+		}
+		else {
+	  		self hide
+		}
+		wait .1
+  	}
+}end
+
+//============================================================================
+sparky_off: {
+//============================================================================
+	self.on = 0
+}end
+
+//============================================================================
+sparky: {
+//============================================================================
+	if ( self.on==1 ) {end}
+	self.on = 1
+
+	while(self.on==1) {
+		self anim start
+		self playsound e2l2_spark  
+		waitframe
+		
+		self anim idle
+		local.t=randomint(100)
+		
+		if (local.t<10) {wait 0.1}
+		else {
+			local.r=randomfloat(1.9)
+			local.r+=0.1
+			wait local.r
+		}
+	}	
+}end
+
+//============================================================================
+sparky1_on: {
+//============================================================================
+	$sparky1 thread sparky
+}end
+
+//============================================================================
+sparky1_off: {
+//============================================================================
+	$sparky1 thread sparky_off
+}end
+
+//============================================================================
+sparky2_on: {
+//============================================================================
+	$sparky2 thread sparky
+}end
+
+//============================================================================
+sparky2_off: {
+//============================================================================
+	$sparky2 thread sparky_off
+}end
+
+//============================================================================
+fireon: {
+//============================================================================
+	// MJG: plane fire is managed in the effectVisibility.scr script now
+	//$plane anim fire_on
+	thread sparky2_on
+}end
+
+//============================================================================
+fireoff: {
+//============================================================================
+	// MJG: plane fire is managed in the effectVisibility.scr script now
+	//$plane anim fire_off
+	thread sparky2_off
+}end
+
+//============================================================================
+whistle: {
+//============================================================================
+	$whistle_spot1 playsound whistle_blow
+	wait 1
+	$whistle_spot2 playsound axis_italian_global004a
+	wait .3
+	$whistle_spot2 playsound whistle_blow
+	wait .5
+	$whistle_spot1 playsound axis_italian_global005a
+	wait 1
+	$whistle_spot2 playsound axis_italian_global001b
+	wait 2
+	$player playsound whistle_blow
+}end
+
+// Phillips plays "HOLD YOUR FIRE, OVER HERE"
+//============================================================================
+dialog_over_here: {
+//============================================================================
+	$player playsound DFRUS_E2L1_JP2742
+	$gobs turnto $player
+	$gobs lookat $player
+	$johnson turnto $player
+	$johnson lookat $player
+	$phillips turnto $player
+	$phillips lookat $player
+}end

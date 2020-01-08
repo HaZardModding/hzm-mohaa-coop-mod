@@ -1,0 +1,212 @@
+// E3L2 Objectives
+//=========================================================================
+InitObjectives: {
+//=========================================================================
+	waitthread global/ObjMgr.scr::Init		// must be called first
+	waitthread global/ObjMgr.scr::InitObj				"findPOWs"			"Search the City for Allied Survivors"
+	waitthread global/ObjMgr.scr::InitObj				"killModellos"		"Destroy Enemy Artillery [" 3 " Remaining]"
+	waitthread global/ObjMgr.scr::InitObj				"protectPOWs"		"Cover the Allied Prisoners’ Escape"
+	waitthread global/ObjMgr.scr::InitObj				"escape"			"Make your Escape"
+	waitthread global/ObjMgr.scr::SetObjCompassTarg 	"findPOWs"					$BarneyPinnedHurt
+	waitthread global/ObjMgr.scr::SetObjCompassTargs 	"killModellos"	"inOrder"	$Cannon1 $Cannon2 $Cannon3
+	waitthread global/ObjMgr.scr::SetObjCompassTarg 	"protectPOWs"				$Truck1 1
+	waitthread global/ObjMgr.scr::SetObjCompassTarg 	"escape"					$Truck1 1
+}end
+
+/*
+	level.num_cannons_remaining = 3
+	level.num_pows_remaining = 7
+
+	level.lead_medic_objective_num = 1
+	level.destroy_tank_objective_num = 2
+	level.find_pows_objective_num = 3
+	level.rescue_radioman_objective_num = 4
+	level.protect_radioman_objective_num = 5
+	level.link_with_radioman_objective_num = 6
+	level.cannon_objective_num = 7
+	level.airstrike_objective_num = 8
+	level.get_in_truck_objective_num = 9
+
+	level.medicHealdBarney = 0
+	level.foundMiniCourtyardPOWs = 0
+	level.foundRuinsGuy = 0
+	level.killedCannon1 = 0
+	level.killedCannon2 = 0
+	level.hitRadiomanCompassNode = 0
+	level.rescuedRadioman = 0
+	level.protectedRadioman = 0
+	level.linkedWithRadioman = 0
+	level.toldToCallAirstrike = 0
+	level.calledAirstrike = 0
+	level.liberatedFinalPOWs = 0
+	level.gotInTruck = 0
+	level.killedCannon3 = 0
+
+	waitthread global/objectives.scr::add_objectives level.lead_medic_objective_num 2 "Lead Medic to wounded Soldier" $BarneyPinnedHurt
+	waitthread global/objectives.scr::add_objectives level.find_pows_objective_num 2 ("Rescue POW's [" + level.num_pows_remaining + " remaining]") $MCpow1
+	waitthread global/objectives.scr::add_objectives level.rescue_radioman_objective_num 1 "Rescue captured radioman" $radioman_compass_node
+	waitthread global/objectives.scr::add_objectives level.protect_radioman_objective_num 1 "Protect radioman"
+	waitthread global/objectives.scr::add_objectives level.link_with_radioman_objective_num 1 "Rendezvous with radioman"
+	waitthread global/objectives.scr::add_objectives level.airstrike_objective_num 1 "Call airstrike on German camp"
+	waitthread global/objectives.scr::add_objectives level.cannon_objective_num 2 ("Destroy Enemy Artillery [" + level.num_cannons_remaining + " remaining]") $Cannon1
+	waitthread global/objectives.scr::add_objectives level.get_in_truck_objective_num 1 "Make your escape in the truck" $Truck1
+
+	waitthread global/objectives.scr::current_objectives level.lead_medic_objective_num
+*/
+//end - Criminal
+
+//=========================================================================
+Transition local.key: {
+//=========================================================================
+/*
+	iprintlnbold ("Hit objectives transition point:  " + local.key)
+
+	switch (local.key)
+	{
+		case "MedicHealedBarney":
+			waitthread global/objectives.scr::add_objectives level.lead_medic_objective_num 3
+			level.medicHealdBarney = 1
+			break
+
+		case "FoundMiniCourtyardPows":
+			level.num_pows_remaining = level.num_pows_remaining - 3
+			waitthread global/objectives.scr::add_objectives level.find_pows_objective_num 2 ("Rescue POW's [" + level.num_pows_remaining + " remaining]") $Wounded1SpawnPoint
+			level.foundMiniCourtyardPOWs = 1
+			break
+
+		case "FoundRuinsGuy":
+			level.num_pows_remaining = level.num_pows_remaining - 1
+			waitthread global/objectives.scr::add_objectives level.find_pows_objective_num 2 ("Rescue POW's [" + level.num_pows_remaining + " remaining]") $finalScenePOWTrigger2
+			waitthread global/objectives.scr::add_objectives level.rescue_radioman_objective_num 2 NIL $radioman_compass_node
+			level.foundRuinsGuy = 1
+			break
+
+		case "HitRadiomanCompassNode":
+			waitthread global/objectives.scr::add_objectives level.rescue_radioman_objective_num 2 NIL $prisoner
+			level.hitRadiomanCompassNode = 1
+			break
+
+		case "RescuedRadioman":
+			waitthread global/objectives.scr::add_objectives level.rescue_radioman_objective_num 3 NIL
+			waitthread global/objectives.scr::add_objectives level.protect_radioman_objective_num 2 NIL
+			level.rescuedRadioman = 1
+			break
+
+		case "ProtectedRadioman":
+			waitthread global/objectives.scr::add_objectives level.protect_radioman_objective_num 3 NIL
+			waitthread global/objectives.scr::add_objectives level.link_with_radioman_objective_num 2 NIL $radio_guy_give_node
+			level.protectedRadioman = 1
+			break
+
+		case "LinkedWithRadioman":
+			waitthread global/objectives.scr::add_objectives level.link_with_radioman_objective_num 3 NIL
+			level.linkedWithRadioman = 1
+			break
+
+		case "KilledCannon1":
+			waitthread global/objectives.scr::add_objectives level.cannon_objective_num 2 ("Destroy Enemy Artillery [" + level.num_cannons_remaining + " remaining]") $Cannon2
+			level.killedCannon1 = 1
+			break
+
+		case "KilledCannon2":
+			waitthread global/objectives.scr::add_objectives level.cannon_objective_num 2 ("Destroy Enemy Artillery [" + level.num_cannons_remaining + " remaining]") $Cannon3_Use
+			level.killedCannon2 = 1
+			break
+
+		case "NeedToCallAirStrike":
+			waitthread global/objectives.scr::add_objectives level.airstrike_objective_num 2 NIL $AirStrikeClickTrigger
+			level.toldToCallAirstrike = 1
+			break
+
+		case "CalledAirStrike":
+			waitthread global/objectives.scr::add_objectives level.airstrike_objective_num 3
+			level.calledAirstrike = 1
+			break
+
+		case "LiberatedFinalPows":
+			waitthread global/objectives.scr::add_objectives level.find_pows_objective_num 3 "Rescue POW's"
+			waitthread global/objectives.scr::add_objectives level.get_in_truck_objective_num 2 NIL $Truck1
+			level.liberatedFinalPOWs = 1
+			break
+
+		case "KilledCannon3":
+			waitthread global/objectives.scr::add_objectives level.cannon_objective_num 2 ("Destroy Enemy Artillery [" + level.num_cannons_remaining + " remaining]")
+			level.killedCannon3 = 1
+			break
+
+		case "GotInTruck":
+			waitthread global/objectives.scr::add_objectives level.get_in_truck_objective_num 3
+			level.gotInTruck = 1
+			break
+	}
+
+	// figure out what the current objective is
+
+	if (!level.medicHealdBarney) {
+		// first we have to heal the tank room guy
+		waitthread global/objectives.scr::current_objectives level.lead_medic_objective_num
+	}
+	else if (!level.foundMiniCourtyardPOWs) {
+		// next we have to find the pows in the courtyard
+		waitthread global/objectives.scr::current_objectives level.find_pows_objective_num
+		waitthread global/objectives.scr::add_objectives level.find_pows_objective_num 2 NIL $MCpow1
+	}
+	else if (!level.foundRuinsGuy) {
+		// then we have to find the guy in the church ruins
+		waitthread global/objectives.scr::current_objectives level.find_pows_objective_num
+		waitthread global/objectives.scr::add_objectives level.find_pows_objective_num 2 NIL $Wounded1SpawnPoint
+	}
+	else if (!level.killedCannon1) {
+		// then we have to kill the first cannon
+		waitthread global/objectives.scr::current_objectives level.cannon_objective_num
+		
+	}
+	else if (!level.hitRadiomanCompassNode)
+	{
+		waitthread global/objectives.scr::current_objectives level.rescue_radioman_objective_num
+		waitthread global/objectives.scr::add_objectives level.rescue_radioman_objective_num 2 NIL $radioman_compass_node
+	}
+	else if (!level.rescuedRadioman) {
+		waitthread global/objectives.scr::current_objectives level.rescue_radioman_objective_num
+		waitthread global/objectives.scr::add_objectives level.rescue_radioman_objective_num 2 NIL $radio_guy_give_node
+	}
+	else if (!level.killedCannon2) {
+		// then we have to kill the second cannon
+		waitthread global/objectives.scr::current_objectives level.cannon_objective_num
+	}
+	else if (!level.linkedWithRadioman) {
+		waitthread global/objectives.scr::current_objectives level.link_with_radioman_objective_num
+	}
+	else if (!level.toldToCallAirstrike) {
+		// if we haven't been told to call the airstrike, then we go back 
+		//    to hunting for POWs
+		waitthread global/objectives.scr::current_objectives level.find_pows_objective_num
+	}
+	else if (!level.calledAirstrike) {
+		// if we haven't called the airstrike then that is what we do next
+		waitthread global/objectives.scr::current_objectives level.airstrike_objective_num
+	}
+	else if (!level.liberatedFinalPOWs) {
+		// back to hunting for POWs again
+		//waitthread global/objectives.scr::add_objectives level.find_pows_objective_num 2 "Liberate last group of POW's" $Cannon3
+		waitthread global/objectives.scr::current_objectives level.find_pows_objective_num
+	}
+	else if (!level.killedCannon3) {
+		// still have to kill the last cannon
+		waitthread global/objectives.scr::current_objectives level.cannon_objective_num
+	}
+	else if (!level.gotInTruck) {
+		// get in the truck
+		waitthread global/objectives.scr::add_objectives level.get_in_truck_objective_num 2 NIL $Truck1
+		waitthread global/objectives.scr::current_objectives level.get_in_truck_objective_num		
+	}
+
+	// make sure the cannon objective is marked complete...
+	if (level.num_cannons_remaining == 0)
+		waitthread global/objectives.scr::add_objectives level.cannon_objective_num 3 ("Destroy Enemy Artillery [" + level.num_cannons_remaining + " remaining]")
+*/
+
+}end
+
+
+

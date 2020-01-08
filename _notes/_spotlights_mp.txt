@@ -1,0 +1,175 @@
+main:
+
+$t720.origin = (2475 1700 -80)
+$t355.origin = (1990 1600 -80)
+$t781.origin = (2545 1160 8)
+$t767.origin = (2496 1152 8)
+$t769.origin = (2340 1136 8)
+$t771.origin = (2144 1184 8)
+$spotpath1_3.origin = ( -26 1960 -80)
+
+	if ($spotlight == NULL)
+		level.spotlights = 0
+		else
+		level.spotlights = $spotlight.size
+
+
+	if (level.spotlights > 0){
+	
+		level.spotlight = exec global/makearray.scr $spotlight
+
+		for (local.i=1;local.i<level.spotlights+1;local.i++){
+		
+			level.spotlight[local.i] thread spotwatch
+
+			if (level.spotlight[local.i].set == NIL){
+			
+				println ("Warning, spotlight at " + level.spotlight[local.i].origin + " has no #set, setting to 1")
+				level.spotlight[local.i].set = 1
+			}
+
+			if (level.spotlight[local.i].group == NIL)
+				println ("Error, spotlight at " + level.spotlight[local.i].origin + " has no #group")
+				else
+				println ("Spawned spotlight " + local.i)
+			}
+			
+		}
+
+end		
+
+//**************************************************************************
+//       Spotlight Controller Script by: Bdbodger  (posted at www.modtheater.com)
+//                 
+//**************************************************************************
+
+spotwatch:
+
+	level waittill spawn
+	local.light = spawn script_model
+	local.light model "fx/dummy.tik"
+	
+	self.spotlight = local.light
+	 
+	local.light light (1.0 1.0 1.0)
+	local.light lightRadius 400
+	local.light lightOn
+	local.light notsolid
+	 
+	self model "miscobj/searchlightbase.tik"
+	self.angles = (0 0 0)
+	self scale 1
+	self notsolid
+	 
+	local.bulb = spawn script_model
+	local.bulb model "miscobj/searchlight.tik"
+	local.bulb scale 1
+	local.bulb.origin = self.origin + (0 0 32)
+	self.bulb = local.bulb
+	
+	local.bulb bind self
+	local.bulb notsolid
+	 
+	local.flare = spawn script_model
+	local.flare model "fx/searchlight.tik"
+	local.flare.origin = self.origin + (64 0 64)
+	self.flare = local.flare
+	    
+	local.flare bind self
+	local.flare notsolid
+	 
+	local.org = spawn script_origin
+	local.org.origin = self.origin
+	self.org = local.org
+	
+	self thread spotpath
+	self thread light_corona
+	self thread aimspot
+	
+end
+
+
+spotpath:
+ 
+	local.path = $("spotpath" + self.set + "_" + self.group)
+	 
+	while(1){
+	
+		self.org.origin = local.path.origin
+		self.org flypath local.path 250 750 200
+		self.org waitmove
+
+	}
+
+end
+
+  
+light_corona:
+ 
+	while (1){    
+
+		local.org = self.org.origin
+		local.vect1 = (local.org - self.origin)
+		local.vect1 = vector_toangles (local.vect1)
+		local.angles = self.angles
+		local.angles[1] = local.vect1[1]
+		self.angles = local.angles
+		local.angles = self.angles
+		local.angles[0] = local.vect1[0] + 180
+		local.angles[1] = 0
+		self.bulb.angles = local.angles
+		 
+		local.vect = self.origin - self.org.origin
+		local.vect = vector_normalize (local.vect)
+		local.dist = 16 // was 32
+		         
+		local.vect[0] = local.vect[0] * local.dist
+		local.vect[1] = local.vect[1] * local.dist
+		local.vect[2] = local.vect[2] * local.dist
+		 
+		self.flare.origin = self.bulb.origin - local.vect
+		self.flare scale 5
+ 
+		waitframe
+	}
+ 
+ end
+
+
+ aimspot: 
+
+	while (1){
+	
+		self.spotlight.origin = self.org
+		self.lightdist = 100 + ((vector_length(self.origin - self.spotlight.origin)) * 0.15)
+		self.spotlight lightRadius self.lightdist
+ 
+		local.org = self.org.origin
+		local.vect1 = (local.org - self.origin)
+		local.vect1 = vector_toangles (local.vect1)
+		local.angles = self.angles
+		local.angles[1] = local.vect1[1]
+		self.angles = local.angles
+		local.angles = self.angles
+		local.angles[0] = local.vect1[0] + 180
+		local.angles[1] = 0
+		self.bulb.angles = local.angles
+
+		waitframe
+	}
+	
+ end
+
+seeme local.org:
+ 
+	local.p = parm.other
+	self.gun setaimtarget local.p
+	self.gun startfiring
+	wait 1
+	self.gun stopfiring 
+	self.gun setaimtarget NULL 
+	waitframe
+	self.gun setaimtarget self
+	local.p iprint "Don't get caught in the spotlights!" 1
+
+end

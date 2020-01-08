@@ -1,0 +1,163 @@
+// enemySet325.scr
+
+//============================================================================
+init: {
+//============================================================================
+	local.paradeConcurrentMax = 3
+	local.paradeDuration = 14
+	level.paraParadeOver = 0  // note to paratrooper
+	local.spawnerCount = $parade325origin.size
+	level.nodrophealth = 1
+
+	for ( local.i = 0; local.i < local.spawnerCount; local.i++) {
+		local.j = local.i + 1
+		local.spawner[local.i] = $parade325origin[local.j]
+		local.spawner[local.i] hide
+		local.spawner[local.i] notsolid
+	}
+
+	level.paradeInProgress = 0
+
+	$AB41 waittill death
+	$trigger325 waittill trigger
+
+	level.endParade = 0
+	$trigger325 thread detectParadeEnd $trigger325
+	
+	if (level.showTriggerMessages) {
+		// iprintlnbold "TRIGGER 325 HIT!"
+	}
+
+	//wait till ab41 is dead
+
+	local.spawnedCount = 0
+	level.aliveCount = 0
+	local.startTime = level.time
+	level.paradeOver = 0
+	level.paradeInProgress = 1
+
+	while (level.time - local.startTime < local.paradeDuration) {
+		//local.dTime = level.time - local.startTime
+		//iprintlnbold local.dTime " elapsed"
+
+		while (level.aliveCount >= local.paradeConcurrentMax) {
+			wait 0.25
+		}
+
+		if (level.endParade != 0) {
+			break
+		}
+
+		// time to spawn another dude
+		local.touching = $player istouching $trigger325
+		if ( local.touching ) {
+			local.spawnerIndex = local.spawnedCount%local.spawnerCount
+			local.currentSpawner = local.spawner[local.spawnerIndex]
+
+			local.i = local.spawnedCount
+			local.parader_name[local.i] = "parade_soldier" + local.i
+
+			spawn local.currentSpawner.model "targetname" (local.parader_name[local.i]) "health" "65"
+
+			$(local.parader_name[local.i]) thread paradeCount
+			local.rallyPoint = $(local.currentSpawner.target)
+			$(local.parader_name[local.i]) thread paradeRun local.rallyPoint
+			$(local.parader_name[local.i]).origin = local.currentSpawner.origin
+			$(local.parader_name[local.i]).angles = local.currentSpawner.angles
+			$(local.parader_name[local.i]).mindist = 128
+			$(local.parader_name[local.i]).maxdist = 1024
+			$(local.parader_name[local.i]).leash = 4096
+			$(local.parader_name[local.i]).fixedleash = 0
+			$(local.parader_name[local.i]).sight = 2048
+			$(local.parader_name[local.i]).noticescale = 25
+			$(local.parader_name[local.i]).hearing = 2048
+			$(local.parader_name[local.i]).enemysharerange = 2048
+			$(local.parader_name[local.i]).sound_awareness = 100
+			$(local.parader_name[local.i]).interval = 128
+			$(local.parader_name[local.i]) dontdropweapons
+			$(local.parader_name[local.i]) type_attack "runandshoot"
+
+			local.random = randomint 100
+			if (local.random <= 75) {
+				$(local.parader_name[local.i]) gun "Moschetto"
+			}
+
+			if (local.random <= 45) {
+				$(local.parader_name[local.i]).ammo_grenade = 4
+			}
+
+			local.spawnedCount++
+		}
+		else {
+			waitframe
+		}
+	}	
+	level.paradeInProgress = 0
+	level.paradeOver = 1
+	level.paraParadeOver = 1
+}end
+
+//============================================================================
+paradeRun local.rallyPoint: {
+//============================================================================
+	if ((local.rallyPoint == NIL) || (local.rallyPoint == NULL)) {
+		// dprintln "no rally point - quitting thread"
+		self.enableEnemy = 1
+		end
+	}
+
+	self forceactivate
+	//self.enableEnemy = 0
+	self runto local.rallyPoint
+
+	local.random = randomint 100
+	if (local.random < 50) {
+		// run all the way to the end
+		self waittill movedone
+	}
+	else {
+		// just run for a couple seconds
+		local.random = randomint 4
+		local.random += 2
+		wait local.random
+	}
+
+	//self.enableEnemy = 1
+	self favoriteenemy $player
+	self aimat $player
+}end
+
+//============================================================================
+paradeCount: {
+//============================================================================
+	level.aliveCount++
+	self waittill death
+	level.aliveCount--
+}end
+
+//============================================================================
+detectParadeEnd local.trigger: {
+//============================================================================
+	level.lastTriggerTime = level.time
+	thread playerInTriggerClear 
+	thread playerInTrigger local.trigger
+}end
+
+//============================================================================
+playerInTriggerClear: {
+//============================================================================
+	while (1) {
+		wait 1
+		//if (level.time - level.lastTriggerTime > 0.5)
+			//level.endParade	= 1
+	}
+}end
+
+//============================================================================
+playerInTrigger local.trigger: {
+//============================================================================
+	while (1) {	
+		local.trigger waittill trigger
+		level.lastTriggerTime = level.time
+	}
+}end

@@ -1,0 +1,110 @@
+//============================================================================
+Init: {
+//============================================================================
+}end
+
+// isLeader - leaders never die. The player has to meet up with him
+// coverNodeString - place where that soldier should huddle waiting for player
+//============================================================================
+MonitorLandingHealth local.isLeader local.coverNodeString: {
+//============================================================================
+	local.max = 10000
+	local.alliedParatrooperHealth = 50;
+
+	self health local.max
+	self.iAmDead = 0
+
+	if (local.isLeader) {
+		waitthread global/ObjMgr.scr::SetObjCompassTarg "assist82nd" self
+		self nodamage
+	}
+
+	while (!self.landed) {
+		if (self.health > (local.max - local.alliedParatrooperHealth)) {
+			break
+		}
+		wait 0.1
+	}
+
+	if (self.health > (local.max - local.alliedParatrooperHealth)) {
+		self health 50
+	}
+	else  {
+		// we died in the air
+		self thread DiedInTheAir
+
+		if (local.isLeader) {
+			dprintln ( "ERROR - LEADER IS DEAD!!!!" )
+		}
+		end
+	}
+
+	if (local.isLeader) {
+		self takedamage
+		self thread maps/e2l3/JohnsonThinker.scr::Think
+	}
+	else {
+		self thread JoinSquad
+	}
+
+	while (!self.landed) {
+		wait 0.1
+	}
+
+	local.dist = vector_length ( self.origin - $(local.coverNodeString).origin )
+	self runto $(local.coverNodeString).origin
+
+	while (self != NULL && self.health > 0 && local.dist > 50) {
+		local.dist = vector_length ( self.origin - $(local.coverNodeString).origin )
+		wait 0.1
+	}
+}end
+
+//============================================================================
+DiedInTheAir: {
+//============================================================================
+	self.iAmDead = 1
+	self nodamage
+	self threatbias ignoreme
+
+	if (!self.onGround) { 
+		self anim AA_AL_DeadParaHanging
+	}
+
+	while (!self.onGround) {
+		wait 0.1
+	}
+
+	if (self == NULL) {
+		end
+	}
+
+	self anim death_headpistol
+	self waittill animdone
+	self bedead
+	wait 3
+
+	if (self != NULL) {
+		self ai_off
+	}
+}end
+
+//============================================================================
+JoinSquad: {
+//============================================================================
+	while (level.joinUpWith82nd == NIL || level.joinUpWith82nd == NULL) {
+		wait 0.1
+	}
+
+	if (self == NULL) {
+		end
+	}
+
+	local.with_player = self waitthread global/squad.scr::join_squad $player
+	local.try_commander = !local.with_player && $Commander != NULL && $Commander != NIL && isalive $Commander
+	if (local.try_commander) {
+		self waitthread global/squad.scr::join_squad $Commander
+	}
+
+	self waitthread global/squad.scr::squadthink
+}end

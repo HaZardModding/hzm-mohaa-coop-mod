@@ -1,0 +1,297 @@
+//============================================================
+main:{
+//============================================================
+	level.music="e1l3"
+	level.script = "maps/e1l3.scr"
+	fadeout .001 0 0 0 1
+	
+	level.coopPrevMap = "e1l2"				//chrissstrahl - set previouse map (for mom voteing)
+	//level.coopNextMap = "e1l4"				//chrissstrahl - set next map (for mom voteing)
+	level.coopNextMap = "e1l1"				//chrissstrahl - go back until e1l4 is complete
+	level.coop_forcePrimary = weapons/Uk_W_Vickers.tik //chrissstrahl - make players spawn with this weapon from start
+	
+	level.coop_disableSpawnWarper = TRUE	//chrissstrahl - disable respawn warper
+	waitthread coop_mod/main.scr::main 	//chrissstrahl - start coop mod, wait for this to finish	
+	thread coop_mod/butler.scr::e1l3_start	//chrissstrahl - remove stuff that we don't need in mp
+	
+	//chrissstrahl - moved here
+	waitexec maps/e1l3/hacks.scr
+	
+	level waittill spawn //chrissstrahl - was already here, but note that this works only one in mp
+	
+	//chrissstrahl - remove after testing/development
+	//chrissstrahl - remove after testing/development
+	//chrissstrahl - remove after testing/development
+	//chrissstrahl - remove after testing/development
+	//if(level.gametype != 0){
+		//level.coop_skipThisBriefing = 1	
+		//level.coop_skipThisTankRide = 1	
+		//level.coop_skipThisMeetKlaus = 1
+		//level.coop_skipThisKlausGino = 1
+	//}	
+	drawhud 0
+
+	//chrissstrahl - coop compatible
+	//crap, if i use coop replacement here the tanks won't move, wtf!!!
+	//level waittill spawn
+	//waitthread coop_mod/replace.scr::waitForPlayer
+
+	for (local.i = 1; local.i <= $BoatEnemy.size; local.i++) {
+		$BoatEnemy[local.i].enemyname = "BoatEnemy"
+	}
+
+	waitexec global/auto.scr "e1l3" //chrissstrahl - changed to waitexec - this might get the script stuck :D
+	/*
+	println "-----------------------------------------------"
+	println "-----------------------------------------------"
+	println "-----------------------------------------------"
+	println "E1L3"
+	println "-----------------------------------------------"
+	*/
+
+	thread MusicStart
+	//waitexec maps/e1l3/hacks.scr //chrissstrahl moved up
+	
+	//exec maps/e1l3/aicleanup.scr //chrissstrahl - moved this further down
+
+	//chrissstrahl - removed as this is pointless in coop, wait was set above
+	//level waittill prespawn
+	//level waittill spawn
+
+	level.aipronechance = 18
+	level.aicrouchchance = 28
+	level.nodrophealth = 1
+	level.enemyhealthscalar = 0.7
+	
+	thread InitLevel
+	thread InitPlayer
+	//wait 1
+
+	/*
+	Sections:
+	"TankRide" - Tank ride in
+	"Briefing" - Briefing with Cap'n
+	"Boating" - Boat section (guys set up boats, player gets in a boat, boat travels across, other boat gets sunk)
+	"JailBreak" - Liberate Brit prisoners
+	"Conquest" - Take fortress with Brits
+	"Sneakers" - Meet Klaus, sneak through streets
+	"RoofJaunt" - Germans are alerted, player and Klaus escape to roof, hop from roof to roof, then
+						Klaus picks a lock while player covers him
+	"FinalEscape" - Klaus and player get into uniform, walk out and show papers to Germans, get in truck,
+						and drive off into the sunset
+	*/
+
+	$fanblade1 bind $center
+	$fanblade2 bind $center
+	$fanblade3 bind $center
+	$fanblade4 bind $center  
+	$center rotatey -115
+	
+	//waitthread maps/e1l3/Objectives.scr::start_init //chrissstrahl - moved down
+iprintlnbold_noloc ( "ride" ) //chrissstrahl - debugme fixme
+	waitthread maps/e1l3/TankRide.scr::init //chrissstrahl - debugme fixme
+iprintlnbold_noloc ( "briefing" )//chrissstrahl
+	waitthread maps/e1l3/Briefing.scr::init
+iprintlnbold_noloc ( "Boating" )//chrissstrahl
+	waitthread maps/e1l3/Boating.scr::init
+iprintlnbold_noloc ( "JailBreak" )//chrissstrahl
+	waitthread maps/e1l3/JailBreak.scr::init
+iprintlnbold_noloc ( "Conquest" )//chrissstrahl
+	waitthread maps/e1l3/Conquest.scr::init
+iprintlnbold_noloc ( "Sneakers" )//chrissstrahl
+	waitthread maps/e1l3/Sneakers.scr::init
+iprintlnbold_noloc ( "RoofJaunt" )//chrissstrahl
+	waitthread maps/e1l3/RoofJaunt.scr::init
+iprintlnbold_noloc ( "FinalEscape" )//chrissstrahl
+	waitthread maps/e1l3/FinalEscape.scr::init
+iprintlnbold_noloc ( "Courtyard" )//chrissstrahl
+	waitthread maps/e1l3/Courtyard.scr::init
+iprintlnbold_noloc ( "Objectives" )//chrissstrahl
+	//waitthread maps/e1l3/Objectives.scr::finish_init //chrissstrahl - moved down
+	
+	if (level.warpTo == "None") {
+		wait 2
+		if(level.gametype == 0){
+			fadein 5.5 0 0 0 1
+		}
+	}else {
+		//chrissstrahl - don't fade in on final escape, it fades on its own
+		if(level.warpTo != "finalEscape"){
+			fadein 0.001 0 0 0 1
+			//keep for sp
+			if(level.gametype == 0){
+				$player item weapons/Uk_W_Vickers.tik
+				$player use vickers			
+			}
+		}
+		drawhud 1
+	}
+
+	thread InitAmbientTriggers
+	
+	//chrissstrahl - 
+	//to prevent players being unable to reach this trigger from where they are spawned
+	//this trigger starts the sort of briefing sequence
+	if(level.gametype != 0){
+		//original pos: 240 -6272 240
+		waitthread coop_mod/replace.scr::waitForPlayer
+		trigger $start_wall_battle_trigger
+		//iprintlnbold_noloc("DEV: triggred: $start_wall_battle_trigger")
+		//$start_wall_battle_trigger origin ( 240 -600 150 )
+		//$start_wall_battle_trigger setsize ( -512 -512 -512 ) ( 512 512 512 )		
+	}
+	
+	//chrissstrahl - update spawn locations - will activate once a player is close
+	exec coop_mod/spawnlocations.scr::e1l3_update4
+	exec coop_mod/spawnlocations.scr::e1l3_update5
+	
+	//chrissstrahl - moved here, to allow the server to handle the other scripts in a timly fashion
+	waitthread maps/e1l3/Objectives.scr::start_init
+	waitthread maps/e1l3/Objectives.scr::finish_init
+	
+	wait 1
+	
+	//chrissstrahl - moved this here, this is not so much time dependant
+	exec maps/e1l3/aicleanup.scr
+}end
+
+//============================================================
+InitAmbientTriggers:{
+//============================================================
+	if (!$exterior){end}
+
+	local.special_trig = NULL
+	for (local.i=1; local.i<$exterior.size; local.i++){
+		if ($exterior[local.i].exiting_fort_gate == 1){
+			local.special_trig = $exterior[local.i]
+			break
+		}
+	}
+
+	if (!local.special_trig){end}
+	local.special_trig waittill trigger
+
+	// now go through and change all #set 2's to #set 3's
+	for (local.i=1; local.i<$exterior.size; local.i++){
+		if ($exterior[local.i].set == 2){
+			$exterior[local.i].set = 3
+		}
+	}
+}end
+
+//============================================================
+InitLevel:{
+//============================================================
+	//chrissstrahl - keep for sp
+	if(level.gametype == 0){
+		$player heal 1
+		setcvar g_mission 1
+	}
+	//	waitthread Fadein
+}end
+
+//============================================================
+InitPlayer:{
+//============================================================
+	if(level.gametype == 0){ //chrissstrahl - keep for sp
+		level waittill prespawn
+		level waittill spawn
+	}
+	drawhud 0
+
+	wait 1.0
+	waitexec global/loadout.scr
+}end
+
+//============================================================
+Fadein:{
+//============================================================
+	//chrissstrahl - keep for sp
+	if(level.gametype == 0){
+		level.startangles = $player.viewangles
+		$player physics_off
+	}
+
+	exec global/fadein.scr
+	waitframe
+
+	waitthread global/fadein.scr::DoFadeIn e1l3_1 e1l3_2 e1l3_3 NIL 1
+	
+	//chrissstrahl - keep for sp
+	if(level.gametype == 0){
+		$player.viewangles = level.startangles  //undo any mousemovment during the hud stuff
+	}
+}end
+
+//============================================================
+Autosave1:{
+//============================================================
+	//dprintln "AUTO:  Doing autosave 1"
+	waitexec global/autosave.scr 1
+}end
+
+//============================================================
+Autosave2:{
+//============================================================
+	//dprintln "AUTO:  Doing autosave 2"
+	waitexec global/autosave.scr 2
+}end
+
+//============================================================
+Autosave3:{
+//============================================================
+	//dprintln "AUTO:  Doing autosave 3"
+	waitexec global/autosave.scr 3
+}end
+
+//Autosave4:
+//dprintln "AUTO:  Doing autosave 4"
+//	waitexec global/autosave.scr 4
+//end
+
+//============================================================
+Autosave5:{
+//============================================================
+	//dprintln "AUTO:  Doing autosave 5"
+	waitexec global/autosave.scr 5
+}end
+
+// You Make Me Sick I Make Music
+//============================================================
+MusicStart:{
+//============================================================
+	thread global/music.scr::PlaySongLoop "sound/music/medicdance.mp3" 1.0
+}end
+//============================================================
+MusicMeetingClaus:{
+//============================================================
+	waitthread global/music.scr::StopSong 2.0
+	thread global/music.scr::PlaySongLoop "sound/music/Monte_Cassino.mp3" 1.0
+}end
+//============================================================
+MusicEscaping:{
+//============================================================
+	waitthread global/music.scr::StopSong 2.0
+	thread global/music.scr::PlaySongLoop "sound/music/mus_06a_mystery.mp3" 1.0
+}end
+
+//failsafe activating the trigger if player did not spawn in time to get attached to the tank and activate the trigger by this
+//============================================================
+coop_cappyFailsafe:{
+//============================================================
+	local.waiting = 1
+	local.waittimed = 0
+	while(local.waiting){
+		if(!$coop_playerTankGlue && local.waittimed > 16){
+			trigger $start_wall_battle_trigger
+			end
+		}
+		//else{
+			//iprintlnbold_noloc("local.waittimed: "+local.waittimed)
+		//}
+		wait 1
+		local.waittimed++
+	}
+}end
+
+

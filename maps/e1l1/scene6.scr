@@ -1,0 +1,161 @@
+//=========================================================================
+Init:
+//=========================================================================
+{
+	waitframe //chrissstrahl - make sure this will be working in coop
+	
+	thread initFinalConvoy
+	$scene6Trigger		 nottriggerable
+	$scene6DialogTrigger nottriggerable
+	$scene6Jeep nodamage
+	$scene6Jeep hide
+
+	if (level.warpToLevelEnd != 1){
+		if ($everythingDoneTrigger){
+			$everythingDoneTrigger waittill trigger
+		}
+		else{
+			println "SCENE6 >>> Everything Done trigger missing!"
+		}
+	}
+	else{
+		wait 1
+		trigger $EnterFinalBunkerRoom1Trigger 
+		wait 1
+	}
+
+	//$scene6AlliedTank1 waittill drive
+	thread rollFinalConvoy
+	$scene6Trigger		 triggerable
+	$scene6DialogTrigger triggerable
+	$scene6Jeep show
+	waitframe
+
+	$scene6Jeep anim idlewindscreen_up
+	$scene6Trigger waittill trigger
+	$finalfight thread doRemove
+
+	if ($scene6AlliedTank1 != NULL){
+		$scene6AlliedTank1 remove
+	}
+
+	if ($scene6AlliedTank2 != NULL){
+		$scene6AlliedTank2 remove
+	}
+
+	/*
+	$scene6AlliedTank1 stop
+	$scene6AlliedTank2 stop
+	$scene6AlliedTank1.origin = $scene6Tank1End.origin
+	$scene6AlliedTank2.origin = $scene6Tank2End.origin
+	$scene6AlliedTank1.angles = $scene6Jeep.angles
+	$scene6AlliedTank2.angles = $scene6Jeep.angles
+	*/
+	waitframe
+
+	// commander
+	spawn models/human/Sc_Al_US_Tank.tik targetname fuches
+	$fuches holster
+	$fuches rendereffects "-shadow"
+	$fuches.enableEnemy = 0
+
+	//$scene6Jeep attachpassengerslot 0 $fuches
+	$fuches.origin  = $scene6Jeep.origin
+	$fuches.angles  = $scene6Jeep.angles
+	$fuches.origin += ( -75 0 10 )
+	$fuches thread global/loopanim.scr::LoopAnim A_11_GetonJeep_idle
+	$fuches threatbias ignoreme
+	$fuches bind $scene6Jeep
+	
+	// driver
+	spawn models/human/Sc_Al_US_Mcmartin.tik targetname driver
+	$driver holster
+	$driver.enableEnemy = 0
+	$driver rendereffects "-shadow"
+	$driver nodamage
+	$driver physics_off
+	$scene6Jeep attachdriverslot 0 $driver
+	$driver thread global/loopanim.scr::LoopAnim AV_jeep_passenger_idle
+	$driver threatbias ignoreme
+	$scene6DialogTrigger waittill trigger
+	$endGuys thread doExplode
+
+	//	$player physics_off
+	$fuches thread global/loopanim.scr::LoopAnimStop
+	$fuches waittill animdone
+	$fuches anim A_11_GetonJeep_talk
+	$fuches waittill animdone
+	$fuches ai_off
+	trigger $fuchesDoneTrigger	
+}end
+
+//=========================================================================
+waitForLevelEnd:
+//=========================================================================
+{
+	$fuchesDoneTrigger waittill trigger
+
+	//iprintln "fuchesDoneTriggered..."
+	waitthread maps/e1l1/objectives.scr::transition "foundAlliedArmorDivision"
+}end
+
+//=========================================================================
+TanksDriveUp:
+//=========================================================================
+{
+	//iprintln "here come the tanks"
+	if (!$scene6AlliedTank1 || !$scene6AlliedTank2){
+		println "ERROR: Can't find scene 6 tanks!"
+		end
+	}
+	
+	local.turret = $scene6AlliedTank1 QueryTurretSlotEntity 0
+	local.turret anim hatch_open
+}end
+
+//=========================================================================
+removeEndVehicle local.vehicle:
+//=========================================================================
+{
+	local.vehicle remove
+}end
+
+//=========================================================================
+initFinalConvoy:
+//=========================================================================
+{
+	$tank3 hide
+	$tank2 hide
+}end
+
+//=========================================================================
+rollFinalConvoy:
+//=========================================================================
+{
+	$tank3 show
+	$tank2 show
+	$tank2.mineclearing = spawn script_model model vehicles/US_V_MineClearing.tik
+	$tank2.mineclearing attach $tank2 origin 1
+
+	local.o 		= spawn script_object targetname theTankTarget
+	local.o.origin 	= $finalTankShootNode.origin
+	local.gun 		= $tank3 QueryTurretSlotEntity 0
+	local.gun setaimtarget theTankTarget
+	$scene6Trigger waittill trigger
+	//wait 1
+	//local.gun anim fire
+}end
+
+//=========================================================================
+doRemove:
+//=========================================================================
+{
+	self remove
+}end
+
+//=========================================================================
+doExplode:
+//=========================================================================
+{
+	thread maps/e1l1/explosion.scr::big self 0 1
+}end

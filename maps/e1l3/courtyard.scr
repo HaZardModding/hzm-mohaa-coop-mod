@@ -1,0 +1,540 @@
+//chrissstrahl - started modifying for coop on 2019.09.18
+//chrissstrahl - completed coopification on 2019.09.18
+
+//
+// courtyard.scr
+//
+//=========================================================================
+init:
+//=========================================================================
+{
+	if (level.warpTo == "courtyard") {
+		//$player.origin = ( -1.5 2569 128 )
+		//$player.origin = ( 1561 3398 128 )
+		
+		//chrissstrahl - keep for sp
+		if(level.gametype == 0){
+			$player.origin 		= ( 593 1841 128 )
+			$player.angles 		= ( 0 90 0 )
+			$player.viewangles 	= ( 0 90 0 )
+		}
+		//$RoofJauntStartTrigger nottriggerable
+
+		$Claus.origin = ( 64 2776 208 )
+		$Claus.angles = ( 0 90 0 )
+	}
+
+	waitthread initCourtyardGuy "cyCrateGuy_1"
+	waitthread initCourtyardGuy "cyRunner_1"
+	waitthread initCourtyardGuy "cyRunner_2"
+	waitthread initCourtyardGuy "cyRunner_3"
+	waitthread initCourtyardGuy "cyTalker_1"
+	waitthread initCourtyardGuy "cyTalker_2"
+	waitthread initCourtyardGuy "cyTalker_3"
+
+	level.playerEscaping 	= 0
+	level.courtyardSpawned 	= 0
+	$cyBike hide
+
+	$getawayTruck anim idlenolights
+	$cyTruck2 anim idlenolights
+
+	thread doWork
+}end
+
+//=========================================================================
+doWork:
+//=========================================================================
+{
+	$CourtyardStart waittill trigger
+	level.cySleeping = 1
+	thread wakeup
+	thread detectPlayerBreach
+}end
+
+//=========================================================================
+wakeGuy:
+//=========================================================================
+{
+	self show
+	self ai_on
+
+	if (self.flyModel != NULL && self.flyModel != NIL) {
+		self.flyModel modifyflypath self.flymodelSpeed self.flymodelSpeed 100
+	}
+}end
+
+//=========================================================================
+wakeup:
+//=========================================================================
+{
+	if (level.courtyardSpawned == 0) {
+		level.courtyardSpawned = 1
+		level.cySleeping = 0
+		waitthread spawn
+		end
+	}
+
+	//iprintlnbold "wakeup!"
+	if (level.cySleeping == 0){
+		//iprintlnbold "already woken up!"
+		end
+	}
+
+	level.cySleeping = 0
+	$cyCrateGuy_1 	waitthread wakeGuy
+	$cyRunner_1 	waitthread wakeGuy
+	$cyRunner_2 	waitthread wakeGuy
+	$cyRunner_3 	waitthread wakeGuy
+	$cyTalker_1 	waitthread wakeGuy
+	$cyTalker_2 	waitthread wakeGuy
+	$cyTalker_3 	waitthread wakeGuy
+}end
+
+//=========================================================================
+sleepGuy:
+//=========================================================================
+{
+	self hide
+	self ai_off
+
+	if (self.flyModel != NULL && self.flyModel != NIL){
+		self.flyModel modifyflypath 0 0 100
+	}
+}end
+
+//=========================================================================
+sleep:
+//=========================================================================
+{
+	//level.courtyardSpawned = 0
+	//iprintlnbold "sleep!"
+	if (level.cySleeping == 1) {
+		//iprintlnbold "already asleep!"
+		end
+	}
+
+	level.cySleeping = 1
+	$cyCrateGuy_1 	waitthread sleepGuy
+	$cyRunner_1 	waitthread sleepGuy
+	$cyRunner_2 	waitthread sleepGuy
+	$cyRunner_3 	waitthread sleepGuy
+	$cyTalker_1 	waitthread sleepGuy
+	$cyTalker_2 	waitthread sleepGuy
+	$cyTalker_3 	waitthread sleepGuy
+}end
+
+//=========================================================================
+detectPlayerBreach:
+//=========================================================================
+{
+	$courtyardBreach waittill trigger
+	thread enableEnemyOnAll
+}end
+
+//=========================================================================
+enableEnemyOnAll:
+//=========================================================================
+{
+	if (level.alreadyBlown == 1){
+		end
+	}
+
+	level.alreadyBlown 	 = 1
+	
+	//chrissstrahl - keep for sp
+	if(level.gametype == 0){
+		$player.health 		 = 1 // make sure player dies a quick and painless death
+		$player.has_disguise = 0
+	}
+	//chrissstrahl - handle multi
+	else{
+		level.coop_health = 1
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+			if( local.player != NULL ){
+				if( local.player.dmteam != "spectator" && local.player.health > 0 ){
+					local.player health level.coop_health
+				}
+			}
+		}
+	}
+	
+	level.alarm 		 = 1
+	$cyCrateGuy_1.enableEnemy = 1
+	$cyRunner_1.enableEnemy = 1
+	$cyRunner_2.enableEnemy = 1    
+	$cyRunner_3.enableEnemy = 1    
+	$cyTalker_1.enableEnemy = 1    
+	$cyTalker_2.enableEnemy = 1    
+	$cyTalker_3.enableEnemy = 1    
+
+	$cyCrateGuy_1.accuracy = 100
+	$cyRunner_1.accuracy = 100
+	$cyRunner_2.accuracy = 100    
+	$cyRunner_3.accuracy = 100    
+	$cyTalker_1.accuracy = 100    
+	$cyTalker_2.accuracy = 100    
+	$cyTalker_3.accuracy = 100
+
+	$cyCrateGuy_1 attackplayer
+	$cyRunner_1   attackplayer
+	$cyRunner_2   attackplayer  
+	$cyRunner_3   attackplayer  
+	$cyTalker_1   attackplayer  
+	$cyTalker_2   attackplayer  
+	$cyTalker_3   attackplayer
+	$bigGerman    attackplayer
+
+	if ($escapeTruckSoldier_1 != NULL){
+		$escapeTruckSoldier_1 attackplayer
+	}
+
+	if ($escapeTruckSoldier_2 != NULL){
+		$escapeTruckSoldier_2 attackplayer
+	}
+		
+	// make sure people in god mode know they lost
+	wait 2
+
+	//chrissstrahl - keep for sp
+	if(level.gametype == 0){
+		if (isalive $player) {
+			iprintlnbold "Your cover was blown."
+			wait 1
+			missionfailed
+		}
+	}else{
+		iprintlnbold "Your cover was blown."
+		wait 1
+		exec coop_mod/replace.scr::missionfailed
+	}
+}end
+
+//=========================================================================
+initCourtyardGuy local.name:
+//=========================================================================
+{
+	waitthread global/ManSpawnNamed.scr::Init local.name
+}end
+
+//=========================================================================
+spawnCourtyardGuy local.name:
+//=========================================================================
+{
+	waitthread global/ManSpawnNamed.scr::Spawn local.name
+	local.guy = $(local.name)
+	local.guy.enableEnemy = 0	
+	local.guy ai_off
+
+	local.guy.sight 	= 4000
+	local.guy.hearing 	= 4000
+	local.guy.accuracy 	= 100
+
+	local.guy health 10000
+	local.guy nodamage
+	local.guy.mood = alert
+}end
+
+//=========================================================================
+spawn:
+//=========================================================================
+{
+	$cyTruck2 vehicleanim idlenolights
+	$cyTruck2.collisionent = $cyTruck2.target
+	$getawayTruck.collisionent = $getawayTruck.target
+	$getawayTruck vehicleanim idlenolights
+
+	spawn trigger_multiple targetname "talker3_sent"
+	spawn trigger_multiple targetname "talker3_returned"
+
+	// create guys
+	waitthread spawnCourtyardGuy "cyCrateGuy_1"
+	$cyCrateGuy_1 thread crateGuy 0.5 "cyCrateGuy_1_start" "cyCrateGuy_1_end"
+
+	waitthread spawnCourtyardGuy "cyRunner_1"
+	$cyRunner_1 thread runner cyRunner_1_path thompson_run_forward 250 0 1 mg42
+
+	waitthread spawnCourtyardGuy "cyRunner_2"
+	$cyRunner_2 thread runner cyRunner_2_path thompson_run_forward 250 0 1 mg42
+
+	waitthread spawnCourtyardGuy "cyRunner_3"
+	$cyRunner_3 thread runner cyRunner_3_path thompson_run_forward 250 0 1 mg42
+
+	waitthread spawnCourtyardGuy "cyTalker_1"
+	$cyTalker_1 thread talker_1
+
+	waitthread spawnCourtyardGuy "cyTalker_2"
+	$cyTalker_2 thread talker_2
+
+	waitthread spawnCourtyardGuy "cyTalker_3"
+	$cyTalker_3 thread talker_3
+
+	$cyBike thread doBike 1
+	thread spawnBigGerman
+}end
+
+//=========================================================================
+talker_2:
+//=========================================================================
+{
+	self ai_on
+	//self anim chatter01
+	//self waittill animdone
+	//iprintlnbold "1 done"
+}end
+
+//=========================================================================
+talker_1:
+//=========================================================================
+{
+	self ai_on
+	local.first = 1
+
+	while (1) {
+		self unholster
+
+		if (local.first){
+			local.first = 0
+			$courtyardRunnerStart waittill trigger
+		}
+		wait 2
+
+		self anim 11B102_BritCaptdial
+		self waittill animdone
+		self holster
+		trigger $talker3_sent		
+
+		self anim smoking01
+		self waittill animdone
+
+		self anim smoking02
+		self waittill animdone
+
+		self anim smoking02
+		self waittill animdone
+
+		self anim smoking04
+		self waittill animdone
+
+		while ($cyTalker_3.returned == 0){
+			wait 0.5
+		}
+	}
+}end
+
+//=========================================================================
+talker_3:
+//=========================================================================
+{
+	self ai_on
+	while (1){
+		$talker3_sent waittill trigger
+		self.returned = 0
+		self waitthread global/SafeMoveTo.scr::SafeRunTo_Wait $cyTalkerPoint_2 
+		wait 3
+
+		self waitthread global/SafeMoveTo.scr::SafeRunTo_Wait $cyTalkerPoint_1
+		self turnto $cyTalker_1
+		wait 1
+
+		self turnto NULL
+		self.returned = 1
+	}		
+}end
+
+//=========================================================================
+crateGuy local.delay local.startPointName local.endPointName:
+//=========================================================================
+{
+	local.startPoint = $(local.startPointName)
+	local.endPoint 	 = $(local.endPointName)
+
+	self holster
+	wait local.delay
+	self ai_on
+	$courtyardRunnerStart waittill trigger
+
+	while (1) {
+		self turnto local.endPoint
+		wait 1
+
+		self anim crate_pickup2
+		self waittill animdone
+		self anim crate_walk
+		wait 3.5
+
+		self anim crate_putdown2
+		self waittill animdone
+		self turnto local.startPoint
+		wait 1
+
+		self walkto local.startPoint
+		self waittill movedone
+	}
+}end
+
+//=========================================================================
+runner local.path local.anim local.speed local.holster local.delay local.gun:
+//=========================================================================
+{
+	$courtyardRunnerStart waittill trigger
+
+	self ai_on
+	self notsolid
+	self physics_off
+	self.origin = $(local.path).origin
+
+	if (local.holster){
+		self holster
+	}
+	else if (local.gun != NULL && local.gun != NIL){
+		self gun local.gun
+	}
+
+	local.model = spawn script_model
+	local.model.origin = $(local.path).origin
+	local.model.angles = self.angles
+	local.model notsolid
+	local.model physics_off
+
+	self.flyModel = local.model
+	self.flyModelSpeed = local.speed
+	self bind local.model
+
+	if (local.anim != NULL){
+		self thread global/loopanim.scr::LoopAnim local.anim
+	}
+
+	thread runnerEnemyCheck
+
+	while (1){
+		local.model flypath local.path local.speed local.speed 100
+		local.model waitmove
+	}
+}end
+
+//=========================================================================
+runnerEnemyCheck:
+//=========================================================================
+{
+	while (self.enemy == NULL || self.enemy == NIL){
+		waitframe
+	}
+
+	self unbind
+	//self.flyModel remove
+	self physics_on
+	self solid
+}end
+
+//=========================================================================
+doBike local.waitTime:
+//=========================================================================
+{
+	end
+	wait 4
+	self.rider = spawn "models/human/german_wehrmact_officer.tik"
+	self notsolid
+	self loopsound bmwbike_snd_run
+	self anim high
+	self.rider thread doBikeRider self 
+	wait local.waitTime
+
+	self nodamage
+	local.o = self.origin
+	local.a = self.angles
+
+	while (1) {
+		//self thread maps/e2l2/bikeThink.scr::init 200 0
+		self show
+		self drive $cyBikePath 450 125 256
+		self waittill drive
+		self hide
+
+		while (level.cySleeping){
+			wait 1
+		}
+		wait 3
+
+		self.origin = local.o
+		self.angles = local.a
+		wait 3
+	}
+}end
+
+//=========================================================================
+doBikeRider local.bike:
+//=========================================================================
+{
+	self rendereffects "-shadow"
+	self holster
+	self physics_off
+	self.angles = (0 0 0)
+	self aimat $player
+	self exec global/disable_ai.scr
+
+	// drive
+	self.origin  = local.bike.origin
+	self.origin += ( 14 0 44 )
+	self.angles  = local.bike.angles
+	self bind local.bike
+	self notsolid
+	self nodamage
+	self physics_off
+	self holster 1
+	//self unholster 1
+
+	self anim_noclip 13G101_Colonel
+	wait 0.5
+	self ai_off
+}end
+
+//=========================================================================
+spawnBigGerman:
+//=========================================================================
+{
+	local.bigGerman = NULL
+
+	while (1) {
+		if (local.bigGerman == NULL) {
+			local.bigGerman = spawn human/german_afrika_NCO.tik targetname bigGerman
+			local.bigGerman.enableEnemy = 1
+			local.bigGerman.hearing = 4096
+			local.bigGerman.sight 	= 0
+
+			local.bigGerman nodamage
+			local.bigGerman.accuracy = 100
+			local.bigGerman.origin 	 = ( -534 3462 128 )
+			local.bigGerman.angles 	 = ( 0 -45 0 )
+		}
+
+		if (level.cySleeping) {
+			local.bigGerman remove
+
+			while (level.cySleeping){
+				waitframe
+			}
+		}
+		else {
+			if (local.bigGerman.enemy != NULL && local.bigGerman.enemy != NIL) {
+				//iprintlnbold "enemy = " local.bigGerman.enemy.targetname
+				local.v 	= (angles_toforward $player.angles)
+				local.dot 	= (vector_dot local.v ( 0 1 0 ))
+				
+				//chrissstrahl - debug - no idea what the idea here is
+				//if(level.gametype != 0){
+					//iprintlnbold_noloc("DEV: local.v: "+local.v)
+				//}
+
+				if (local.dot > 0.0 || level.playerEscaping == 1){
+					thread enableEnemyOnAll
+					end
+				}
+				local.bigGerman remove
+			}
+		}
+		waitframe
+	}
+}end
+

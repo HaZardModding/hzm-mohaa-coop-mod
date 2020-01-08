@@ -1,0 +1,416 @@
+// Tank pin-down section
+
+// Allied soldiers (1 wounded) are holed up in building.
+// Player leads medic in to heal wounded, triggering
+// a tank attack from outside.
+//=========================================================================
+InitSection: {
+//=========================================================================
+	//	$towersniper1 thread maps/e3l2.scr::DisableGuy
+	//	$sandbagguy thread maps/e3l2.scr::DisableGuy
+
+	waitthread global/ManSpawnNamed.scr::Init "BarneyPinnedHurt" 
+	waitthread global/ManSpawnNamed.scr::Init "BarneyPinned1"
+	waitthread global/ManSpawnNamed.scr::Init "BarneyPinned2"
+
+	if ($BarneyPinnedFodder) {
+		$BarneyPinnedFodder delete
+	}
+
+	//	waitthread global/ManSpawnNamed.scr::Init "BarneyPinnedFodder"
+	//	$BarneyPinnedHurt thread maps/e3l2.scr::DisableGuy
+	//	$BarneyPinned2 thread maps/e3l2.scr::DisableGuy
+	//	$BarneyPinned1 thread maps/e3l2.scr::DisableGuy
+	//	$BarneyPinnedFodder thread maps/e3l2.scr::DisableGuy
+	spawn trigger_relay targetname "rollTank1Trigger"
+
+	if (level.warp_to_section != "TankPinDown") {
+		$TankPinDoor lock
+	}
+
+	$tank1 thread initTank	
+	thread InitEnemies
+	thread DoSection
+}end
+
+//=========================================================================
+DoSection: {
+//=========================================================================
+	$RoomGuysTrigger waittill trigger
+
+	waitthread global/ManSpawnNamed.scr::Spawn "BarneyPinnedHurt"
+	waitthread global/ManSpawnNamed.scr::Spawn "BarneyPinned1"
+	waitthread global/ManSpawnNamed.scr::Spawn "BarneyPinned2"
+	// waitthread global/ManSpawnNamed.scr::Spawn "BarneyPinnedFodder"
+	waitframe
+
+	$BarneyPinned1 gun "enfield"
+	$BarneyPinned2 gun "enfield"
+	waitframe
+
+	$BarneyPinnedHurt exec global/disable_ai.scr
+	$BarneyPinned2 exec global/disable_ai.scr
+	$BarneyPinned2 holster
+	$BarneyPinned1 exec global/disable_ai.scr
+	// $BarneyPinnedFodder exec global/disable_ai.scr
+	$BarneyPinnedHurt thread InjuredAnimThread
+	// $BarneyPinnedHurt thread global/loopanim.scr::LoopAnim 23A825_InjuredCycle
+
+	//Pinned2 moves to wounded and crouches by his side
+	$BarneyPinned2 walkto $BarneyPinnedHurt
+	$BarneyPinned2 lookat $BarneyPinnedHurt
+	$BarneyPinned2 turnto $BarneyPinnedHurt
+	$BarneyPinned2 thread global/loopanim.scr::LoopAnim unarmed_crouch_alert
+
+	$TankPinDownTrigger waittill trigger
+	exec global/autosave.scr 1
+
+	$BarneyPinnedHurt thread InjuredSoundsThread
+
+	level.dangerousness = 0
+	waitthread maps/e3l2/medic_think.scr::MedicLeaveForcedHuddle
+	wait 0.5
+
+	$medic.stop_thinking = 1
+	waitframe
+
+	waitframe
+	$medic exec global/stand.scr
+	$medic waittill animdone
+	$medic.movedoneradius = 32
+
+	//everyone freaks when Baker enters
+	$BarneyPinned1 lookat $player
+	$BarneyPinned2 lookat $player
+	$BarneyPinned1 turnto $player
+	// $BarneyPinnedFodder turnto $player
+	$BarneyPinned1 aimat $player
+	// $BarneyPinnedFodder aimat $player
+
+	$BarneyPinned1 anim A_32_PvtWerizTalk_01  //come down slowly
+	$BarneyPinned1 waittill animdone
+	wait 1
+
+	$BarneyPinned1 aimat NULL
+	wait 0.5
+
+	//$BarneyPinnedFodder aimat NULL
+	$BarneyPinned1 anim A_32_PvtWerizTalk_02  //what a relief
+
+	$medic walkto $MedicPinnedHuddle1
+	$medic waittill movedone
+	$medic.no_idle = 1
+	$medic thread global/loopanim.scr::LoopAnim A_32_MedTalk_idle
+	// $medic exec global/crouch.scr
+	// $medic waittill animdone
+	$medic avoidplayer 0
+	$medic turnto $BarneyPinnedHurt
+	// $BarneyPinned1 waittill animdone
+
+	// // heal Barney
+	// $BarneyPinnedHurt.been_healed = 0
+	// $BarneyPinnedHurt healthonly 1
+
+	$medic upperanim pass_canteen_start
+	$medic waittill upperanimdone
+	$medic playsound med_canteen
+	$medic upperanim pass_canteen_end
+	$medic waittill upperanimdone
+	
+	//	$TankPinRoomTrigger waittill trigger
+	//
+	//	thread maps/e3l2/medic_think.scr::MedicHealWounded $BarneyPinnedHurt
+	//	waitthread maps/e3l2/medic_think.scr::MedicForceHuddle $MedicPinnedHuddle1
+	//
+	//	while ($BarneyPinnedHurt.been_healed == 0)
+	//		wait 0.2
+	wait 1
+
+	//everyone watches the medic now
+	$BarneyPinned1 turnto $medic
+	$BarneyPinned2 turnto $medic
+	//	$BarneyPinnedFodder turnto $medic
+	$BarneyPinned1 lookat $medic
+	$BarneyPinned2 lookat $medic
+	//	$BarneyPinnedFodder lookat $medic
+	//	waitthread maps/e3l2/objectives.scr::Transition "MedicHealedBarney"
+
+	//	$medic turnto $player
+	//	$medic waittill turndone
+	$medic turnto NULL
+	$medic waitthread global/loopanim.scr::LoopAnimStop
+	waitframe
+
+	//	$medic lookat $player
+	$medic anim A_32_MedTalk_04   //this guy is pretty banged up
+	$medic waittill animdone
+	$medic thread global/loopanim.scr::LoopAnim A_32_MedTalk_idle
+
+	$BarneyPinned1 turnto $player
+	$BarneyPinned1 lookat $player
+	$BarneyPinned1 anim A_32_PvtWerizTalk_03  //we can't head back yet
+	$BarneyPinned1 waittill animdone
+
+	$medic waitthread global/loopanim.scr::LoopAnimStop
+	waitframe
+
+	$medic anim A_32_MedTalk_05  //you'll have to go on without me...
+	$medic waittill animdone
+	$medic thread global/loopanim.scr::LoopAnim A_32_MedTalk_idle
+	$medic turnto $BarneyPinnedHurt
+	$medic waittill turndone
+	$medic turnto NULL
+
+	if ($MCJailKeys) {
+		waitthread global/ObjMgr.scr::SetObjCompassTarg "findPOWs" $MCJailKeys
+	}
+
+	wait 2
+	trigger $rollTank1Trigger
+	wait 1
+
+	$medic anim A_32_MedTalk_02 // "Now what?  Is that a tank?"
+	$medic waittill animdone
+	$medic anim A_32_MedTalk_03 //Keep your head down
+	$medic waittill animdone
+
+	//	waitthread maps/e3l2/objectives.scr::Transition "TankPinDown"
+	
+	//	// make medic run for huddle point and do a "forced huddle"
+	//	waitthread maps/e3l2/medic_think.scr::MedicForceHuddle $MedicPinnedHuddle1
+	//	$medic.stop_thinking = 1
+
+	//	$BarneyPinnedFodder exec global/crouch.scr
+	wait 0.5
+
+	$BarneyPinned1 exec global/crouch.scr
+	$BarneyPinned1 avoidplayer 0
+	wait 0.25
+
+	$BarneyPinned2 exec global/crouch.scr
+	$BarneyPinned2 avoidplayer 0
+	wait 0.5
+
+	// turn everyone towards tank sounds
+	$BarneyPinned1 turnto $tank1
+	$BarneyPinned2 turnto $tank1
+
+	// Dave's tank stuff is working...
+	$tank1 waittill death
+	wait 1
+
+	// Barneys are now mine friends
+	if (isalive $BarneyPinned1) {
+		$BarneyPinned1 avoidplayer 1
+		$BarneyPinned1 lookat NULL
+		$BarneyPinned1 turnto NULL
+		$BarneyPinned1 exec global/stand.scr
+		$BarneyPinned1 waittill animdone
+		$BarneyPinned1 health 5
+		$BarneyPinned1 healthonly 4
+		$BarneyPinned1 unholster
+		$BarneyPinned1 exec global/enable_ai.scr
+		$BarneyPinned1.destination = $player
+		$BarneyPinned1.friendtype = 1
+		$BarneyPinned1.distance = 225
+		$BarneyPinned1 thread global/friendly.scr::friendlythink
+		$BarneyPinned1.targetname = "Barney"
+	}
+
+	if (isalive $BarneyPinned2) {
+		$BarneyPinned2 avoidplayer 1
+		$BarneyPinned2 waitthread global/loopanim.scr::LoopAnimStop
+		waitframe
+
+		$BarneyPinned2 lookat NULL
+		$BarneyPinned2 turnto NULL
+		$BarneyPinned2 exec global/stand.scr
+		$BarneyPinned2 waittill animdone
+		$BarneyPinned2 health 5
+		$BarneyPinned2 healthonly 4
+		$BarneyPinned2 unholster
+		$BarneyPinned2 exec global/enable_ai.scr
+		$BarneyPinned2.destination = $player
+		$BarneyPinned2.friendtype = 1
+		$BarneyPinned2.distance = 250
+		$BarneyPinned2 thread global/friendly.scr::friendlythink
+		$BarneyPinned2.targetname = "Barney"
+	}
+
+	// cleanup
+	exec global/EntityRemoveOnTrigger.scr $BaddieSection5Trigger "medic" "BarneyPinnedHurt" "wallguy" "sandbagguy" "towersniper1"
+}end
+
+//=========================================================================
+InitEnemies: {
+//=========================================================================
+	waitthread global/ManSpawnNamed.scr::Init "sandbagguy"
+	waitthread global/ManSpawnNamed.scr::Init "towersniper1"
+	$tankpindownfinishtrigger waittill trigger
+
+	waitthread global/ManSpawnNamed.scr::Spawn "sandbagguy"
+	waitthread global/ManSpawnNamed.scr::Spawn "towersniper1"
+	waitframe
+
+	// $towersniper1 waitthread maps/e3l2.scr::EnableGuy
+	$towersniper1.target = $player
+
+	// $sandbagguy waitthread maps/e3l2.scr::EnableGuy
+	$sandbagguy waitexec global/disable_ai.scr
+	$sandbagguy thread maps/e3l2.scr::doRunTo $sandbagtarget
+	$sandbagguy waittill movedone
+	$sandbagguy exec global/enable_ai.scr
+	$sandbagguy.target = $player
+}end
+
+//=========================================================================
+initTank: {
+//=========================================================================
+	spawn trigger_relay targetname "tank1FireTrigger"
+	self hide
+	self.tankFireTrigger = $tank1FireTrigger
+	//self.health = 3000
+
+	//changes the tank's health based on the game's difficulty level.  Note that 
+	//if on the lowest difficulty level, the tank is effectively invulnerable 
+	//until it destroys the section of wall, at which point its health is set to 400
+	// (roughly 2 hits)
+
+	if (level.skill == "0") {
+		self.health = 3000
+	}
+	else if (level.skill == "1") {
+		self.health = 800
+	}
+	else if (level.skill == "2") {
+		self.health = 1000
+	}	
+	
+	self.health_set = 1
+	self.tankType = panzer
+	self.tankSpeed = 6
+	self.tankAccel = 20
+	self.tankLookAhead = 200
+	self.tankPath = $tank1Path
+	self.tankPathLoop = 0
+	self.tankDriveDelay = 0
+	self.tankEngageDelay = 0
+	self.tankStunTime = 0
+	self.tankGuysJumpOut = 0
+	self.tankReloadTime = 4
+	level.tankDebugPrint = 0
+
+	// wait here for wounded soldier to get healed
+	//self hide
+	self.gun = self QueryTurretSlotEntity 0
+	self.gun hide
+	//self.gun hide
+	$rollTank1Trigger waittill trigger
+	self show
+	self.gun show
+
+	// don't warp in while player is looking
+	//while ($player canseenoents $tank1)
+	//	waitframe
+
+	//self show
+	//self.gun show
+	
+	self thread maps/e3l2/thinkTank.scr::tankGo 
+	local.targetNo = 1
+	while (/*local.targetNo < 6 &&*/ self != NULL && self != NIL && (IsAlive self)) {
+		if (local.targetNo > 2) {
+			local.tank_max_sight_range = 2048
+			local.tank_max_shot_range = 1024
+
+			if (!(vector_within self.origin $player.origin local.tank_max_shot_range)) {
+				self.tankShotLimit = 0
+
+				while (!(vector_within self.origin $player.origin local.tank_max_shot_range)) {
+					if (!(vector_within self.origin $player.origin local.tank_max_sight_range)) {
+						self hide
+
+						while (!(vector_within self.origin $player.origin local.tank_max_sight_range)) {
+							wait 0.5
+						}
+						self show
+					}
+					wait 0.5
+				}
+				self.tankShotLimit = -1
+			}
+		}
+
+		// give the tank a target and wait for it to fire
+		if (self.tankTarget != player) {
+			self.tankTarget = "tank1Target" + local.targetNo
+		}
+
+		self.tankFireTrigger waittill trigger
+
+		// tank fired, camera shake mag. it proportional to distance to target
+		local.target = $(self.tankTarget)
+		local.dir = local.target.origin - $player.origin
+
+		local.dist = vector_length local.dir
+		if (local.dist < 1) {
+			local.dist = 1
+		}
+
+		local.mag = 1000.0/local.dist
+		if (local.mag > 1) {
+			local.mag = 1
+		}
+
+		earthquake 0.3 local.mag 1 0
+
+		switch (local.targetNo) {
+			case 2:
+			//	// shot kills the fodder
+			//	$BarneyPinnedFodder damage $world 5000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+
+				if (level.skill == "0") {
+					self.health = 400  //make tank 'killable' on easy setting
+				}
+
+				// after this shot, keep firing at player
+				self.tankTarget = player
+				break
+
+			//case 5:
+			//	// fifth shot kill the medic (and everyone else, too!)
+			//	$medic damage $world 5000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+			//	$BarneyPinned1 damage $world 5000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+			//	$BarneyPinned2 damage $world 5000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+			//	$BarneyPinnedHurt damage $world 5000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+			//	break
+		}
+		local.targetNo++
+	}
+}end
+
+//=========================================================================
+InjuredSoundsThread: {
+//=========================================================================
+	while (self && (isalive self)) {
+		wait (1 + (randomfloat 3))
+
+		if (randomint 2) {
+			self playsound wounded_soldier_01a_10
+		}
+		else {
+			self playsound wounded_soldier_02a_20
+		}
+	}
+}end
+
+//=========================================================================
+InjuredAnimThread: {
+//=========================================================================
+	local.saved_origin = self.origin
+	while (1) {
+		self anim 23A825_InjuredCycle
+		self waittill animdone
+		self.origin = local.saved_origin
+	}
+}end

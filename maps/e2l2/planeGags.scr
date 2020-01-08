@@ -1,0 +1,496 @@
+//PlaneGags.scr
+
+//============================================================================
+init: 
+//============================================================================
+	//$warehousetruck notsolid
+	$airplane_sabotage1 thread SabotagePlane_Trigger $airplane1
+	$airplane_sabotage2 thread SabotagePlane_Trigger $airplane2
+	$airplane_sabotage3 thread SabotagePlane_Trigger $airplane3
+	$airplane_sabotage4 thread SabotagePlane_Trigger $airplane4
+
+	$airplane1 thread InitPlane
+	$airplane2 thread InitPlane
+	$airplane3 thread InitPlane
+	$airplane4 thread InitPlane
+	
+	$dowrencher thread WrenchAway
+	$welder_trigger thread DoWelder	
+	$sleepertrigger thread DoSleepers
+	$towertrigger1 thread DoTowerGuys
+
+	$projector_face hide
+	$projector_trigger thread doprojector
+	$projector_off_trigger thread projector_off
+	$projector_off_trigger_effect thread projector_off_effect
+	$PlaneTextTrigger1 thread DoPlaneThrobbingText $airplane1
+	$PlaneTextTrigger2 thread DoPlaneThrobbingText $airplane2
+	$PlaneTextTrigger3 thread DoPlaneThrobbingText $airplane3
+	$PlaneTextTrigger4 thread DoPlaneThrobbingText $airplane4
+	
+	thread InitLights
+	$radio_nopulse hide
+	$scramble_trigger nottriggerable
+	level.playAlarm = 1
+	
+	// Criminal - no "end" in init by default.
+
+//============================================================================
+UpdateAirplanesObj: {
+//============================================================================
+	if ((level.warpTo == "stealExitTruck") || (level.warpTo == "crashedGlider")) {			
+		waitthread global/objectives.scr::add_objectives level.sabotageAirplanes_no 3 "Sabotage Italian Fighters"
+		level.airplanesSabotaged = 1
+		thread maps/e2l2/objectives.scr::transition "airplanesSabotaged"
+		end
+	}
+	
+	if (level.planes_to_sabotage <= 0) {		
+		$scramble_trigger triggerable
+		waitthread global/objectives.scr::add_objectives level.sabotageAirplanes_no 3 "Sabotage Italian Fighters"
+		level.airplanesSabotaged = 1
+		thread maps/e2l2/objectives.scr::transition "airplanesSabotaged"
+	}
+	else {
+		// find nearest alive on-ground plane
+		local.nearest = NULL
+
+		for (local.i=1; local.i<=4; local.i++) {
+			local.p = $("airplane" + local.i)
+
+			if (local.p.sabotaged == 0) {
+				local.p = $("airplane" + local.i)
+
+				if ((local.nearest == NULL) || (vector_closer local.p.origin local.nearest.origin $player.origin)) {
+					local.nearest = local.p
+				}
+			}
+		}		
+		
+		if( level.curr_obj_num == level.sabotageAirplanes_no ) {
+			waitthread global/objectives.scr::add_objectives level.sabotageAirplanes_no 2 ("Sabotage Italian Fighters [" + level.planes_to_sabotage + " Remaining]") local.nearest.origin
+		}
+	}
+}end
+
+//============================================================================
+AirplaneObjCompass_Thread: {
+//============================================================================
+	if ((level.warpTo == "stealExitTruck") || (level.warpTo == "crashedGlider")) {
+		end
+	}
+	
+	while (level.planes_to_sabotage > 0) {
+		wait 1.0
+
+		while ((level.planes_to_sabotage >= 0) && (level.currentobjective == level.sabotageAirplanes_no)) {				
+			waitthread UpdateAirplanesObj
+			waitthread maps/e2l2/objectives.scr::SetCurrObj level.sabotageAirplanes_no
+			wait 1.0
+		}
+	}
+}end
+
+//============================================================================
+InitPlane: {
+//============================================================================
+	self.sabotaged	= 0
+	self.state		= "closed"
+	self anim idle // fixes bug #6493 --James G
+}end
+
+
+//============================================================================
+SabotagePlane_Trigger local.plane: {
+//============================================================================
+	self waittill trigger
+	local.plane waitthread SabotagePlane
+
+	if( local.plane.state != "closed" ) {	
+		self thread SabotagePlane_Trigger local.plane
+	}
+}end
+
+//============================================================================
+SabotagePlane: {
+//============================================================================
+	switch( self.state ) {
+		case "open":
+			self.state = "cut"
+			self anim cut
+			level.planes_to_sabotage--						
+			self.sabotaged = 1
+			break
+
+		case "closed":
+			self.state = "open"
+			self anim open			
+			break
+
+		case "cut":
+			self.state = "closed"
+			self anim close			
+			break
+	}
+
+	if( self.targetname == "airplane3" ) {
+		if( isalive $wrencher ) {
+			$wrencher thread global/wrenching.scr::wrenchinginterrupt		
+		}
+	}
+
+	thread global/throbtext.scr::throbtext_off
+}end 
+
+//============================================================================
+ScrambleAirplanes: {
+//============================================================================
+	self waittill trigger
+	$radio_nopulse show
+	$radio_pulse remove
+	$scramble_trigger playsound Radiosend
+
+	waitthread global/ai.scr::spawnset 5000
+	
+	//play the air raid siren
+	$scramble_trigger thread LoopAlarm
+	thread maps/e2l2/objectives.scr::transition "scrambledFighters"	
+
+	//Ok all hell is ready to go
+	$allhell_vehicles triggerable
+
+	//Show the truck
+	thread maps/e2l2/trucks.scr::ShowTruck10	
+
+	//Open the gate	
+	$finalgate open $finalgate_origin
+
+	//Setup the final jeep and lyndon
+	$spawnlyndon triggerable	
+	thread maps/e2l2.scr::DoMusic "end"	
+}end
+
+//============================================================================
+InitLights: {
+//============================================================================
+	for (local.i = 1; local.i <= $landinglight.size; local.i++) {		
+		if (local.min == NIL) {
+			local.min = $landinglight[local.i].set
+		}
+		else if (local.min > $landinglight[local.i].set) {
+			local.min = $landinglight[local.i].set
+		}
+					
+		if (local.max == NIL) {
+			local.max = $landinglight[local.i].set
+		}
+		else if (local.max < $landinglight[local.i].set) {
+			local.max = $landinglight[local.i].set
+		}
+	}	
+
+	//dprintln ( " range of " + $landinglight.size + " lights is from " + local.min + " to " + local.max )
+	
+	local.current = local.min
+	while (1) {
+		wait .5
+
+		for (local.i = 1; local.i <= $landinglight.size; local.i++) {	
+			if ($landinglight[local.i].set == local.current) {	
+				$landinglight[local.i] show
+			}
+		}
+
+		local.current++
+		if (local.current > local.max) {
+			local.current = local.min
+		}
+		
+		for (local.i = 1; local.i <= $landinglight.size; local.i++) {
+			if ($landinglight[local.i].set == local.current) {
+				$landinglight[local.i] hide
+			}
+		}
+	}
+}end
+
+//============================================================================
+GiveVickers: {
+//============================================================================
+	self waittill trigger
+
+	$vickersincase hide
+	$player item weapons/uk_w_vickers.tik
+	$player useweaponclass mg
+}end
+
+//============================================================================
+WindowDeath: {
+//============================================================================
+	while( self != NULL && self.health > 0 ) {		
+		waitframe
+	}	
+	
+	$getvickers triggerable
+}end
+
+//============================================================================
+DoPlaneThrobbingText local.plane: {
+//============================================================================
+	self waittill trigger
+
+	local.usekey = getboundkey1 "+use"	
+	local.msg = (loc_convert_string ("Press " + local.usekey + " twice to sabotage the fighter."))
+	thread global/throbtext.scr::throbtext local.msg 0	
+
+	while( $player isinside self ) {
+		waitframe
+	}
+	
+	thread global/throbtext.scr::throbtext_off
+	
+	if( local.plane.sabotaged == 0 ) {
+		self thread DoPlaneThrobbingText local.plane
+	}
+}end
+
+//============================================================================
+WrenchAway: {
+//============================================================================
+	self waittill trigger
+
+	$wrencher.sight				= 256
+	$wrencher.hearing			= 256
+	$wrencher.noticescale		= 10
+	$wrencher.sound_awareness	= 100	
+	$wrencher thread global/wrenching.scr::wrench $wrench_stand $wrench_look
+}end
+
+//============================================================================
+DoWelder: {
+//============================================================================
+	self waittill trigger
+	$welder thread global/welder.scr::welding
+}end
+
+//============================================================================
+doprojector: {
+//============================================================================
+	self waittill trigger	
+
+	$projector.isOn = 1
+	while( $projector.isOn == 1 ) {			
+		$projector_beam hide
+		wait .01
+		
+		//We do this in case the projector is turned off while in this loop
+		if( $projector.isOn == 1 ) {
+			$projector_beam show
+		}
+		wait .01		
+	}
+}end
+
+//============================================================================
+projector_off: {
+//============================================================================
+	self waittill trigger
+	
+	$projector.isOn = 0		
+	$projector_faceon hide
+	$projector_beam hide	
+	$projector_face show
+}end
+
+//============================================================================
+projector_off_effect: {
+//============================================================================
+	self waittill trigger
+	self thread global/exploder.scr::explode 3241
+}end
+
+//============================================================================
+LoopAlarm: {
+//============================================================================
+	while( level.playAlarm == 1 )	 {
+		self playsound E2L2_alarm
+		wait 8
+	}
+}end
+
+//============================================================================
+DoSleepers: {
+//============================================================================
+	self waittill trigger
+
+	waitthread global/ai.scr::spawnset 8500 sleepers
+	$sleepers thread DoSleeper
+}end
+
+//============================================================================
+DoTowerGuys: {
+//============================================================================
+	self waittill trigger
+
+	waitthread global/ai.scr::spawnset 8510 radio_guy
+	waitthread global/ai.scr::spawnset 8520 tower_writer
+
+	$radio_guy thread DoRadioListener
+	$tower_writer thread maps/e2l2/class_gag.scr::InitWriters
+}end
+
+//============================================================================
+DoRadioListener: {
+//============================================================================
+	if( self.target != NIL && self.target != NULL ) {
+		self.chair = self.target
+	}
+
+	self nosurprise 1
+	self.nolongpain = 1
+	self.interrupted = 0
+	self forceactivate
+	self type_attack "alarm"
+	self alarmthread "RadioInterrupt"
+
+	if(self.gun == "" || self.gun == NULL || self.gun == NIL || self.gun == "none") {
+		self weapon "walter p38"
+	}
+
+	self holster
+	waitframe
+
+	self thread RadioOnPain
+
+	while( isalive self && self.interrupted != 1 ) {
+		self waitthread DoRadioState	
+	}
+}end
+
+//============================================================================
+RadioOnPain: {
+//============================================================================
+	self waittill pain
+	self type_attack "turret"
+	self thread RadioInterrupt
+}end
+
+//============================================================================
+DoRadioState: {
+//============================================================================
+	local.state = randomint( 3 )
+	local.state++
+	
+	self waitthread global/LoopAnim.scr::LoopAnimStop
+	self curiousoff
+
+	switch( local.state ) {
+		case 1:				
+			self thread global/LoopAnim.scr::LoopAnim2 chair_radio_generic
+			wait 10
+			break
+
+		case 2:			
+			self anim chair_radio_tune
+			self waittill animdone
+			break
+
+		case 3:				
+			self anim chair_radio_talkstart
+			self waittill animdone			
+			self thread global/LoopAnim.scr::LoopAnim2 chair_radio_talkidle
+			wait 5
+			self waitthread global/LoopAnim.scr::LoopAnimStop
+			self anim chair_radio_talkend
+			self waittill animdone
+			break
+		
+		default:						
+			self thread global/LoopAnim.scr::LoopAnim2 chair_radio_generic			
+			wait 10
+			break
+	}
+}end
+
+//============================================================================
+RadioInterrupt: {
+//============================================================================
+	if( self.interrupted == 1 ) {	
+		end
+	}
+
+	self.nolongpain		= 0
+	self.sight			= 1024
+	self.hearing		= 1024	
+	self.interrupted	= 1
+
+	self waitthread global/LoopAnim.scr::LoopAnimStop
+	self exec global/disable_ai.scr	
+
+	if( self.chair != NIL && self.chair != NULL ) {
+		self.chair anim chair_death_backwards
+	}
+
+	self anim chair_alert_stand
+	self waittill animdone
+
+	if( isalive self ) {
+		self unholster
+	}
+	
+	wait .1	
+	if( isalive self ) {
+     	self exec global/enable_ai.scr
+     	self attackplayer
+	}	
+}end
+
+//============================================================================
+DoSleeper: {
+//============================================================================
+	self holster
+	self nosurprise 1
+	self.alerted	= 0
+	self.nolongpain = 1
+	self.hearing	= 180
+
+	if(self.gun == "" || self.gun == NULL || self.gun == NIL || self.gun == "none") {
+		self weapon "walter p38"
+	}
+
+	waitframe
+	self anim sleep_lowerbunk
+	self curiousoff
+	self type_attack "alarm"
+	self prealarmthread "WakeUp"
+	self waittill pain
+	self type_attack "turret"
+	self thread WakeUp
+}end
+
+//============================================================================
+WakeUp: {
+//============================================================================		
+	if( self.alerted == 1 ) {	
+		end
+	}
+
+	self.nolongpain		= 0
+	self.sight			= 1024
+	self.hearing		= 1024
+	self.alerted		= 1	
+
+	self exec global/disable_ai.scr	
+	self anim jumpup_lowerbunk
+	self waittill animdone
+	
+	if( isalive self ) {
+		self unholster
+	}
+	
+	wait .1	
+	if( isalive self ) {
+     	self exec global/enable_ai.scr
+     	self attackplayer
+	}	
+}end

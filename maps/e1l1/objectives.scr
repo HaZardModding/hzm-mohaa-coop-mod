@@ -1,0 +1,316 @@
+// Objectives
+//
+//=========================================================================
+init:
+//=========================================================================
+{
+	level.fight_thru_enemy_lines_objNum			= 1
+	level.seize_enemy_artillery_objNum			= 2
+	level.get_thru_gate_objNum					= 3
+	level.locate_enemy_bunker_objNum			= 4
+	level.radios_objNum							= 5
+	level.documents_objNum						= 6
+	level.rendezvous_objNum						= 7
+	level.fight_to_bunkers_objDone				= 0
+	level.tank_battle_objDone					= 0
+	level.clear_path_objDone					= 0
+	level.radios_objDone						= 0
+	level.documents_objDone						= 0
+	level.rendezvous_objDone					= 0
+	level.seizedFlaks							= 0
+	level.foundBunker							= 0
+	level.player_did_intro						= 0
+	level.player_found_player_tank				= 0
+	level.player_tank_was_blocked				= 0
+	level.curr_obj_num							= 1		// just so it's a valid value
+
+	$finalDoor thread doLock
+	waitthread InitObj level.fight_thru_enemy_lines_objNum	"Fight Through Enemy Lines"
+	waitthread InitObj level.seize_enemy_artillery_objNum	"Locate and Seize Enemy Artillery"
+	waitthread InitObj level.get_thru_gate_objNum			"Find a Way Through the Fortified Gate"
+	waitthread InitObj level.locate_enemy_bunker_objNum		"Locate Enemy Bunker"
+	waitthread InitObj level.radios_objNum					"Destroy Enemy Communications"
+	waitthread InitObj level.documents_objNum				"Search the Bunker for Intelligence"
+	waitthread InitObj level.rendezvous_objNum				"Rendezvous with 1st Armored Division"
+
+	spawn trigger_relay "targetname" "everythingDoneTrigger"
+	waitthread maps/e1l1/objectives.scr::init_compass_points
+
+	thread WaitForGetThruGate
+	thread leadToFlaks
+	thread leadToBunker
+}end
+
+//=========================================================================
+WaitForGetThruGate:
+//=========================================================================
+{
+	$scene3Trigger3 waittill trigger
+	
+	//chrissstrahl - coop mod respawn area
+	if(level.gametype != 0){
+		//chrissstrahl - create spawnpoints for coop
+		waitthread coop_mod/spawnlocations.scr::e1l1_update4
+	}
+	
+	
+	waitthread transition "hitGateTrigger"
+}end
+
+//=========================================================================
+init_compass_points:
+//=========================================================================
+{
+	waitthread InitObjCompass level.fight_thru_enemy_lines_objNum		$playerTank.origin
+	waitthread InitObjCompass level.seize_enemy_artillery_objNum		$flakObjectiveLeadNode.origin
+	waitthread InitObjCompass level.get_thru_gate_objNum				$gate_switch_origin.origin
+	waitthread InitObjCompass level.locate_enemy_bunker_objNum			$bunkerObjectiveLeadNode.origin
+	waitthread InitObjCompass level.radios_objNum						$radio1.origin
+	waitthread InitObjCompass level.documents_objNum					$documents.origin
+	waitthread InitObjCompass level.rendezvous_objNum					$scene6Jeep.origin
+}end
+
+//=========================================================================
+move_curr_compass_point local.new_point:
+//=========================================================================
+{
+	waitthread global/objectives.scr::add_objectives level.curr_obj_num 2 NIL local.new_point
+	waitthread global/objectives.scr::current_objectives level.curr_obj_num
+}end
+
+//=========================================================================
+transition local.key:
+//=========================================================================
+{
+	dprintln "transition hit:" local.key
+
+	switch (local.key){
+		case "didIntro":
+			level.player_did_intro = 1
+			waitthread RevealObj level.fight_thru_enemy_lines_objNum
+			waitthread RevealObj level.seize_enemy_artillery_objNum
+			waitthread SetCurrObj level.fight_thru_enemy_lines_objNum
+			break
+
+		case "commanderGagStart":
+			level.player_found_player_tank = 1
+			waitthread SucceedObj level.fight_thru_enemy_lines_objNum
+			break
+
+		case "commanderGagEnd":
+			waitthread SetCurrObj level.seize_enemy_artillery_objNum
+			break
+
+		case "hitGateTrigger":
+			waitthread RevealObj level.get_thru_gate_objNum
+			waitthread SetCurrObj level.get_thru_gate_objNum
+			break
+
+		case "openedGate":
+			// we've opened the gate, go back to artillery objective...
+			waitthread SucceedObj level.get_thru_gate_objNum
+			waitthread SetCurrObj level.seize_enemy_artillery_objNum
+			break
+
+		case "seizedFlaks":
+			waitthread SucceedObj level.seize_enemy_artillery_objNum
+			if (level.foundBunker == 0) {
+				waitthread RevealObj level.locate_enemy_bunker_objNum
+				waitthread SetCurrObj level.locate_enemy_bunker_objNum
+			}
+
+			level.seizedFlaks = 1
+			waitthread UpdateCurrObj
+			break
+
+		case "foundBunker":
+			waitthread SucceedObj level.locate_enemy_bunker_objNum
+			level.foundBunker = 1
+			waitthread UpdateCurrObj
+			break
+
+		case "talkedToSoldier":
+			waitthread RevealObj level.radios_objNum
+			waitthread RevealObj level.documents_objNum
+			waitthread UpdateCurrObj
+			break
+
+
+		case "killedRadios":
+			level.radios_objDone = 1
+			waitthread SucceedObj level.radios_objNum
+			waitthread UpdateCurrObj
+			break
+
+		case "foundDocs":
+			level.documents_objDone = 1
+			waitthread SucceedObj level.documents_objNum
+			waitthread UpdateCurrObj
+			break
+
+		case "reachedBunkers":
+			level.foundBunker = 1
+			waitthread SucceedObj level.locate_enemy_bunker_objNum
+			//	waitthread SetCurrObj level.radios_objNum
+			waitthread UpdateCurrObj
+			break
+
+		case "foundAlliedArmorDivision":
+			level.rendezvous_objDone = 1
+			waitthread SucceedObj level.rendezvous_objNum
+			break
+	}
+	///	waitthread UpdateCurrObj
+}end
+
+//=========================================================================
+UpdateCurrObj:
+//=========================================================================
+{
+	if ( level.seizedFlaks==0 ){
+		//dprintln "flaks still not seized."
+		waitthread SetCurrObj level.seize_enemy_artillery_objNum
+		end
+	}
+
+	if ( level.foundBunker==0 ){
+		//dprintln "bunker still not found."
+		waitthread SetCurrObj level.locate_enemy_bunker_objNum
+		end
+	}
+
+	if ( level.radios_objDone==0 ){
+		//dprintln "radio not done."
+		waitthread SetCurrObj level.radios_objNum
+		end
+	}
+
+	if ( level.documents_objDone==0 ){
+		//dprintln "documents not done."
+		waitthread SetCurrObj level.documents_objNum
+		end
+	}
+
+	//dprintln "Time to rendezvou!"
+	// if we're here, everything is done, so do the trigger and unlock the door. Let's rendezvou!
+	waitthread RevealObj level.rendezvous_objNum
+	trigger $everythingDoneTrigger
+	$finalDoor thread doUnlock
+	waitthread SetCurrObj level.rendezvous_objNum
+}end
+
+//=========================================================================
+UpdateCurrObj_OLD:
+//=========================================================================
+{
+	if (level.player_found_player_tank == 0){
+		waitthread SetCurrObj level.fight_thru_enemy_lines_objNum
+	}
+	else if (level.player_tank_was_blocked == 0){
+		waitthread SetCurrObj level.seize_enemy_artillery_objNum
+	}
+	else if (level.clear_path_objDone == 0){
+		waitthread SetCurrObj level.get_thru_gate_objNum
+	}
+	else if (level.tank_battle_objDone == 0){
+		waitthread SetCurrObj level.seize_enemy_artillery_objNum
+	}
+	else if (level.fight_to_bunkers_objDone == 0){
+		waitthread SetCurrObj level.fight_thru_enemy_lines_objNum
+	}
+	else if ((level.radios_objDone == 0) || (level.documents_objDone == 0)){
+
+		if (level.radios_objDone == 0){
+			waitthread SetCurrObj level.radios_objNum
+		}
+		else if (level.documents_objDone == 0){
+			waitthread SetCurrObj level.documents_objNum
+		}
+	}
+	else if (level.rendezvous_objDone == 0){
+		waitthread SetCurrObj level.rendezvous_objNum
+	}
+}end
+
+// handies
+//=========================================================================
+InitObj local.num local.desc:
+//=========================================================================
+{
+	waitthread global/objectives.scr::add_objectives local.num 1 local.desc
+}end
+
+//=========================================================================
+InitObjCompass local.num local.point:
+//=========================================================================
+{
+	waitthread global/objectives.scr::add_objectives local.num 1 NIL local.point
+}end
+
+//=========================================================================
+RevealObj local.num:
+//=========================================================================
+{
+	waitthread global/objectives.scr::add_objectives local.num 2
+}end
+
+//=========================================================================
+SucceedObj local.num:
+//=========================================================================
+{
+	waitthread global/objectives.scr::add_objectives local.num 3
+}end
+
+//=========================================================================
+SetCurrObj local.num:
+//=========================================================================
+{
+	waitthread global/objectives.scr::current_objectives local.num
+	level.curr_obj_num = local.num
+}end
+
+//=========================================================================
+doUnlock:
+//=========================================================================
+{
+	self unlock
+}end
+
+//=========================================================================
+doLock:
+//=========================================================================
+{
+//chrissstrahl - make sure we don't get any troubles in coop
+	if(level.gametype == 0){
+		if ($player == NULL)	{
+			level waittill spawn
+		}
+		self lock
+	}
+	else{
+		//chrissstrahl - we might not need to do anything here
+		//this thread is timecritical, we can't have to much delay here, other init threads relay on this to be finished
+		/*for(local.i=15;local.i>0;local.i--){
+			iprintlnbold_noloc( "Needs attention objectives.scr::doLock" )
+			wait 1
+		}*/
+	}
+}end
+
+//=========================================================================
+leadToFlaks:
+//=========================================================================
+{
+	$scene3Trigger5 waittill trigger
+	waitthread global/objectives.scr::add_objectives level.seize_enemy_artillery_objNum 2 NIL $scene3Cannon2.origin
+	thread UpdateCurrObj
+}end
+
+//=========================================================================
+leadToBunker:
+//=========================================================================
+{
+	$bunkerObjectiveLeadTrigger waittill trigger
+	waitthread global/objectives.scr::add_objectives level.locate_enemy_bunker_objNum 2 NIL $reachedBunkerTrigger.origin
+	thread UpdateCurrObj
+}end

@@ -1,0 +1,668 @@
+//*********************************************************************************************************************************************
+//*** add / modify an objective in the list
+//*** this will replace an objective if you use a number that already exists
+//*** if any field entered contains a 0, it's left at what it was
+//*** syntax --------------------------------
+//*** add_objectives <objective number> <status|1-don't draw, 2-in progress, 3-completed> [objective text] [associated location in map|vector]
+//*********************************************************************************************************************************************
+//modified for moh aa,sh,bt coop by chrissstrahl
+//IF YOU REMOVE THE COMMENTS WITH THE println OR iprintlnbold I WILL KILL YOU! I NEED THEM FOR DEBUGGING!
+//IF YOU REMOVE THE COMMENTS WITH THE println OR iprintlnbold I WILL KILL YOU! I NEED THEM FOR DEBUGGING!
+//IF YOU REMOVE THE COMMENTS WITH THE println OR iprintlnbold I WILL KILL YOU! I NEED THEM FOR DEBUGGING!
+//IF YOU REMOVE THE COMMENTS WITH THE println OR iprintlnbold I WILL KILL YOU! I NEED THEM FOR DEBUGGING!
+
+//2018.08.26 - chrissstrahl - performance updated
+
+
+add_objectives local.index local.status local.objective local.location:
+	local.gametype = getCvar("g_gametype")
+	
+	//this is the game internal standard stuff
+	//don't do this in coop, it is a waste
+	if(local.gametype == "0"){
+		local.objective = waitthread global/string_format.scr::str_format local.objective 50	// was 41
+	}
+	addobjective local.index local.status local.objective local.location
+	
+	
+//here begins the stuff for coop - chrissstrahl
+	if(local.status == NIL){
+		local.status = -1
+	}
+	local.statusName = waitthread coop_objectivesGetStatusName local.status
+//I need to see what is happeing, to decide how to fix the level-script mess - chrissstrahl
+//	iprintlnbold ( "--->OBJ: " + local.index + " , " + local.statusName + " , " + local.objective + " , " + local.location )
+	
+	if(local.status == 3){
+		local.objectivesCompleteFlag = "objectiveComplete" + local.index
+		$world.flags[local.objectivesCompleteFlag] = 1
+	}
+	
+//08.Feb.2015 chrissstrahl - added for mohaa coop
+	if(level.coopObjectivesManager == NIL){
+		thread coop_objectivesManage
+		waitframe
+	}
+//updated for BT on 16th FEB 2015, BT uses NIL as Objective text, when the objective is updated, BT inizialised Objectives at level start
+//make objectiveText avilable for global use on this level
+	
+//check if we need to write or read the objectives
+//if NIL or empty string is send we read from the previouse written varaiable
+	local.writeObjOnVar = 0
+	if(local.objective != NIL && local.objective.size > 1){
+		local.writeObjOnVar = 1
+	}
+
+	if( local.writeObjOnVar )
+	{
+	//	println "############# A OBJECTIVE HAS BEEN WRITTEN ############"
+		switch local.index
+		{
+			case 1:
+				level.coopObjective1Text = local.objective
+				break
+			case 2:
+				level.coopObjective2Text = local.objective
+				break
+			case 3:
+				level.coopObjective3Text = local.objective
+				break
+			case 4:
+				level.coopObjective4Text = local.objective
+				break
+			case 5:
+				level.coopObjective5Text = local.objective
+				break
+			case 6:
+				level.coopObjective6Text = local.objective
+				break
+			case 7:
+				level.coopObjective7Text = local.objective
+				break
+			case 8:
+				level.coopObjective8Text = local.objective
+				break
+		}
+	}else{
+		//println "############# A OBJECTIVE HAS BEEN READ ############"
+		switch local.index
+		{
+			case 1:
+				local.objective = level.coopObjective1Text
+				break
+			case 2:
+				local.objective = level.coopObjective2Text
+				break
+			case 3:
+				local.objective = level.coopObjective3Text
+				break
+			case 4:
+				local.objective = level.coopObjective4Text
+				break
+			case 5:
+				local.objective = level.coopObjective5Text
+				break
+			case 6:
+				local.objective = level.coopObjective6Text
+				break
+			case 7:
+				local.objective = level.coopObjective7Text
+				break
+			case 8:
+				local.objective = level.coopObjective8Text
+				break
+		}
+	}
+//make objectiveStatus avilable for global use on this level
+	switch local.index
+	{
+		case 1:
+			level.coopObjective1 = local.status
+			break
+		case 2:
+			level.coopObjective2 = local.status
+			break
+		case 3:
+			level.coopObjective3 = local.status
+			break
+		case 4:
+			level.coopObjective4 = local.status
+			break
+		case 5:
+			level.coopObjective5 = local.status
+			break
+		case 6:
+			level.coopObjective6 = local.status
+			break
+		case 7:
+			level.coopObjective7 = local.status
+			break
+		case 8:
+			level.coopObjective8 = local.status
+			break
+	}
+//get previouse status for comparison
+// switch local.index
+// {
+// case 1:
+// local.statusPrev = level.coopObjective1
+// break
+// case 2:
+// local.statusPrev = level.coopObjective2
+// break
+// case 3:
+// local.statusPrev = level.coopObjective3
+// break
+// case 4:
+// local.statusPrev = level.coopObjective4
+// break
+// case 5:
+// local.statusPrev = level.coopObjective5
+// break
+// case 6:
+// local.statusPrev = level.coopObjective6
+// break
+// case 7:
+// local.statusPrev = level.coopObjective7
+// break
+// case 8:
+// local.statusPrev = level.coopObjective8
+// break
+// }
+//17.Feb 2015 chrissstrahl - don't set objective when it is allready set, this creates unnessary net traffic
+//do not send empty objective text to any player!
+// local.ObjectiveTextHasStayedTheSame = 0
+// if(local.objectivePreviouseTextWas != NIL ){
+// if( local.objective == local.ObjectiveTextPrev){
+// local.ObjectiveTextHasStayedTheSame = 1
+// }
+// }
+// if( local.status == local.statusPrev && local.status == 2 && local.ObjectiveTextHasStayedTheSame == 1){
+// end
+// }
+// local.ObjectiveTextPrev = local.objective
+	
+	if( local.objective != NIL ){
+		thread coop_objectivesSendAll local.index local.status local.objective
+	}
+end
+
+//*************************************************
+//*** set the current objective
+//*** syntax ---------------------------------
+//*** current_objectives <number of objective>
+//*************************************************
+current_objectives local.index:
+//16.Feb 2015 chrissstrahl - added  here too, just to be sure, cuz BT scripts seam kinda fucked up
+	if(level.coopObjectivesManager == NIL){
+		thread coop_objectivesManage
+		waitframe
+	}
+	
+//let me see what is going on
+	//iprintlnbold ( "--->OBJ CURRENT: " + local.index )
+
+//default code, set current objective
+	setcurrentobjective local.index
+	level.currentobjective = local.index	
+	
+//16.Feb 2015 chrissstrahl - completed objectives can no longer be set as current
+	local.objectivesCompleteFlag = "objectiveComplete" + local.index
+	if( $world.flags[local.objectivesCompleteFlag] != NIL){
+		if( $world.flags[local.objectivesCompleteFlag] == 1){
+			end
+		}
+	}
+	
+//17.Feb 2015 chrissstrahl - don't update the current objective when it is allready current, this creates unnessary net traffic
+	if(local.index == level.coopCurrentObjective){
+		end
+	}
+	
+//17.Feb 2015 chrissstrahl - grab temporarly the current objective	
+	local.obCurOld = level.coopCurrentObjective
+	
+//17.Feb 2015 chrissstrahl - we need to use our own, cuz the default variable is controlled else where!!!
+	level.coopCurrentObjective = local.index
+
+//18.FEB 2015 Chrissstrahl - put this in a sperate function, because we don't want the game waiting to long
+	for(local.player = 1;local.player<=$player.size;local.player++){
+		local.entity = $player[local.player]
+		if(local.entity != NULL){
+			thread coop_objectiveMakeCurrentForPlayer local.player local.obCurOld local.index
+		}
+	}
+end
+
+
+coop_objectiveMakeCurrentForPlayer local.player local.obCurOld local.obCurNew:
+	local.entity = $player[local.player]
+	if(local.entity == NULL){ end }
+	
+	if(local.obCurOld == NIL){
+		local.obCurOld = 0
+	}
+	if(local.obCurNew == NIL){
+		local.obCurNew = 0
+		end
+	}
+
+//println ( "coop_objectiveMakeCurrentForPlayer old:" + local.obCurOld + " new: " + local.obCurNew )
+	
+//16.Feb 2015 chrissstrahl - perviouse current objective shall no longer be marked as current
+	if(local.obCurOld > 0 ){
+		local.entity stufftext ( "set coop_o" + local.obCurOld + "c 0" )
+	}
+	
+//grab objectives text of the new current objectives
+	switch local.obCurNew
+	{
+		case 1:
+			local.objective = level.coopObjective1Text
+			break
+		case 2:
+			local.objective = level.coopObjective2Text
+			break
+		case 3:
+			local.objective = level.coopObjective3Text
+			break
+		case 4:
+			local.objective = level.coopObjective4Text
+			break
+		case 5:
+			local.objective = level.coopObjective5Text
+			break
+		case 6:
+			local.objective = level.coopObjective6Text
+			break
+		case 7:
+			local.objective = level.coopObjective7Text
+			break
+		case 8:
+			local.objective = level.coopObjective8Text
+			break
+	}
+
+//get status of the current objective, so we can see in what state it currently is
+	switch local.obCurNew
+	{
+	case 1:
+		local.status = level.coopObjective1
+		break
+	case 2:
+		local.status = level.coopObjective2
+		break
+	case 3:
+		local.status = level.coopObjective3
+		break
+	case 4:
+		local.status = level.coopObjective4
+		break
+	case 5:
+		local.status = level.coopObjective5
+		break
+	case 6:
+		local.status = level.coopObjective6
+		break
+	case 7:
+		local.status = level.coopObjective7
+		break
+	case 8:
+		local.status = level.coopObjective8
+		break
+	}
+	
+//mark the current objectives as current	
+	if( local.entity != NULL ){ // && local.objective != NIL ){
+		
+	//this is suppose to make the text yellow (current), but without showing the background if there is no text yet
+		//if( (local.objective).size > 1 && local.status == 2 )
+		//{
+			//$player[local.player] stufftext ("exec ui/coop_objectives/obj_" + local.obCurNew + "current")
+		//}else{
+			local.entity stufftext ( "set coop_o" + local.obCurNew + "c 1" )
+			//thread coop_objectivesSendPlayer local.player local.obCurNew 2 local.objective
+		//}
+	}
+end
+
+
+////////////////////////////////////////////////////////
+//08.Feb.2015 - chrissstrahl - manages all players, does the following for each player: resets objective, sends objective, updates objective
+////////////////////////////////////////////////////////
+coop_objectivesManage:
+	if(level.coopObjectivesManager == 1){
+		end
+	}
+	level.coopObjectivesManager = 1
+	
+	if(level.coopCurrentObjective == NIL){level.coopCurrentObjective = 0}
+	if(level.coopObjective1 == NIL){ level.coopObjective1 = 0 }
+	if(level.coopObjective2 == NIL){ level.coopObjective2 = 0 }
+	if(level.coopObjective3 == NIL){ level.coopObjective3 = 0 }
+	if(level.coopObjective4 == NIL){ level.coopObjective4 = 0 }
+	if(level.coopObjective5 == NIL){ level.coopObjective5 = 0 }
+	if(level.coopObjective6 == NIL){ level.coopObjective6 = 0 }
+	if(level.coopObjective7 == NIL){ level.coopObjective7 = 0 }
+	if(level.coopObjective8 == NIL){ level.coopObjective8 = 0 }
+	if(level.coopObjectivesPlayers == NIL){ level.coopObjectivesPlayers = 0 }
+	
+	while( level.coopObjectivesManager == 1)
+	{
+	//new player, do setup stuff
+		if($player.size != level.coopObjectivesPlayers){
+		//	println ( "Coop OBJECTIVES: # of players has changed, was: "+level.coopObjectivesPlayers+" is now: "+$player.size )
+			level.coopObjectivesPlayers = $player.size
+			thread coop_objectivesResetForPlayers
+		}
+		waitframe
+	}
+end
+
+
+////////////////////////////////////////////////////////
+//08.Feb.2015 - chrissstrahl - reset objectives menu and cvars for all players
+////////////////////////////////////////////////////////
+coop_objectivesResetForPlayers:
+	for(local.inx = 1;local.inx<=$player.size;local.inx++){
+		local.entity = $player[local.inx]
+		if(local.entity != NULL){
+			if(local.entity.flags[coopObjectiveSetupDone] == NIL){
+				thread coop_objectivesResetForPlayer local.inx
+				waitframe
+			}
+		}
+	}
+end
+
+
+////////////////////////////////////////////////////////
+//08.Feb.2015 - chrissstrahl - send objectives to all players
+////////////////////////////////////////////////////////
+coop_objectivesSendAll local.index local.status local.objective: 
+	for(local.inx = 1;local.inx<=$player.size;local.inx++){
+		thread coop_objectivesSendPlayer local.inx local.index local.status local.objective
+		waitframe
+	}
+end
+
+
+////////////////////////////////////////////////////////
+//09.Feb.2015 - chrissstrahl - get name for status number, used to retrive name part of cfg file
+////////////////////////////////////////////////////////
+coop_objectivesGetStatusName local.status:
+//make sure they can not mess it up
+	if(local.status == NIL){
+		end "error"
+	}
+	local.coopObjectiveStatus = "hidden"
+	switch local.status
+	{
+		case 1:
+			local.coopObjectiveStatus = "hidden"
+			break
+		case 2:
+			local.coopObjectiveStatus = "active"
+			break
+		case 3:
+			local.coopObjectiveStatus = "complete"
+			break
+	}
+end local.coopObjectiveStatus
+
+
+////////////////////////////////////////////////////////
+//08.Feb.2015 - chrissstrahl - send objectives to a player
+//wait till player has been set up, and then show him the objectives, not before
+//16.Feb.2015 - Chrissstrahl - fixed the index not updating issue
+////////////////////////////////////////////////////////
+coop_objectivesSendPlayer local.player local.index local.status local.objective:
+//do not handle player that are not there
+	local.entity = $player[local.player]
+	
+	//check inside the function, as we can not garantee safe calls
+	if( local.entity == NULL ){ end }
+
+	if(local.index == NIL){
+		local.index = 0
+	}
+	if(local.status == NIL){
+		local.status = 0
+	}
+	
+//give me some info
+	//iprintlnbold ( "--->OBJ SEND: " + local.index + " " + local.status + "")
+	//println ( "coop_objectivesSendPlayer " + local.index + " " + local.status + "" )
+	
+//get the current cmd index
+	if( local.entity.flag[coopObjectivesCmdIndex] == NIL ){
+		local.entity.flag[coopObjectivesCmdIndex] = -1
+		local.cmdIndex = -1
+	}else{
+		local.cmdIndex = local.entity.flag[coopObjectivesCmdIndex]
+	}
+	
+//make sure we can reads the last send info
+	if( local.entity.flag[coopObjectivesCmdIndexLast] == NIL ){
+		local.entity.flag[coopObjectivesCmdIndexLast] = -1
+	}
+	
+//set new current cmd index
+	local.cmdIndex = ( local.cmdIndex + 1 )
+	local.entity.flag[coopObjectivesCmdIndex] = local.cmdIndex
+	
+//write cmd into the new current index
+	local.cmdName = ("coopObjectivesCmd" + local.cmdIndex + "ObjText")
+	local.entity.flag[local.cmdName] = local.objective
+	local.cmdName = ("coopObjectivesCmd" + local.cmdIndex + "ObjId")
+	local.entity.flag[local.cmdName] = local.index
+	local.cmdName = ("coopObjectivesCmd" + local.cmdIndex + "ObjStat")
+	local.entity.flag[local.cmdName] = local.status
+	
+//I wana see what you are doing!
+	//iprintlnbold ( "write: INDEX" + local.cmdIndex + " -> " + local.index + "," + local.status + "," + local.objective )
+	
+//make sure we only run this once untill all commands are processed
+	if(local.entity.flag[coopObjectivesSending] == NIL || local.entity.flag[coopObjectivesSending] == 0){
+		local.entity.flag[coopObjectivesSending] = 1
+	}else{
+		end
+	}
+
+//wait until the player is ready to receive the objectives
+	while( local.entity.flags[coopObjectiveSetupDone] == NIL)
+	{
+		wait 0.2
+	//check each time if he is even there (allways after any wait command)
+		if( local.entity == NULL ){
+			end
+		}
+	}
+
+//continue where we stopped last time
+	local.lastCmd = local.entity.flag[coopObjectivesCmdIndexLast]
+	local.current = local.entity.flag[coopObjectivesCmdIndex]
+	while(local.lastCmd < local.current)
+	{
+		local.doNotSendAgain = 0
+		local.lastCmd = ( local.lastCmd + 1 )
+		
+		//iprintlnbold ( "running: INDEX" + local.lastCmd + " of " + local.current )
+		
+	//grab objective text
+		local.cmdName	= ("coopObjectivesCmd" + local.lastCmd + "ObjText")
+		local.objective	= local.entity.flag[local.cmdName]
+	//grab objective id
+		local.cmdName	= ("coopObjectivesCmd" + local.lastCmd + "ObjId")
+		local.index		= local.entity.flag[local.cmdName]	
+	//grab objective status
+		local.cmdName	= ("coopObjectivesCmd" + local.lastCmd + "ObjStat")
+		local.status	= local.entity.flag[local.cmdName]
+		
+		//iprintlnbold ( "read: INDEX" + local.lastCmd + " -> " + local.index + "," + local.status + "," + local.objective )
+		
+	//grab status name from status integer
+		local.coopObjectiveStatus = waitthread coop_objectivesGetStatusName local.status
+		
+		//if status or text of the objectives has chnaged, send again to player, otherwhise don't bother
+		local.objectiveStatus = ("objectiveStatus" + local.index)
+		local.objectiveText = ("objectiveText" + local.index)
+		if( 	local.entity.flags[local.objectiveStatus] != NIL &&
+				local.entity.flags[local.objectiveText] != NIL &&
+				local.entity.flags[local.objectiveStatus] == local.status &&
+				local.entity.flags[local.objectiveText] == local.objective)
+		{
+			//println ("coop_objectivesSendPlayer: Abborted objective"+local.index+", player["+local.player+"] is allready up to date!")
+			local.doNotSendAgain = 1
+		}else{
+			//println ("coop_objectivesSendPlayer: Sending objective"+local.index+" (status: " + local.status + ") to player["+local.player+"]")
+			local.entity.flags[local.objectiveStatus]	= local.status
+			local.entity.flags[local.objectiveText]	= local.objective	
+		}
+		
+		
+//iprintlnbold ( "--->OBJ FLAG: " + local.index + " " + local.status + "")
+		
+
+		if( local.doNotSendAgain == 0)
+		{
+			//println ("coop_objectivesSendPlayer: Sending objective:"+local.index+" (status: " + local.status + ") to player["+local.player+"]")
+			//do not update status to hidden when it is allready hidden
+			
+			//iprintlnbold ( "--->OBJ TRANS: " + local.index + " " + local.coopObjectiveStatus + "(" + local.status + "")
+			
+			if(	local.status > 1 && local.entity.flags[local.objectiveStatus] != NIL || local.entity.flags[local.objectiveStatus] != 1 ){
+				local.entity stufftext ("exec ui/coop_objectives/obj_" + local.index + "" + local.coopObjectiveStatus)
+				wait 0.1
+			}
+		//check each time if he is even there (allways after any wait command)
+			if( local.entity == NULL ){	end	}
+			
+		//allways send objectives text
+			local.entity stufftext ("set coop_o" + local.index  + " " + local.objective)
+		}
+		//else{
+			//println ("coop_objectivesSendPlayer: ABORTED (player is up to date) objective:"+local.index+" (status: " + local.status + ") to player["+local.player+"]")
+		//}
+		waitframe
+		local.current = local.entity.flag[coopObjectivesCmdIndex]
+	}
+	//check each time if he is even there (allways after any wait command)
+	if( local.entity != NULL ){
+		local.entity.flag[coopObjectivesCmdIndexLast] = local.current
+		local.entity.flag[coopObjectivesSending] = 0		
+	}
+end
+
+////////////////////////////////////////////////////////
+//08.Feb.2015 - chrissstrahl - reset objectives menu and cvars
+//09.Feb.2015 - Chrissstrahl - updated, to send state and text of objectives activate prior to the player joining the level
+////////////////////////////////////////////////////////
+coop_objectivesResetForPlayer local.playerNum:
+
+	local.entity = $player[local.playerNum]
+	
+	//check inside the function, no need to check we do have safe calls only to this function
+	//if( local.entity == NULL ){ end }	
+	
+	local.entity stufftext ("exec ui/coop_objectives/obj_reset.cfg")
+	
+//set current objective status to hidden
+	for(local.inx=1;local.inx<9;local.inx++){
+		local.objectiveStatus 	= ("objectiveStatus" 	+ local.inx)
+		local.objectiveText 	= ("objectiveText" 		+ local.inx)
+		local.entity.flags[local.objectiveStatus] 	= 1
+		local.entity.flags[local.objectiveText] 	= ""
+		waitframe
+	}
+
+	wait 2
+	
+//mark as complete
+	local.entity.flags[coopObjectiveSetupDone] = 1
+	
+	local.statusNumber = 1 //this is used so I can replace the numbers in teh text bellow without messing the if check up
+	
+	//if(level.coopObjective1 != NIL){ 					//set
+		if(level.coopObjective1 > local.statusNumber){	//active or completed
+			if(level.coopObjective1Text != NIL){		//has text
+				local.coopObjectiveStatus = waitthread coop_objectivesGetStatusName level.coopObjective1
+				waitthread coop_objectivesSendPlayer local.playerNum 1 level.coopObjective1 level.coopObjective1Text
+				waitframe
+			}
+		}
+	//}
+	//if(level.coopObjective2 != NIL){ 					//set
+		if(level.coopObjective2 > local.statusNumber){	//active or completed
+			if(level.coopObjective2Text != NIL){		//has text
+				local.coopObjectiveStatus = waitthread coop_objectivesGetStatusName level.coopObjective2
+				waitthread coop_objectivesSendPlayer local.playerNum 2 level.coopObjective2 level.coopObjective2Text
+				waitframe
+			}
+		}
+	//}
+	//if(level.coopObjective3 != NIL){ 					//set
+		if(level.coopObjective3 > local.statusNumber){	//active or completed
+			if(level.coopObjective3Text != NIL){		//has text
+				local.coopObjectiveStatus = waitthread coop_objectivesGetStatusName level.coopObjective3
+				waitthread coop_objectivesSendPlayer local.playerNum 3 level.coopObjective3 level.coopObjective3Text
+				waitframe
+			}
+		}
+	//}
+	//if(level.coopObjective4 != NIL){ 					//set
+		if(level.coopObjective4 > local.statusNumber){	//active or completed
+			if(level.coopObjective4Text != NIL){		//has text
+				local.coopObjectiveStatus = waitthread coop_objectivesGetStatusName level.coopObjective4
+				waitthread coop_objectivesSendPlayer local.playerNum 4 level.coopObjective4 level.coopObjective4Text
+				waitframe
+			}
+		}
+	//}
+	//if(level.coopObjective5 != NIL){ 					//set
+		if(level.coopObjective5 > local.statusNumber){	//active or completed
+			if(level.coopObjective5Text != NIL){		//has text
+				local.coopObjectiveStatus = waitthread coop_objectivesGetStatusName level.coopObjective5
+				waitthread coop_objectivesSendPlayer local.playerNum 5 level.coopObjective5 level.coopObjective5Text
+				waitframe
+			}
+		}
+	//}
+	//if(level.coopObjective6 != NIL){ 					//set
+		if(level.coopObjective6 > local.statusNumber){	//active or completed
+			if(level.coopObjective6Text != NIL){		//has text
+				local.coopObjectiveStatus = waitthread coop_objectivesGetStatusName level.coopObjective6
+				waitthread coop_objectivesSendPlayer local.playerNum 6 level.coopObjective6 level.coopObjective6Text
+				waitframe
+			}
+		}
+	//}
+	//if(level.coopObjective7 != NIL){ 					//set
+		if(level.coopObjective7 > local.statusNumber){	//active or completed
+			if(level.coopObjective7Text != NIL){		//has text
+				local.coopObjectiveStatus = waitthread coop_objectivesGetStatusName level.coopObjective7
+				waitthread coop_objectivesSendPlayer local.playerNum 7 level.coopObjective7 level.coopObjective7Text
+				waitframe
+			}
+		}
+	//}
+	//if(level.coopObjective8 != NIL){ 					//set
+		if(level.coopObjective8 > local.statusNumber){	//active or completed
+			if(level.coopObjective8Text != NIL){		//has text
+				local.coopObjectiveStatus = waitthread coop_objectivesGetStatusName level.coopObjective8
+				waitthread coop_objectivesSendPlayer local.playerNum 8 level.coopObjective8 level.coopObjective8Text
+				waitframe
+			}
+		}
+	//}
+//set current objective, highligt
+	if(level.coopCurrentObjective != NIL && level.coopCurrentObjective > 0){
+		if(local.entity != NULL){
+			local.entity stufftext ("set coop_o" + level.coopCurrentObjective + "c 1")
+			waitframe		
+		}
+	}
+	//println ("coop_objectivesResetForPlayer COMPLETE")
+end
+
+

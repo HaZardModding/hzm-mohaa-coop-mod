@@ -1,0 +1,650 @@
+//=========================================================================
+InitBunker3:
+//=========================================================================
+{
+	/*
+	level.targetl1 = spawn script_object
+	level.targetr1 = spawn script_object
+	level.targetl1 = waitthread createstrafetarget level.targetl1 $bunker3planetargetl1 2500
+	level.targetr1 = waitthread createstrafetarget level.targetl1 $bunker3planetargetr1 2500
+	waitthread bindguns
+	*/
+	$bunker3reinforcementtrigger nottriggerable
+	$2b3playerclip notsolid
+
+	$piatguy nodamage
+	$piatguy ai_off
+	$piatguy notsolid
+	$piatguy hide
+	$piatguy threatbias ignoreme
+
+	$bunker3mgguy1 ai_off
+	$bunker3mgguy1 notsolid
+	$bunker3mgguy1 hide
+	$bunker3mgguy1 nodamage
+	
+	$bunker3mgguy2 ai_off
+	$bunker3mgguy2 notsolid
+	$bunker3mgguy2 hide
+	$bunker3mgguy2 nodamage
+
+	local.bunkerwalltrigger = waitthread global/FindTrigger.scr::FindTrigger "bunker3boom1"
+	local.bunkerwalltrigger nottriggerable
+
+	local.bunkerwall02trigger = waitthread global/FindTrigger.scr::FindTrigger "bunker3boom2"
+	local.bunkerwall02trigger nottriggerable
+	
+	thread JeepFX
+	level.bunker3failuretext = "You failed to defend Charlie Bunker."
+}end
+
+//=========================================================================
+bunker3doorlocktrigger:
+//=========================================================================
+{
+	$player playsound door_wood_locked
+}end
+
+//=========================================================================
+JeepFX:
+//=========================================================================
+{
+	local.fireon = 1
+	while ($jeepfire){
+		local.firedist = vector_length($player.origin - $jeepfire.origin)
+
+		if (local.fireon == 1){
+			if (local.firedist > 3000){
+				local.fireon = 0
+				$jeepfire anim stop
+				$jeepfiresmoke1 anim stop
+			}
+		}
+		else{
+			if (local.firedist < 3000){
+				local.fireon = 1
+				$jeepfire anim start
+				$jeepfiresmoke1 anim start
+			}
+		}
+		wait 1
+	}
+}end
+
+//=========================================================================
+JeepDriveAwayToBunker3:
+//=========================================================================
+{
+	$startjeep thread maps/e3l4/Bunker1.scr::dirtFromTheTires 
+	$startjeep drive $drivetobunker3path 700 100 200 256
+	$startjeep waittill drive
+
+	// move the driver to the jeep explosion point
+	$jeepdriver thread global/LoopAnim.scr::LoopAnimStop
+	$jeepdriver detach
+	$jeepdriver ai_off
+	$jeepdriver notsolid
+	$jeepdriver hide
+
+	// remove the un-exploded jeep
+	$startjeep remove
+}end
+
+//=========================================================================
+ObjectiveRetreatToBunker3:
+//=========================================================================
+{
+	if (level.hackskipbunker3 == 1){
+		end
+	}
+
+	thread CreateMrInvisible
+	thread JeepDriverTalk
+	thread RetreatToBunker3Failure
+
+	//	thread ProjectileGenerators
+
+	$bunker3mg1 thread maps/e3l4/Bunker1.scr::SetupMG
+	$bunker3mg2 thread maps/e3l4/Bunker1.scr::SetupMG
+
+	$bunker3mgguy1 ai_on
+	$bunker3mgguy1 solid
+	$bunker3mgguy1 show
+	
+	$bunker3mgguy2 ai_on
+	$bunker3mgguy2 solid
+	$bunker3mgguy2 show
+	
+	$bunker3mg1 thread global/mg42init.scr::AttachGuyToMG42 $bunker3mgguy1 NIL 1
+	$bunker3mg2 thread global/mg42init.scr::AttachGuyToMG42 $bunker3mgguy2 NIL 1
+	
+	$bunker3arrivaltrigger waittill trigger
+	$b3mrinvisible1 remove
+}end
+
+//=========================================================================
+CreateMrInvisible:
+//=========================================================================
+{
+	spawn models/human/german_misc_frogman.tik targetname "b3mrinvisible1"
+	$b3mrinvisible1.origin = (6696 4640 852)
+	$b3mrinvisible1 hide
+	$b3mrinvisible1 nodamage
+	$b3mrinvisible1 physics_off
+	$b3mrinvisible1 notsolid
+	$b3mrinvisible1 threatbias 10000
+	$b3mrinvisible1 exec global/shoot.scr
+	wait 5
+}end
+
+//=========================================================================
+RetreatToBunker3Failure:
+//=========================================================================
+{
+	$canyonautosave waittill trigger
+	if (level.currentobjective != level.ObjRegroupInCastle){
+		iprintlnbold level.bunker3failuretext
+		wait 2
+		missionfailed
+	}
+}end
+
+//=========================================================================
+ObjectiveDefendBunker3:
+//=========================================================================
+{
+	if (level.hackskipbunker3 == 1){
+		if (level.hackskipbunker4 == 1){
+			local.LowerTunnel = waitthread global/FindTrigger.scr::FindTrigger "secondfloortunnel"
+			$player.origin 	  = local.LowerTunnel.origin
+		}
+		end
+	}
+
+	$bunker3parade.activeguys = 0
+	exec global/autosave.scr 4 // Charlie Bunker
+	
+	thread maps/e3l4/Bunker2.scr::CleanupSceneBunker2
+	thread CleanupSceneBunker2to3
+	
+	$bunker3falltree anim death	// close off path back to B2
+	$2b3playerclip solid
+
+	$bunker3mgguy1 exec global/disable_ai.scr
+	$bunker3mgguy1 physics_on
+	$bunker3mgguy1 say A_34_Soldier3Talk_01  //we've got to hold till reinforcements...
+	$bunker3mgguy1 waittill saydone
+	$bunker3mgguy1 physics_off
+	$bunker3mgguy1 exec global/enable_ai.scr
+
+	$bunker3mgguy1 takedamage
+	$bunker3mgguy2 takedamage
+
+	thread BlowUpWall
+	$bunker3leavetrigger thread LeaveMissionFailure
+
+	waitthread Bunker3BattleManager
+
+	if ($player.turret != NIL && $player.turret != NULL){
+		$player usestuff $player.turret
+	}
+
+	waitthread PIATGuyTalk
+}end
+
+//=========================================================================
+ProjectileGenerators:
+//=========================================================================
+{
+	$pgenB2B3 turnon
+	$pgenB2B3trigger waittill trigger
+	$pgenB2B3 turnoff
+}end
+
+//=========================================================================
+LeaveMissionFailure:
+//=========================================================================
+{
+	self waittill trigger
+
+	if (level.currentobjective == level.ObjDefendBunker3){
+		iprintlnbold level.bunker3failuretext
+		wait 2
+		missionfailed
+	}
+}end
+
+//=========================================================================
+HereTheyComeDialogue:
+//=========================================================================
+{
+	$bunker3mgguy1 exec global/disable_ai.scr
+	$bunker3mgguy1 say A_34_Andyboy_02
+	$bunker3mgguy1 waittill saydone
+	$bunker3mgguy1 exec global/enable_ai.scr
+}end
+
+//=========================================================================
+Bunker3BattleManager:
+//=========================================================================
+{
+	level.bunker3battleon = 1
+	wait 5
+
+	local.wave1 = 7
+	local.wave2 = 13
+	local.wave3 = 15
+
+	//	$bunker3parade.totalguys = local.wave1 + local.wave2 + local.wave3 + 5 + $bunker3parade.spawncount
+	$bunker3parade thread global/parade.scr::RunParade
+
+	//	thread HereTheyComeDialogue
+	//	thread LockAndLoadDialog
+	
+	// 5 active guys, 7 total
+	$bunker3parade.activeguys = 5
+	while ($bunker3parade.spawncount < local.wave1){
+		waitframe
+	}
+
+	thread InvadeBunkerAttempts
+
+	// 8 second cleanup time
+	$bunker3parade.activeguys = 0
+	wait 8
+
+	thread BlowUpUpperWall
+
+	// 8 active guys 13 total
+	$bunker3parade.activeguys = 8
+	while ($bunker3parade.spawncount < local.wave1 + local.wave2){
+		waitframe
+	}
+
+	// 5 second cleanup time
+	$bunker3parade.activeguys = 0
+	wait 5
+
+	// 10 active guys, 15 total
+	$bunker3parade.activeguys = 10
+	while ($bunker3parade.spawncount < local.wave1 + local.wave2 + local.wave3){
+		waitframe
+	}
+
+	// Wait till they're all dead
+	while ($bunker3parade.spawndead < local.wave1 + local.wave2 + local.wave3){
+		waitframe
+	}
+
+	waitthread WakeUpPIATGuy
+
+	// Any remaining guys run away
+	$bunker3parade_paradeguy thread Retreat $bunker3retreatnode
+
+	// Tell the invaders to stop
+	level.bunker3runaway = 1
+
+	// Stop the parade!
+	$bunker3parade thread global/parade.scr::DeleteParade
+	wait 10
+
+	level.bunker3battleon = 0
+}end
+
+/*
+LockAndLoadDialog:
+
+	wait 3
+
+	$bunker3mgguy2 exec global/setdeathanim.scr ""
+	$bunker3mgguy2.no_idle = 1
+	$bunker3mgguy2 exec global/disable_ai.scr
+
+	$bunker3mgguy2.abortmg42 = 1
+	waitframe
+	$bunker3mgguy2 gun "none"
+	$bunker3mgguy2 say A_34_Soldier4Talk_01  //lock and load...eat lead...bastard...etc
+	$bunker3mgguy2 waittill saydone
+
+	$bunker3mgguy2 bedead
+	$bunker3mgguy2 notsolid
+
+end
+*/
+
+//=========================================================================
+BlowUpWall:
+//=========================================================================
+{
+	$pgenB3 TurnOn
+	local.bunkerwalltrigger = waitthread global/FindTrigger.scr::FindTrigger "bunker3boom1"
+	local.bunkerwalltrigger triggerable
+	local.bunkerwalltrigger waittill trigger
+	waitexec global/earthquake.scr .4 3 0 0
+
+	// Pop player off turret, probably need an effect here or something to explain what happened
+	//	if ($player.turret != NIL && $player.turret != NULL)
+	//		$player usestuff $player.turret
+
+	$pgenB3 TurnOff
+	$bunker3mgguy1 exec global/bullethit.scr (0 0 20) 5000 0 1
+	$doorlocktrigger delete
+}end
+
+//=========================================================================
+BlowUpUpperWall:
+//=========================================================================
+{
+	//dprintln "Thread launched: e3l4\bunker.scr::BlowUpUpperWall"
+
+	$pgenB302 TurnOn
+	local.bunkerwall02trigger = waitthread global/FindTrigger.scr::FindTrigger "bunker3boom2"
+	local.bunkerwall02trigger triggerable
+	local.bunkerwall02trigger waittill trigger
+	
+	//dprintln "Triggered: bunkerwall02trigger (bunker3boom2)"
+	waitexec global/earthquake.scr .4 3 0 0
+
+	// Pop player off turret, probably need an effect here or something to explain what happened
+	//	if ($player.turret != NIL && $player.turret != NULL)
+	//		$player usestuff $player.turret
+
+	$pgenB302 TurnOff
+	$bunker3mgguy2 exec global/bullethit.scr (0 0 20) 5000 0 1
+}end
+
+//=========================================================================
+Retreat local.retreatpoint:
+//=========================================================================
+{
+	if (isalive self){
+		//self exec global/disable_ai.scr
+		//while (vector_length(self.origin - local.retreatpoint.origin) > 50)
+		//{
+			self.type_attack = "runandshoot"
+			self runto local.retreatpoint
+			self waittill movedone
+		//	wait 2
+		//}
+
+		if (self && vector_length(self.origin - local.retreatpoint.origin) < 50){
+			self remove
+		}
+	}
+}end
+
+//=========================================================================
+JeepDriverTalk:
+//=========================================================================
+{
+	/*
+	local.close = 0
+	local.battledone = 0
+	while (local.close == 0 && local.battledone == 0)
+	{
+		if (vector_length($jeepdriver.origin - $player.origin) < 150)
+			local.close = 1
+
+		local.battledone = 1
+		for (local.i=1;local.i<=$2b3guys2.size;local.i++)
+		{
+			if ($2b3guys2[local.i] && isalive $2b3guys2[local.i])
+				local.battledone = 0
+		}
+
+		waitframe
+	}
+	*/
+	// spawn jeep fire
+	//jeepfire
+	//jeepfiresmoke1
+
+	$jeepdriver physics_on
+	$jeepdriver notsolid
+	$jeepdriver.origin = $jeepdriverwaitpoint
+	$jeepdriver exec global/enable_ai.scr
+	$jeepdriver gun "thompson"
+	$jeepdriver.type_attack = "cover"
+
+	$jeepdriver ai_on
+	$jeepdriver show
+	$jeepdriver solid
+	$jeepdriver waitthread global/LoopAnim.scr::LoopAnimStop
+
+	while (vector_length($jeepdriver.origin - $player.origin) > 400){
+		waitframe
+	}
+
+	$jeepdriver exec global/disable_ai.scr
+	$jeepdriver turnto $player
+	$jeepdriver lookat $player
+
+	$jeepdriver say A_34_jeepDriver_2
+	$jeepdriver waittill saydone
+	$jeepdriver exec global/enable_ai.scr
+
+	$jeepdriver turnto NULL
+	$jeepdriver lookat NULL
+	$jeepdriver takedamage
+	$jeepdriver waitthread maps/e3l4/Friendly.scr::LeadPlayer $bunker2to3start
+
+	// Wait till we've finished leading the player
+	$jeepdriver waitthread maps/e3l4/friendly.scr::StartFollow 200
+}end
+
+/*
+WallTargetSwitch:
+
+	// Make each wall triggerable successively, and tell the bazooka guys to target them
+	level.bunker3boom1 triggerable
+	level.attackwall = level.bunker3boom1
+	level.bunker3boom1 waittill trigger
+
+	level.bunker3boom2 triggerable
+	level.attackwall = level.bunker3boom2
+	level.bunker3boom2 waittill trigger
+
+	level.bunker3boom3 triggerable
+	level.attackwall = level.bunker3boom3
+	level.bunker3boom3 waittill trigger
+
+	level.bunker3boom4 triggerable
+	level.attackwall = level.bunker3boom4
+	level.bunker3boom4 waittill trigger
+
+	if (level.currentobjective == level.ObjDefendBunker3)
+		$bunker3reinforcementtrigger waitthread FailedToDefendBunker3
+
+End
+
+
+BazookaGuyTargeting:
+
+	while (level.currentobjective == level.ObjDefendBunker3)
+	{
+		for (local.i=1;local.i<=$bunker3parade_paradeguy.size;local.i++)
+		{
+			if ($bunker3parade_paradeguy[local.i] &&
+				isalive $bunker3parade_paradeguy[local.i] &&
+				$bunker3parade_paradeguy[local.i].shooting != 1 &&
+				$bunker3parade_paradeguy[local.i].gun == "panzerschrek" &&
+				$bunker3parade_paradeguy[local.i].donerally == 1)
+			{
+				$bunker3parade_paradeguy[local.i] thread ShootAtWall level.attackwall
+			}
+		}
+		waitframe
+
+	}
+End
+
+ShootAtWall local.wall:
+
+	// Don't start another shoot thread
+	self.shooting = 1
+
+	self exec global/disable_ai.scr
+	self turnto level.attackwall
+	self aimat level.attackwall
+	self setaimtarget level.attackwall 1
+
+	wait 0.5
+
+	self exec global/shoot.scr
+
+	self exec global/enable_ai.scr
+
+	wait 1.5
+
+	// You may start another shoot thread on this guy
+	self.shooting = 0
+End
+*/
+
+//=========================================================================
+WakeUpPIATGuy:
+//=========================================================================
+{
+	// Set up the reinforcement dude who tells us to run away
+	$piatguy ai_on
+	$piatguy solid
+	$piatguy show
+	$piatguy exec global/disable_ai.scr
+
+	// Make the first reinforcement run to the player
+	$piatguy runto $player
+
+	while (vector_length($piatguy.origin - $player.origin) > 150){
+		waitframe
+	}
+
+	if (level.bunker3battleon == 1){
+		$piatguy runto NULL
+		$piatguy exec global/enable_ai.scr
+		$piatguy waitthread maps/e3l4/friendly.scr::StartFollow 150
+	}
+}end
+
+//=========================================================================
+PIATGuyTalk:
+//=========================================================================
+{
+	$piatguy exec global/disable_ai.scr
+	$piatguy waitthread maps/e3l4/friendly.scr::StopFollow
+
+	// Make the first reinforcement run to the player
+	$piatguy runto $player
+
+	while (vector_length($piatguy.origin - $player.origin) > 150){
+		waitframe
+	}
+
+	$piatguy turnto $player
+	$piatguy lookat $player
+
+	$piatguy say A_34_Soldier6Talk_02
+	$piatguy waittill saydone
+	$piatguy say A_34_Soldier6Talk_03
+	$piatguy waittill saydone
+
+	$piatguy turnto NULL
+	$piatguy lookat NULL
+	$piatguy runto  NULL
+
+	$piatguy exec global/enable_ai.scr
+	$piatguy waitthread maps/e3l4/friendly.scr::StartFollow 150
+	$piatguy takedamage
+}end
+
+// Bunker 3 invasion guys
+//=========================================================================
+InvadeBunkerAttempts:
+//=========================================================================
+{
+	level.bunker3runaway = 0
+	while(level.bunker3runaway == 0){
+		local.invader = waitthread ChooseRandomParadeGuy
+
+		if (local.invader){
+			local.invader thread InvadeBunker
+			wait 3
+
+			//while ((isalive local.invader) && (local.invader.abort != 1))
+			//	waitframe
+		}
+		wait 1
+	}
+}end
+
+//=========================================================================
+ChooseRandomParadeGuy:
+//=========================================================================
+{
+	if (!$bunker3parade_paradeguy){
+		end
+	}
+
+	local.closestguy  = NULL
+	local.closestdist = 0
+
+	for (local.i=1;local.i<=$bunker3parade_paradeguy.size;local.i++){
+		if ($bunker3parade_paradeguy[local.i] && isalive $bunker3parade_paradeguy[local.i] && $bunker3parade_paradeguy[local.i].gun != "panzerschrek" && $bunker3parade_paradeguy[local.i].invading != 1){
+			local.dist = vector_length($bunker3parade_paradeguy[local.i].origin - $bunker3invadenode.origin)
+
+			if (local.dist > local.closestdist){
+				local.closestdist = local.dist
+				local.closestguy  = $bunker3parade_paradeguy[local.i]
+			}
+		}
+	}
+}end local.closestguy
+
+//=========================================================================
+InvadeBunker:
+//=========================================================================
+{
+	//	self exec global/disable_ai.scr
+	self runto $bunker3invadenode.origin
+	self.invading = 1
+
+	local.startnode = $bunker3invadenode
+	//local.endnode = $bunker3invadenode
+	local.endnode 	= $bunker3invadeendnode
+
+	while (self && isalive self && vector_length(self.origin - local.endnode.origin) > 100 && vector_length(self.origin - local.startnode.origin) > 100){
+		self.type_attack = "runandshoot"
+		self.movedoneradius = 80
+		self runto local.startnode.origin
+		self waittill movedone
+		wait 1
+	}
+
+	// if  we are dead, get out of here
+	if (!self || !(isalive self)){
+		end
+	}
+
+	if (vector_length(self.origin - local.endnode.origin) > 80){
+		self.abort = 1
+		//self exec global/enable_ai.scr
+		end
+	}
+}end
+
+//=========================================================================
+CleanupSceneBunker2to3:
+//=========================================================================
+{
+	thread global/EntityCleanup.scr::EntityCleanup "2b3guys1" 3000
+	thread global/EntityCleanup.scr::EntityCleanup "2b3guys2" 3000
+	thread global/EntityCleanup.scr::EntityCleanup "2b3guys3" 3000
+	thread global/EntityCleanup.scr::EntityCleanup "2b3guys4" 3000
+
+	$jeepfire remove
+	$jeepfiresmoke1 remove
+}end
+
+//=========================================================================
+CleanupSceneBunker3:
+//=========================================================================
+{}end

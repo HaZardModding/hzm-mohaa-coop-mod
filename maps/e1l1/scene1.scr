@@ -1,0 +1,434 @@
+//
+// scene1.scr
+//
+//=========================================================================
+Init:
+//=========================================================================
+{
+	$jeep SoundSet "alt_jeep_"
+	//thread doTank1
+
+	spawn models/human/animation/scripted/level_e1l1_keylocations.tik targetname introLocations
+	$introLocations notsolid
+}end
+
+//=========================================================================
+jeepGuy local.anim:
+//=========================================================================
+{
+	self rendereffects "-shadow"
+	self holster
+	self nodamage
+	self notsolid
+
+	if (self.isDriver == 1){
+		self attach $jeep driver_seat 1 ( 0 0 0 )
+	}
+	else{
+		self attach $jeep passenger_seat 1 ( 0 0 0 )
+	}
+
+	self.angles = $jeep.angles
+	self bind $jeep
+	self notsolid
+	self gun "none"
+	self.eneableEnemy = 0
+}end
+
+//=========================================================================
+prepJeepRide:
+//=========================================================================
+{
+	thread doJeepSound1
+	thread maps/e1l1/introSpawnGuys.scr::spawnGuys
+
+	if (level.skipJeepRide){
+		end
+	}
+
+	$jeep remove
+	waitframe
+	spawn script_model model models/vehicles/willys.tik targetname jeep
+
+	$jeep.origin = $introLocations gettagposition jeep1_start
+	$jeep notsolid
+	$jeep anim idlewindscreen_up
+	$jeep anim idlehide_cutter
+
+	spawn models/human/Sc_Al_US_wheathers.tik targetname general
+	$general waitthread jeepGuy 
+
+	spawn models/human/Sc_Al_US_Corp.tik targetname driver
+	$driver.isDriver = 1
+	$driver waitthread jeepGuy 
+
+	spawn Camera targetname jeepCamera
+
+	if(level.gametype == 0){ // -- Criminal - SP & MP test shit, maybe would work.
+		$player.viewangles  = $jeep.angles
+		$player.viewangles += ( 0 18 0 )
+	}
+	else{
+		for (local.i = 1; local.i <= $player.size; local.i++) {
+			local.player = $player[local.i]
+			local.player.viewangles  = $jeep.angles
+			local.player.viewangles += ( 0 18 0 )			
+		}
+	}
+
+	local.useNullObj = 1
+
+	if (local.useNullObj) {
+		level.cameraModel = spawn models/miscobj/cameranull.tik
+		level.cameraModel notsolid
+		level.cameraModel physics_off
+		level.cameraModel.origin = $introLocations gettagposition cam_start
+		$jeepCamera.origin = level.cameraModel.origin
+		$jeepCamera bind level.cameraModel
+	}
+	else{
+		$jeepCamera attach $jeep driver_seat 0 ( -50 0 55 )
+	}
+
+	$jeepCamera.angles = $jeep gettagangles driver_seat
+	
+	if (level.walkThroughIntro) {	
+		//$player.origin = ( -2155 -6701 270 )  // start of jeep ride
+		//$player.origin = ( -1815 -4913 366 )
+		//$player.origin = ( -3194 -4444 248 )	// at sentry
+		if(level.gametype == 0){ // -- Criminal - SP & MP test shit, maybe would work.
+	 		$player.origin = ( -3896 -3961 305 )	// at map & medic tents
+		}
+		else{
+			for (local.i = 1; local.i <= $player.size; local.i++) {
+				local.player = $player[local.i]
+				local.player.origin = ( -3896 -3961 305 )
+				//make sure players don't get stuck even if there are no valid spawns
+				thread playerMakeSolidAsap local.i
+			}
+		}
+	 	//$player.origin = ( -5800 -1770 307 )  // near guy getting in truck
+	 	//$player.origin = ( -5039 82 300 ) // near battlefield entrance
+	}	  
+	else{ // -- Criminal - SP & MP test shit, maybe would work.
+		if (level.gametype == 0) {
+			$player hide
+			$player physics_off
+			$player notsolid
+		}
+		else{
+			for (local.i = 1; local.i <= $player.size; local.i++) {
+				local.player = $player[local.i]
+				local.player hide
+				local.player physics_off
+				local.player notsolid
+			}
+		}
+		cuecamera $jeepCamera
+	}
+
+	level.RideOver = 0
+	thread maintainCamera
+
+	if (!level.noStorm) {
+		//iprintln "gluing strom"
+		//$storm glue $jeepCamera
+		$jeepCamera waitthread maps/e1l1/storm.scr::AttachStorm
+	}
+}end
+
+//=========================================================================
+generalAnim:
+//=========================================================================
+{
+	thread generalTalk
+	self.enableEnemy = 0
+
+	if (!level.warpToFrontLine) {
+		self anim_noclip A_11_General_jeepA
+		self waittill animdone
+		self anim_noclip A_11_General_jeepB
+		self waittill animdone
+		self anim_noclip A_11_General_jeepC
+		self waittill animdone
+		self anim_noclip A_11_General_jeepD
+		self waittill animdone
+		self anim_noclip A_11_General_jeepE
+		self waittill animdone
+		self anim_noclip A_11_General_jeepF
+		self waittill animdone
+		self anim_noclip A_11_General_jeepG
+		self waittill animdone
+		self anim_noclip A_11_General_jeepH
+		self waittill animdone
+		self anim_noclip A_11_General_jeepI
+		self waittill animdone
+		self anim_noclip A_11_General_jeepJ
+		self waittill animdone
+
+		exec global/autosave.scr 1	//"Ride done, whatever"
+
+		self anim_noclip A_11_General_jeepK
+		self waittill animdone
+		self anim_noclip A_11_General_jeepL
+		self waittill animdone
+	}
+}end
+
+//=========================================================================
+driverAnim:
+//=========================================================================
+{
+	self.enableEnemy = 0
+	if (!level.warpToFrontLine) {
+		self anim_noclip A_11_jeep1driver_drive1
+		self waittill animdone
+		self anim_noclip A_11_jeep1driver_drive2
+		self waittill animdone
+		self anim_noclip A_11_jeep1driver_drive3
+		self waittill animdone
+	}
+}end
+
+//=========================================================================
+cameraAnim:
+//=========================================================================
+{
+	self moveanim A_11_cam1
+	self waittill animdone
+	self moveanim A_11_cam2
+	self waittill animdone
+	self moveanim A_11_cam3
+	self waittill animdone
+}end
+
+//=========================================================================
+rollJeepRide:
+//=========================================================================
+{
+	trigger $jeepRideStart 
+
+	if (level.skipJeepRide){
+		end
+	}
+	wait 0.33
+
+	$general thread generalAnim
+	wait 0.66
+
+	$driver thread driverAnim
+	level.cameraModel thread cameraAnim
+
+	if (!level.warpToFrontLine) {
+		// leg 1
+		$jeep moveanim A_11_jeep1_drive1
+		$jeep waittill animdone
+		trigger $jeepFinalApproach 
+
+		// leg 2
+		//$jeep.origin = $introLocations gettagposition jeep1_waypoint1
+		$jeep moveanim A_11_jeep1_drive2
+		$jeep waittill animdone
+	}
+
+	thread doJeepSound2
+	thread doJeepSound3
+	trigger $jeepArrivedAtBattle
+
+	// spawn another thread to finish the jeep ride, and return now, so
+	//    that the objectives are updated immediately
+	thread jeepDriveAway
+}end
+
+//=========================================================================
+doJeepSound1:
+//=========================================================================
+{
+	wait 3.05
+	$jeep playsound Intro_Jeep_Player1
+}end
+
+//=========================================================================
+doJeepSound2:
+//=========================================================================
+{
+	$jeep playsound Intro_Jeep_Player2
+}end
+
+//=========================================================================
+doJeepSound3:
+//=========================================================================
+{
+	wait 5.3
+	$jeep playsound Intro_Jeep_Player3
+}end
+
+//=========================================================================
+jeepDriveAway:
+//=========================================================================
+{
+	// leg 3
+	//$jeep.origin = $introLocations gettagposition jeep1_waypoint2
+
+	$jeep thread KillPlayerOnTouch
+	$jeep moveanim A_11_jeep1_drive3
+	$jeep waittill animdone
+	
+	$general remove
+	$jeep remove
+	$driver remove
+	level.cameraModel remove
+}end
+
+
+//	Simulate player getting run over by the jeep..
+//=========================================================================
+KillPlayerOnTouch:
+//=========================================================================
+{
+	wait 2.7
+	self solid
+
+	while ( self!=NIL && self!=NULL )
+	{
+		self waittill touch
+		//dprintln "who is touching jeep:" parm.other.targetname
+
+		
+		//chrissstrahl - if not activated by a entity
+		if ( parm.other == NULL ){ continue }
+
+		//chrissstrahl - handle all players
+		for(local.i=1;local.i<=$player.size;local.i++){
+			local.player = $player[local.i]
+			if( local.player == NULL ||
+				!(waitexec coop_mod/main.scr::isPlayerActive local.player) ||
+				!(local.player isTouching self) )
+			{
+				continue
+			}
+			
+			local.velocity 		= self.velocity
+			local.velocity[2] 	= 0.0
+			local.toPlayer 		= (local.player.origin - self.origin)
+			local.toPlayer[2] 	= 0.0
+			local.dot 			= (vector_dot	local.velocity local.toPlayer)
+
+			if (local.dot > 0.0){
+				dprintln "KILLING PLAYER HE'S IN THE WAY OF THE JEEP!"
+
+				// kill him now!
+				local.player damage NULL 3000 NULL (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+				
+				if(level.gametype == 0){ //chrissstrahl - singleplayer
+					end
+				}
+			}
+			else{
+				dprintln "player touching jeep, but not opposing velocity"
+			}
+		}
+		waitframe
+	}
+}end
+
+
+//=========================================================================
+maintainCamera_coop_grabPlayer:{
+//=========================================================================
+	local.player = exec coop_mod/replace.scr::player_anyPreferValid
+}end local.player
+
+//chrissstrahl - coop compatible version
+//=========================================================================
+maintainCamera_coop:{
+//=========================================================================
+	if(level.RideOver==1){
+		end
+	}
+	local.player = waitthread maintainCamera_coop_grabPlayer
+	while(local.player == NULL){
+		waitframe
+		//iprintlnbold_noloc("maintainCamera_coop 1")
+		local.player = waitthread maintainCamera_coop_grabPlayer
+	}
+	
+	local.useNullObj 	  = 1
+	level.oldPlayerAngles = local.player.viewangles
+	local.deltaAngles 	  = local.player.viewangles - level.oldPlayerAngles
+
+	if (local.useNullObj){
+		$jeepCamera.angles = (level.cameraModel gettagangles camera) + local.deltaAngles
+	}
+	else{
+		$jeepCamera.angles = ($jeep gettagangles driver_seat) + local.deltaAngles
+	}
+
+	while (level.RideOver == 0){
+		local.player = waitthread maintainCamera_coop_grabPlayer
+		while(local.player == NULL){
+			waitframe
+			//iprintlnbold_noloc("maintainCamera_coop 2")
+			local.player = waitthread maintainCamera_coop_grabPlayer
+		}
+		local.deltaAngles = local.player.viewangles - level.oldPlayerAngles
+
+		if (local.useNullObj){
+			$jeepCamera.angles = (level.cameraModel gettagangles camera) + local.deltaAngles
+		}
+		else{
+			$jeepCamera.angles = ($jeep gettagangles driver_seat) + local.deltaAngles
+		}
+		waitframe
+	}
+}
+
+
+//=========================================================================
+maintainCamera:
+//=========================================================================
+{
+	//chrissstrahl - handle different for coop
+	if(level.gametype != 0){
+		thread maintainCamera_coop
+		end
+	}
+	local.useNullObj 	  = 1
+	level.oldPlayerAngles = $player.viewangles
+	local.deltaAngles 	  = $player.viewangles - level.oldPlayerAngles
+
+	if (local.useNullObj){
+		$jeepCamera.angles = (level.cameraModel gettagangles camera) + local.deltaAngles
+	}
+	else{
+		$jeepCamera.angles = ($jeep gettagangles driver_seat) + local.deltaAngles
+	}
+
+	while (level.RideOver == 0){
+		local.deltaAngles = $player.viewangles - level.oldPlayerAngles
+
+		if (local.useNullObj){
+			$jeepCamera.angles = (level.cameraModel gettagangles camera) + local.deltaAngles
+		}
+		else{
+			$jeepCamera.angles = ($jeep gettagangles driver_seat) + local.deltaAngles
+		}
+		waitframe
+	}
+}end
+
+//=========================================================================
+generalTalk:
+//=========================================================================
+{}end	
+
+//=========================================================================
+driverDrive:
+//=========================================================================
+{}end
+
+//=========================================================================
+doTank1:
+//=========================================================================
+{}end
+

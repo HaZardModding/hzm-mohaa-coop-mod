@@ -1,0 +1,170 @@
+//=========================================================================
+main:{
+//=========================================================================
+	level.coopPrevMap = "m2l2b"			//chrissstrahl - set previouse map (for mom voteing)
+	level.coopNextMap = "m2l3"			//chrissstrahl - set next map (for mom voteing)
+	thread coop_mod/main.scr::main 		//chrissstrahl - start coop mod extensions
+	
+	//chrissstrahl - setup stuff that is needed
+	if(level.gametype != 0){
+		spawn trigger_once targetname coop_updateSpawn setthread coop_updateSpawn origin (2100 -6333 -434)
+	}
+	
+	exec global/loadout.scr maps/m2l2c.scr
+level waittill prespawn
+	exec global/ambient.scr m2l2c
+
+	$t1487 hide //hack: guy was visible before chainspawner was ran 
+level waittill spawn
+
+	level.maxspawn = 4
+	level.skillz = getcvar(skill)
+	if(level.skillz == "0")
+		level.chainspawner_thread = "easyskill"
+	level.chainspawnzone = "t1484"
+	waitthread global/chainspawner.scr::spawners 2
+	wait 2
+	thread global/chainspawner.scr::init
+	$t1487 show
+	waitthread global/objectives.scr::add_objectives 1 2 "Exfiltrate." $endlevel.origin
+	waitthread global/objectives.scr::current_objectives 1
+	thread wavesounds
+	thread storeroomguyaction
+	thread playalarmsound
+	thread endlevelthread
+	exec coop_mod/replace.scr::tmstartloop "sound/music/mus_11a_surprise.mp3"	//chrissstrahl - coop comptibility
+	for(local.i = 1; local.i <= $alarm_sound.size; local.i++)
+	{
+		$alarm_sound[local.i] loopsound m2l2_alarm
+	}
+//	$player stufftext "notarget"
+	
+	if( level.gametype != 0){//chrissstrahl - spawn trigger to update spawnpoints - set size of triggerfield in coop only
+		$coop_updateSpawn setsize ( -200 -200 -100) (200 200 100)
+	}
+}end
+
+
+doorlocked:
+	self playsound door_metal_locked
+end
+
+easyskill:
+	if(self.health > 50)
+		self.health = (self.health / 2)
+//	println self.targetname "'s health is " self.health
+	self noticescale 1000
+//	println self.targetname "'s noticescale is " self.noticescale
+	
+	if(self.gun != "kar 98k")
+		self accuracy (self.accuracy / 6)
+	else
+		self accuracy (self.accuracy / 4)
+		
+//	println self.targetname "'s gun is " self.gun
+end
+
+wavesounds:
+	local.asdf = 1
+	for(local.i = 1;local.i <= $wavelaps.size;local.i++)
+		{
+			if($wavelaps[local.i].volume == "low")
+				$wavelaps[local.i] loopsound wave_laps_low 1
+			else if($wavelaps[local.i].volume == "medium")
+				$wavelaps[local.i] loopsound wave_laps_med 1
+			else if($wavelaps[local.i].volume == "high")
+          		$wavelaps[local.i] loopsound wave_laps_high 1
+			else
+				$wavelaps[local.i] loopsound wave_laps_med 1
+		}
+end
+
+storeroomguyaction:
+	$storeroomguyactiontrig waittill trigger
+	$storeroomguy exec global/walkto.scr $storeroomguyspot1
+end
+
+playalarmsound:
+	end//chrissstrahl - this is probably utterly useless, which is why I disabled it
+	level.altime = 1
+	while(1){
+		while(level.alarm == 1)
+		{
+			wait 2
+			level.altime++
+			if(level.altime > 20)
+			{
+        		for(local.i = 1;local.i <= $alarm_sound.size;local.i++){
+               		if((vector_length ($player.origin - $alarm_sound[local.i].origin) < 1024))
+               		{
+               	//		local.loudspeaker[local.i] playsound den_m2l2_258p
+               		//	$alarm_sound[local.i] playsound den_m2l2_258p
+					}
+               	}
+				wait 7
+				level.altime = 1
+			}
+		}
+		wait 1
+	}
+end
+
+becomecover:
+	self type_attack "cover"
+end
+
+endlevelthread:
+	$endlevel waittill trigger
+	waitthread global/objectives.scr::add_objectives 1 3 "Exfiltrate." $endlevel.origin
+	waitthread global/objectives.scr::current_objectives 0
+	exec global/missioncomplete.scr m2l3 1
+end
+
+lockedvent:
+ 	self playsound vent_gate_locked
+end
+
+lockedgate:
+	self playsound gate_metal_locked
+end
+
+//*******FOGRAMP***********
+// adjusts farplane when entering and exitting buildings
+//***************************
+
+fogramp local.rampto:
+	if (level.fogplane == local.rampto)
+	{
+		end
+	}
+	if (level.fogplane < local.rampto)
+	{
+		for (local.bleh = level.fogplane; local.bleh < local.rampto; local.bleh += 100)
+		{
+			level.fogplane = local.bleh
+			$world farplane level.fogplane
+			iprintlnbold_noloc("farplane[1]:" + level.fogplane)
+			wait .03
+		}
+		end
+	}
+	if (level.fogplane > local.rampto)
+	{
+		for (local.bleh = level.fogplane; local.bleh > local.rampto; local.bleh -= 100)
+		{
+			level.fogplane = local.bleh
+			$world farplane level.fogplane
+			iprintlnbold_noloc("farplane[2]:" + level.fogplane)
+			wait .03
+		}
+		end
+	}
+end
+
+//=========================================================================
+coop_updateSpawn:{
+//=========================================================================
+//chrissstrahl - set new location for spawnpoints
+	thread coop_mod/spawnlocations.scr::m2l2c_update1	
+}
+

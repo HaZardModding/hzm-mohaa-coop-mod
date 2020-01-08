@@ -1,0 +1,1225 @@
+//chrissstrahl - completed coopification on 2019.09.18
+
+// JailBreak
+
+init:
+	//chrissstrahl - developer test stuff, we can leave this
+	if (level.warpTo == "jailBreak") {
+		// hack warp section
+
+		local.spacing = 100
+		$player.origin = ( (664 - 7 * local.spacing) -2700 160 )
+
+		waitthread maps/e1l3/Objectives.scr::catchup "crossedCanal"
+
+//		spawn "models/human/Sc_Al_US_Inf"  "targetname" "BoatGuyLeader"
+//		spawn "models/human/Sc_Al_US_Inf"  "targetname" "BoatGuy1"
+//		spawn "models/human/Sc_Al_US_Inf"  "targetname" "BoatGuy2"
+//
+//		$BoatGuyLeader.origin = ( (664 - 8 * local.spacing) -2680 160 )
+//		$BoatGuyLeader exec global/disable_ai.scr
+//		//$BoatGuyLeader.destination = $player
+//		//$BoatGuyLeader.friendtype = 1
+//		//$BoatGuyLeader.distance = 250
+//		//$BoatGuyLeader thread global/friendly.scr::friendlythink
+//
+//		$BoatGuy1.origin = ( (664 - 9 * local.spacing) -2680 160 )
+//		$BoatGuy1 exec global/enable_ai.scr
+//		$BoatGuy1.destination = $BoatGuyLeader
+//		$BoatGuy1.friendtype = 1
+//		$BoatGuy1.distance = 250
+//		$BoatGuy1 thread global/friendly.scr::friendlythink
+//
+//		$BoatGuy2.origin = ( (664 - 10 * local.spacing) -2680 160 )
+//		$BoatGuy2 exec global/enable_ai.scr
+//		$BoatGuy2.destination = $BoatGuyLeader
+//		$BoatGuy2.friendtype = 1
+//		$BoatGuy2.distance = 250
+//		$BoatGuy2 thread global/friendly.scr::friendlythink
+//
+//		$BoatGuy1.targetname = "BoatGuy"
+//		$BoatGuy2.targetname = "BoatGuy"
+
+		for (local.i=1; local.i<=$BoatEnemy.size; local.i++)
+		{
+			$BoatEnemy[local.i] ai_off
+			$BoatEnemy[local.i] threatbias ignoreme
+		}
+
+//		$BoatGuyLeader nodamage
+
+		$leader_tank.origin = ( 1791 -4850 126.625 )
+		$leader_tank.angles = ( 0 90 0 )
+	}
+
+	// initialization
+
+	level.exit_unlocked = 0
+	level.prisoners_to_free = 3		//4
+	level.prisoners_must_live = 1
+	level.player_entered_armory = 0
+
+	$PrisonerGun1 notsolid
+	$PrisonerGun2 notsolid
+	$PrisonerGun3 notsolid
+	$PrisonerGunExtra notsolid
+	if ($WeaponRoomBeretta)
+		$WeaponRoomBeretta notsolid
+
+	level.prisoners_to_get_guns = 3			//4
+	spawn trigger_relay "targetname" "PrisonersGotGunsTrigger"
+
+	spawn trigger_relay "targetname" "BlastHoleExplosivesPlaced_Trigger"
+	spawn trigger_relay "targetname" "BlastHoleBlasted_Trigger"
+
+	level.player_has_jail_key = 0
+	spawn trigger_relay "targetname" "PlayerGotJailKeys_Trigger"
+
+	$PrisonDoor lock
+	level.prison_door_unlocked = 0
+	spawn trigger_relay "targetname" "PrisonDoorUnlocked_Trigger"
+	$PrisonDoorOther lock
+	$WeaponRoomDoor lock
+
+	waitthread global/ManSpawnNamed.scr::Init "Prisoner1"
+	waitthread global/ManSpawnNamed.scr::Init "Prisoner2"
+	waitthread global/ManSpawnNamed.scr::Init "Prisoner3"
+	if ($Prisoner4)
+		delete $Prisoner4
+	waitthread global/ManSpawnNamed.scr::Init "JailGuard"
+
+	$JailWallThrobber SetDamage 1000
+	$JailWallThrobber hide
+
+	//thread PlayerNearBlastHoleTrigger_Thread
+
+	// spawn work thread
+	thread DoWork
+
+	thread removeAcrossCanalGuys
+
+	println "jailBreak initialized"
+end
+
+
+DoWork:
+	thread PlayerBlastHole_Thread
+	thread TankBridgeGag_Thread
+
+	$PlayerNearBlastHole_Trigger waittill trigger
+
+	thread PlayerGetKeys_Thread
+	thread PlayerEnterArmory_Thread
+
+	//while (!$BoatGuyLeader)
+	//	waitframe
+
+	waitthread global/ManSpawnNamed.scr::Spawn "Prisoner1"
+	waitthread global/ManSpawnNamed.scr::Spawn "Prisoner2"
+	waitthread global/ManSpawnNamed.scr::Spawn "Prisoner3"
+
+	waitframe
+
+	$Prisoner1 threatbias ignoreme
+	$Prisoner1 exec global/disable_ai.scr
+	$Prisoner1 gun "none"
+	$Prisoner1 thread PrisonerThink 1
+
+	$Prisoner2 threatbias ignoreme
+	$Prisoner2 exec global/disable_ai.scr
+	$Prisoner2 gun "none"
+	$Prisoner2 thread PrisonerThink 2
+
+	$Prisoner3 threatbias ignoreme
+	$Prisoner3 exec global/disable_ai.scr
+	$Prisoner3 gun "none"
+	$Prisoner3 thread PrisonerThink 3
+
+	$PlayerInJail_Trigger waittill trigger
+
+	//chrissstrahl - make coop compatible
+	exec coop_mod/replace.scr::threatbias 0
+	//chrissstrahl - update spawn locations - we die here a lot
+	exec coop_mod/spawnlocations.scr::e1l3_update3
+	
+	if ($BoatGuy)
+		$BoatGuy threatbias 0
+
+	thread PlayerTakeExtraGun_Thread
+	thread PlayerTakeBeretta_Thread
+	waitthread global/ManSpawnNamed.scr::Spawn "JailGuard"
+	waitframe
+	$JailGuard hearing 4048
+	$PrisonDoor thread DoorThread $PrisonDoor_UseTrigger
+//	thread BoatGuysThinkage
+//	wait 1
+//	$JailGuard.type_attack = "runandshoot"
+//	if ($JailGuard.target && $($JailGuard.target))
+//		$JailGuard runto $($JailGuard.target)
+
+	$PrisonDoorUnlocked_Trigger waittill trigger
+
+	waitthread maps/e1l3/Objectives.scr::transition "freedBrits"
+	waitthread global/items.scr::remove_item "keys"
+
+	$PrisonersGotGunsTrigger waittill trigger
+
+
+	// here's where we do a nicey little nazis-rush-in mini-gaglet
+
+	wait 3
+	$WeaponRoomDoor unlock
+	waitframe
+
+	$WeaponRoomParade thread global/parade.scr::RunParade
+
+	wait 10
+	trigger $StartConquestSectionTrigger
+
+end
+
+
+//BoatGuysThinkage:
+//
+//	$BoatGuyLeader threatbias 0
+//	waitexec global/EntityIterateCommand.scr "BoatGuy" threatbias 0
+//
+//	// unleash BoatLeader when he reaches dest
+//	$BoatGuyLeader exec global/disable_ai.scr
+//	$BoatGuyLeader waitthread global/SafeMoveTo.scr::SafeRunTo_Wait $BoatLeaderWaitPoint_Jail
+//	$BoatGuyLeader exec global/enable_ai.scr
+//
+//	// wait till jail guard is dead
+//
+//	$JailGuard waittill death
+//
+//	$BoatGuyLeader exec global/disable_ai.scr
+//	waitexec global/EntityIterateCommand.scr "BoatGuy" disable_ai
+//
+//
+//	while (level.player_has_jail_key == 0)
+//		waitframe
+//
+//
+//	// run into armory
+//	$BoatGuyLeader waitthread global/SafeMoveTo.scr::SafeRunTo_Wait $BoatLeaderWaitPoint_Armory
+//	$BoatGuyLeader turnto $WeaponRoomDoor
+//	for (local.i=1; local.i<=$BoatGuy.size; local.i++)
+//	{
+//		$BoatGuy[local.i] turnto $WeaponRoomDoor
+//	}
+//
+//	$PrisonersGotGunsTrigger waittill trigger
+//
+//	wait 3
+//
+//	$BoatGuyLeader turnto NULL
+//	$BoatGuyLeader exec global/enable_ai.scr
+//	for (local.i=1; local.i<=$BoatGuy.size; local.i++)
+//	{
+//		$BoatGuy[local.i] turnto NULL
+//		$BoatGuy[local.i] exec global/enable_ai.scr
+//	}
+//
+//end
+
+
+PlayerBlastHole_Thread:
+
+	if ($JailEntranceFakeDoor)
+	{
+		$JailEntranceFakeDoor lock
+		$JailEntranceFakeDoor hide
+	}
+
+	$RevealWallThrobberTrigger waittill trigger
+
+	$JailWallThrobber show
+
+	$BlastHoleExplosivesPlaced_Trigger waittill trigger
+	wait 4.6
+
+	waitthread global/ObjMgr.scr::SetObjCompassTarg "freeBrits" $JailKeys
+end
+
+
+BlastHoleExplosivesPlaced_Thread:
+
+	waitthread global/items.scr::remove_item "explosive"
+	trigger $BlastHoleExplosivesPlaced_Trigger
+
+	// run boat guys away
+
+	if ($BoatGuySplodeHuddlePoint)
+	{
+		if ($BoatGuy)
+		{
+			$BoatGuy waitthread global/friendly.scr::friendlystop
+			$BoatGuy exec global/disable_ai.scr
+			$BoatGuy waitthread global/SafeMoveTo.scr::SafeRunTo_Wait $BoatGuySplodeHuddlePoint
+			$BoatGuy exec global/enable_ai.scr
+		}
+//		$BoatGuyLeader exec global/disable_ai.scr
+//
+//		if ($BoatGuy)
+//		{
+//			for (local.i=1; local.i<=$BoatGuy.size; local.i++)
+//			{
+//				$BoatGuy[local.i] exec global/disable_ai.scr
+//			}
+//		}
+//
+//		$BoatGuyLeader waitthread global/SafeMoveTo.scr::SafeRunTo $BoatGuySplodeHuddlePoint
+	}
+
+end
+
+
+BlastHoleBlast_Thread:
+
+	thread global/exploder.scr::explode 1
+
+	if ($JailEntranceFakeDoor)
+	{
+		$JailEntranceFakeDoor unlock
+		waitframe
+		$JailEntranceFakeDoor open $world //chrissstrahl
+		waitframe
+		$JailEntranceFakeDoor delete
+	}
+
+	if ($BoatGuySplodeHuddlePoint)
+	{
+		if ($BoatGuy)
+		{
+			$BoatGuy thread global/friendly.scr::friendlythink
+		}
+//		$BoatGuyLeader exec global/enable_ai.scr
+//
+//		if ($BoatGuy)
+//		{
+//			for (local.i=1; local.i<=$BoatGuy.size; local.i++)
+//			{
+//				$BoatGuy[local.i] exec global/enable_ai.scr
+//			}
+//		}
+	}
+
+	wait 1.05
+
+	thread SpawnRandomWaterSplashes 464 -2940 840 -2832 10 20			//494 -2876 840 -2812 10 20
+	thread PositionedSound ( 664 -2840 0 ) "arty_exp_water2" 0.5 5
+	
+	//chrissstrahl - cleanup this mess
+	exec coop_mod/butler.scr::e1l3_jailbreakClensing
+end
+
+
+SpawnRandomWaterSplashes local.min_x local.min_y local.max_x local.max_y local.num local.change_wait_tween:
+
+	for (local.i=1; local.i<=local.num; local.i++)
+	{
+		local.x = waitthread RandomFloatInRange local.min_x local.max_x
+		local.y = waitthread RandomFloatInRange local.min_y local.max_y
+
+		local.pos = ( local.x local.y 0 )
+		thread SpawnWaterSplashEffect local.pos 0.25
+
+		if ((randomint 100) < local.change_wait_tween)
+			waitframe
+	}
+
+end
+
+
+PositionedSound local.origin local.sound local.volume local.remove_time:
+	local.soundorigin = spawn script_model model "fx/dummy.tik"
+	local.soundorigin.origin = local.origin
+	local.soundorigin playsound local.sound NIL local.volume
+	local.soundorigin notsolid
+
+	wait local.remove_time
+
+	local.soundorigin remove
+end
+
+
+PlayerNearBlastHoleTrigger_Thread:
+
+	level.player_near_blast_hole = 0
+
+	$PlayerNearBlastHole_Trigger waittill trigger
+
+	level.player_near_blast_hole = 1
+
+end
+
+
+PlayerGetKeys_Thread:
+
+	$JailKeys_UseTrigger waittill trigger
+
+	waitthread global/items.scr::add_item "keys"
+
+	level.player_has_jail_key = 1
+	trigger $PlayerGotJailKeys_Trigger
+	waitthread global/ObjMgr.scr::SetObjCompassTarg "freeBrits" $Prisoner1
+	if($PrisonDoorOther!=NULL){ $PrisonDoorOther unlock } //chrissstrahl - stop console spam
+
+//	$JailKeys_UseTrigger playsound keys_pickup
+
+	$JailKeys delete
+
+end
+
+
+PlayerEnterArmory_Thread:
+
+	$PlayerEnteredArmory_Trigger waittill trigger
+	level.player_entered_armory = 1
+
+	// clean up some stanks
+	$player_tank remove
+	$player_tank_damaged remove
+	$follow_tank remove
+	if($follow_tank_damaged!=NULL){ $follow_tank_damaged remove } //chrissstrahl - stop console spam
+	
+end
+
+
+DoorThread local.use_trigger:
+	while (1){
+		local.use_trigger waittill trigger
+
+		if (level.player_has_jail_key == 1){
+			self unlock
+			wait 0.25
+			
+			//chrissstrahl - wait and grab closest player
+			local.player = NULL
+			while(local.player == NULL){
+				waitframe
+				local.player = waitexec coop_mod/replace.scr::player_closestTo self
+			}
+			self open local.player //chrissstrahl
+			
+			trigger $PrisonDoorUnlocked_Trigger
+			level.prison_door_unlocked = 1
+			local.use_trigger playsound keys_use
+
+			while (1)
+			{
+				wait 1
+				
+				//chrissstrahl - this seams to be some sort of failsafe if something is blocking or closing the door
+				if (!self.isOpen){
+					self open $world //chrissstrahl
+				}
+			}
+			break
+		}
+		else
+		{
+			local.use_trigger playsound door_metal_locked
+		}
+	}
+end
+
+
+
+PrisonerMustLive:
+	self waittill death
+	if (level.prisoners_must_live == 1)
+	{
+		level.prisoners_must_live = 0		// don't repeat the logic below
+
+		iprintlnbold "A POW was killed in action."
+		wait 1
+		iprintlnbold "Mission Failed."
+
+		//chrissstrahl - fail in coop - not sure how to transition here
+		//this might be the only solution to turn screen redish
+		if(level.gametype != 0){
+			exec coop_mod/replace.scr::missionfailed
+			end
+		}else{
+			wait 1
+			missionfailed
+		}
+	}
+end
+
+
+PrisonerThink local.pris_num:
+	self thread PrisonerMustLive
+
+	switch (local.pris_num)
+	{
+		case 1:		// cap-tin
+			self.no_idle = 1
+//			self notsolid
+			self.origin = (158 -1864 64)			//(100 -2120 64)			//(128 -2120 64)
+			self.angles = (0 0 0)
+
+			self anim A_13_Brit_captidle01
+			wait 4		//0.2
+			self ai_off
+			$PlayerInJail_Trigger waittill trigger
+			wait 0.5
+
+//			if (level.player_has_jail_key == 0)
+//				$PlayerGotJailKeys_Trigger waittill trigger
+
+			//chrissstrahl - allow em to "die" even if guard is still alive
+			//they would not animate dieing if shot, unless the guard would be dead
+			//if ($JailGuard && (isalive $JailGuard))
+				//$JailGuard waittill death
+			while($JailGuard && (isalive $JailGuard) && self.health > 0){
+				waitframe
+			}
+
+			self ai_on
+			
+			//chrissstrahl - coop compatible
+			self exec coop_mod/replace.scr::turnto
+			
+//			self waittill animdone
+			wait 2.5
+			self say A_13_Brit_captalk01
+			self waittill saydone
+//			self say A_13_Brit_captalk02
+//			self waittill saydone
+//			self say A_13_Brit_captalk03		// "Right ho!  Let's give 'em what for!"
+//			self waittill saydone
+
+//			self.no_idle = 0
+//			waitframe
+//			self exec global/stand.scr
+//			self turnto $player
+
+			local.start_time = level.time
+			while (level.prison_door_unlocked == 0)
+			{
+				waitframe
+				if (level.time >= (local.start_time + 7))
+				{
+//					self turnto NULL
+//					self.no_idle = 1
+					self anim A_13_Brit_captalk02
+					self waittill animdone
+					self anim A_13_Brit_captidle03
+					self waittill animdone
+//					self.no_idle = 0
+//					waitframe
+//					self exec global/stand.scr
+					break
+				}
+			}
+
+			if (level.prison_door_unlocked == 0)
+				$PrisonDoorUnlocked_Trigger waittill trigger
+
+			self.no_idle = 0
+			self solid
+			self exec global/stand.scr
+			self turnto NULL
+//			self thread global/LoopAnim.Scr::LoopAnim A_13_Brit_captidle01
+			break
+
+
+		case 2:
+			self.no_idle = 1
+			self notsolid
+			self.origin = (156 -2416 64)				//(156 -2384 64)
+			self.angles = (0 0 0)
+
+			self anim A_13_Brit_jailstand02
+
+			wait 0.2
+			self ai_off
+			$PlayerInJail_Trigger waittill trigger
+			wait 0.5
+//			$JailGuard waittill death
+			self ai_on
+
+			if (level.prison_door_unlocked == 0)
+				$PrisonDoorUnlocked_Trigger waittill trigger
+
+			self.no_idle = 0
+			self solid
+			self exec global/stand.scr
+			break
+
+
+		case 3:
+			self.no_idle = 1
+			self notsolid
+			self.origin = (106 -2316 64)			//(106 -1804 64)
+			self.angles = (0 270 0)
+
+			self anim A_13_Brit_jailsit01
+
+			wait 0.2
+			self ai_off
+			$PlayerInJail_Trigger waittill trigger
+		//	wait 0.5
+		//	$JailGuard waittill death
+			self ai_on
+//			self waittill animdone
+
+			self anim A_13_Brit_jailwalk01
+			self waittill animdone
+			self anim A_13_Brit_jailstand01
+			self waittill animdone
+			if (level.prison_door_unlocked == 0)
+				$PrisonDoorUnlocked_Trigger waittill trigger
+			self.no_idle = 0
+			self solid
+			self exec global/stand.scr
+//			//self turnto $player
+//			//self waittill turndone
+//			//self turnto NULL
+//			self thread global/LoopAnim.Scr::LoopAnim A_13_Brit_jailstand01
+////			self thread global/LoopAnim.Scr::LoopAnim A_13_Brit_jailsit01
+			break
+	}
+
+	if ($JailGuard && (isalive $JailGuard))
+		$JailGuard waittill death
+
+	self waitthread global/LoopAnim.Scr::LoopAnimStop
+	self threatbias 0
+
+	wait (local.pris_num * 1.0)
+
+	self interval 256
+
+	local.my_gun = $("PrisonerGun" + local.pris_num)
+	local.my_arming_point = $("PrisonerArmingPoint" + local.pris_num)
+
+	if ((local.my_gun != NULL) && (local.my_arming_point != NULL))
+	{
+		self waitthread global/SafeMoveTo.scr::SafeRunTo_Wait local.my_arming_point 32		//64
+		wait 0.5
+
+//		if ((level.player_entered_armory == 0) && ((randomint 2) == 0))
+//			$PlayerEnteredArmory_Trigger waittill trigger
+
+		// grab it
+		self thread global/friendly.scr::lookpast local.my_gun
+		self turnto local.my_gun
+	//	self waittill turndone
+	//	wait 0.33
+		self upperanim pickup_obj
+		wait 0.33
+		self playsound mp40_snd_pickup
+		self gun "MP40"
+		local.my_gun delete
+		self turnto NULL
+	}
+	else
+	{
+		self gun "MP40"
+	}
+	self lookat NULL
+
+	level.prisoners_to_get_guns--
+	if (level.prisoners_to_get_guns <= 0)
+	{
+		trigger $PrisonersGotGunsTrigger
+		level.prisoners_must_live = 0		// doesn't matter any more
+	}
+
+	if (local.pris_num == 1)
+	{
+		if (level.prisoners_to_get_guns > 0)
+			$PrisonersGotGunsTrigger waittill trigger
+
+		waitthread maps/e1l3.scr::Autosave2
+		self turnto $PrisonerCover3
+		self waittill turndone
+		self say A_13_Brit_captalk03		// "Right ho!  Let's give 'em what for!"
+		self waittill saydone
+	}
+
+	self runto $("PrisonerCover" + local.pris_num)
+	self waittill movedone
+	self turnto $WeaponRoomDoor
+	self waittill turndone
+	self turnto NULL
+
+	if (level.prisoners_to_get_guns > 0)
+		$PrisonersGotGunsTrigger waittill trigger
+
+	wait 3
+
+	self exec global/enable_ai.scr
+	self fixedleash 1
+	self leash 64
+	self resetleash
+
+	wait 15
+
+	self fixedleash 0
+	self leash 0
+
+end
+
+
+PlayerTakeExtraGun_Thread:
+	$PlayerTakeExtraPrisonerGun_Trigger waittill trigger
+	
+	//chrissstrahl - keep in sp
+	if(level.gametype == 0){
+		$PrisonerGunExtra delete
+		$player ammo smg 96
+		$player item weapons/mp40.tik
+		$player use "MP40"	
+	}
+	//chrissstrahl - Coop - might want to give player using trigger the weapon for coop, it is after all a trigger use we can use
+	else{
+		//grab player, set special var and give special weapon
+		local.player = parm.other
+		if(local.player != NIL && local.player != NULL){
+			local.player ammo smg 300 //make sure the player has full ammo and does not block other players from getting the weapon
+			local.player exec coop_mod/replace.scr::specialweaponPrimary "weapons/mp40.tik"
+			exec coop_mod/main.scr::playerForcePrimary local.player "weapons/mp40.tik"
+		}
+		$PrisonerGunExtra hide
+		wait 2
+		$PrisonerGunExtra show
+		thread PlayerTakeExtraGun_Thread
+	}
+end
+
+
+PlayerTakeBeretta_Thread:
+	if (!$WeaponRoomBeretta || !$WeaponRoomBerettaTrigger)
+		end
+
+	$WeaponRoomBerettaTrigger waittill trigger
+	
+	//chrissstrahl - keep in sp
+	if(level.gametype == 0){
+		$WeaponRoomBeretta delete
+		$player ammo pistol 32
+		$player item weapons/It_W_Beretta.tik
+		$player use "Beretta"
+	}
+	//chrissstrahl - Coop - might want to give player using trigger the weapon for coop, it is after all a trigger use we can use
+	else{
+		//grab player, set special var and give special weapon
+		local.player = parm.other
+		if(local.player != NIL && local.player != NULL){
+			local.player ammo pistol 200 //make sure the player has full ammo and does not block other players from getting the weapon
+			local.player exec coop_mod/replace.scr::specialweaponSecondary "weapons/It_W_Beretta.tik"
+			exec coop_mod/main.scr::playerForceSecondary local.player "weapons/It_W_Beretta.tik"		
+		}
+
+		
+		$WeaponRoomBeretta hide
+		wait 2
+		$WeaponRoomBeretta show
+		thread PlayerTakeBeretta_Thread
+	}
+end
+
+
+///////////////////////////////////////////
+
+
+TankBridgeGag_Thread:
+
+	if (level.warpTo != "jailBreak")
+		$StartTankOnBridgeTrigger waittill trigger
+
+	thread CoverGuysBridgeGag_Thread
+
+	local.tank = $leader_tank
+//	local.tank setcollisionentity $sherman_collide			//$sherman_tank_hull
+	local.tank nodamage
+
+//	local.tank.stop_firing = 1
+	waitframe
+	waitframe
+//	local.tank notsolid
+	local.tank drive $LeaderTankPath3
+	wait 8.5		//8.7
+	local.tank stop
+//	local.tank waittill drive
+//	local.tank physics_off
+	local.tank waitthread tank_killed
+	local.tank delete
+	local.tank = $leader_tank_damaged_version		// charred hulk
+
+	thread global/exploder.scr::explode 3
+	
+	//chrissstrahl - cleanup after they blow up the bridge
+	//we need to clean up the script_origins as this map is
+	//over the actual entity limits that work in multiplayer
+	exec coop_mod/butler.scr::e1l3_bridgeBlowupClensing
+
+//	local.tank thread timedFireAndSmoke (local.tank.origin + ( 0 0 100 )) 1 1
+
+//	wait 3
+
+	local.x = local.tank.origin[0]
+	local.y = local.tank.origin[1]
+	local.vel_y = 30
+	local.z = local.tank.origin[2]
+	local.die_z = local.z - 600
+	local.vel_z = 30		//0
+	local.acc_z = 200		//60
+	local.pitch = 0
+	local.vel_pitch = -30		//0
+	local.acc_pitch = 200		//60		//30
+	local.yaw = local.tank.angles[1]
+
+	local.did_hit_water = 0
+
+	local.tank thread TankWaterSplash 1 15 256 256
+
+	local.prev_time = level.time
+	while (local.z > local.die_z)
+	{
+		local.dt = level.time - local.prev_time
+		local.prev_time = level.time
+
+		local.y += (local.vel_y * local.dt)
+
+		local.vel_z -= (local.acc_z * local.dt)
+		local.z += (local.vel_z * local.dt)
+		if ((local.did_hit_water == 0) && (local.z < 0))
+		{
+			local.vel_z = (local.vel_z * 0.5)
+			local.vel_pitch = (local.vel_pitch * 0.2)
+			local.acc_z = (local.acc_z * 0.5)
+
+			local.did_hit_water = 1
+		}
+
+		local.vel_pitch += (local.acc_pitch * local.dt)
+		local.pitch += (local.vel_pitch * local.dt)
+
+		local.tank.origin = (local.x local.y local.z)
+		local.tank.angles = (local.pitch local.yaw 0)
+
+		waitframe
+	}
+
+	local.tank delete
+
+end
+//	$leader_tank removeondeath 0
+//	$leader_tank damage $world 55000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+//	$leader_tank waittill death
+//	$leader_tank thread tank_killed
+//
+//end
+
+
+TankWaterSplash local.delay local.num local.x_size local.y_size:
+
+	wait local.delay
+
+	if (!self)
+	{
+		println "***** TANKSPLASH: tank no longer exists"
+		end
+	}
+
+	self playsound arty_exp_water2
+
+	local.x_rad = local.x_size / 2
+	local.y_rad = local.y_size / 2
+
+	for (local.i=1; local.i<=local.num; local.i++)
+	{
+		local.x_min = -local.x_rad
+		local.x_max = local.x_rad
+		local.y_min = -local.y_rad
+		local.y_max = local.y_rad
+		switch (randomint 2)			//4)
+		{
+			case 0:
+				local.x_max = local.x_min
+				break
+			case 1:
+				local.y_min = local.y_max
+				break
+//			case 2:
+//				local.y_max = local.y_min
+//				break
+//			case 3:
+//				local.x_min = local.x_max
+//				break
+		}
+
+		local.x = waitthread RandomFloatInRange local.x_min local.x_max
+		local.y = waitthread RandomFloatInRange local.y_min local.y_max
+
+		local.pos = ( (self.origin[0] + local.x) (self.origin[1] + local.y) 0 )
+
+		thread SpawnWaterSplashEffect local.pos
+
+		local.chance_of_wait = 20
+		if ((randomint 100) < local.chance_of_wait)
+			waitframe
+	}
+
+end
+
+
+RandomFloatInRange local.min local.max:
+
+	if (local.min == local.max)
+		end local.min
+
+end (local.min + (randomfloat (local.max - local.min)))
+
+
+SpawnWaterSplashEffect local.pos local.scale:
+
+	if (!local.scale)
+		local.scale = 0.5
+
+	local.model = "models/animate/fx_mortar_water.tik"
+//	local.model = "models/animate/fx_water_spray.tik"
+
+	local.fx = spawn script_model model local.model scale local.scale
+	local.fx.origin = local.pos
+	local.fx anim start
+	local.fx waittill animdone
+	local.fx remove
+
+end
+
+
+
+tank_killed:
+
+	local.tankGuysJumpOut = 0		//self.tankGuysJumpOut
+	self playsound explode_tank
+	self stop
+	self.driving = 0
+
+	local.do_collision = 0			//1
+	local.turretmodel = NIL
+	local.type = self.type
+
+//	if (self.attack_thread)
+//		self.attack_thread delete
+//	if (self.pain_thread)
+//		self.pain_thread delete
+//	if (level.tankDebugPrint)
+//		println "z:          self.type: " self.type
+//	switch (self.type)
+//	{
+//		case empty_turretless_tiger:
+//			local.model = models/vehicles/tigertank_wot_d.tik
+//			break
+//		case panzer_desert:
+//			local.model = models/vehicles/panzer_iv_d.tik
+//			break
+//		case panzer:
+//			local.model = models/vehicles/panzer_iv_eud.tik
+//			if (local.tankGuysJumpOut > 0) {
+//				// a guy jumps out!
+//				local.get_out = 1
+//				local.anims[0] = panzer_exit_1
+//				local.anims[1] = panzer_exit_2
+//				local.anims[2] = panzer_exit_3
+//			}
+//			else {
+//				// tank is on fire, everybody dies!
+//				thread maps/e1l1/explosion.scr::timedFireAndSmoke (self.origin + ( 0 0 100 )) 
+//			}
+//			break
+//		case empty_panzer_desert:
+//			local.model = models/vehicles/Panzer_destroyed_lowpoly_base.tik
+//			local.turretmodel = models/vehicles/Panzer_destroyed_lowpoly_cannon.tik
+//			local.get_out = 0
+//			break
+//		case sherman:
+//			thread timedFireAndSmoke (self.origin + ( 0 0 100 )) 
+			local.model = models/vehicles/shermantank_damaged.tik
+			local.turretmodel = NIL
+			local.get_out = 0
+//			local.do_collision = 0
+//			break;
+//	
+//		case empty_tiger:
+//			thread maps/e1l1/explosion.scr::timedFireAndSmoke (self.origin + ( 0 0 100 )) 
+//			local.model = models/vehicles/tigertank_destroyed_base.tik
+//			local.turretmodel = models/vehicles/tigertank_destroyed_cannon.tik
+//			local.get_out = 0
+////			local.do_collision = 0
+//			break;
+//		case bridge_tiger:
+//			// tiger tank that get's pushed into the bridge...
+//			local.model = models/vehicles/tigertank_destroyed_base.tik
+//			local.get_out = 0
+//			local.do_collision = 0
+//			break
+//		case panzerwerfer:
+//			local.model = models/vehicles/Panzerwerfer_d_base.tik
+//			local.turretmodel = models/vehicles/Panzerwerfer_d_cannon.tik
+//			local.get_out = 0
+//			break;
+//		case empty_panzer_winter:
+//			local.model = models/vehicles/PanzerIV_w_d_base.tik
+//			local.turretmodel = models/vehicles/PanzerIV_w_d_cannon.tik
+//			local.get_out = 0
+//			break;
+//		case panzer_winter:
+//			local.model = models/vehicles/PanzerIV_w_d_base.tik
+//			local.turretmodel = models/vehicles/PanzerIV_w_d_cannon.tik
+//			local.get_out = 1
+//			local.anims[0] = panzer_exit_1
+//			local.anims[1] = panzer_exit_2
+//			local.anims[2] = panzer_exit_3
+//			break;
+//		case empty_panzer_lowpoly:
+//			local.model = models/vehicles/panzer_destroyed_lowpoly_base.tik
+//			local.turretmodel = models/vehicles/panzer_destroyed_lowpoly_cannon.tik
+//			local.get_out = 0
+////			local.do_collision = 0
+//			break;
+//		case empty_t34:
+//			local.model = models/vehicles/t34_base_d.tik
+//			local.turretmodel = models/vehicles/t34_cannon_d.tik
+//			local.get_out = 0
+////			local.do_collision = 0
+//			break;
+//		case bridge_panzer:
+//			// tiger tank that get's pushed into the bridge...
+//			local.model = models/vehicles/Panzer_destroyed_lowpoly_base.tik
+//			local.get_out = 0
+//			local.do_collision = 0
+//			break
+//		case berlin_panzer:
+//			local.model = models/vehicles/panzer_destroyed_lowpoly_base.tik
+//			local.turretmodel = models/vehicles/panzer_destroyed_lowpoly_cannon.tik
+//			local.get_out = 1
+//			local.anims[0] = tank_exit_1
+//			local.anims[1] = tank_exit_2
+//			local.anims[2] = tank_exit_3
+//			local.anims[3] = tank_exit_4
+//			break
+//		case empty_carroP40:
+//			local.model = models/vehicles/PanzerIV_w_d_base.tik
+//			local.turretmodel = models/vehicles/PanzerIV_w_d_cannon.tik
+//			local.get_out = 0
+//			break
+//		default:
+//			local.model = models/vehicles/tigertank_destroyed_base.tik
+//			local.turretmodel = models/vehicles/tigertank_destroyed_cannon.tik
+//			local.get_out = 1
+//			local.anims[0] = tank_exit_1
+//			local.anims[1] = tank_exit_2
+//			local.anims[2] = tank_exit_3
+//			local.anims[3] = tank_exit_4
+//			break
+//	}
+	local.name = self
+	local.angles = self.angles
+	local.origin = self.origin
+	if (self.collisionent == NULL)
+		println "!!! tank " self.targetname " has no collision entity"
+	else {
+		local.brushmodel = self.collisionent.brushmodel
+	}
+	local.targetname = (self.targetname + "_damaged_version")
+
+	//stop the smoke emitter that came from damage and start a temp emitter for the death model
+	
+	if (self.smoke)
+	{
+		self.smoke anim stop
+		self.smoke = NIL
+	}
+
+	self anim temp_smoke
+	self anim temp_sizzle
+	
+	self.gun = self QueryTurretSlotEntity 0
+	self.gun2 = self QueryTurretSlotEntity 1
+
+	if (self.gun)
+		local.turretangles = self.gun.angles
+
+	self thread spawn_fx models/emitters/explosion_tank.tik
+	waitframe
+	exec global/earthquake.scr .2 4 0 0
+	//radiusdamage self.origin level.bomb_damage level.bomb_explosion_radius
+	radiusdamage (self.origin + (0 0 200)) 800 400
+	waitframe
+	if (self.gun)
+	{
+		self DetachTurretSlot 0
+		self.gun remove
+	}
+	if (self.gun2)
+	{
+		self DetachTurretSlot 1
+		self.gun2 remove
+	}
+
+	self remove
+
+	if ( local.do_collision==1 )
+	{
+		local.collision = thread damaged_collision local.angles local.origin local.brushmodel
+	}
+	
+	local.damaged = waitthread spawn_damaged_new local.model local.angles local.origin
+	local.damaged.targetname = local.targetname
+
+	local.damaged.smoke	= local.smoke
+
+	//produce temporary smoke and burning sound
+	local.damaged anim temp_smoke
+	local.damaged anim temp_sizzle
+
+	if ( local.collision != NIL )
+	{
+		local.damaged notsolid
+		local.collision disconnect_paths
+	}
+
+	if ( local.turretmodel != NIL )
+	{
+		local.turretname = local.targetname + "_damaged_turret"
+		if (self.tankTossOnDeath == 0)
+			local.damaged attachmodel local.turretmodel "turret0" 1 local.turretname
+		local.turretname detach
+		local.turretname.angles = local.turretangles
+		if (local.get_out == 1)
+			local.turretname thread tank_guys_get_out local.tankGuysJumpOut local.anims local.name local.type local.angles
+	}
+	else
+	{
+		if (local.get_out == 1)
+			local.damaged thread tank_guys_get_out local.tankGuysJumpOut local.anims local.name local.type local.angles local.turretname
+	}
+
+//	if (self.tankTossOnDeath == 1)
+//	{
+//		local.damaged notsolid
+//		local.damaged thread toss self.velocity 1			// self.tossRefObj
+////		local.turretname thread toss self.velocity 1
+//	}
+
+end
+
+
+spawn_damaged_new local.model local.angles local.origin:
+
+	local.damaged = spawn script_model model local.model
+	local.damaged.origin = local.origin
+	local.damaged.angles = local.angles
+
+end local.damaged
+
+spawn_fx local.fx:
+	local.temp = spawn script_model model local.fx
+	local.temp notsolid
+	local.temp.origin = self.origin
+	local.temp anim start
+	local.temp notsolid
+	wait 5
+	local.temp remove
+end
+
+
+timedFireAndSmoke local.origin local.fireTime local.smokeTime:
+
+	if (local.fireTime == NIL || local.fireTime == NULL)
+		local.fireTime = 15
+	if (local.smokeTime == NIL || local.smokeTime == NULL)
+		local.smokeTime = 15
+
+	local.fire = spawn "models/emitters/fireandsmoke.tik"
+	local.fire.origin = local.origin
+	local.fire glue self 1
+	wait local.fireTime
+
+	local.smoke = spawn "models/emitters/linger_smoke.tik"
+	local.smoke.origin = local.origin
+	local.smoke glue self 1
+	wait 2
+	local.fire remove
+	local.smokeTime -= 2
+	if (local.smokeTime > 0)
+		wait local.smokeTime
+	local.smoke remove
+
+end
+
+
+
+CoverGuysBridgeGag_Thread:
+
+	local.num_guys = $cover_fire_guy.size
+	local.num_live_guys = 0
+	for (local.i=1; local.i<=local.num_guys; local.i++)
+	{
+		if (isalive $cover_fire_guy[local.i])
+		{
+			local.num_live_guys++
+			local.live_guy_list[local.num_live_guys] = $cover_fire_guy[local.i]
+			local.live_guy_list[local.num_live_guys] nodamage
+		}
+	}
+
+	if (local.num_live_guys > 0)
+	{
+		switch (local.num_live_guys)
+		{
+			default:
+				for (local.i=local.num_live_guys; local.i>=5; local.i--)
+				{
+					local.live_guy_list[local.i] thread CoverGuyAssaultThink_Single $CoverGuyAssaultPoint4
+				}
+				// fall through
+			case 4:
+				local.live_guy_list[4] thread CoverGuyAssaultThink_Single $CoverGuyAssaultPoint4
+				// fall through
+			case 3:
+				local.live_guy_list[3] thread CoverGuyAssaultThink_Single $CoverGuyAssaultPoint3
+				// fall through
+			case 2:
+				local.live_guy_list[2] thread CoverGuyAssaultThink_Single $CoverGuyAssaultPoint2
+				// fall through
+			case 1:
+				local.live_guy_list[1] thread CoverGuyAssaultThink_Single $CoverGuyAssaultPoint1
+				break
+		}
+	}
+
+end
+
+
+CoverGuyAssaultThink_Single local.dest:
+
+	self exec global/disable_ai.scr
+	self waitthread global/SafeMoveTo.scr::SafeRunTo_Wait local.dest
+	self exec global/enable_ai.scr
+	self takedamage
+
+end
+
+
+//-----------------------------------------------------------------------------
+
+removeAcrossCanalGuys:
+	$PlayerInJail_Trigger waittill trigger
+	if ($AcrossCanalGuys)
+		$AcrossCanalGuys thread doRemoveGuy
+end
+
+doRemoveGuy:
+	self remove
+end
+		
+

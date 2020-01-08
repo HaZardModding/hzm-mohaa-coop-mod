@@ -1,0 +1,76 @@
+//class_gag.scr
+//
+// Create a level with 2 scientists with unique targetnames.  A pathnode that is near 
+// your chalkboard with a unique targetname.  The scientists should not have weapons.
+//
+// Create desks and chairs that with ai guys at the same location as the chairs.
+// You should dumb down the ai so that the player can walk in and suprise everyone.
+// The ai guys should all have the same targetname.
+//
+// Created: 08/08/2003
+
+//============================================================================
+init local.scientist1 local.scientist2 local.dudes local.board: {
+//============================================================================
+	//Setup writers
+	local.dudes thread InitWriters
+	
+	//Do the scientists	
+	thread global/scientist_wallchart.scr::start local.scientist1 local.scientist2 local.board
+}end
+
+//============================================================================
+InitWriters: {
+//============================================================================
+	if( self.target != NIL && self.target != NULL ) {
+		self.chair = self.target
+	}
+
+	self nosurprise 1
+	self.alerted = 0
+	self.nolongpain = 1
+
+	self holster
+	self type_attack "alarm"
+	self prealarmthread "InterruptWriting"
+
+	self curiousoff
+	self thread global/LoopAnim.scr::LoopAnim2 chair_write
+	self waittill pain
+
+	self type_attack "turret"
+	self thread InterruptWriting
+}end
+
+//============================================================================
+InterruptWriting: {
+//============================================================================
+	if( self.alerted == 1 ) {	
+		end
+	}
+	
+	self.nolongpain		= 0
+	self.sight			= 1024
+	self.hearing		= 1024
+	self.alerted		= 1
+
+	self thread global/LoopAnim.scr::LoopAnimStop
+	self exec global/disable_ai.scr	
+
+	if( self.chair != NIL && self.chair != NULL ) {
+		self.chair anim chair_death_backwards
+	}
+
+ 	self anim chair_alert_stand	
+	wait .3
+
+	if(isalive self) {
+		self unholster
+	}
+	
+	wait .1		
+	if(isalive self) {
+		self exec global/enable_ai.scr
+     	self attackplayer
+	}	
+}end

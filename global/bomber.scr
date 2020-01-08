@@ -1,0 +1,519 @@
+//	Plane/bombing system created by Mackey McCandlish.
+//
+//	Before level waittill spawn "exec global/bomber.scr".
+//
+//	Used in m3l3, m4l0, m5l1a, m5l1b, m5l3, m3l3, training, and maybe someplace else, who can say? (One of the DM levels too).
+//
+//	Created a info_splinepath and click model and choose the plane you want to use. Choose one that ends with fly.tik.
+//
+//	Copy the info_splinepath into a big line of them, of where you want the plane to fly through space.
+//
+//	Link them all together.
+//
+//	Give the first one a targetname of "bomberpath"
+//
+//	Set this one's $mdl value to be equal to its model value.
+//
+//	Rotate each individual info_splinepath. The way its rotated will determine what position the plane will be in when it flies
+//	through that point in space.
+//
+//	You can set the "speed" key to multiplicably values. This defaults to 1. If you think 1 is too fast, set all the splines
+//	to a .speed of 0.5. Or set half of them to 0.5, and for that half the plane will fly at half speed.
+//
+//	You can make the planes drop bombs by setting up similar paths using the model "ammo/us_bomb.tik", and the first spline
+//	on the path has targetname "bomber".
+//
+//	Both the "bomber" and the "bomberpath" entities are given the same #set value, to associate them. You can give the bombers
+//	a $setthread value to make them run a thread in the level.script upon impact. They automatically do an explosion when they
+//	reach the end of their path.
+//
+//	You can make triggers for the bombers with "trigger_multiple"s that have a targetname "bombertrigger" and the same #set 
+//	number as the bomberpath, or you can do "thread global/bomber.scr::bomb #" where # is the #set number in question.
+
+main:
+	//chrissstrahl disabled##println "-- Loading Plane Bombing SCR"
+
+	if (level.flyplane == NIL)
+		level.flyplane = 1
+
+
+
+
+//	if (level.bombsdropped == NULL)
+	level.bombsdropped = 0
+
+	if ($friend == NULL)
+		level.friends = 0
+	else
+		level.friends = $friend.size
+
+	if (level.friends > 0)
+		level.friend = exec global/makearray.scr $friend
+
+	if ($bomber == NULL)
+		level.bombers = 0
+	else
+		level.bombers = $bomber.size
+
+	if (level.bombers > 0)
+	{
+		level.bomber = exec global/makearray.scr $bomber
+
+		for (local.i=1;local.i<level.bombers+1;local.i++)
+		{
+			if (level.bomber[local.i].loop == NIL)
+				level.bomber[local.i].loop = 0
+
+			level.bomber[local.i] hide
+			level.bomber[local.i] notsolid
+
+			if (level.bomber[local.i].set == NIL)
+				exec global/error.scr "Error, bomber has no #set" 1
+			//else //chrissstrahl
+			//chrissstrahl disabled##println ("Spawned Bomber " + level.bomber[local.i].set)
+			local.set = level.bomber[local.i].set
+		}
+	}
+
+	if ($bomberpath == NULL)
+		level.bomberpaths = 0
+	else
+		level.bomberpaths = $bomberpath.size
+
+	if (level.bomberpaths > 0)
+	{
+		level.bomberpath = exec global/makearray.scr $bomberpath
+
+		for (local.i=1;local.i<level.bomberpaths+1;local.i++)
+		{
+//			level.bomberpath[local.i] hide
+//			level.bomberpath[local.i] notsolid
+
+/* //chrissstrahl - stop spam
+			if (level.bomberpath[local.i].mdl)
+				chrissstrahl disabled##println ("model is " + level.bomberpath[local.i].mdl)
+			else
+				chrissstrahl disabled##println ("model is NONE")
+*/
+
+			if (level.bomberpath[local.i].set == NIL)
+				exec global/error.scr "Error, bomberpath has no #set" 1
+			//else //chrissstrahl
+			//chrissstrahl disabled##println ("Spawned BomberPath " + level.bomberpath[local.i].set)
+			local.set = level.bomberpath[local.i].set
+		}
+	}
+
+	if ($bombertrigger == NULL)
+		level.bombertriggers = 0
+	else
+		level.bombertriggers = $bombertrigger.size
+
+	if (level.bombertriggers > 0)
+	{
+		level.bombertrigger = exec global/makearray.scr $bombertrigger
+
+		for (local.i=1;local.i<level.bombertriggers+1;local.i++)
+		{
+			level.bombertriggerset[level.bombertrigger[local.i].set] = 0
+			level.bombertrigger[local.i] thread bombertrigger
+
+			if (level.bombertrigger[local.i].set == NIL)
+				exec global/error.scr "Error, bombertrigger has no #set" 1
+			//else //chrissstrahl
+			//chrissstrahl disabled##println ("Spawned BomberTrigger " + level.bombertrigger[local.i].set)
+			local.set = level.bombertrigger[local.i].set
+		}
+	}
+
+
+	if ($bomberspeaker == NULL)
+		level.bomberspeakers = 0
+	else
+		level.bomberspeakers = $bomberspeaker.size
+
+	if (level.bomberspeakers > 0)
+	{
+		level.bomberspeaker = exec global/makearray.scr $bomberspeaker
+
+		for (local.i=1;local.i<level.bomberspeakers+1;local.i++)
+		{
+			if (level.bomberspeaker[local.i].set == NIL)
+				exec global/error.scr "Error, bomberspeaker has no #set" 1
+			//else //chrissstrahl
+			//chrissstrahl disabled##println ("Spawned bomberspeaker " + level.bomberspeaker[local.i].set)
+			local.set = level.bomberspeaker[local.i].set
+		}
+	}
+
+
+
+end
+
+repeat:
+level waittill spawn
+wait 2
+level.bomberrepeat = 1
+end
+
+
+bombertrigger:
+	level.bombertimer[self.set] = level.time
+	level waittill spawn
+	self waittill trigger
+//	//chrissstrahl disabled##println AHA
+	if (level.bombertriggerset[self.set] == 0)
+	if (level.time > level.bombertimer[self.set])
+	{ 
+		level.bombertriggerset[self.set] = 1
+		//chrissstrahl disabled##println ("threaded " + self.set)
+		level.bombertimer[self.set] = level.time + 6
+		thread bomb self.set
+	}
+	wait 15
+
+	if (level.bomberrepeat == 1)
+	goto bombertrigger
+end
+
+
+delayplaysound local.delay local.sound:
+wait local.delay
+self playsound (local.sound) 0 1 512
+end
+
+firelight:
+	if (self.fire == NIL)
+	end
+
+	local.r = 0.5 + randomfloat (0.8)
+	local.g = 0.4 + randomfloat (0.6)
+	
+	self lightRed (local.r)
+	self lightGreen (local.g)
+
+	wait 0.2
+	goto firelight
+end
+
+
+fireoff local.name:
+
+	for (local.i=1;local.i<level.exploderfires + 1;local.i++)
+	{
+		if (level.exploderfire[local.i].set == local.name)
+		{
+			level.exploderfire[local.i] hide
+
+			if (level.exploderfire[local.i].fire != NIL)
+			{
+				level.exploderfire[local.i] lightOff
+				level.exploderfire[local.i] stoploopsound
+				level.exploderfire[local.i].thread delete
+			}
+		}
+	}
+
+
+end
+
+
+fireon local.name:
+	for (local.i=1;local.i<level.exploderfires + 1;local.i++)
+	{
+		if (level.exploderfire[local.i].set == local.name)
+		{
+			level.exploderfire[local.i] show
+			level.exploderfire[local.i] anim start
+
+			if (level.exploderfire[local.i].fire != NIL)
+			{
+				level.exploderfire[local.i] lightOn	
+
+/*
+				if (randomint(100) > 50)
+					level.exploderfire[local.i] loopsound "sound/environment/fire_small.wav" 1.5 256
+				else
+				level.exploderfire[local.i] loopsound "sound/environment/fire_big.wav" 1.5 256	
+*/
+				level.exploderfire[local.i] thread firelight
+				level.exploderfire[local.i].thread = parm.previousthread
+			}
+		}
+	}
+
+
+end
+
+fireinit local.name:
+	for (local.i=1;local.i<level.exploderfires + 1;local.i++)
+	{
+		if (level.exploderfire[local.i].set == local.name)
+		if (level.exploderfire[local.i].fire != NIL)
+		{
+			level.exploderfire[local.i] light (1.0 0.8 0.0)
+		}
+	}
+
+end
+
+showorg:
+	//chrissstrahl disabled##println self.origin
+	wait 0.1
+	if (self)
+	thread showorg
+end
+
+
+flyplane local.i local.model local.sound local.smoke:
+			//chrissstrahl disabled##println ("using model " + local.model)
+
+			if (local.smoke)
+			{
+				local.ent = spawn emitters/plane_smoke.tik
+				local.ent glue self
+			}
+			
+			self model local.model
+			
+			//chrissstrahl - added to make model visible through fog (by 1337Smithy)
+			self alwaysdraw
+			//end chrissstrahl
+			
+//			self model self.model
+//			self model "vehicles/tigertank.tik"
+			self.origin = level.bomberpath[local.i].origin 
+			self scale 0.5
+//			wait 1
+			if (self.pause != NIL)
+			wait self.pause
+
+			if (level.flyplane == 0)			
+				self flypath level.bomberpath[local.i] 1500 2000 256
+			else
+				self followpath level.bomberpath[local.i]
+
+
+//			self thread showorg
+//			local.thread = parm.previousthread
+
+			if (local.sound != NIL)
+			{
+				wait 2
+				self playsound airplane
+				//chrissstrahl disabled##println "playin sound"
+			}
+
+			self waitmove
+//			local.thread delete
+			if (local.smoke)
+				local.ent delete
+			self delete
+
+
+end
+
+
+bomberspeaker local.name:
+	if (self.pause != NIL)
+		wait self.pause
+
+	if (self.sound == NIL)
+		self.sound = "airplane"
+
+	self playsound self.sound
+
+end
+
+
+bomb local.name local.sound:
+
+	//if (getcvar(debug) == "1")
+		//chrissstrahl disabled##println ("bombed " + local.name)
+
+	for (local.i=1;local.i<level.bomberpaths+1;local.i++)
+	{
+		if (local.name == level.bomberpath[local.i].set)
+		{
+			spawn script_model "targetname" ("bomberplane" + level.bomberpath[local.i].set) "spawnflags" "2"
+
+			if (level.bomberpath[local.i].mdl != NIL)
+				local.model = level.bomberpath[local.i].mdl
+				else
+				local.model = "vehicles/p47fly.tik"
+
+			if (level.bomberpath[local.i].smoke != NIL)
+				$("bomberplane" + level.bomberpath[local.i].set) thread flyplane local.i local.model local.sound 1
+			else
+				$("bomberplane" + level.bomberpath[local.i].set) thread flyplane local.i local.model local.sound
+
+		}
+	}
+
+
+	for (local.i=1;local.i<level.bomberspeakers+1;local.i++)
+	{
+		if (level.bomberspeaker[local.i].set == local.name)
+		{
+			level.bomberspeaker[local.i] thread bomberspeaker local.name
+//			local.i = level.bomberspeakers + 5
+		}
+	}
+
+	for (local.i=1;local.i<level.bombers+1;local.i++)
+	{
+		if (local.name == level.bomber[local.i].set)
+		{
+			if (level.bomber[local.i].loop == 0)
+			{
+				level.bomber[local.i].loop = -1
+				level.bomber[local.i] thread bombdrop local.name local.i
+			}
+			else
+			if (level.bomber[local.i].loop == 1)
+				level.bomber[local.i] thread bombdrop local.name local.i
+
+		}
+	}
+end
+
+bombdrop local.name local.num:
+	local.range = vector_length (self.origin - $("bomberplane" + local.name).origin) + 100
+	local.oldrange = local.range
+
+//		//chrissstrahl disabled##println local.range
+	local.time = level.time + 1
+//	while ((local.range < local.oldrange) || (local.range > 500))
+	while (level.time < local.time)
+	{
+		wait 0.1
+	}
+ 	while (local.range > 200)
+	{
+		local.oldrange = local.range
+		local.range = vector_length (self.origin - $("bomberplane" + local.name).origin)
+		wait 0.1
+	}
+
+		spawn script_model "targetname" ("bombdrop" + local.num)
+		$("bombdrop" + local.num) playsound drop_bomb
+		$("bombdrop" + local.num).origin = self.origin
+
+
+		$("bombdrop" + local.num) playsound drop_bomb
+		
+		$("bombdrop" + local.num) model "ammo/us_bomb.tik"
+		$("bombdrop" + local.num) notsolid
+		$("bombdrop" + local.num) scale 1
+		$("bombdrop" + local.num) flypath self 2500 2000 256
+		// speed accell lookahead
+		$("bombdrop" + local.num) waitmove
+		
+
+		thread spawntankshot $("bombdrop" + local.num).origin
+		if (self.setthread)
+		{
+			//chrissstrahl disabled##println ("Bomb from set " + local.name + " threading " + self.setthread)
+			$("bombdrop" + local.num) thread level.script::self.setthread
+		}
+		$("bombdrop" + local.num) delete
+
+end
+
+phyvel local.vec:
+	self physics_velocity ( local.vec )
+	wait 0.2
+	self physics_on 1
+	self physics_velocity ( local.vec )
+	
+
+end
+
+explodetouch:
+	level waittill spawn
+
+self waittill touch
+////chrissstrahl disabled##println self.velocity
+
+if (parm.other == $world)
+	thread moveitout self.velocity[2]
+//  //chrissstrahl disabled##println parm.other
+//	self hide
+end
+
+
+
+
+
+
+waitplaysound local.waiter local.sound local.chan local.vol local.range:
+	wait local.waiter
+	self playsound local.sound local.chan local.vol local.range
+	
+end
+
+
+/*
+	models/emitters/mortar_higgins
+	models/emitters/explosion_mine.tik
+	models/emitters/explosion_tank.tik
+	models/emitters/explosion_bombdirt.tik
+
+*/
+
+
+tankkill local.hit local.vec:
+	if !(isalive $(local.hit))
+	end
+
+
+	if ((vector_length (local.vec - local.hit.origin)) < 350)
+	{
+		local.hit.health = local.hit.health - 10000
+
+	local.rand = randomint(4) + 1
+		if (local.rand == 1)
+		{
+		local.hit exec global/setdeathanim.scr "death_mortar_twist"
+			local.hit exec global/bullethit.scr local.vec 500 25 1
+	
+		}
+		else
+		if (local.rand == 2)
+		{
+		local.hit exec global/setdeathanim.scr "death_mortar_high"
+			local.hit exec global/bullethit.scr local.vec 500 25 1
+		}
+		else
+		if (local.rand == 3)
+		{
+		local.hit exec global/setdeathanim.scr "death_mortar_medium"
+			local.hit exec global/bullethit.scr local.vec 500 25 1
+		}
+		else
+		{
+			local.hit exec global/setdeathanim.scr "death_mortar_flip"
+			local.hit exec global/bullethit.scr local.vec 500 25 1
+		}
+	}
+
+end
+
+
+killwithboom local.vec:
+	for (local.i=1;local.i<level.friends+1;local.i++)
+	{
+		thread tankkill level.friend[local.i] local.vec
+	}
+end
+
+
+
+spawntankshot local.vec:
+
+	exec global/model.scr local.vec "models/emitters/explosion_mine.tik"
+
+	thread killwithboom local.vec
+	radiusdamage local.vec 500 500
+
+end

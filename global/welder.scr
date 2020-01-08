@@ -1,0 +1,106 @@
+//-------------------------------------------------------------------
+welding:
+//-------------------------------------------------------------------
+	
+	self forceactivate
+	self thread welderdeath
+	self.health = 1
+	self exec global/setdeathanim.scr "welding_death"
+	self anim welding_init
+	
+
+	self type_attack "alarm"
+
+	if(self.gun == "" || self.gun == NULL || self.gun == NIL || self.gun == "none")
+		self weapon "walter p38"
+
+	self holster
+	wait 5.0
+
+	self exec global/disable_ai.scr
+	level.wakeWelder = 0
+	self thread weldinginterrupt
+	self thread checkWelder
+	
+end
+//----------
+checkWelder:
+//----------
+	local.welderHealth = $welder.health
+	while ((vector_length ( $player.origin - $welder.origin ) > 450) && (local.welderHealth == $welder.health))
+	{
+		waitframe
+	}
+	level.wakeWelder = 1
+end
+//-------------------------------------------------------------------
+weldinginterrupt:
+//-------------------------------------------------------------------
+
+	while (level.wakeWelder == 0)
+	{
+		if (level.wakeWelder == 1) {break}
+		self anim welding_start
+		self waittill animdone
+
+		if (level.wakeWelder == 1) {break}
+		self anim welding_action
+		wait 5
+
+		if (level.wakeWelder == 1) {break}
+		self anim welding_end
+		self waittill animdone
+
+		if (level.wakeWelder == 1) {break}
+		self anim welding_idle
+		wait 7
+	}
+
+	//self thread welderbreak
+	self exec global/disable_ai.scr
+	self.interrupted = 1
+	wait .1
+	self anim welding_stop
+	self waittill animdone
+	
+	wait .3
+	
+	if(isalive self)
+		self unholster
+	wait .1	
+	
+	if(isalive self)
+	{
+     	self exec global/enable_ai.scr
+     	self attackplayer
+	}	
+
+end
+
+//-------------------------------------------------------------------
+welderdeath:
+//-------------------------------------------------------------------
+	
+	if(self.ded != 1)
+	{
+		self waittill death		
+	}	
+	self.ded = 1
+
+	end
+
+//-------------------------------------------------------------------
+welderbreak:
+//-------------------------------------------------------------------
+	
+	if(self.welderbroke != 1)
+	{ 	
+     	self.welderbroke = 1
+     	spawn script_model model "models/miscobj/welding_tank.tik" targetname ((self.targetname) + "big1")
+     	$((self.targetname) + "big1") notsolid
+     	$((self.targetname) + "big1").origin = self.origin
+     	$((self.targetname) + "big1").angles = self.angles
+     	$((self.targetname) + "big1") anim tank_death 
+	}
+
+	end

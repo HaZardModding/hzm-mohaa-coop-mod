@@ -1,0 +1,486 @@
+//
+// playerTank.scr
+//
+//=========================================================================
+init:
+//=========================================================================
+{
+	level.playerTankHealth_Easy   = 5000
+	level.playerTankHealth_Medium = 3750
+	level.playerTankHealth_Hard   = 2500
+	level.playerTankIsDead 		  = 0
+
+	self nodamage
+	self vehiclespeed 150
+	self rendereffects "-shadow"
+
+	self.parent 		= spawn script_origin
+	self.parent.origin 	= self.origin
+	self.previoushealth = self.health
+
+	level.playertanktarget 			= spawn script_origin
+	level.playertanktarget.origin 	= (self.origin + (0 0 80))
+
+	level.playertanktarget bind self.parent
+	self.parent glue self
+
+	if (self.target) {
+		self.collisionent = self.target
+		self.collisionent notsolid
+	}
+
+	spawn trigger_relay "targetname" "PlayerEnteredTank_FirstTime_Trigger"
+	thread tankIdle	
+	thread tankHealth
+}end
+
+//=========================================================================
+TankThrobText_Thread:
+//=========================================================================
+{
+	local.throb_text_dist = 200
+	local.text_up 		  = 999		// 1 = get on, 2 = get off 999= invalid
+	local.done 			  = 0
+
+	while (local.done==0){
+		if (level.player_should_be_on_tank == 1){
+			// player is being encouraged/hinted to get on tank
+
+			if (level.playerIsInTank){
+				local.done = 1
+			}
+
+			if (!level.playerIsInTank && (vector_within $player.origin $playerTank.origin local.throb_text_dist)){
+				// "get on tank" text needs to be up
+
+				if (local.text_up != 1){
+					// "get on tank" text is not currently up
+
+					local.usekey = getboundkey1 "+use"
+					local.msg    = "Press " + local.usekey + " to get on the tank."
+					local.msg    = (loc_convert_string local.msg)
+					thread global/throbtext.scr::throbtext local.msg 0
+					local.text_up = 1
+				}
+			}
+			else{
+				// no throbbing text should be up
+
+				if (local.text_up != 0){
+					// there is some throbbing text going
+
+					if (level.rubble_explosive_throb_text_on != 1){		// don't interfere with other help text
+						thread global/throbtext.scr::throbtext_off			// "" 0
+					}
+
+					local.text_up = 0
+				}
+			}
+		}
+		else{
+			// player is being encouraged/hinted to get off of tank
+
+			if (level.playerIsInTank){
+				// "get off tank" text needs to be up
+
+				if (local.text_up != 2){
+					// "get off tank" text is not currently up
+
+					local.usekey = getboundkey1 "+use"
+					local.msg = (loc_convert_string "Press ") + local.usekey + (loc_convert_string " to get off the tank.")
+					thread global/throbtext.scr::throbtext local.msg 0
+					local.text_up = 2
+				}
+			}
+			else{
+				local.done = 1
+				// no throbbing text should be up
+
+				if (local.text_up != 0){
+					// there is some throbbing text going
+
+					if (level.rubble_explosive_throb_text_on != 1){		// don't interfere with other help text
+						thread global/throbtext.scr::throbtext_off			// "" 0
+					}
+
+					local.text_up = 0
+				}
+			}
+		}
+		wait 0.5
+	}
+}end
+
+//=========================================================================
+showText:
+//=========================================================================
+{
+	level.player_should_be_on_tank = 1
+	waitthread TankThrobText_Thread
+
+	$scene3AxisTank4 waittill death
+	level.player_should_be_on_tank = 0
+	waitthread TankThrobText_Thread
+
+
+	//	$scene
+	//	$NatBridgeRubbleCleared_Trigger waittill trigger
+	//	level.player_should_be_on_tank = 1
+	//
+	//	if ($scene3AxisTank6 && (isalive $scene3AxisTank6))
+	//		$scene3AxisTank6 waittill death
+	//	if ($scene3Cannon2 && (isalive $scene3Cannon2))
+	//		$scene3Cannon2 waittill death
+	//	level.player_should_be_on_tank = 0
+}end
+
+
+
+//=========================================================================
+tankIdle:
+//=========================================================================
+{
+	local.usedistance = 200
+
+	//	$tankCommanderDoneTalking waittill trigger
+	//	dprintln "COMMANDER DONE TALKING, SHOWING TANK TEXT!"
+
+	thread showText
+
+	//	wait 1
+	//while($player.useheld == 0)
+	//	waitframe
+
+	local.textUp = 0
+
+	while (!level.lastTankDead || level.playerJumpedOnTank){
+		//if (level.playerIsInTank) {
+		//	// if the flashing text was up, remove it
+		//	if (local.textUp) {
+		//		local.textUp = 0
+		//		thread global/throbtext.scr::throbtext "" 0
+		//	}
+		//}
+		//local.dist = vector_length ($player.origin - self.origin) 
+
+		if ($player.useheld){
+			local.dist = vector_length ($player.origin - self.origin) 
+
+			// player is trying to use, see if we can get in
+			local.doGetIn  = 0
+			local.doGetOut = 0
+
+			if (self.inuse)	{
+				local.doGetOut = 1
+			}
+			else if (local.dist < local.usedistance) {
+				local.doGetIn = 1
+			}
+
+			while ($player.useheld){
+				waitframe
+			}
+
+			if (local.doGetOut){
+				waitthread playerGetOut
+			}
+
+			else if (local.doGetIn) {
+				level.playerJumpedOnTank = 1
+				waitthread playerGetIn
+			}
+		}
+		//else if (local.dist < local.usedistance) {
+		//	// player is close enough to get in, show use text if it isn't there
+		//	if (!local.textUp) {
+		//		local.textUp = 1
+		//		local.usekey = getboundkey1 "+use"
+		//		local.msg = (loc_convert_string "Press ") + local.usekey + (loc_convert_string " to get on or off the tank.")
+		//		thread global/throbtext.scr::throbtext local.msg 0
+		//	}
+		//}
+		//else if (local.textUp) {
+		//	// player can't get in, remove use text if it is there
+		//	local.textUp = 0
+		//	thread global/throbtext.scr::throbtext "" 0
+		//}
+		waitframe
+	}
+}end
+
+//=========================================================================
+playerGetIn:
+//=========================================================================
+{
+	// have to wait a sec after holstering before we mount the tank, or
+	//    else the weapon isn't holstered
+	$player safeholster 1
+	wait 1
+
+	if (!level.noStorm){
+		//$storm detach
+		//$storm.origin = ( 99999 99999 99999 )
+		//self waitthread maps/e1l1/storm.scr::AttachStorm
+	}
+
+	$player physics_off
+	self unlockmovement
+	self removeondeath 0
+	self.inuse = 1
+	self.gun   = self QueryTurretSlotEntity 0
+
+	if (self.gun){
+		self.gun nodamage
+	}
+
+	waitthread maps/e1l1/storm.scr::SafeStormTankTransitionStart
+	$player notsolid
+	$player nodamage
+	self attachdriverslot 0 $player
+	$player perferredweapon "88mm Tank Gun"
+	level.playerIsInTank = 1
+	self takedamage
+
+	if (level.bunker_gun_exploder_trigger_1){
+		level.bunker_gun_exploder_trigger_1 triggerable
+	}
+
+	if (level.bunker_gun_exploder_trigger_2){
+		level.bunker_gun_exploder_trigger_2 triggerable
+	}
+
+	self notsolid
+	self waitthread maps/e1l1/storm.scr::AttachStorm
+
+	waitthread maps/e1l1/storm.scr::SafeStormTankTransitionEnd
+	thread spawnPoorBastard
+}end
+
+//=========================================================================
+playerGetOut:
+//=========================================================================
+{
+	thread killPoorBastard
+	waitthread maps/e1l1/storm.scr::SafeStormTankTransitionStart
+
+	// reset the tank
+	self lockmovement
+	self fullstop
+	self notsolid
+
+	if (self.collisionent != NULL && self.collisionent != NIL){
+		self.collisionent notsolid
+	}
+
+	self detachdriverslot 0 $player
+
+	// remove the turret, spawn it again later
+	if(self.gun){
+		self detachturretslot 0 self.gun.origin
+		self.gun remove
+	}
+
+	// reset the player
+	$player physics_on
+	$player show
+	$player solid
+	$player takedamage
+	$player.origin 		= self.origin + (0 0 150)
+	$player.viewangles 	= ($player.viewangles[0] $player.viewangles[1] 0)
+	waitframe
+
+	// reset the turret, finish resetting the tank
+	self.driver = NULL
+	self.gun 	= self QueryTurretSlotEntity 0
+	self spawnturret 0 "vehicles/panzer_cannon_drivable.tik"
+	self.inuse = 0
+	self solid
+
+	if (self.collisionent != NULL && self.collisionent != NIL){
+		self.collisionent solid
+	}
+
+	level.playerIsInTank = 0
+
+	if (level.bunker_gun_exploder_trigger_1){
+		level.bunker_gun_exploder_trigger_1 nottriggerable
+	}
+
+	if (level.bunker_gun_exploder_trigger_2){
+		level.bunker_gun_exploder_trigger_2 nottriggerable
+	}
+
+	$player waitthread maps/e1l1/storm.scr::AttachStorm
+	waitthread maps/e1l1/storm.scr::SafeStormTankTransitionEnd
+}end
+
+//=========================================================================
+tankHealth:
+//=========================================================================
+{
+	local.skill = getcvar (skill)
+	println "z:       local.skill = getcvar (skill) = " local.skill   
+
+	if (local.skill == "2"){
+		self.health = level.playerTankHealth_Hard
+	}
+
+	if (local.skill == "1"){
+		self.health = level.playerTankHealth_Medium 
+	}
+
+	if ( (local.skill != "1") && (local.skill != "2") ){
+		self.health = level.playerTankHealth_Easy
+	}
+
+	if (level.godPlayerTank){
+		self.health = 9999999
+	}
+
+	//iprintlnbold "PLAYER TANK SKILL = " local.skill ", HEALTH = " self.health
+	//if ( (int (getcvar developer)) )
+	//	thread playertank_health_hud
+	thread tankPain
+
+	self waittill death
+	self playsound explode_tank
+
+	if (level.playerIsInTank == 1){
+		self LockMovement
+		level.missionfailed = 1
+		missionfailed
+	}
+	else{
+		self.type = panzer
+		level.playerTankIsDead = 1
+		thread maps/e1l1/thinkTank.scr::tank_killed
+	}
+}end
+
+//=========================================================================
+tankPain:
+//=========================================================================
+{
+	local.original_health = self.health
+	local.previoushealth  = self.health
+	local.paintime 		  = level.time
+
+	while(isAlive self){
+		wait .1
+
+		if (self.health < local.previoushealth){
+			self playsound damage_tank
+			exec global/earthquake.scr .2 4 0 0
+
+			if ( (self.health < (local.previoushealth - 150)) && (level.time > (local.paintime + 5) ) ){
+				local.paintime = level.time
+				local.health_fraction = (self.health / local.original_health)
+				println "z:     local.health_fraction: " local.health_fraction
+				
+				if (local.health_fraction >= 0.7){
+					$player playsound tank_hurt1
+				}
+				else if (local.health_fraction >= 0.4){
+					$player playsound tank_hurt2
+				}
+				else{
+					$player playsound tank_hurt3
+				}
+			}
+			local.previoushealth = self.health
+		}
+	}
+	
+	//	self.original_health = self.health
+	//	self.previoushealth = self.health
+	//	self.paintime = level.time
+	//
+	//	while(isAlive self)
+	//	{
+	//		wait .1
+	//		if (self.health < self.previoushealth)
+	//		{
+	//			self playsound damage_tank
+	//			exec global/earthquake.scr .2 4 0 0
+	//
+	//			if ( (self.health < (self.previoushealth - 150)) && (level.time > (self.paintime + 5) ) )
+	//			{
+	//				self.paintime = level.time
+	//				self.health_fraction = (self.health / self.original_health)
+	//				println "z:     self.health_fraction: " self.health_fraction
+	//				
+	//				if (self.health_fraction >= 0.7)
+	//				{
+	//					$player playsound tank_hurt1
+	//				}
+	//				else if (self.health_fraction >= 0.4)
+	//				{
+	//					$player playsound tank_hurt2
+	//				}
+	//				else
+	//				{
+	//					$player playsound tank_hurt3
+	//				}
+	//			}
+	//
+	//			self.previoushealth = self.health
+	//		}
+	//	}
+}end
+
+//=========================================================================
+tankHealthHud:
+//=========================================================================
+{
+	//playertank_health_hud:
+	level.subtitleX = 10
+	level.subtitleY = 70
+
+	while (1){
+		locprint level.subtitleX level.subtitleY ("Health: " + self.health)
+		wait 1
+	}
+}end
+
+//=========================================================================
+playertank_reset_health local.fullhealth local.prevhealth:
+//=========================================================================
+{
+	//force tank to reset health/damage
+	if(local.prevhealth > 0){
+		self.health = local.fullhealth
+		waitframe
+
+		//force tank to reset health/damage when player gets in
+		radiusdamage $player.origin (local.fullhealth - local.prevhealth) 256
+	}
+	else{
+		self.health = local.fullhealth
+	}
+}end
+
+//=========================================================================
+spawnPoorBastard:
+//=========================================================================
+{
+	waitframe
+	local.model = spawn models/human/Sc_AL_US_infmask.tik targetname "poorSoul"
+	local.model hide
+	local.model.angles = $player.angles
+	local.model.enableEnemy = 0
+	local.model physics_off
+	local.model attach $playerTank turret0 1 ( 50 0 30 )
+	local.model notsolid
+	local.model holster
+	local.model nodamage
+}end
+
+//=========================================================================
+killPoorBastard:
+//=========================================================================
+{
+	waitframe
+	$poorSoul remove
+}end
+
+

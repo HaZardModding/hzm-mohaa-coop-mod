@@ -1,0 +1,914 @@
+////////////////////////////////////////////////////////////////////////////////////////
+//
+//  MoH: Allied Assault Script File  
+//  Global function: Alarm ringing and reinforcement system for disguise levels
+//  Script Written By: Benson 'elmagoo' Russell
+//
+////////////////////////////////////////////////////////////////////////////////////////
+
+
+//chrissstrahl - $player.zone_index canged to level.playerZone_index
+
+
+//**************************************************************************
+//*** Will setup and run the alarm system for a disguise level
+//*** syntax --------------------------------
+//*** alarm_system_setup
+//============================================================================
+alarm_system_setup:{
+//============================================================================
+	//chrissstrahl - make sure this works in mp
+	//so the story behind this is that the maps are loadad in the right order in spanwers
+	//so if a varaible was set on the player entity on a previouse map it would still exist
+	//when the next map was loaded by the game, provided the map was not loaded manually
+	//via the map command (or if a game shutdown was inbetween and no savegame is loaded )
+	//so in multiplayer we do have exactly that situation, so we need to make sure the
+	//variable is set in multiplayer by the actual script.
+	//
+	//Another thing is that we did not keep the sp approact to store data on the player
+	//because obviously in mp/coop you don't have the player, you have or don't have multiple
+	//versions of players, so we thought it best to use a level wide varaible
+	level.playerZone_index = 1 //chrissstrahl - not sure if 1 is the right inizial value
+	
+	//*** CHECK EXISTENCE OF CRITICAL COMPONENTS
+
+	//*** check for zone_triggers
+	if ($zone_trigger == NULL){
+		println "^~^~^ ALARM SYSTEM ERROR:  There are no zone_trigger's in the level, aborting alarm system"
+		//goto alarm_system_setup_end //chrissstrahl
+		end //chrissstrahl - do it right
+	}
+
+	//*** check for alarm switch triggers
+	if ($alarm_switch_trigger == NULL){
+		println "^~^~^ ALARM SYSTEM ERROR:  There are no $alarm_switch_trigger's in the level, aborting alarm system"
+		//goto alarm_system_setup_end //chrissstrahl
+		end //chrissstrahl - do it right
+	}
+
+	//*** check for ai alarm pullers
+	if ($ai_alarm == NULL){
+		println "^~^~^ ALARM SYSTEM ERROR:  There are no $ai_alarm guys in the level, aborting alarm system!!!"
+		//goto alarm_system_setup_end //chrissstrahl
+		end //chrissstrahl - do it right
+	}
+
+	//*** check for ai sounding alarm waittrigger
+	if ($waittrigger_gofor_alarm == NULL){
+		println "^~^~^ ALARM SYSTEM ERROR:  There is no $waittrigger_gofor_alarm in the level, aborting alarm system!!!"
+		//goto alarm_system_setup_end //chrissstrahl
+		end //chrissstrahl - do it right
+	}
+
+	//*** check for ai sounding alarm waittrigger
+	if ($waittrigger_alarm_master == NULL){
+		println "^~^~^ ALARM SYSTEM ERROR:  There is no $waittrigger_alarm_master in the level, aborting alarm system!!!"
+		//goto alarm_system_setup_end //chrissstrahl
+		end //chrissstrahl - do it right
+	}
+
+	//*** check for ai sounding alarm waittrigger
+	if ($waittrigger_alarm_backup_spawning == NULL){
+		println "^~^~^ ALARM SYSTEM ERROR:  There is no $waittrigger_alarm_backup_spawning in the level, aborting alarm system!!!"
+		//goto alarm_system_setup_end //chrissstrahl
+		end //chrissstrahl - do it right
+	}
+
+	//*** check for ai sounding alarm waittrigger
+	if ($waittrigger_alarm_sound == NULL){
+		println "^~^~^ ALARM SYSTEM ERROR:  There is no $waittrigger_alarm_sound in the level, aborting alarm system!!!"
+		//goto alarm_system_setup_end //chrissstrahl
+		end //chrissstrahl - do it right
+	}
+	
+	//*********************************************
+	//*** INIT VARIABLES
+
+	//*** for backup spawning guys
+	level.ai_alarm_backup[1] = 0
+	level.ai_alarm_backup_total = 0
+
+	//*** holds all the zone string names
+	level.zone[1] = NULL
+
+	//*** used for alerted AI stack
+	level.ai_alerted_stack[1] = NULL
+	level.ai_alerted_index = 0
+	level.ai_alerted_isprocessing = 0
+
+	//*** check the maximum allowed number of spawned guys, default it to 5 if nothing was set
+	if (level.ai_alarm_backup_max == NIL){
+		println "^~^~^ ALARM SYSTEM:  level.ai_alarm_backup_max was not set, defaulting to a maximum of 4 backup guys!!!"
+		level.ai_alarm_backup_max = 4
+	}
+
+	//*** check the cycle time for spawning backup guys
+	if (level.ai_alarm_backup_time == NIL){
+		println "^~^~^ ALARM SYSTEM:  level.ai_alarm_backup_time was not set, defaulting to 15 seconds!!!"
+		level.ai_alarm_backup_time = 15
+	}
+
+	//*** check for a default sound
+	if (level.alarm_sound == NIL){
+		println "^~^~^ ALARM SYSTEM:  level.alarm_sound was not set, there is no default sound!  Some sounds may not play!!!"
+	}
+
+	//*** check for a default removal distance for backup guys
+	if (level.backup_remove_distance == NIL){
+		println "^~^~^ ALARM SYSTEM:  level.backup_remove_distance was not set, defaulting it to 2048!!!"
+		level.backup_remove_distance = 2048
+	}
+
+
+	//*********************************************
+	//*** PRE-PROCESSING
+
+	local.zone_index = 1
+
+	//*** zone triggers and backup spawners
+	for (local.i = 1; local.i <= $zone_trigger.size ; local.i ++){
+		//*** check to see if the zone has a name, if not abort the alarm system
+		if ($zone_trigger[local.i].zone == NIL){
+			println "^~^~^ ALARM SYSTEM ERROR:  $zone_trigger without a .zone property at coordinates:  " $zone_trigger[local.i].origin "  :Aborting alarm system!!!"
+			//goto alarm_system_setup_end //chrissstrahl
+			end //chrissstrahl - do it right
+		}
+		
+		//println "DEBUG ALARM: processing zone trigger: " local.i
+		
+		//*** check the existing zone against the zones stored to assign it a number, and count the zones
+		for (local.j = 1; local.j < local.zone_index ; local.j ++){
+			//println "DEBUG ALARM: cycling through zone array for a match: " $zone_trigger[local.i].zone " :on zone arry index: " local.j
+			
+			//*** check to see if this zone is already assigned a number, if so, skip to next zone
+			if ($zone_trigger[local.i].zone == level.zone[local.j]){
+				//println "DEBUG ALARM: zone array match found on index: " local.j " :matching: " level.zone[local.j]
+				goto alarm_system_setup_zone_trigger_skipto_spawners
+			}
+		}
+		
+		//println "DEBUG ALARM: zone match not found.  Assigning to index: " local.zone_index
+		level.zone[local.zone_index] = $zone_trigger[local.i].zone
+		local.zone_index ++
+
+//============================================================================
+		alarm_system_setup_zone_trigger_skipto_spawners:
+//============================================================================
+		
+		//*** assign the zone number into the trigger
+		$zone_trigger[local.i].zone_number = local.j
+
+		//println "DEBUG ALARM: assigning zone number: " local.j " :to zone: " $zone_trigger[local.i].zone
+			
+		//*** set the index in the trigger
+		$zone_trigger[local.i].zone_index = local.i
+		
+		local.index = 1
+		
+		//*** convert the targeted AI into spawners with their values saved
+		if ($($zone_trigger[local.i].target) != NULL){
+			local.check = $($zone_trigger[local.i].target)
+			
+			if (local.check.isprocessed != 1){
+	//			println "DEBUG ALARM: spanwers currently not processed for zone: " $zone_trigger[local.i].zone
+				//*** mark it as processed and grab the current trigger zone's index for further processing info
+				local.check.isprocessed = 1
+				local.check.zone_index = local.i
+				
+				//*** assign the zone and zone_number into the zone center
+				local.check.zone = $zone_trigger[local.i].zone
+				local.check.zone_number = $zone_trigger[local.i].zone_number
+				
+				//*** loop while there's still targets in the chain and process them
+				local.check = $(local.check.target)
+				while (local.check != NULL){					
+					//*** convert the guy into a spawner
+					local.spawner = waitthread global/spawner.scr::spawner_create_targetname local.check
+					
+					//*** if a match is found, store it's targetname into the trigger
+					$zone_trigger[local.i].backup_spawner[local.index] = local.spawner
+						
+//        			println "DEBUG ALARM: storing spawner into zone trigger with index: " local.i
+//        			println "DEBUG ALARM: storing spawner into .backup_spawners count: " local.index
+//        			println "DEBUG ALARM: storing spawner: " $zone_trigger[local.i].backup_spawner[local.index]
+						
+					local.index ++
+						
+					//*** reasign the check variable and proceed to the next entity
+					local.check = $(local.spawner.spawn_target)
+					
+	//				println "DEBUG ALARM: " local.spawner " has a target of: " local.spawner.spawn_target
+				}
+			}
+			else{  //*** grab all the values that have already been stuffed
+	//			println "DEBUG ALARM: spanwers are processed for zone: " $zone_trigger[local.i].zone
+				for (local.k = 1; local.k <= $zone_trigger[local.check.zone_index].backup_spawner.size ; local.k ++){
+					$zone_trigger[local.i].backup_spawner[local.k] = $zone_trigger[local.check.zone_index].backup_spawner[local.k]
+//        			println "DEBUG ALARM: storing spawner targetname: " $zone_trigger[local.i].backup_spawner[local.k] " :in spawner index: " local.k
+				}
+			}		
+		}
+
+		//*** cycle through and find associated alarm switches per zone
+		if ($zone_trigger[local.i].alarm_switch != NIL){
+			//println "DEBUG ALARM: looking for alarm switch on zone_trigger with index: " local.i
+			
+			for (local.l = 1; local.l <= $alarm_switch_trigger.size ; local.l ++){
+				if ($alarm_switch_trigger[local.l].alarm_switch == NIL){
+					println "^~^~^ ALARM SYSTEM ERROR:  $alarm_switch_trigger with no .alarm_switch value set at coordinates: " $alarm_switch_trigger[local.l].origin " :Aborting alarm system!!!"
+					//goto alarm_system_setup_end //chrissstrahl
+					end //chrissstrahl - do it right
+				}
+				
+				if ($alarm_switch_trigger[local.l].alarm_switch == $zone_trigger[local.i].alarm_switch){
+					//*** set the index in the switch
+					$alarm_switch_trigger[local.l].alarm_switch_index = local.l
+					
+					//*** grab the switches settings and put them into the zone trigger
+					$zone_trigger[local.i].alarm_switch_index = local.l
+					$zone_trigger[local.i].alarm_switch_model = $($alarm_switch_trigger[local.l].target)
+					$zone_trigger[local.i].alarm_switch_node = $($zone_trigger[local.i].alarm_switch_model.target)
+					
+					//println "DEBUG ALARM: alarm switch found!  Index of switch: " $zone_trigger[local.i].alarm_switch_index
+					//println "DEBUG ALARM: alarm switch found!  targetname of model: " $zone_trigger[local.i].alarm_switch_model
+					//println "DEBUG ALARM: alarm switch found!  targetname of node: " $zone_trigger[local.i].alarm_switch_node
+					goto alarm_system_setup_zone_trigger_skipto_launchthread
+				}
+			}
+			
+			println "^~^~^ ALARM SYSTEM ERROR:  $zone_trigger with no associated alarm switch for zone: " $zone_trigger[local.i].zone " : at coordinates: " $zone_trigger[local.i]origin " :Aborting alarm system!!!"
+			//goto alarm_system_setup_end //chrissstrahl
+			end //chrissstrahl - do it right
+		}
+		else{
+			println "^~^~^ ALARM SYSTEM ERROR:  $zone_trigger with no associated alarm switch for zone: " $zone_trigger[local.i].zone " : at coordinates: " $zone_trigger[local.i]origin " :Aborting alarm system!!!"
+			//goto alarm_system_setup_end //chrissstrahl
+			end //chrissstrahl - do it right
+		}
+
+		alarm_system_setup_zone_trigger_skipto_launchthread:	
+		//*** launch the zone trigger thread
+		$zone_trigger[local.i] thread zone_trigger_thread local.i
+	}
+
+	//*** search through the alarm sounds and see if sound alias' are set, else set it to the default
+	for (local.i = 1; local.i <= $alarm_sound.size ; local.i ++){
+		if ($alarm_sound[local.i].sound_alias == NIL && level.alarm_sound != NIL){
+			$alarm_sound[local.i].sound_alias = level.alarm_sound
+		}
+		else if ($alarm_sound[local.i].sound_alias == NIL && level.alarm_sound == NIL){
+			println "^~^~^ ALARM SYSTEM: $alarm_sound at coordinates: " $alarm_sound[local.i].origin " :with no alias, no default is set!  Sound will NOT play from here!!!"
+		}
+	}
+
+	//*********************************************
+	//*** LAUNCH THREADS
+
+	//*** setup all the alarm AI
+	for (local.i = 1; local.i <= $ai_alarm.size ; local.i ++){
+		$ai_alarm[local.i] thread ai_alarm_setup
+	}
+
+	//*** launch a thread for all the alarm switches
+	for (local.i = 1; local.i <= $alarm_switch_trigger.size ; local.i ++){
+		$alarm_switch_trigger[local.i] thread alarm_switch_thread
+	}
+
+	thread ai_gofor_alarm  //determines who should run for the alarm
+	thread alarm_system_master  //master cycle for turning the alarms on and off
+	thread alarm_system_sound  //thread for alarm sounds to play
+	thread alarm_system_backup_spawn  //thread for spawning backup guys
+}end
+
+
+//*************************************************************************************
+//*************************************************************************************
+//
+// INIT THREADS
+//
+//*************************************************************************************
+//*************************************************************************************
+
+
+//**************************************************************************
+//*** alarm system zone trigger thread
+//**************************************************************************
+zone_trigger_thread local.index:
+
+zone_trigger_loop:
+local.self waittill trigger
+
+local.dude = parm.other
+
+//println "ALARM SYSTEM ZONE TRIGGER: " local.dude " just passed through zone: " local.self.zone " : zone number : " local.self.zone_number " : zone index : " local.self.zone_index
+
+local.dude.zone = local.self.zone
+local.dude.zone_number = local.self.zone_number
+local.dude.zone_index = local.self.zone_index
+
+goto zone_trigger_loop
+
+end
+
+
+//**************************************************************************
+//*** alarm system $ai_alarm setup thread
+//**************************************************************************
+ai_alarm_setup:
+
+//*** check to make sure the AI is targeting the zone center, if not, remove him from the world
+if (local.self.target == NIL || local.self.target == "")
+{
+	println "^~^~^ ALARM SYSTEM ERROR:  $ai_alarm guy at coordinates: " local.self.origin " :has no target!  Removing him from the alarm system!!!"
+	local.self remove	
+	goto ai_alarm_setup_end
+}
+
+//*** stuff the zone and zone_number into the AI
+local.self.zone = local.self.target.zone
+local.self.zone_number = local.self.target.zone_number
+local.self.zone_index = local.self.target.zone_index
+
+//*** set his type_attack to alarm, and his alarmthread to run
+local.self.type_attack = "alarm"
+local.self.alarmthread = global/alarm_system.scr::ai_alarm_alerted
+
+ai_alarm_setup_end:
+end
+
+
+//**************************************************************************
+//*** alarm system backup guy death thread
+//**************************************************************************
+ai_backup_death:
+
+local.self waittill death
+
+level.ai_alarm_backup_total --
+
+local.self.targetname = ""
+
+end
+
+
+//*************************************************************************************
+//*************************************************************************************
+//
+// MAIN SYSTEM THREADS
+//
+//*************************************************************************************
+//*************************************************************************************
+
+
+//**************************************************************************
+//*** alarm system ai alerted stack - adding to
+//**************************************************************************
+ai_alarm_alerted:
+	/*
+	if (level.ai_alerted_isprocessing == 1){
+		println "^~^~^ ALARM SYSTEM ALERT STACK ADD ERROR: An AI tried to update the stack while an instance was running!!  Aborting for that A!!"
+		goto ai_alerted_stack_add_end
+	}
+	*/
+
+	//println "AI ALARM THREAD: ai has been alerted!!!"
+
+	//*** if the stack is busy, wait till it's free
+	while (level.ai_alerted_isprocessing == 1){
+		//println "AI ALARM THREAD: alerted stack is processing, holding"
+		wait .5
+	}
+
+	//*** claim the stack
+	level.ai_alerted_isprocessing = 1
+
+	level.ai_alerted_index ++
+	level.ai_alerted_stack[level.ai_alerted_index] = local.self
+
+	//println "AI ALARM THREAD: added ai to stack index: " level.ai_alerted_index
+
+	//*** trigger the gofor thread to find someone to go ring the alarm
+	trigger $waittrigger_gofor_alarm
+
+	//*** relinquish the stack
+	level.ai_alerted_isprocessing = 0
+
+ai_alerted_stack_add_end:
+end
+
+
+//**************************************************************************
+//*** alarm system ai alerted stack - bumping the stack
+//**************************************************************************
+ai_alarm_alerted_bumpstack:
+	//println "AI ALARM STACK BUMP: bumping AI off of the alerted stack!" 
+
+	//*** if the stack is already processing, wait till it's ready
+	while (level.ai_alerted_isprocessing == 1){
+		//println "AI ALARM STACK BUMP: stack is processing, holding!"
+		wait .1
+	}
+
+	//*** claim the stack
+	level.ai_alerted_isprocessing = 1
+
+	//*** cycle all the existing stack entries down one index
+	for (local.i = 1; local.i < level.ai_alerted_index ; local.i ++){
+		//println "AI ALARM STACK BUMP: cycling stack down: " (local.i + 1) " : moving into index: " local.i
+		level.ai_alerted_stack[local.i] = level.ai_alerted_stack[(local.i + 1)]
+	}
+
+	level.ai_alerted_stack[level.ai_alerted_index] = NULL
+	level.ai_alerted_index --
+
+	//println "AI ALARM STACK BUMP: new alerted index number: " level.ai_alerted_index 
+
+	//*** relinquish the stack
+	level.ai_alerted_isprocessing = 0
+end
+
+
+//**************************************************************************
+//*** alarm system ai gofor alarm switch master thread
+//**************************************************************************
+ai_gofor_alarm:
+ai_gofor_alarm_reset:
+
+	local.stack_processing_index = 1
+
+	$waittrigger_gofor_alarm waittill trigger
+
+	//println "GOFOR ALARM: the player has been spotted!!"
+
+	ai_gofor_alarm_processnext:
+
+	//*** check if the alarm is ringing, if it is, go to the wait area for the alarm to finish
+	if (level.alarm == 1){
+		//println "GOFOR ALARM: the alarm is currently on, wait for it to finish"
+		goto ai_gofor_alarm_waitforalarm
+	}
+
+	//*** if the alerted stack is empty, abort out completely
+	if (level.ai_alerted_index == 0){
+		//println "GOFOR ALARM: the alerted stack is empty, resetting the gofor thread!"
+		goto ai_gofor_alarm_reset
+	}
+
+	//*** if the processing index exceeded the stack, reset it to one to start going through the stack again
+	if (local.stack_processing_index > level.ai_alerted_index){
+		//println "GOFOR ALARM: the processing index is greater than the stack index, resetting to 1"
+		local.stack_processing_index = 1
+		wait 3
+	}
+
+	//*** grab the first guy on the stack
+	local.ai_alerted = level.ai_alerted_stack[local.stack_processing_index]
+
+	//println "GOFOR ALARM: processing alerted stack index: " local.stack_processing_index " : in zone: " local.ai_alerted.zone 
+
+	//*** check if the guy is still alive, else goto the next guy
+	if !(isalive local.ai_alerted){
+		//println "GOFOR ALARM: " local.ai_alerted " is dead, bumping stack and finding the next guy"
+		waitthread ai_alarm_alerted_bumpstack
+		goto ai_gofor_alarm_processnext
+	}
+
+	//*** unholster the guys weapon
+	local.ai_alerted unholster
+
+	//*** check if the guy is still alerted, else goto the next guy
+	if (local.ai_alerted.thinkstate != "attack"){
+		//println "GOFOR ALARM: " local.ai_alerted " is no longer alert, bumping stack and finding the next guy"
+		waitthread ai_alarm_alerted_bumpstack
+			local.ai_alerted.type_attack = "alarm"
+			local.ai_alerted.alarmthread = global/alarm_system.scr::ai_alarm_alerted	
+		goto ai_gofor_alarm_processnext
+	}
+
+	//*** if the ai can't see the player pick a different alerted guy
+	//if (!(local.ai_alerted canseenoents $player)){ //chrissstrahl
+	if (!(local.ai_alerted exec coop_mod/replace.scr::canseenoents)){ //chrissstrahl - coop
+		//println "GOFOR ALARM: " local.ai_alerted " can't see the player, trying a different alerted guy!"
+			local.stack_processing_index ++
+			local.ai_alerted exec global/enable_ai.scr
+			goto ai_gofor_alarm_processnext	
+	}
+
+	//println "GOFOR ALARM: beginning check to make the found guy run to the alarm"
+	local.ai_runto_switch = 1
+
+	//*** start looping to make the guy run to the alarm node
+	while (local.ai_runto_switch != 0){
+		//println "GOFOR ALARM: in running loop, level.alarm: " level.alarm
+		//*** check if the alarm is on
+		if (level.alarm == 1){
+			local.ai_runto_switch = 0
+			local.alarm_reached = 0  //0 means the alarm was rung while going for it
+			goto ai_gofor_alarm_breakrunning
+		}
+		
+		if !(isalive local.ai_alerted){
+			local.ai_runto_switch = 0
+			local.alarm_reached = 1  //1 means the ai was killed
+			goto ai_gofor_alarm_breakrunning
+		}
+		//*** grab the desired alarm switch
+		local.choosen_alarm = $alarm_switch_trigger[$zone_trigger[local.ai_alerted.zone_index].alarm_switch_index]
+		local.choosen_alarm_node = $zone_trigger[local.ai_alerted.zone_index].alarm_switch_node
+
+		//*** check for the alarmswitch he's supposed to pull and if he's closer to it than the player is
+		local.distance_ai = local.ai_alerted.origin - local.choosen_alarm.origin
+		local.distance_player = (waitexec coop_mod/replace.scr::origin local.choosen_alarm) - local.choosen_alarm.origin //chrissstrahl - coop mod
+			
+		//println "GOFOR ALARM LOOP: distance_ai: " local.distance_ai " : distance player: " local.distance_player 
+		
+		if ((local.distance_ai * local.distance_ai) < (local.distance_player * local.distance_player)){
+			//*** the AI is closer to the switch
+			local.ai_runto_switch = 1
+		}
+		else{
+			//*** the player is closer to the switch, goto the next guy in the stack
+			local.ai_runto_switch = 0
+			local.alarm_reached = 2  //2 means the ai is alive, but couldn't reach the alarm, process the next guy in the stack
+			goto ai_gofor_alarm_breakrunning
+		}
+		
+		//*** check to see if the AI has reached the alarm, if so, mark it reached and break the loop
+		if (vector_length(local.ai_alerted.origin - local.choosen_alarm_node.origin) <= 24){
+			local.alarm_reached = 3  //3 means the switch was reached successfully
+			local.ai_runto_switch = 0
+			goto ai_gofor_alarm_breakrunning
+		}
+		
+		//println "GOFOR ALARM: the alerted guy hasn't reached the alarm yet, make him keep running!" 
+		//*** disable his AI so he can be manipulated
+		local.ai_alerted exec global/disable_ai.scr
+
+		//*** if all the checks are cool, tell him to run to the node
+		local.ai_alerted exec global/runto.scr local.choosen_alarm_node
+
+	ai_gofor_alarm_breakrunning:		
+		wait .5
+	}
+
+	//println "GOFOR ALARM: finished trying to make: " local.ai_alerted " run to the alarm"
+
+	//*** check the status of how he broke out of the loop
+	if (local.alarm_reached == 0){
+		//*** the ai is alive and the alarm was rung enroute
+		//println "GOFOR ALARM: " local.ai_alerted " had the alarm rung in route to the alarm"
+			goto ai_gofor_alarm_waitforalarm
+	}
+	else if (local.alarm_reached == 1){
+		//*** the ai was killed
+		//println "GOFOR ALARM: " local.ai_alerted " was killed enroute to the alarm, bumping stack and restarting"
+		waitthread ai_alarm_alerted_bumpstack
+		goto ai_gofor_alarm_processnext
+	}
+	else if (local.alarm_reached == 2){
+		//*** the ai and was prevented from ringing the alarm
+		//println "GOFOR ALARM: " local.ai_alerted " was prevented from reaching the alarm"
+			local.stack_processing_index ++
+			local.ai_alerted exec global/enable_ai.scr
+			goto ai_gofor_alarm_processnext	
+	}
+
+
+	//println "GOFOR ALARM: " local.ai_alerted " has reached the alarm, making him turn to face it"
+	local.ai_alerted exec global/turnto.scr local.choosen_alarm
+	local.ai_alerted waittill turndone
+
+	local.ai_alerted exec global/turnto.scr NULL
+
+	wait 1
+	//*** check if the guy is still dead, or if the alarm was rung.  If so goto the next guy on the stack
+	if !(isalive local.ai_alerted){
+		//println "GOFOR ALARM: " local.ai_alerted " was killed at the alarm, bumping stack and restarting"
+		waitthread ai_alarm_alerted_bumpstack
+		goto ai_gofor_alarm_processnext
+	}
+	else if (level.alarm == 1){
+		//println "GOFOR ALARM: " local.ai_alerted " reached the alarm, but it was activated before he could trigger it"
+			local.stack_processing_index ++
+			local.ai_alerted exec global/enable_ai.scr
+			goto ai_gofor_alarm_waitforalarm	
+	}
+
+
+	//*** trigger the alarm and reenable the guy
+	//trigger $alarm_switch_trigger[$zone_trigger[local.ai_alerted.zone_index].alarm_switch_index]
+	//println "SWITCH USED: " $alarm_switch_trigger[$zone_trigger[local.ai_alerted.zone_index].alarm_switch_index]
+	
+	//chrissstrahl - compability to coop
+	local.player = exec coop_mod/replace.scr::player_closestTo $alarm_switch_trigger[$zone_trigger[local.ai_alerted.zone_index].alarm_switch_index]
+	while(local.player == NULL){
+		wait 1
+		local.player = exec coop_mod/replace.scr::player_closestTo $alarm_switch_trigger[$zone_trigger[local.ai_alerted.zone_index].alarm_switch_index]
+	}	
+	$alarm_switch_trigger[$zone_trigger[local.ai_alerted.zone_index].alarm_switch_index] douse local.player //chrissstrahl - coop
+	local.ai_alerted exec global/enable_ai.scr
+
+	wait 2
+
+	ai_gofor_alarm_waitforalarm:
+	//*** wait till the alarm shuts off
+	while (level.alarm == 1){
+		wait .1
+	}
+
+	goto ai_gofor_alarm_processnext
+end
+
+
+//**************************************************************************
+//*** alarm switch trigger thread
+//**************************************************************************
+alarm_switch_thread:
+
+alarm_switch_thread_loop:
+local.self waittill trigger
+
+//println "ALARM SWITCH THREAD " local.self.alarm_switch_index " : has been triggered"
+
+//*** trigger the master alarm thread to go
+trigger $waittrigger_alarm_master
+
+wait 3
+goto alarm_switch_thread_loop
+
+end
+
+
+//**************************************************************************
+//*** alarm system master thread
+//**************************************************************************
+alarm_system_master:
+
+alarm_system_master_loop:
+$waittrigger_alarm_master waittill trigger
+
+//println "MASTER ALARM THREAD: has been triggered"
+
+//*** check whether to turn the alarm on or off
+if (level.alarm != 1)
+{
+	//println "MASTER ALARM THREAD: the alarm is off, turning it on!"
+	//*** if the alarms are not on, turn them on
+	level.alarm = 1
+	level.alarmlights = 1
+	
+	//*** animate all the switches here
+	for (local.i = 1; local.i <= $alarm_switch_trigger.size ; local.i ++)
+        {
+        	$($alarm_switch_trigger[local.i].target) anim turnon
+		$($alarm_switch_trigger[local.i].target) playsound alarm_switch
+        } 
+	
+	trigger $waittrigger_alarm_backup_spawning
+	trigger $waittrigger_alarm_sound
+}
+else
+{
+	//println "MASTER ALARM THREAD: the alarm is on, turning it off!"
+	//*** if the alarms are on, turn them off
+	
+	//*** animate all the switches here
+	for (local.i = 1; local.i <= $alarm_switch_trigger.size ; local.i ++)
+        {
+        	$($alarm_switch_trigger[local.i].target) anim turnoff
+		$($alarm_switch_trigger[local.i].target) playsound alarm_switch
+        } 
+
+	level.alarm = 0
+	level.alarmlights = 0
+}
+
+goto alarm_system_master_loop
+
+end
+
+
+//**************************************************************************
+//*** alarm system sound thread
+//**************************************************************************
+alarm_system_sound:
+
+alarm_system_sound_loop:
+$waittrigger_alarm_sound waittill trigger
+
+//*** play sounds on all the alarm points
+for (local.i = 1; local.i <= $alarm_sound.size ; local.i ++){
+	if ($alarm_sound[local.i].sound_alias != NIL){
+		//println "ALARM SYSTEM SOUND PLAY: alias: " $alarm_sound[local.i].sound_alias
+        $alarm_sound[local.i] loopsound $alarm_sound[local.i].sound_alias
+    }
+}
+
+//*** wait for the alarms to go off
+while (level.alarm == 1){
+	wait .1
+}
+
+//*** stop the sounds on all the alarmpoints
+for (local.i = 1; local.i <= $alarm_sound.size ; local.i ++){
+	if ($alarm_sound[local.i].sound_alias != NIL){
+       	$alarm_sound[local.i] stoploopsound
+   }
+}
+goto alarm_system_sound_loop
+end
+
+
+//**************************************************************************
+//*** alarm system backup spawning thread
+//**************************************************************************
+alarm_system_backup_spawn:
+
+alarm_system_backup_spawn_loop:
+$waittrigger_alarm_backup_spawning waittill trigger
+
+//println "BACKUP SPAWNING: alarms sounded, spawning reinforcements"
+
+wait 1
+
+//*** loop while the alarm is on
+while (level.alarm == 1)
+{
+	//println "BACKUP SPAWNING: .backup_spawner.size value: " $zone_trigger[level.playerZone_index].backup_spawner.size
+	//iprintlnbold_noloc( "BACKUP SPAWNING: .backup_spawner.size value: "+$zone_trigger[level.playerZone_index].backup_spawner.size )
+	//*** check to see if there are any spawners for this area
+	if ($zone_trigger[level.playerZone_index].backup_spawner.size == -1)
+        {
+        	//println "BACKUP SPAWNING: there are no spawners for zone: " $zone_trigger[level.playerZone_index].zone " skipping spawning"
+        	iprintlnbold_noloc( "BACKUP SPAWNING: there are no spawners for zone: "+$zone_trigger[level.playerZone_index].zone+" skipping spawning" ) //chrissstrahl - testing
+			goto alarm_system_backup_spawn_skip
+        }
+	
+	//*** there are spawners, cycle through and spawn guys that don't already exist for this zone up to the maximum allowed
+	//println "BACKUP SPAWNING: starting cycling for backup guys"
+	for (local.i = 1; local.i <= $zone_trigger[level.playerZone_index].backup_spawner.size ; local.i ++)
+        {
+		//println "BACKUP SPAWNING: spawning guys in zone: " $zone_trigger[level.playerZone_index].zone
+		//println "BACKUP SPAWNING: There are: " $zone_trigger[level.playerZone_index].backup_spawner.size " spawners in this zone"
+        	if (level.ai_alarm_backup_total < level.ai_alarm_backup_max)
+                {
+			//println "BACKUP SPAWNING: the max number of guys has not been reached, continue spawning"
+                	//*** grab the actual spawner to use
+			local.spawner = $zone_trigger[level.playerZone_index].backup_spawner[local.i]
+			
+			//*** check to see if this guy already exists
+			if ($(local.spawner.spawn_targetname) == NULL)
+                        {
+        			//println "BACKUP SPAWNING: spawning at spawner: " local.spawner
+        			
+        			//*** spawn the guy and grab him into a variable
+        			//println "BACKUP SPAWNING: spawning guys targetname: " local.spawner.spawn_targetname
+        			//println "BACKUP SPAWNING: spawning guys model: " local.spawner.spawn_model
+        			//println "BACKUP SPAWNING: spawning guys gun: " local.spawner.spawn_weapon
+        			//println "BACKUP SPAWNING: spawning guys origin: " local.spawner.origin
+				
+				/*        			
+        			spawn local.spawner.spawn_model targetname local.spawner.spawn_targetname voicetype local.spawner.voicetype
+        			local.dude = $(local.spawner.spawn_targetname)
+        			
+        			//*** set the values into the AI from the spawner
+        			local.dude.weapon = local.spawner.spawn_weapon
+        			local.dude.type_attack = local.spawner.type_attack
+        			local.dude.hearing = local.spawner.hearing
+        			local.dude.sight = local.spawner.sight
+        			local.dude.fov = local.spawner.fov
+        			local.dude.leash = local.spawner.leash
+        			local.dude.mindist = local.spawner.mindist
+        			local.dude.maxdist = local.spawner.maxdist
+        			local.dude.health = local.spawner.health
+        			local.dude.soundawareness = local.spawner.soundawareness
+        			local.dude.noticescale = local.spawner.noticescale
+        			local.dude.fixedleash = local.spawner.fixedleash
+        			local.dude.enemysharerange = local.spawner.enemysharerange
+        			//local.dude.voicetype = local.spawner.voicetype
+        			local.dude.accuracy = local.spawner.accuracy
+        			local.dude.ammo_grenade = local.spawner.ammo_grenade
+        			local.dude.alarmnode = local.spawner.alarmnode
+        			*/
+				
+				//*** spawn the guy in
+				local.dude = waitthread global/spawner.scr::spawner_activate_targetname local.spawner
+        			
+				//*** launch his ondeath thread
+        			local.dude thread ai_backup_death
+        			
+        			//*** reposition him in the world
+        			//local.dude.origin = local.spawner.origin
+        			
+        			//*** increment the counter for AI in the level
+        			level.ai_alarm_backup_total ++
+        			
+        			//*** if the alarmnode is filled, run there, else run to player
+        			if (local.dude.alarmnode == NIL || local.dude.alarmnode == "" || local.dude.alarmnode == NULL)
+                                {
+					//local.dude.movedoneradius = 192
+                                	//local.dude exec global/runto.scr $player
+					//local.dude forceactivate
+					//local.dude attackplayer
+					local.dude thread alarm_system_backup_dude
+                                }
+        			else
+        			{
+					//local.dude forceactivate
+        				//local.dude attackplayer
+					local.dude thread alarm_system_backup_dude
+        			}
+
+                        }
+			else
+			{
+				//*** the guy already exists, abort
+				//println "BACKUP SPAWNING: " local.spawner.spawn_targetname " backup guy already exists, checking next guy in zone: " $zone_trigger[level.playerZone_index].zone
+			}
+			
+			//*** clear the variable
+			local.dude = NULL
+                }
+        }
+
+//*** wait the backup cycle time before checking to spawn in more guys or not
+alarm_system_backup_spawn_skip:	
+wait level.ai_alarm_backup_time
+}
+
+//*** the alarm is over, reset thread
+goto alarm_system_backup_spawn_loop
+
+end
+
+
+//**************************************************************************
+//*** alarm system backup dude's routine
+//**************************************************************************
+alarm_system_backup_dude:
+
+//println "ALARM DUDE: " local.self " setting movedone radius"
+local.self.movedoneradius = 256
+local.self forceactivate
+
+//println "ALARM DUDE: " local.self " running to player"
+//local.self exec global/runto.scr $player //chrissstrahl
+local.self exec coop_mod/replace.scr::runtoClosest	//chrissstrahl - coop
+local.self waittill movedone
+
+local.self exec global/stand.scr
+
+wait 5
+alarm_system_backup_dude_loop:
+//*** check to see if the player is far enough away to remove the guy
+while (local.self.thinkstate != "attack" && isalive local.self){
+	//println "ALARM DUDE: " local.self " cansee player: " (local.self cansee $player 90 16000)
+	//println "ALARM DUDE: " local.self " is within " level.backup_remove_distance " units of player: " (vector_within local.self.origin $player.origin level.backup_remove_distance)
+	//entity cansee entity fov distance
+	
+	//if ($player cansee local.self 90 16000 == 0 && vector_within local.self.origin $player.origin level.backup_remove_distance == 0){ //chrissstrahl
+	if (local.self exec coop_mod/replace.scr::cansee 90 16000 == 0 && !(exec coop_mod/replace.scr::withinDistanceOf local.self level.backup_remove_distance)){ //chrissstrahl - coop
+        goto alarm_system_backup_dude_gone
+    }
+	wait 1
+}
+
+if !(isalive local.self)
+{
+	//println "ALARM DUDE: " local.self " is dead"
+	goto alarm_system_backup_dude_done
+}
+
+wait 3
+
+goto alarm_system_backup_dude_loop
+
+alarm_system_backup_dude_gone:
+//println "ALARM DUDE: " local.self " is being removed"
+local.self remove
+
+alarm_system_backup_dude_done:
+end
+
+
+//*************************************************************************************
+//*************************************************************************************
+//
+// SPECIAL FUNCTIONS
+//
+//*************************************************************************************
+//*************************************************************************************
+
+//**************************************************************************
+//*** find an alarm ringer guy
+//**************************************************************************
+find_guy local.find_name:
+	for (local.i = 1; local.i <= $ai_alarm.size ; local.i ++){
+		if ($ai_alarm[local.i].find_name == local.find_name){
+			local.result = $ai_alarm[local.i]
+			goto find_guy_end
+		}
+	}
+	println "^~^~^ ALARM SYSTEM FIND GUY: There was no $ai_alarm with a .find_name of: " local.find_name
+find_guy_end:
+end local.result

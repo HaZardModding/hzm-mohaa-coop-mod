@@ -1,0 +1,670 @@
+/*
+	THE BOCAGE
+	ARCHITECTURE: PRESTON, NATE, TODD
+	SCRIPTING: Z
+	Modified for coop.
+
+	9/10/208 - remember to add clip, so players have to folow pilot.
+			 - pilot can't be killed, line: 90. - He dies way to easy, temporary solution if we doesn't want immortal allies.
+			 - mg42_active.scr error. - "self.current_target NIL" - fixed by adding if(self.gunner != NIL ){ end } at line 285 in mg42_active.scr - solution to check by you (chrisss).
+			 - commented out thread and line spamming pilot health  - lines: 73; 125.
+
+	Bugs & Errors: 
+		- No hit location after death.
+		- Pilot is n00b, he dies every 5 seconds. - Temporary fix done, talk to chris.
+		- Sometimes pilot pernamently holster weapon after player death.
+		- MG42 gunner do it also, but he can bash with invisible stick.
+		- Player after death started from beginning of map, but (magically) it changed and he respawns at place he died.
+		- Server screams to put some lines to map precache.
+		- Two times AI was able to see me and shoot at me when I was in spectator.
+
+	ToDo_tudu:
+		- Maybe add some spawnpoint for other players.
+		- Maybe make trick that all players have to be near pilot to get new objectives after rescue.
+		- Maybe fix that spectator thing.
+
+
+*/
+//============================================================================
+main:{
+//============================================================================
+	level.coopNextMap = "maps/m4l2"				//chrissstrahl - set next map (for mom voteing)
+	level.coopPrevMap = "briefing/briefing4"	//chrissstrahl - set previouse map (for mom voteing)
+	level.coop_aaMap = 1						//chrissstrahl - let global scripts know this is a AA level
+	level.coop_debugSpawn = 1 					//chrissstrahl - enable spawnpoint debug (make visible)
+	thread coop_mod/main.scr::main         		//chrissstrahl - start coop mod extensions
+	
+	//chrissstrahl - test spawn locations
+	//exec coop_mod/spawnlocations.scr::m4l1_update1
+	//exec coop_mod/spawnlocations.scr::m4l1_update2
+	//exec coop_mod/spawnlocations.scr::m4l1_update3
+	
+	//chrissstrahl - make sure pilot does not wander about
+	$friendly exec global/disable_ai.scr
+		
+	$altar notsolid
+	$altar_button notsolid
+	$altar_buttonpulse notsolid
+	 
+	exec global/loadout.scr maps/m4l1.scr
+
+	level waittill prespawn
+
+	//** Global Threads
+	thread global/door_locked.scr::lock
+
+	$altar solid
+	$altar_button solid
+	$altar_buttonpulse solid
+	$altar_button hide
+
+	$manon exec global/disable_ai.scr
+	$manon nodamage
+
+	thread pilot_init
+
+	exec global/ambient.scr m4l1
+
+	level waittill spawn
+
+	thread playmusic
+	thread pilot_waittill_rescue
+
+	waitthread global/items.scr::add_item "binoculars" noprint	// Show binoculars inventory icon
+	waitthread global/objectives.scr::add_objectives 1 2 "Locate the downed G3 pilot." level.pilot.origin
+	waitthread global/objectives.scr::add_objectives 2 2 "Escort the pilot to the Maquis hideout." $altar_button.origin
+	waitthread global/objectives.scr::current_objectives 1
+
+	// Opel truck brush model collision
+	$truck01 setcollisionentity $opelmap
+
+	level.planesequence_activated = 0
+	level.trucksequence_activated = 0
+	level.alive_count = 0
+	
+	$church_enemy thread register_alive
+	$turret3_gunner thread register_alive
+	$turret4_gunner thread register_alive
+
+	//*** Turret threads
+	$turret3.pitchcaps = ( -25 25 0)
+	$turret3 thread global/mg42_active.scr::mg42
+	$turret4.pitchcaps = ( -25 25 0)
+	$turret4 thread global/mg42_active.scr::mg42
+}end
+
+//============================================================================
+pilot_init:{
+//============================================================================
+	waitthread global/friendly.scr::friendlygen 
+	level.friendlyavoid = 0
+	level.pilot = level.friendly1
+
+	// Init's the friendlynodes and friendly AI
+	// waitthread global/friendly.scr::debug 
+	// Add's helpful messages
+	
+	level.pilot = level.friendly1
+	
+	level.friendly1.friendtype = 1
+	//level.friendly1 tether $player //chrissstrahl
+	level.friendly1 exec coop_mod/main.scr::tether //chrissstrahl - Coop compatible
+	level.friendly1.distance = 256
+	level.friendly1.sight = 1
+	if(level.gametype != 0){ //chrissstrahl - lets keep him alive at all costs
+		level.friendly1 nodamage
+	}
+	//level.friendly1.sight = 384
+	level.friendly1.noticescale = 200
+	level.pilot threatbias ignoreme
+	level.pilot.fallheight = 200
+	level.pilot type_attack weaponless
+	
+	level.skill = getcvar ("skill")
+	if (level.skill == "0")	{level.pilot.maxhealth = 230}
+	else {level.pilot.maxhealth = 200}
+	
+	level.pilot.health = level.pilot.maxhealth
+	level.pilot gun "none"
+	level.pilot exec global/disable_ai.scr
+	level.pilot thread wait_till_death
+	
+	thread pilot_waittill_combat
+
+	$plane_german1 anim plane_german1_idle1
+	$plane_german2 anim plane_german2_idle1
+	
+	//chrissstrahl - auto update spawnpoints twiche
+	//needs to be here because level var is only created above
+	if( level.gametype != 0){
+		thread coop_upatePlayerSpawn
+	}
+}end
+
+//============================================================================
+plane_sequence:{
+//============================================================================
+	if (level.planesequence_activated == 1) {end}
+	level.planesequence_activated = 1
+	
+	for (local.i = 1 ; local.i <= $plane_sequence_trigger.size ; local.i ++){
+		$plane_sequence_trigger[local.i] remove
+	}
+	 
+	$plane_german3 walkto $german3_node1
+	level.pilot walkto $pilot_node1
+	
+	println "GERMAN1 and GERMAN2 in idle"
+	println "STARTING"
+	
+	$plane_german1 anim actor_m4l1_400
+	$plane_german1 waittill animdone
+	println "GERMAN1 ANIM"
+	
+	$plane_german2 anim plane_german2_getup
+	$plane_german2 waittill animdone
+	println "GERMAN2 Get up"
+	
+	$plane_german2 anim actor_m4l1_401
+	$plane_german2 waittill animdone
+	println "GERMAN2 ANIM"
+	
+	$plane_german1 anim plane_german1_idle2
+	$plane_german2 anim plane_german2_idle1
+	println "GERMAN1 and GERMAN2 in idle"
+	
+	$plane_german1 anim actor_m4l1_402
+	$plane_german1 waittill animdone
+	println "GERMAN1 ANIM"
+	
+	$plane_german1 anim plane_german1_idle2
+	println "GERMAN1 idle"
+
+	wait 1
+		
+	$plane_german2 exec global/stand.scr
+	$plane_german1 anim actor_m4l1_402
+	$plane_german1 waittill animdone
+	println "fourth waittill done"
+	
+	$plane_german1 anim plane_german1_idle2
+	wait 4
+ 
+	level.pilot threatbias 0
+}end
+
+//============================================================================
+pilot_waittill_combat:{
+//============================================================================
+	while ($plane_german1.thinkstate == idle && $plane_german2.thinkstate == idle && $plane_german3.thinkstate == idle){
+		wait .2
+	}	
+		
+	level.pilot exec global/disable_ai.scr //chrisssstrahl
+	level.pilot exec global/stand.scr
+	wait .1
+	level.pilot anim pilot_falldown
+	level.pilot waittill animdone
+	level.pilot anim pilot_ground_idle 
+}end
+
+//============================================================================
+pilot_waittill_rescue:{
+//============================================================================
+	while (IsAlive $plane_german1 || IsAlive $plane_german2 || IsAlive $plane_german3){
+		wait 1
+		//println "z:    waiting for the germans to be dead"
+	} 
+	wait 1
+	
+	level.pilot exec global/disable_ai.scr
+	
+	level.pilot runto $mp40_spot
+	level.pilot waittill movedone
+	level.pilot turnto $pilot_mp40
+	level.pilot waittill turndone
+	level.pilot lookat $pilot_mp40
+	level.pilot lookat NULL
+	level.pilot upperanim pickup_obj
+	level.pilot playsound mp40_snd_pickup
+	
+	$pilot_mp40 remove
+	
+	level.pilot gun "MP40"
+	level.pilot exec global/enable_ai.scr
+	level.pilot exec global/stand.scr
+	wait 1
+	
+	level.pilot threatbias 0
+	// I'm lucky you came along. There's a Maquis safehouse right near here.  It's over that way.
+	level.pilot waitthread pilotsay dfr_M4L1_400h_1 $player //chrissstrahl - handled in func for coop
+	
+	waitthread global/objectives.scr::add_objectives 1 3 "Locate the downed G3 pilot." level.pilot.origin
+	waitthread global/objectives.scr::current_objectives 2
+	
+	// Autosave
+	if(level.gametype == 0){ //chrissstrahl - only in sp
+		exec global/autosave.scr 1	//"Downed plane"
+	}
+	
+	level.pilot thread global/friendly.scr::friendlythink
+	level.pilot thread heal_once
+}end
+
+//============================================================================
+pilotsay local.alias local.listener local.distance local.movecloser local.animated:{
+//============================================================================
+	if (self == NULL){
+		//println "Z: null speaker: " self " " local.alias
+		end
+	}
+
+	if (local.listener == NULL || local.listener.size > 1){	//chrissstrahl - make sure we make this coop compatible
+		local.listener = exec coop_mod/replace.scr::player_closestTo level.pilot
+		if(local.listener == NULL){end}
+	}
+
+	if (local.distance == NIL || local.distance < 64) {local.distance = 160}
+	
+	if (local.movecloser != 1){
+		self.friendtype = -1
+		
+		while (((vector_length(local.listener.origin - self.origin)) > local.distance) || !(local.listener cansee self)){
+			if ((vector_length(local.listener.origin - self.origin)) > local.distance){
+				println "Z:        speaker too far from listener: " local.listener
+			}
+
+			if !(local.listener cansee self){
+				println "Z:        speaker cant see listener: " local.listener
+			}
+		
+			self exec global/runto.scr local.listener.origin
+			wait .2
+		}
+		self exec global/stand.scr
+		self.friendtype = 1
+	}
+
+	self turnto local.listener
+	self lookat local.listener
+	wait .3
+	
+	if (local.animated == 1){
+		self anim local.alias
+		//self waittill animdone
+	}
+	else{
+		self say local.alias
+		//self waittill saydone
+	}
+	wait 3.5
+
+	self lookat NULL
+	self turnto $altar_buttonpulse	
+	wait 2
+	
+	self turnto NULL
+}end
+
+//============================================================================
+wait_till_death:{
+//============================================================================
+	self waittill death
+	iprintlnbold "Lt. Joe Baylor has been killed in action."
+	wait 3
+	missionfailed
+}end
+
+//============================================================================
+friendly_think1:{
+//============================================================================
+	// second clearing with the MG
+	level.pilot.friendtype = -1
+	wait .5
+	level.pilot runto $pilot_hide_node1
+	
+	while ((IsAlive $turret3_gunner) && (IsAlive $turret4_gunner)){
+		wait 1
+		// println "waiting for 1 turret guy"
+	}
+
+	while (level.alive_count > 4){
+    	wait 1
+    	// println "waiting for 3 or less enemies"
+    }
+
+	level.pilot.friendtype = 1
+}end
+
+//============================================================================
+register_alive:{
+//============================================================================
+	level.alive_count++
+	self waittill death
+	level.alive_count--
+}end
+
+
+// Truck attack thread
+//============================================================================
+truck01_drive:{
+//============================================================================
+	if (level.trucksequence_activated == 1) {end}
+	
+	level.trucksequence_activated = 1
+	
+	for (local.i = 1 ; local.i <= $truck01_drive_trigger.size ; local.i ++){
+		$truck01_drive_trigger[local.i] remove
+	}
+	
+	while (level.alive_count > 0){
+		wait 1
+		// println "waiting for no guys"
+    }
+    
+	if(level.gametype == 0){ // chrissstrahl - only in sp
+		exec global/autosave.scr 3	// "Uphill battle"
+	}
+	
+	//chrissstrahl - set new spawn/respawn location
+	if( level.gametype != 0){
+		exec coop_mod/spawnlocations.scr::m4l1_update3
+	}
+
+	exec global/spotlight.scr::corona $truck01 "light left" 	// Turn on camptruck coronas
+	exec global/spotlight.scr::corona $truck01 "light right"
+	
+	//chrissstrahl - at some point somone will stand where the truck spawns and the mission gets stuck...
+	//chrissstrahl - this needs to be fixed by adding a killzone or something
+	$truck01.origin = (1823 225 -120)
+	$truck01.angles = (359 104.996338 0)
+	
+	waitframe //chrissstrahl - wait a moment
+	//chrissstrahl - make sure we kill players blocking the truck //only coop
+	//kill now just in case a player is standing wher ethe truck is spawned/moved
+	if(level.gametype != 0){
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+			if( local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator"){
+				if( local.player istouching $truck01 ){
+					//terminate player
+					local.player normal_damage (local.player.health + 1)
+					//make sure player will not respawn inside killzone
+					exec coop_mod/main.scr::resetSpawn local.player
+				}
+			}
+		}
+	}
+	
+	$truck01 thread global/vehicles_thinkers.scr::enemy_truck_think 3000 4 $truck01_path NULL green "human//german_wehrmact_soldier.tik"
+	wait 1
+	
+	//chrissstrahl - make sure we kill players blocking the truck //only coop
+	//kill now again just in case someone respawned
+	if(level.gametype != 0){
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+			if( local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator"){
+				if( local.player istouching $truck01 ){
+					//terminate player
+					local.player normal_damage (local.player.health + 1)
+					//make sure player will not respawn inside killzone
+					exec coop_mod/main.scr::resetSpawn local.player
+				}
+			}
+		}
+	}
+	
+	thread pilot_runto_trucksafepoint
+	
+	$truck01 modifydrive 270 500 256
+	$truck01 waittill drive
+	$truck01 disconnect_paths
+
+	// Set pilot AI back to normal 	
+	level.friendly1.friendtype = 1
+
+	//  Tether back to the player
+	//  level.friendly1 tether $player // Criminal
+	level.friendly1 exec coop_mod/main.scr::tether //  Criminal - coop compatibility.
+
+	// Set leash back to normal
+	level.friendly1.leash = 512
+
+	//println "leash   = " level.friendly1.leash
+
+}end
+
+
+// Keep the pilot from getting run over by the truck
+//============================================================================
+pilot_runto_trucksafepoint:{
+//============================================================================
+
+	if (isalive level.pilot){
+		// Disconnect from player and walk to $trucksafepoint
+		level.friendly1.friendtype = -1
+		level.pilot exec global/disable_ai.scr
+		level.pilot runto $trucksafepoint
+		level.pilot waittill movedone
+		
+		// Make $trucksafepoint the new home and shrink his leash
+		level.friendly1 tether $trucksafepoint
+		level.friendly1.leash = 128
+		//println "leash   = " level.friendly1.leash
+
+		// Drink from canteen
+		level.pilot thread canteen
+	}
+
+}end
+
+//============================================================================
+heal_once:{
+//============================================================================
+	while ((self.health > 76) && (IsAlive self)) {wait 4}
+	
+	self thread canteen
+}end
+
+// Heal the pilot using his canteen
+//============================================================================
+canteen:{
+//============================================================================
+	while !(self.thinkstate == "idle") {waitframe}
+
+	self exec global/disable_ai.scr
+	
+	if !(isAlive self) {end}
+
+	local.friendtype = self.friendtype
+	self.friendtype = -1
+	//self holster // Criminal
+	self exec coop_mod/replace.scr::holster //Criminal
+	wait 1
+
+	if !(isAlive self) {end}
+
+	self lookat NULL
+	self upperanim pass_canteen_drink
+	self waittill upperanimdone
+
+	if !(isAlive self) {end}
+
+	self.health = self.maxhealth
+	self.friendtype = local.friendtype
+	//self unholster // Criminal
+	self exec coop_mod/replace.scr::unholster //Criminal
+	self exec global/enable_ai.scr
+
+}end
+
+//============================================================================
+lower_friendlydistance:{
+//============================================================================
+	level.friendly1.distance = 128
+}end
+
+
+// Slide open altar sequence
+//============================================================================
+altar_think:{
+//============================================================================
+
+	if !(vector_within level.pilot $altar 1000)
+	{
+		//println "pilot not near altar"
+		iprintln "You have not completed all your objectives yet."
+	}
+	else
+	{
+		$altar_think_trigger remove
+		
+		waitthread global/objectives.scr::add_objectives 2 2 "Escort the pilot to the Maquis hideout." $manon.origin
+		waitthread global/objectives.scr::current_objectives 2
+		
+		$altar_buttonpulse remove
+		$altar_button playsound temp
+		$altar_button show
+		$altar_button time 1
+		$altar_button moveWest 2
+		$altar_button waitmove
+		wait 1
+		$altar playsound m4l1_altar_slide
+		thread slide $altar
+		thread slide $altar_button
+	}
+
+}end
+
+
+// Slide altar and button
+//============================================================================
+slide local.object:{
+//============================================================================
+	local.object time 4
+	local.object moveWest 88
+	local.object waitmove
+}end
+
+//============================================================================
+playmusic:{
+//============================================================================
+	waitframe
+	//$player stufftext "tmstart sound/music/mus_03c_suspense.mp3"	// One shot music //Criminal
+	exec coop_mod/replace.scr::tmstart sound/music/mus_03c_suspense.mp3	//Criminal
+}end
+
+//============================================================================
+save2:{
+//============================================================================
+
+	while ((IsAlive $save2guy1) || (IsAlive $save2guy2)){
+		wait 1
+		//println "waiting for save2 guys to die"
+	}
+	
+	wait 1
+	exec global/autosave.scr 2	//"Road bend"
+}end
+
+
+
+// Manon end level dialog sequence
+//============================================================================
+endlevel:{
+//============================================================================
+
+	waitthread global/objectives.scr::add_objectives 2 3
+	
+	//$player stufftext "tmstart sound/music/mus_03b_success.mp3"	// One shot music //Criminal
+	exec coop_mod/replace.scr::tmstart sound/music/mus_03b_success.mp3 //Criminal
+	
+	// TEST
+	$manon anim actor_m4l1_walk
+	$manon waittill animdone
+	// TEST
+	$manon anim actor_m4l1_idle
+	$manon.avoidplayer = 0
+	//$manon turnto $player // Criminal
+	$manon exec coop_mod/replace.scr::turnto // Criminal
+	//$manon lookat $player // Criminal
+	$manon exec coop_mod/replace.scr::lookat // Criminal
+	wait 1
+
+	$manon say dfr_m4l1_408n_2	/// You are the American agent?
+	$manon waittill saydone
+	wait 1
+
+	$manon say dfr_m4l1_409n_2	/// You didn't have too much trouble getting here I hope.
+	$manon waittill saydone
+	wait 1
+
+	$manon say dfr_m4l1_412n_2	/// You won't want to use those guns you are carrying, they make far too much noise.
+	$manon waittill saydone
+	
+	thread take_weapons
+	wait 2
+	
+	exec global/missioncomplete.scr m4l2 transfer
+}end
+
+//============================================================================
+take_weapons:{
+//============================================================================
+	//println "Taking weapons"
+	/* Criminal
+	$player take weapons/colt45.tik
+	$player take weapons/p38.tik
+	$player take weapons/m1_garand.tik
+	$player take weapons/kar98.tik
+	$player take weapons/springfield.tik
+	$player take weapons/kar98sniper.tik
+	$player take weapons/thompsonsmg.tik
+	$player take weapons/mp40.tik
+	$player take weapons/bar.tik
+	$player take weapons/mp44.tik
+	$player take weapons/bazooka.tik
+	$player take weapons/panzerschrek.tik
+	$player take weapons/shotgun.tik
+	*/
+
+	exec coop_mod/replace.scr::takeAll //Criminal
+	//$player item weapons/silencedpistol.tik //Criminal
+	exec coop_mod/replace.scr::item weapons/silencedpistol.tik 1 //Criminal - give and use weapon - coop replacment.
+	waitframe
+	
+	//$player useweaponclass pistol //Criminal
+}end
+
+//chrissstrahl - updates player spawns
+//this function only exists because there are no triggers at the places
+//where we want the script to update the spawn locations
+//this is why we check where the frindly ai is and set new spawns
+//once the ai reaches/is close to the spawn location
+//============================================================================
+coop_upatePlayerSpawn:{
+//============================================================================
+	local.stage = 0
+	while(1){
+		//pilot gone exit
+		if(level.pilot == NULL){ break }
+		
+		//use stage to prevent spawnpoints going backwards...
+		if(local.stage == 0){
+			if( vector_length( level.pilot.origin - ( 4297 -3057 30 ) ) < 1024 ){
+				exec coop_mod/spawnlocations.scr::m4l1_update1
+				local.stage++
+			}
+		}else if(local.stage == 1){
+			if( vector_length( level.pilot.origin - ( 1527 2210 -65 ) ) < 512 ){
+				exec coop_mod/spawnlocations.scr::m4l1_update2
+				local.stage++
+				break
+			}
+		}
+		wait 0.5
+	}
+}end
+
+

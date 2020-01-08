@@ -1,0 +1,1011 @@
+// THE SEA WALL
+// ARCHITECTURE: TODD/ADAM
+// HACKING: ADAM
+
+//$obj2step trigger
+//elevator_top trigger
+
+//=========================================================================
+main:{
+//=========================================================================
+	level.coop_aaMap = 1						//chrissstrahl - let global scripts know this is a AA level
+	level.coopPrevMap = "m1l3b"					//chrissstrahl - set previouse map (for mom voteing)
+	level.coopNextMap = "briefing/briefing2"	//chrissstrahl - set next map (for mom voteing)
+	level.coop_equipmentDestroyed = 0			//chrissstrahl - specific var for this level elevator thread
+	thread coop_mod/main.scr::main 				//chrissstrahl - start coop mod extensions
+	
+	//chrissstrahl - setup stuff that is needed
+	if(level.gametype != 0){
+		thread coop_setup
+		thread coop_updateSpawn
+		thread coop_updateSpawnLighthouse
+	
+		//chrissstrahl - place trigger above the elevator so that players jumping on it can be teleported and do not get stuck
+		spawn trigger_multiple targetname coop_liftTop origin ( -5952 -5488 880) setthread coop_liftTop
+		
+		//chrissstrahl - place trigger in the elevator pit so that players jumping down can be teleported and do not get stuck
+		spawn trigger_multiple targetname coop_liftPit origin ( -5952 -5488 -50) setthread coop_liftPit
+	}
+	
+	
+	//chrissstrahl - fix sea not visible and other bugs
+	//$world farplane 10000
+
+	//*** Ai Spawners
+	thread global/ai.scr::main
+
+	//*** Give Weapons
+	exec global/loadout.scr maps/m1l3c.scr
+
+	level waittill prespawn
+
+	//*** Alarm Lights
+	exec global/alarmlight.scr
+
+	//*** Turn Off Fog
+	$world farplane 0
+
+	//*** Exploder Setup
+	thread global/exploder.scr::main
+
+	//*** Ambience Script
+	exec global/ambient.scr m1l3c
+
+	//*** Setup Threads
+	thread level_setup
+
+	level waittill spawn
+	waitthread coop_mod/replace.scr::waitForPlayer	//chrissstrahl - wait for any player to join
+
+	waitframe
+
+	//*** Music
+	exec coop_mod/replace.scr::tmstartloop "sound/music/mus_01a_suspense.mp3" //chrissstrahl - made coop compatible
+
+	level.radiosound = spawn script_model model "fx/dummy.tik"
+	level.radiosound.origin = $radio3.origin
+	level.radiosound loopsound m1l2b_radio1 // I put this here, loopsounds to be played after level spawns- nate
+	
+	//chrissstrahl - setup the extra coop triggers
+	if(level.gametype != 0){
+		$coop_liftTop bind $elevator_origin
+		$coop_liftTop setsize ( -60 -60 0)  (60 60 4)
+		$coop_liftPit setsize ( -60 -60 -100)  (60 60 1)
+	}
+}end
+
+
+//*********************************************
+// Setup Level
+//*********************************************
+level_setup:
+
+	level.alarmlights = 1
+	thread global/door_locked.scr::lock
+	thread oceanspray
+	thread ossmobileprep
+	thread elevatorprep
+	thread world_noise
+	$the_end nottriggerable
+	$enddialog nottriggerable
+	//$bunkertruck1 anim idlenolights
+	//$bunkertruck2 anim idlenolights
+	level.flags[0] = 0 //communications Equipment 1
+	level.flags[1] = 0 //communications Equipment 2
+	level.flags[2] = 0 //communications Equipment 3
+	level.flags[3] = 0 //communications Equipment 4
+
+	//$lazydude1 exec anim/lean.scr 20 2
+	//$lazydude2 exec anim/lean.scr 90 1
+
+	//*** Triggered Threads
+	thread objectives
+	//thread fogness
+	thread lightbright
+	thread radmobile
+
+
+end
+
+
+//*** --------------------------------------------
+//*** "Objectives"
+//*** --------------------------------------------
+
+//*** Set Objectives
+objectives:
+
+	//waitthread global/objectives.scr::reset_objectives
+	//waitthread global/objectives.scr::blank_objectives
+	waitthread global/objectives.scr::add_objectives 1 2 "Destroy all communications equipment." $radio1.origin
+	waitthread global/objectives.scr::add_objectives 2 2 "Make your way to the lighthouse." $elevator_origin.origin
+	waitthread global/objectives.scr::add_objectives 3 2 "Signal the fleet with the lighthouse beacon." $obj3.origin
+	waitthread global/objectives.scr::current_objectives 1 
+	exec coop_mod/replace.scr::playsound objective_text //chrissstrahl - made coop compatible
+
+end
+
+//*** Objective 1
+
+objectiveupdate1:
+
+	waitthread global/objectives.scr::add_objectives 1 3 "Destroy all communications equipment." $radio1.origin
+	exec coop_mod/replace.scr::playsound objective_text //chrissstrahl - made coop compatible
+
+	thread objectiveupdate2step
+
+	$elevator_cab playsound elevator_start wait
+	wait .5
+	$elevator_cab playsound elevator_run
+	$elevator_cab moveto $elevator_way1
+	$elevator_cab waitmove
+	$elevator_cab playsound elevator_stop
+	wait 1
+	$elevator_gate_1 playsound elevator_gate
+	$elevator_gate_1 movedown 70
+	$elevator_gate_1 waitmove
+	$clip1 notsolid
+	$elevatoractorclip notsolid
+
+	level.enemyfnum [101] leash 2048
+	level.enemyfnum [102] leash 2048
+
+	
+//*** Objective 2 Step
+
+objectiveupdate2step:
+
+	waitthread global/objectives.scr::add_objectives 2 2 "Make your way to the lighthouse." $elevator_origin.origin
+	waitthread global/objectives.scr::current_objectives 2
+	exec coop_mod/replace.scr::playsound objective_text //chrissstrahl - made coop compatible
+
+	goto objectiveupdate2
+
+
+//*** Objective 2
+
+objectiveupdate2:
+
+	$obj2step waittill trigger
+
+	waitthread global/objectives.scr::add_objectives 2 2 "Make your way to the lighthouse." $obj2.origin
+	waitthread global/objectives.scr::current_objectives 2
+
+	goto objectiveupdate3
+
+
+//*** Objective 3
+
+objectiveupdate3:
+
+	$obj2trig waittill trigger
+
+	waitthread global/objectives.scr::add_objectives 2 3 "Make your way to the lighthouse." $obj2.origin
+	waitthread global/objectives.scr::add_objectives 3 2 "Signal the fleet with the lighthouse beacon." $obj3.origin
+	waitthread global/objectives.scr::current_objectives 3
+
+	goto objectiveupdate4
+
+
+//*** Objective 4
+
+objectiveupdate4:
+
+	$obj3trig waittill trigger
+
+	waitthread global/objectives.scr::add_objectives 3 3 "Signal the fleet with the lighthouse beacon." $obj3.origin
+	waitthread global/objectives.scr::add_objectives 4 2 "Meet up with Major Grillo in the truck and escape." $obj4.origin
+	waitthread global/objectives.scr::current_objectives 4
+	exec coop_mod/replace.scr::playsound objective_text //chrissstrahl - made coop compatible
+
+end
+
+
+//*** --------------------------------------------
+//*** "Binoculars Pickup HACK!!!!!!!!!!!!!!!!!!!!"
+//*** --------------------------------------------
+binocs:
+	exec coop_mod/replace.scr::playsound panzerschreck_snd_pickup //chrissstrahl - made coop compatible
+	$binocs remove
+	waitthread global/items.scr::add_item "binoculars"
+end
+
+
+//*** --------------------------------------------
+//*** "Destroy Communications equipment"
+//*** --------------------------------------------
+
+//*** Communications equipment 1
+radio1:
+
+	if (level.flags[0] == 1)
+	{
+		end
+	}
+	//iprintlnbold "Equipment Destroyed"
+	level.flags[0] = 1
+	thread radio_objective
+
+end
+
+//*** Communications equipment 2
+radio2:
+
+	if (level.flags[1] == 1)
+	{
+		end
+	}
+	//iprintlnbold "Equipment Destroyed"
+	level.flags[1] = 1
+	thread radio_objective
+
+end
+
+//*** Communications equipment 3
+radio3:
+                                                                                                                                                                                         
+	if (level.flags[2] == 1)
+	{
+		end
+	}
+	//iprintlnbold "Equipment Destroyed"
+	level.flags[2] = 1
+	thread radio_objective
+
+end
+
+//*** Communications equipment 4
+radio4:
+
+	if (level.flags[3] == 1)
+	{
+		end
+	}
+	//iprintlnbold "Equipment Destroyed"
+	level.flags[3] = 1
+	thread radio_objective
+
+end
+
+//*** Communications equipment Check
+//=========================================================================
+radio_objective:{
+//=========================================================================
+
+	if (level.flags[0] == 0)
+	{
+		//waitthread global/objectives.scr::add_objectives 1 2 "Destroy all communications equipment." $radio1.origin
+	}
+	else if (level.flags[1] == 0)
+	{
+		//waitthread global/objectives.scr::add_objectives 1 2 "Destroy all communications equipment." $radio2.origin
+	}
+	else if (level.flags[2] == 0)
+	{
+		//waitthread global/objectives.scr::add_objectives 1 2 "Destroy all communications equipment." $radio3.origin
+	}
+	else if (level.flags[3] == 0)
+	{
+		//waitthread global/objectives.scr::add_objectives 1 2 "Destroy all communications equipment." $radio4.origin
+	}
+	else
+	{
+		iprintlnbold "Equipment Destroyed"
+		level.radiosound stoploopsound m1l2b_radio1		
+		
+		thread objectiveupdate1
+
+		//exec global/ai.scr::spawn 007							//chrissstrahl
+		exec global/ai.scr::spawn 007 NIL coop_aiWaitForLift	//chrissstrahl - fix issue that ai gets stuck in lift
+		waitframe
+		level.enemyfnum [101] leash 0
+		level.enemyfnum [102] leash 0
+		
+		//chrissstrahl - ai gets stuck in elevator and breaks the script....
+		level.coop_equipmentDestroyed = 1					//chrissstrahl - allow lift to move now
+		thread coop_mod/spawnlocations.scr::m1l3c_update1	//chrissstrahl - update spawnpoints for coop
+	}
+}end
+
+
+//*** --------------------------------------------
+//*** "Custom Locked Doors"
+//*** --------------------------------------------
+bunker_door_locked:
+
+	$bunker_door_locked playsound door_metal_locked 
+
+end
+
+
+//*** --------------------------------------------
+//*** "Mission Failure"
+//*** --------------------------------------------
+
+//=========================================================================
+missionfailed:{
+//=========================================================================
+	if(level.gametype != 0){ end } //chrissstrahl - don't fail in coop - if someone wants to drown, let them
+	
+	wait 1
+	missionfailed
+}end
+
+//=========================================================================
+waterdeath:{
+//=========================================================================
+	//chrissstrahl - this player shall not respawn at where he dies, respawn at start
+	if(level.gametype != 0){
+		exec coop_mod/main.scr::resetSpawn parm.other
+	}
+	//end chrissstrahl
+	
+	$ocean volumedamage 1000
+}end
+
+
+//*** --------------------------------------------
+//*** "The Funky Fogness"
+//*** --------------------------------------------
+//fogness:
+
+	//$fogness1 waittill trigger
+	//setcvar "r_farplane_nofog" "1"
+
+	//$fogness2 waittill trigger
+	//setcvar "r_farplane_nofog" "0"
+
+//goto fogness
+
+
+//*** --------------------------------------------
+//*** "World Noises"
+//*** --------------------------------------------
+world_noise:
+
+	$lighthum1 playsound electrical_hum2
+	$lighthum2 playsound electrical_hum2
+	$lighthum3 playsound electrical_hum2
+	$lighthum4 playsound electrical_hum2
+	$lighthum5 playsound electrical_hum2
+	$lighthum6 playsound electrical_hum2
+	$lighthum7 playsound electrical_hum2
+
+end
+
+
+//*** --------------------------------------------
+//*** "Germans Talking In Radio Room"
+//*** --------------------------------------------
+
+//*** Talkers Start
+germantalkers:
+
+	$talker1 idlesay den_m6l1_614r
+	$talker1 waittill saydone
+
+	wait .1
+
+	$talker2 idlesay den_m6l1_615b
+	$talker2 waittill saydone
+
+	wait .25
+
+	$talker1 idlesay den_m6l1_616r
+	$talker1 waittill saydone
+
+	wait .5
+
+	$talker2 idlesay den_m6l1_617b
+	$talker2 waittill saydone
+	
+	wait .1
+
+	$talker1 idlesay den_m6l1_618r
+	$talker1 waittill saydone
+
+	wait .1
+
+	$talker2 idlesay den_m6l1_619b
+	$talker2 waittill saydone
+
+	wait .1
+
+	$talker1 idlesay den_m6l1_620r
+	$talker1 waittill saydone
+
+	wait .5
+
+	$talker2 idlesay den_m6l1_621b
+	$talker2 waittill saydone
+
+	wait .1
+
+	$talker1 idlesay den_m6l1_622r
+	$talker1 waittill saydone
+
+	wait .1
+
+	$talker1 idlesay den_m6l1_623b
+	$talker1 waittill saydone
+
+	wait .1
+
+	$talker1 idlesay den_m6l1_624r
+	$talker1 waittill saydone
+
+	wait .1
+
+	$talker1 idlesay den_m6l1_625b
+	$talker1 waittill saydone
+
+	wait .1
+
+	$talker1 idlesay den_m6l1_626r
+	$talker1 waittill saydone
+
+	wait .1
+
+	$talker1 idlesay den_m6l1_627b
+	$talker1 waittill saydone
+
+	wait .25
+
+	$talker1 idlesay den_m6l1_628r
+	$talker1 waittill saydone
+
+	wait .1
+
+	$talker1 idlesay den_m6l1_629b
+	$talker1 waittill saydone
+
+end
+
+
+//*** --------------------------------------------
+//*** "Elevator Action"
+//*** --------------------------------------------
+
+//*** Elevator Setup
+elevatorprep:
+	//*** Switch Position
+	$elevator_switch_pulse bind $elevator_cab
+	$elevator_switch bind $elevator_cab
+	$elevator_switch anim off
+
+	//*** Elevator Speeds
+	$elevator_cab time 4
+	$elevator_gate_1 time 0.75
+	$elevator_gate_2 time 0.75
+	$elevator_gate_3 time 0.75
+
+	//*** Elevator Clips
+	$clip1 solid //chrissstrahl - make sure it is realy solid
+	
+	$clip1 hide
+	//$clip1 notsolid
+	$clip2 hide
+	$clip2 notsolid
+	$clip3 hide
+	$clip3 notsolid
+
+	//*** Elevator Start Down
+	$elevator_cab moveto $elevator_way2
+	$elevator_cab waitmove
+	
+	//*** Hide
+	$elevator_switch hide
+
+goto elevator_loop
+end
+
+elevator_loop:
+	local.clip1 = ( -5760 -5528 752)
+	local.clip2 = ( -5808 -5480 258)
+	local.clip3 = ( -5804 -5484 -20)
+
+	$elevator_switch anim off
+	//$elevator_reset1 waittill trigger
+	$clip2 notsolid
+
+	$elevator_top waittill trigger
+
+//moving down//////////////////////////////chrissstrahl
+
+	$elevator_switch show
+	$elevator_switch_pulse hide
+	
+	$clip1 exec coop_mod/replace.scr::solid local.clip1 //chrissstrahl - coop replacement
+	$clip1 exec coop_mod/replace.scr::teleportToOnTouch $elevator_cab NIL (0 0 -70) //chrissstrahl - coop teleport player touching clip into lift
+	$elevator_switch anim turn
+	$elevator_switch anim waittill animdone
+	$elevator_switch anim on
+
+	$elevator_gate_1 playsound elevator_gate
+	$elevator_gate_1 moveup 70
+	$elevator_gate_1 waitmove
+
+	wait 1
+
+	$elevator_cab playsound elevator_start wait
+
+	wait .5
+
+	$elevator_cab playsound elevator_run
+	$elevator_cab moveto $elevator_way2
+	$elevator_cab waitmove
+
+	wait 1
+
+	$elevator_gate_2 playsound elevator_gate
+	$elevator_gate_2 movedown 70
+	$elevator_gate_2 waitmove
+
+	$elevator_switch anim off
+	//$elevator_reset2 waittill trigger
+	$clip1 notsolid
+
+	$elevator_middle waittill trigger
+	$clip2 exec coop_mod/replace.scr::solid local.clip2
+	$clip2 exec coop_mod/replace.scr::teleportToOnTouch $elevator_cab NIL (0 0 -70) //chrissstrahl - coop teleport player touching clip into lift
+	
+	$elevator_switch anim turn
+	$elevator_switch anim waittill animdone
+	$elevator_switch anim on
+
+	$elevator_gate_2 playsound elevator_gate
+	$elevator_gate_2 moveup 70
+	$elevator_gate_2 waitmove
+
+	wait 1
+
+	$elevator_cab playsound elevator_start wait
+
+	wait .5
+
+	$elevator_cab playsound elevator_run
+	$elevator_cab moveto $elevator_way3
+	$elevator_cab waitmove
+
+	wait 1
+
+	$elevator_gate_3 playsound elevator_gate
+	$elevator_gate_3 movedown 70
+	$elevator_gate_3 waitmove
+
+	//$elevator_reset3 waittill trigger
+	$clip2 notsolid
+	
+	$elevator_bottom waittill trigger
+	$clip3 exec coop_mod/replace.scr::solid local.clip3
+	$clip3 exec coop_mod/replace.scr::teleportToOnTouch $elevator_cab NIL (0 0 -70) //chrissstrahl - coop teleport player touching clip into lift
+	$elevator_switch anim turn
+	$elevator_switch anim waittill animdone
+	$elevator_switch anim on
+	
+	$elevator_gate_3 playsound elevator_gate
+	$elevator_gate_3 moveup 70
+	$elevator_gate_3 waitmove
+
+	wait 1	
+	
+	$elevator_cab playsound elevator_start wait
+	
+	wait .5
+	
+	$elevator_cab playsound elevator_run
+	$elevator_cab moveto $elevator_way2
+	$elevator_cab waitmove
+
+	wait 1
+	
+	$elevator_gate_2 playsound elevator_gate
+	$elevator_gate_2 movedown 70
+	$elevator_gate_2 waitmove
+
+	//$elevator_reset2 waittill trigger
+	$clip3 notsolid
+	
+	$elevator_middle waittill trigger
+	$clip2 exec coop_mod/replace.scr::solid local.clip2
+	$clip2 exec coop_mod/replace.scr::teleportToOnTouch $elevator_cab NIL (0 0 -70) //chrissstrahl - coop teleport player touching clip into lift
+	$elevator_switch anim turn
+	$elevator_switch anim waittill animdone
+	$elevator_switch anim on
+	
+	$elevator_gate_2 playsound elevator_gate
+	$elevator_gate_2 moveup 70
+	$elevator_gate_2 waitmove
+	
+	$elevator_cab playsound elevator_start wait
+	
+	wait .5
+	
+	$elevator_cab playsound elevator_run
+	$elevator_cab moveto $elevator_way1
+	$elevator_cab waitmove
+	$elevator_cab playsound elevator_stop
+
+	wait 1
+	
+	$elevator_gate_1 playsound elevator_gate
+	$elevator_gate_1 movedown 70
+	$elevator_gate_1 waitmove
+	
+goto elevator_loop
+
+//=========================================================================
+elevator_failsafe:{
+//=========================================================================
+	if(level.gametype != 0){ end } //chrissstrahl - don't do this in coop - we are looping the lift up and down all the time
+
+	$elevator_switch anim turn
+	$elevator_switch anim waittill animdone
+	$elevator_switch anim on
+
+	$elevator_gate_2 playsound elevator_gate
+	$elevator_gate_2 moveup 70
+	$elevator_gate_2 waitmove
+	
+	wait 1
+
+	$elevator_cab playsound elevator_start wait
+
+	wait .5
+
+	$elevator_cab playsound elevator_run
+	$elevator_cab moveto $elevator_way3
+	$elevator_cab waitmove
+
+	wait 1
+
+	$elevator_gate_3 playsound elevator_gate
+	$elevator_gate_3 movedown 70
+	$elevator_gate_3 waitmove
+
+	$elevator_bottom waittill trigger
+	$clip3 solid
+	$elevator_switch anim turn
+	$elevator_switch anim waittill animdone
+	$elevator_switch anim on
+	
+	$elevator_gate_3 playsound elevator_gate
+	$elevator_gate_3 moveup 70
+	$elevator_gate_3 waitmove
+
+	wait 1	
+
+	$elevator_cab playsound elevator_start wait
+
+	wait .5
+
+	$elevator_cab playsound elevator_run
+	$elevator_cab moveto $elevator_way2
+	$elevator_cab waitmove
+
+	wait 1
+
+	$elevator_gate_2 playsound elevator_gate
+	$elevator_gate_2 movedown 70
+	$elevator_gate_2 waitmove
+
+	//$elevator_reset2 waittill trigger
+	$clip3 notsolid
+	
+	$elevator_middle waittill trigger
+	$clip2 solid
+	$elevator_switch anim turn
+	$elevator_switch anim waittill animdone
+	$elevator_switch anim on
+	
+	$elevator_gate_2 playsound elevator_gate
+	$elevator_gate_2 moveup 70
+	$elevator_gate_2 waitmove
+	
+	$elevator_cab playsound elevator_start wait
+
+	wait .5
+
+	$elevator_cab playsound elevator_run
+	$elevator_cab moveto $elevator_way1
+	$elevator_cab waitmove
+	$elevator_cab playsound elevator_stop
+
+	wait 1
+
+	$elevator_gate_1 playsound elevator_gate
+	$elevator_gate_1 movedown 70
+	$elevator_gate_1 waitmove
+	
+goto elevator_loop
+}end
+
+
+//*** --------------------------------------------
+//*** "Close Encounters of the Turd Kind"
+//*** --------------------------------------------
+bathroom_door:
+
+	$toilet playsound toilet_flush
+
+	wait 5
+
+	$stall open $toiletguy
+
+end
+
+
+//*** --------------------------------------------
+//*** "Lighthouse"
+//*** --------------------------------------------
+lightbright:
+
+	$beam hide
+	$beam bind $lamp
+	$switchnopulse hide
+	$lightbright waittill trigger
+	$ossmobiletrig triggerable
+	$switchpulse remove
+	$switchnopulse show
+	$switchnopulse anim move
+	$switchnopulse playsound lighthouse_lever
+	$beam show
+	$lamp rotatey 15
+	$lamp loopsound lighthouse_run
+
+end
+
+
+//*** --------------------------------------------
+//*** "Radmobile, Radmobile, Radmobile"
+//*** --------------------------------------------
+radmobile:
+
+	$radmobile setcollisionentity $radmobile.target
+	$radmobile hide
+	//$truckclip notsolid
+	$radmobiletrig waittill trigger
+
+	exec coop_mod/replace.scr::playsound sanford_and_son //chrissstrahl - made coop compatible
+	
+	$radmobile.origin = $teleport.origin
+	$radmobile show
+	exec global/spotlight.scr::corona $radmobile "light left" 
+	exec global/spotlight.scr::corona $radmobile "light right"
+	$radmobile thread global/vehicles_thinkers.scr::enemy_truck_think 400 6 $weez_juice
+	//$truckclip solid
+
+end
+
+//*** --------------------------------------------
+//*** "Ocean Sprays"
+//*** --------------------------------------------
+
+//start sprays
+oceanspray:
+	thread spray1
+	thread spray2
+	thread spray3
+	thread spray4
+	thread spray5
+	thread spray6
+end
+
+spray1:
+	wait 13
+	trigger $spray1
+goto spray1
+
+spray2:
+	wait 3.5
+	$spray1 anim start
+	wait 1
+	$spray2 anim stop
+goto spray2
+
+spray3:
+	wait 6
+	$spray3 anim start
+	wait 1
+	$spray3 anim stop
+goto spray3
+
+spray4:
+	wait 2.5
+	$spray4 anim start
+	wait 1
+	$spray4 anim stop
+goto spray4
+
+spray5:
+	wait 5
+	$spray5 anim start
+	wait 1
+	$spray5 anim stop
+goto spray5
+
+spray6:
+	wait 3
+	$spray5 anim start
+	wait 1
+	$spray5 anim stop
+goto spray6
+
+
+//*** --------------------------------------------
+//*** "OSS Man to the Rescue"
+//*** --------------------------------------------
+
+//*** Ossmobile Prep
+ossmobileprep:
+
+	$ossman threatbias ignoreme
+	$ossmobile.health = 900000
+	$ossmobile setcollisionentity $ossmobile.target
+	$explosion anim stop
+	$ossmobiletrig nottriggerable
+	$fence_busted hide
+	$fence_busted notsolid
+	$ossmobile hide
+	$ossman hide
+	$ossman exec global/disable_ai.scr
+	$ossmobile attachdriverslot 0 $ossman
+	$ossman notsolid
+	$ossman anim_scripted opel_driver
+	exec global/spotlight.scr::corona $ossmobile "light left" 
+	exec global/spotlight.scr::corona $ossmobile "light right"
+	$ossmobiletrig waittill trigger
+	$ossmobile thread drive_pathtruck $ossmobile_path 270
+	$ossmobile show
+	$ossman show
+
+end
+
+//*** Grillo Tells Powell To Get In Truck
+grillo_dialog:
+
+	$ossman idlesay dfr_M1L3_157m_2
+
+end
+
+//*** Bust Gate
+bust_gate:
+
+	wait .25
+
+	$fence_notbusted notsolid
+	$fence_notbusted hide
+	$fence_busted show
+	$fence_notbusted playsound fence_crash
+	$explosion anim start
+
+	wait 2
+
+	$explosion anim stop
+
+end
+
+//*** Start OSS Mans Truck
+drive_pathtruck local.path local.speed:
+
+	// drive Vector position, speed, acceleration, reach_distance, look_ahead
+	self drive local.path local.speed 60 200 256
+	self waitTill drive
+	self stop
+	$enddialog triggerable
+
+goto the_end
+
+
+//*** --------------------------------------------
+//*** "The End"
+//*** --------------------------------------------
+
+//*** End Level Stuff
+the_end:
+
+	$the_end triggerable
+	$the_end waittill trigger
+
+	waitthread global/objectives.scr::add_objectives 4 3 "Meet up with Major Grillo in the truck and escape." $obj4.origin
+	exec coop_mod/replace.scr::playsound objective_text //chrissstrahl - made coop compatible
+
+
+	//fadeout 2 0 0 0 1
+
+	//wait 2.25
+
+	setcvar "g_m2l1" "1"
+
+	exec global/missioncomplete.scr briefing/briefing2
+
+end
+
+//=========================================================================
+coop_aiWaitForLift:{
+//=========================================================================
+	//chrissstrahl - turn these fuckers off - not okay how much time it takes to fix you messing things up
+	if(game.gametype == 0){ end }
+	
+	self ai_off
+	wait 0.5
+	local.wait = 1
+	
+	while( local.wait ){
+		local.vec = $elevator_cab.origin
+		
+		if( local.vec[2] >= 880 ){
+			local.wait = 0
+		}
+		waitframe
+	}
+	wait 1
+	self ai_on
+}end
+
+//=========================================================================
+coop_setup:{
+//=========================================================================
+//chrissstrahl - make trigger bigger and move it so we don't need to go into the lighthouse again
+	$ossmobiletrig origin ( -731 -2400 300)
+	$ossmobiletrig setsize ( -312 -312 -20) (312 312 20)
+}
+
+//=========================================================================
+coop_liftTop:{
+//=========================================================================
+	if( parm.other != NULL ){
+		local.awaypos = $elevator_origin.origin
+		local.awaypos[2] += -70
+		parm.other origin local.awaypos
+		
+		for (local.iOther = 1;local.iOther <= $player.size;local.iOther++){
+			local.otherPlayer =  $player[local.iOther]
+			if( local.otherPlayer != NULL && local.player == parm.other ){
+				exec coop_mod/main.scr::playerMakeSolidAsap local.i
+				end
+			}
+		}
+	}
+}
+
+//=========================================================================
+coop_liftPit:{
+//=========================================================================
+	if( parm.other != NULL ){
+		local.awaypos = ( -5804 -5484 -20)
+		parm.other origin local.awaypos
+		
+		for (local.iOther = 1;local.iOther <= $player.size;local.iOther++){
+			local.otherPlayer =  $player[local.iOther]
+			if( local.otherPlayer != NULL && local.player == parm.other ){
+				exec coop_mod/main.scr::playerMakeSolidAsap local.i
+				end
+			}
+		}
+	}
+}
+
+//=========================================================================
+coop_updateSpawn:{
+//=========================================================================
+//chrissstrahl - wait until any player progressed this far
+	while(!(exec coop_mod/replace.scr::withinDistanceOf $weez_juice 512))
+	{
+		wait 1
+	}
+	thread coop_mod/spawnlocations.scr::m1l3c_update2	//chrissstrahl - update spawnpoints for coop
+}
+
+
+
+//=========================================================================
+coop_updateSpawnLighthouse:{
+//=========================================================================
+//chrissstrahl - wait until any player progressed this far
+	while(!(exec coop_mod/replace.scr::withinDistanceOf $t71 512))
+	{
+		wait 1
+	}
+	thread coop_mod/spawnlocations.scr::m1l3c_update3	//chrissstrahl - update spawnpoints for coop
+}

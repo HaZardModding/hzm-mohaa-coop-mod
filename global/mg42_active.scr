@@ -1,0 +1,497 @@
+////////////////////////////////////////////////////////////////////////////////////////
+//
+//  MoH: Allied Assault Script File  
+//  Global function: MG42 routine for mounted machine guns with spotters
+//  Script Written By: Benson 'elmagoo' Russell, Robert Field
+//
+////////////////////////////////////////////////////////////////////////////////////////
+
+//*****************************************************************************************************************
+// self is the mg42 gun
+//*****************************************************************************************************************
+
+//=========================================================================
+//chrissstrahl - modified for coop use
+//=========================================================================
+
+
+//=========================================================================
+mg42 local.range:{
+//=========================================================================
+	//*** check to see if the gun exists
+	if (self == NULL){
+		println "^~^~^ MG42 turret does not exist!"
+		end
+	}	
+
+	//println self " set in gun range: " self.max_range
+	if (local.range != NIL){
+		self.max_range = local.range
+	}else if (self.max_range == NIL){
+		self.max_range = 2400
+	}
+
+	//println self " range: " local.range
+	//println self " in-set spawn value: " self.spawn
+
+	if (self.setplayerusable == NIL){
+		self.setplayerusable = 1
+	}
+	if (self.turnspeed == NIL){
+		self.turnspeed = 45
+	}
+	if (self.pitchcaps == NIL){
+		self.pitchcaps = ( -15 15 0)
+	}
+	if (self.maxyawoffset == NIL){
+		self.maxyawoffset = 45
+	}
+
+	self.firedelay = .1
+
+	if (self.bulletdamage == NIL){
+		self.bulletdamage = 70
+	}
+	if (self.tracerfrequency == NIL){
+		self.tracerfrequency = 3
+	}
+
+	self setplayerusable self.setplayerusable
+	self turnspeed self.turnspeed
+	self pitchcaps self.pitchcaps
+	self maxyawoffset self.maxyawoffset
+	self firedelay self.firedelay
+	self bulletdamage self.bulletdamage
+	self tracerfrequency self.tracerfrequency
+
+	self.gunner = $(self.targetname + "_gunner")
+	if (self.gunner != NULL){
+		thread mg42_gunner_death
+	}
+
+	self.spotter = $(self.targetname + "_spotter")
+	if (self.spotter != NULL){
+		thread mg42_spotter_death
+	}
+
+	//*** create the center aim target script_origin for reloading
+	//println self " spawning a center aim target"
+	self.center = spawn script_origin
+	self.temp_origin = (self.forwardvector * 128) + self.origin
+	self.temp_origin[2] = self.origin[2]
+	self.center.origin = self.temp_origin
+
+	//*** create a temp target for this gun for accuracy
+	self.temp_target = spawn script_origin
+	//println "MG42: spawned temp target: " self.temp_target
+
+	self.reload_counter = 0
+	self.cover_time = 0
+
+	self.spawner_gunner = $(self.targetname + "_spawner_gunner")
+
+	if (self.spawner_gunner != NULL) {
+		if (self.spawner_gunner.path == NIL || self.spawner_gunner.path == ""){
+			self.path_gunner = $(self.targetname + "_gunner_path")
+		}else{
+			self.path_gunner = $(self.spawner_gunner.path)
+		}
+
+		if (self.spawner_gunner.ai_model == NIL || self.spawner_gunner.ai_model == ""){
+			self.model_gunner = "models/human/german_wehrmact_grenadier"
+		}else{
+			self.model_gunner = ("models/human/" + self.spawner_gunner.ai_model)
+		}
+	}
+
+	self.spawner_spotter = $(self.targetname + "_spawner_spotter")
+
+	if (self.spawner_spotter != NULL){
+		if (self.spawner_spotter.path == NIL || self.spawner_spotter.path == ""){
+			self.path_spotter = $(self.targetname + "_spotter_path")
+		}else{
+			self.path_spotter = $(self.spawner_spotter.path)
+		}
+
+		if (self.spawner_spotter.ai_model == NIL || self.spawner_spotter.ai_model == ""){
+			self.model_spotter = "models/human/german_wehrmact_grenadier"
+		}else{
+			self.model_spotter = ("models/human/" + self.spawner_spotter.ai_model)
+		}
+	}
+
+	self.spawn_left = self.spawn
+
+	thread mg42_gunner_start
+	thread mg42_spotter_start
+
+	wait 1
+	if (self.gunner == NULL && self.spotter == NULL){
+		thread mg42_spawn
+	}
+}end
+
+//=========================================================================
+mg42_spawn:{
+//=========================================================================
+	if (self.spawn_left == NIL || self.spawn_left <= 0){
+		end
+	}
+	self.gunner = spawn self.model_gunner gun "mg42" ammo_grenade "5" origin self.spawner_gunner.origin
+	thread mg42_gunner_death
+
+	if (self.spawner_spotter != NULL){
+		self.spotter = spawn self.model_spotter gun "mauser kar 98k" ammo_grenade "5" origin self.spawner_spotter.origin
+		self.spotter exec global/disable_ai.scr
+		thread mg42_spotter_death
+	}
+
+	self.spawn_left--
+
+	thread mg42_gunner_run
+	if (isalive self.spotter){
+		thread mg42_spotter_run
+	}
+}end
+ 
+
+//=========================================================================
+mg42_gunner_run:{
+//=========================================================================
+	//println "gunner: " self.gunner " running on path: " self.path_gunner
+	self.gunner exec global/disable_ai.scr
+	self.gunner exec global/runto.scr self.path_gunner
+	self.gunner waittill movedone
+	self.gunner exec global/enable_ai.scr
+	thread mg42_gunner_start
+}end
+
+//=========================================================================
+mg42_spotter_run:{
+//=========================================================================
+	//println "spotter: " self.spotter " running on path: " self.path_spotter
+	self.spotter exec global/runto.scr self.path_spotter
+	self.spotter waittill movedone
+	thread mg42_spotter_start
+}end
+
+
+//=========================================================================
+mg42_gunner_start:{
+//=========================================================================
+	if !(isalive self.gunner){
+		end
+	}
+
+	//*** turn the gunner into a machinegunner
+	self.gunner type_idle machinegunner
+	self.gunner type_attack machinegunner
+	self.gunner type_disguise machinegunner
+	self.gunner type_grenade machinegunner
+	self.gunner turret self
+	self.gunner health 5
+	self.gunner.flags["coopMG42_gunner"] = 1	//chrissstrahl - used to detect gunners in anim/attack.scr to applay hack coop_mod/mg42_hack.scr
+	self.gunner exec global/setdeathanim.scr "death_fall_back"	
+	goto enable
+
+//=========================================================================
+	enable:
+//=========================================================================
+
+	if !(isalive self.gunner){ end }
+	if (self.gunner_thread){ end }
+
+	self.gunner_thread = local
+	self.target_changed = 1
+
+//=========================================================================
+	mg42_main_fireloop:
+//=========================================================================
+	if (!self.gunner.turret){
+		if (IsAlive self.spotter){
+			self.spotter weapon_internal models/weapons/kar98.tik
+			self.spotter exec global/enable_ai.scr
+		}
+		end
+	}
+
+	//*** check to see if the gun needs to reload
+	if (self.reload_counter >= 13){
+	//	println self " reloading"
+		self stopfiring
+		self.isfiring = 0
+		self setaimtarget self.center
+
+		wait .5
+		
+		//chrissstrahl - stop console spam
+		if(self.gunner == NULL){
+			end
+		}
+		
+		self.gunner reload_mg42
+		self.gunner waittill animdone
+		self.target_changed = 1
+	 
+		self.reload_counter = 0
+	//	println self " done reloading"
+	}
+	
+	//*** if there is currently no target, make it the player
+	if (self.setaimtarget == NIL || self.current_target == NIL || !(isalive self.setaimtarget) || !(isalive self.current_target)){
+		//chrissstrahl - allied assault
+		if(level.coop_aaMap){
+			self.setaimtarget = exec coop_mod/replace.scr::player_closestTo self	//chrissstrahl - grab closest player in coop
+			self stopfiring
+			self.isfiring = 0
+			self.target_changed = 1
+		}
+		//chrissstrahl - breaktrough
+		else{
+			if(self.team == "german" ){
+				//chrissstrahl - make this coop compatible
+				self.setaimtarget = exec coop_mod/replace.scr::player_closestTo self	//chrissstrahl - grab closest player in coop
+			}
+			else if(self.team == "american"){//chrissstrahl
+				self.setaimtarget = self findenemy
+			}
+			// the one with findenemy is the smarter way to do this, but whatever, at least the americans will be smart
+		//	self.setaimtarget = self findenemy
+			self stopfiring
+			self.isfiring = 0
+			self.target_changed = 1
+		}
+	}
+	else if (self.setaimtarget != self.current_target)
+	{
+		self.target_changed = 1
+	}
+
+	//*** If the target changed, have the spotter tap gunner on the head
+	if (self.target_changed == 1){
+	//	println self " target was changed, stopping to switch to new target"
+		if (isalive self.spotter){
+			thread mg42_spotter_tap
+		}
+		// Set target_changed to 2 so the gunner knows to respond next loop.
+		self.target_changed = 2
+	}
+	//*** When you get tapped on the head, fire at the new target
+	else if (self.target_changed == 2){
+		self startfiring
+		self.isfiring = 1
+		
+		// Reset the target_changed variable now we're done with it.
+		self.target_changed = 0
+	}
+
+	self.current_target = self.setaimtarget
+	
+	//chrissstrahl - stop console spam
+	if( self.current_target == NIL ){
+		iprintlnbold_noloc("ERROR: Implement the Coop Mod for mg42_active.scr TO WORK!")
+		wait 10
+		goto mg42_main_fireloop
+	}
+	if(self.current_target == NULL ){
+		wait 1
+		goto mg42_main_fireloop
+	}
+	
+	//*** check distance and line of sight to target, if outside distance or not visible, stop firing
+	if !(self.gunner cansee self.current_target (self.maxyawoffset * 2) self.max_range){
+	//		println self " can't see it's current target: " self.current_target
+		wait self.cover_time
+		self stopfiring
+		self setaimtarget NULL
+		self.isfiring = 2	// 2 to represent "wants to fire"
+		wait .5
+		goto mg42_main_fireloop
+	}else{
+		if (!self.player_enemy && (self.current_target.targetname == "player")){	//chrissstrahl - make this coop compatible
+			//*** check to see if the player is disguised
+			if (self.current_target.is_disguised == 1 || level.gametype != 0 && level.coop_threatbias == "ignoreme" ){	//chrissstrahl - make this coop compatible
+				self stopfiring
+				self setaimtarget NULL
+				wait .5
+				goto mg42_main_fireloop
+			}
+			self.player_enemy = 1
+		}
+		if (self.isfiring == 2){
+			//println "MG42: wait time to start firing again: " self.cover_time
+			wait self.cover_time
+			self startfiring
+			self.isfiring = 1
+		}
+	}
+
+	//println self " has target: " self.current_target
+	//*** do a range check and set the accuracy accordingly
+	local.distance = vector_length (self.origin - self.current_target.origin)
+
+	//println "MG42: range to target: " self.current_target " : is: " local.distance
+	if (local.distance >= 2401){
+		//*** calculate a point that's offset from the current target
+		local.xoffset = (randomint 321 - 160)
+		local.yoffset = (randomint 321 - 160)
+		local.zoffset = (randomint 185 - 92)
+		self.temp_origin = ( (self.current_target.origin[0] + local.xoffset) (self.current_target.origin[1] + local.yoffset) ((self.current_target.origin[2] + local.zoffset) + 48) )
+		
+		//*** set the temp targets origin to the offset origin
+		self.temp_target.origin = self.temp_origin
+		
+		//*** set the wait time for if the player goes behind cover
+		self.cover_time = 1.5
+		
+		//*** make the gun shoot at that
+		self setaimtarget self.temp_target
+	}
+	else if (local.distance >= 1801){
+		//*** calculate a point that's offset from the current target
+		local.xoffset = (randomint 297 - 148)
+		local.yoffset = (randomint 297 - 148)
+		local.zoffset = (randomint 145 - 72)
+		self.temp_origin = ( (self.current_target.origin[0] + local.xoffset) (self.current_target.origin[1] + local.yoffset) ((self.current_target.origin[2] + local.zoffset) + 48) )
+
+		//*** set the temp targets origin to the offset origin
+		self.temp_target.origin = self.temp_origin
+
+		//*** set the wait time for if the player goes behind cover
+		self.cover_time = 1
+		
+		//*** make the gun shoot at that
+		self setaimtarget self.temp_target
+	}
+	else if (local.distance >= 1201){
+		//*** calculate a point that's offset from the current target
+		local.xoffset = (randomint 185 - 92)
+		local.yoffset = (randomint 185 - 92)
+		local.zoffset = (randomint 65 - 32)
+		self.temp_origin = ( (self.current_target.origin[0] + local.xoffset) (self.current_target.origin[1] + local.yoffset) ((self.current_target.origin[2] + local.zoffset) + 48) )
+
+		//*** set the temp targets origin to the offset origin
+		self.temp_target.origin = self.temp_origin
+		
+		//*** set the wait time for if the player goes behind cover
+		self.cover_time = .5
+
+		//*** make the gun shoot at that
+		self setaimtarget self.temp_target
+	}
+	else if (local.distance >= 501){
+		//*** calculate a point that's offset from the current target
+		local.xoffset = (randomint 65 - 32)
+		local.yoffset = (randomint 65 - 32)
+		local.zoffset = (randomint 33 - 16)
+		self.temp_origin = ( (self.current_target.origin[0] + local.xoffset) (self.current_target.origin[1] + local.yoffset) ((self.current_target.origin[2] + local.zoffset) + 48) )
+
+		//*** set the wait time for if the player goes behind cover
+		self.cover_time = .25
+		
+		//*** set the temp targets origin to the offset origin
+		self.temp_target.origin = self.temp_origin
+		
+		//*** make the gun shoot at that
+		self setaimtarget self.temp_target
+	}
+	else if (local.distance < 500){
+		
+		//*** set the wait time for if the player goes behind cover
+		self.cover_time = .25
+		self setaimtarget self.current_target
+	}
+
+	if (self.isfiring == 1){
+		self.reload_counter++
+	}
+/*
+	println "MG42: xoffset: " local.xoffset
+	println "MG42: yoffset: " local.yoffset
+	println "MG42: zoffset: " local.zoffset
+	println "MG42: temp_targets origin: " self.temp_target.origin
+	println "MG42: current_targets origin: " self.current_target.origin
+*/
+
+	wait .5
+	goto mg42_main_fireloop
+}end
+
+//=========================================================================
+mg42_spotter_tap:{
+//=========================================================================
+
+//println "MG42 SPOTTER TAP: executing tap"
+
+	if (self.current_target != NIL && self.current_target != NULL ){
+		if (((self.current_target.origin - self.origin) * self.leftvector) >= 0){
+			//*** point left and tap
+		//	println "MG42 SPOTTER TAP: " self.spotter " spotter pointing left"
+			self.spotter anim MG42_spotter_stand_left
+		}
+		else{
+			//*** point right and tap
+		//	println "MG42 SPOTTER TAP: " self.spotter " spotter pointing right"
+			self.spotter anim MG42_spotter_stand_right
+		}
+	}
+}end
+
+//=========================================================================
+mg42_spotter_start:{
+//=========================================================================
+	//println "MG42 SPOTTER SETUP: spotter at the weapon" 
+	//println "MG42 SPOTTER SETUP: spotter: " self.spotter " has reached the weapon"
+	if !(isalive self.spotter){
+		end
+	}
+
+	//	println "MG42 SPOTTER SETUP: " self.spotter " is alive, disabling and telling the weapon"
+	self.spotter exec global/disable_ai.scr
+	self.spotter exec coop_mod/replace.scr::holster	//chrissstrahl - make this work in mp
+}end
+
+//=========================================================================
+mg42_gunner_death:{
+//=========================================================================
+	self.gunner waittill death
+
+	if (self.gunner_thread){
+		self.gunner_thread delete
+	}
+
+	if !(isalive self.spotter){
+		wait 2
+		thread mg42_spawn
+	}else{
+	//	println self.gunner " waking up the spotter"
+		self.spotter type_idle idle
+		self.spotter type_attack cover
+		self.spotter exec global/enable_ai.scr
+		self.spotter exec coop_mod/replace.scr::unholster	//chrissstrahl - make this work in mp
+		self.spotter attackplayer
+	}
+}end
+
+//=========================================================================
+mg42_spotter_death:{
+//=========================================================================
+	self.spotter waittill death
+	
+	if !(isalive self.gunner){
+		wait 2
+		thread mg42_spawn
+	}
+}end
+
+//=========================================================================
+disable:{
+//=========================================================================
+	if (self.gunner_thread){
+		self.gunner_thread delete
+	}
+	self stopfiring
+	self setaimtarget NULL
+}end
+
+

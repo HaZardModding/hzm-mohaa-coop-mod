@@ -1,0 +1,143 @@
+//handles the air drop of the 82nd into the town when the player comes out into the vineyard
+
+//============================================================================
+Init: {
+//============================================================================
+	if (level.skipairdrop == 1) {
+		$player.origin = ( -3900 3200 0 )
+		thread maps/e2l3/Paratrooper.scr::updateObjectives
+		end
+	}
+	
+	thread DropParatroopers
+	thread CrippleCurrentForces
+}end
+
+//============================================================================
+CrippleCurrentForces: {
+//============================================================================
+	$summonPlane waittill trigger
+
+	if ($battleAirborne_Commander) {
+		$battleAirborne_Commander turnto $player
+		$battleAirborne_Commander lookat $player
+		$battleAirborne_Commander runto $player
+		$battleAirborne_Commander waittill movedone
+		$battleAirborne_Commander upperanim A_23_Hudson_1D
+		$battleAirborne_Commander waittill upperanimdone
+		$battleAirborne_Commander turnto NULL
+		$battleAirborne_Commander lookat NULL
+		$battleAirborne_Commander runto NULL
+		$battleAirborne_Commander thread CrippleSoldier
+	}
+
+	if ($battleAirborne_Trooper) {
+		$battleAirborne_Trooper thread CrippleSoldier
+	}
+}end
+
+//============================================================================
+CrippleSoldier: {
+//============================================================================
+	self.maxhealth = 5
+	self.health = 5
+}end
+
+//============================================================================
+DropParatroopers: {
+//============================================================================
+	$summonPlane waittill trigger
+	$c47 thread FlySpew
+}end
+
+//============================================================================
+FlySpew: {
+//============================================================================
+	self.origin = $c47_path.origin
+	self show
+	self notsolid
+	self flypath $c47_path 1200 1200 1500
+	self anim no_props
+	self move
+	wait 2
+
+	$player playsound e2l3_c47_flyby
+
+	local.guys = 3
+	local.i = 1
+	while (local.i <= local.guys) {
+		thread WaitForC47 local.i self
+		local.i++
+	}
+
+	wait 5
+	self waitmove
+	self hide
+}end
+
+//============================================================================
+WaitForC47 local.guy local.c47: {
+//============================================================================-
+
+	local.pathNode = $("c47_dropper_" + local.guy)
+	if (local.pathNode == NIL || local.pathNode == NULL)  {
+		dprintln ( "ERROR: $c47_dropper_" + local.guy + " is missing! Parachutist not spawned!")
+		end
+	}
+
+	local.origin = local.pathNode.origin
+	local.origin[2] = local.c47.origin[2]
+
+	local.endNode = $(local.pathNode + "_lz")
+	if (local.endNode == NIL || local.endNode == NULL)  {
+		dprintln ( "ERROR: $c47_dropper_" + local.guy + "_lz is missing!")
+		local.lzorigin = local.pathNode.origin 
+	}
+	else {
+		local.lzorigin = local.endNode.origin
+	}
+
+	local.pastDist = -1
+
+	while (1) {
+		/* watch the plane, it is coming towards us. */
+		/* The moment is passes us, kick the guy out */
+		local.distX = (local.c47.origin[0] - local.origin[0])
+		local.distY = (local.c47.origin[1] - local.origin[1])
+		local.dist = local.distX * local.distX + local.distY * local.distY
+		
+		if (local.pastDist == -1) {
+			local.pastDist = local.dist
+		}
+		else  {
+			if (local.dist > local.pastDist) {
+				break
+			}
+			local.pastDist = local.dist
+		}
+		wait 0.1
+	}
+
+	level.chutFallingScale = 1.25
+	local.dude = thread global/parachuteDrop.scr::dropGuy local.origin local.lzorigin
+	local.dude.targetname = Paratrooper
+	local.isLeader = 0
+
+	if (local.guy == 1) {
+		local.isLeader = 1
+		local.dude.targetname = "ParatrooperLeader"
+	}
+
+	local.dude thread DoParatrooper local.isLeader ( "c47_dude" + local.guy )
+	wait 0.2
+
+	level.paratroopersDropped++
+}end
+
+//============================================================================
+DoParatrooper local.leader local.covernode: {
+//============================================================================
+	self.enableEnemy = 0
+	self waitthread maps/e2l3/Paratrooper.scr::MonitorLandingHealth local.leader local.covernode
+	self.enableEnemy = 1
+}end

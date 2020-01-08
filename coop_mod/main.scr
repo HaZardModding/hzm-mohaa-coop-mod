@@ -1,0 +1,1589 @@
+//////////////////////////////////////////////
+// created by chrissstrahl on 2018.06.28
+//
+// This contains the main functions for my
+// MOHAA Coop Mod
+
+//WARNING these files contain Adult commentary
+//WARNING these files contain Adult commentary
+//WARNING these files contain Adult commentary
+
+//
+//////////////////////////////////////////////
+//NEW CVARS
+// coop_health - sets health players have
+// coop_interval - sets spawn interval
+// coop_lifes - sets respawns players have, default 0 = infinity
+// coop_obj - responsible for toggeling menu
+//
+//NOTES
+//global/friendly.scr
+// $player.entref = -1 //chrissstrahl - dono what this is used for yet
+// $player.maxhealth = $player.health //chrissstrahl - not sure this is even used anywhere
+// friendlyinit: - self.destination = $player
+// (exec coop_mod/main.scr::friendlyPlayerOrigin)) //chrissstrahl - made coop mod compatible
+// (exec coop_mod/main.scr::friendlyDestination)) //chrissstrahl - made coop mod compatible
+// self.destination = $player
+// local.player.flags["coop_isActive"] == 1 //if a player has selected a team but is not active yet the "spectator" check will not work anymore, this is only set to 1 if a player is truly active in game
+//MISC
+// threatbias ignoreme
+// game.skill
+// self.enemy
+// level.pilot type_attack weaponless
+// anim/gog_killed.scr
+// level.time
+// self removeondeath 0 						//prevent it from vanishing when destroyed
+// waitexec
+// exec
+// thread
+// waitthread
+// level.gametype
+// safesolid <- can this actually replace coop check routines ? Need to test
+// //for class
+//team - returns 'german' or 'american'
+//"local.player.dmteam", can be 'spectator', 'freeforall', 'allies' or 'axis'
+//level.nodrophealth = 1	// telling the AI to not drop health
+//self.nosurprise = 1 //telling ai not to be surprised when encountering player
+// if (((self.current_target.origin - self.origin) * self.leftvector) >= 0){
+//PLAYER SIZE
+// setsize "-16 -16 0" "16 16 92"
+//KILLED
+// local.player killed local.player (local.player.health + 1) local.player (0 0 -1) (local.player.origin) (0 0 0) (100) (0) (1) (-1)
+	
+
+//chrissstrahl - texture problems (maybe this is caused by updated shaders, renaming the textures in the bsp would do the trick)
+//general_industrial/deckgrate_set1
+//general_industrial/verticalbrace
+//general_industrial/strangebrace1b
+//general_industrial/strangebrace1
+//general_industrial/ibeam_vert
+//general_industrial/ibeam_flat2
+//general_industrial/strangebrace1straight
+//general_industrial/jh_holeflr1
+
+//NEEDS FIXING
+// squad.scr - fix player reference, need to figure out where and how it is used
+// Entity::Sound: snd_pickup needs an alias in ubersound.scr or uberdialog.scr - Please fix.
+//DEAD STAY
+//self removeondeath 0
+//m3l1a - setup_mg42, whats going on there unfinished ?
+/*
+level.aipronechance = 0
+level.aicrouchchance = 0
+level.dontdropweapons = 1
+//level.debug_mode = 1
+*/
+
+//=========================================================================
+main:{
+//=========================================================================
+	level.gametype						= int(getCvar("g_gametype")) //[200] chrissstrahl - this seams not to work sometimes, this is why we have the coop mod set it, just in case
+	level.coop_debugSpawn				= 0 //show (1) spawnlocations or not (0)
+	level.coop_svmaxclients				= int(getcvar("sv_maxclients"))
+	level.coop_mapname					= getcvar("mapname")
+	level.coop_playerReady				= 0	//player(s) are not ready/not joined
+	
+	level.coop_musicCommandVol			= NIL
+	level.coop_musicCommand				= NIL
+	//I belive we don't need this
+	//level.coop_musicCommandIndx				= 0
+	//level.coop_musicCommandLoop				= NIL
+	//level.coop_musicCommandLoopIndx			= 0
+	
+	//if(level.coop_physicsOn			== NIL){ level.coop_physicsOn				= 1 }		//used for replacement of $player physicson
+	//if(level.coop_specialSpawn		== NIL){ level.coop_specialSpawn			= 0 }		//used for replacement of $player hide
+	if(level.coop_inJeep				== NIL){ level.coop_inJeep					= 0 }		//used to check if player should be in jeep or not
+	if(level.coop_playerGlue			== NIL){ level.coop_playerGlue				= 0 }		//used for replacement of $player glue
+	if(level.coop_playerHide			== NIL){ level.coop_playerHide				= 0 }		//used for replacement of $player hide
+	if(level.coop_player				== NIL){ level.coop_player					= NULL }	//follow player for gloabal/fiendly.scr
+	if(level.coop_playerTank			== NIL){ level.coop_playerTank				= NULL }	//tank driving player for gloabal/vehicles_thinkers.scr
+	if(level.enemyhealthscalar			== NIL){ level.enemyhealthscalar			= 1 }		//health scaler - used in global/spawner.scr
+	if(level.coop_noWeapon				== NIL){ level.coop_noWeapon				= 0 }		//specifies if players should have no weapons
+	if(level.coop_threatbias			== NIL){ level.coop_threatbias				= 10 }		//specifies how badly the enemy considers the player a problem
+	if(level.coop_aaMap					== NIL){ level.coop_aaMap					= 0 }		//sets a map to be handles like in aa
+	if(level.coop_health				== NIL){	//sets players health (only multiplayer)
+		level.coop_health				= (int(getcvar("coop_health")))
+		if(level.coop_health == 0){
+			level.coop_health = 1000
+		}
+	}
+	if(level.coop_prespawn				== NIL){ level.coop_prespawn				= 1 }		//used for replace.scr::waitTillPrespawn
+	if(level.coopMedicHealth			== NIL){ level.coopMedicHealth				= 1000 }	//sets medic AI health
+	if(level.script						== NIL){ level.script						= "maps/"+getCvar("mapname")+".scr" }
+	
+	//SINGLEPLAYER//////////////////////////	
+	if( level.gametype == 0 ){	
+		level waittill spawn
+		level.coop_playerReady = 1
+		end
+	}
+	//MULTIPLAYER//////////////////////////
+	thread setupServer
+	thread managePlayers
+	
+	//chrissstrahl - create spawnpoints for coop
+	thread coop_mod/spawnlocations.scr::main
+	
+	//chrissstrahl - set coop mod specific mom file
+	thread mom/mom.scr::setup "coop_mod/mom_actions.scr" 2 "coop_mom" 
+	
+	//chrissstrahl - check if mapceck should be done
+	thread coop_checkMaps
+
+	//while(1){
+		//iprintlnbold_noloc("gametype:"+level.gametype)
+		//waitframe
+	//}
+}end
+
+//loads next map until check is over or starting maps are reached
+//this is used for unattended level loading and testing of the scripts
+//this sometimes does not work as intended because of game limitations
+//this is how ever much more comfortable than manual handling
+//=========================================================================
+coop_checkMaps:{
+//=========================================================================
+	if(int(getcvar("coop_dev")) == 1 && int(getcvar("coop_check")) == 1){
+		if( level.coopNextMap == "briefing/briefing1" || level.coopNextMap == "e1l1" ){
+			setcvar "coop_check" "0"
+			end
+		}
+		local.waittime = 10
+		for(local.i=local.waittime;local.i > 0;local.i--){
+			iprintlnbold_noloc("Coop Map Ceck is active, loading next map in: "+local.i)
+			wait 1
+		}
+		exec global/missioncomplete.scr level.coopNextMap
+	}
+}end
+
+//this makes sure we have all the settings set we need to operate correctly
+//=========================================================================
+setupServer:{
+//=========================================================================
+	local.spawnInterval = 0
+	
+	if( level.coop_disableSpawnWarper == NIL ){
+		level.coop_disableSpawnWarper = FALSE
+	}else if( level.coop_disableSpawnWarper == 1){
+		level.coop_disableSpawnWarper = TRUE
+	}
+	
+	if( int(getCvar("coop_lifes")) > 0 ){
+		level.dmrespawning = int(getCvar("coop_lifes"))
+	}
+	
+	//send this also to each player - this currently sets value only for hosting player
+	//setcvar "ui_team_spawn_interval" 0
+	
+	//check vital server settings
+	local.correct = 0
+	/*
+	if( getCvar("ui_team_spawn_interval") != "0" )	{ local.correct = 1 }
+	waitthread setupServerBadSettingInfo local.correct "ui_team_spawn_interval"
+	if( getCvar("sv_team_spawn_interval") != "0" )	{ local.correct = 2 }
+	waitthread setupServerBadSettingInfo local.correct "sv_team_spawn_interval"
+	if( getCvar("g_gametype")	!= "2" )			{ local.correct = 3 }
+	waitthread setupServerBadSettingInfo local.correct "g_gametype"
+	//if( getCvar("maxentities")	!= "2048" )			{ local.correct = 4 }
+	//waitthread setupServerBadSettingInfo local.correct "maxentities"
+	if( getCvar("timelimit")	!= "0" )			{ local.correct = 5 }
+	waitthread setupServerBadSettingInfo local.correct "timelimit"
+	if( getCvar("fraglimit")	!= "0" )			{ local.correct = 6 }
+	waitthread setupServerBadSettingInfo local.correct "fraglimit"
+	if( getCvar("roundlimit")	!= "0")				{ local.correct = 7 }
+	waitthread setupServerBadSettingInfo local.correct "roundlimit"
+	*/
+	if( local.correct != 0 ){
+		thread fixServer
+		end
+	}
+	
+	//[200] chrissstrahl - just to be sure this works
+	setcvar "g_gametypestring" "HZM_Coop_Mod"
+}end
+
+//chrissstrahl - this is only for temporary debug
+//=========================================================================
+setupServerBadSettingInfo local.setting local.message:{
+//=========================================================================
+	//end
+	if( local.setting == 0 ){ end }
+	error ("HZM COOP MOD BAD SETTING("+local.setting+"): "+local.message) 1000
+}end
+
+//=========================================================================
+fixServer:{
+//=========================================================================
+	wait 3
+	for(local.count=0;local.count<8;local.count++){
+		iprintlnbold_noloc ( "=*= BAD SERVER SETTINGS, reloading map =*=" )
+		wait 1
+	}
+	
+	//if this does not work fall back to stufftext
+	setcvar "ui_team_spawn_interval" 0 //local server
+	setcvar "sv_team_spawn_interval" 0
+	
+	setcvar "g_gametype" 2
+	setcvar "maxentities" 2048
+	setcvar "timelimit" 0
+	setcvar "fraglimit" 0
+	setcvar "roundlimit" 0
+	
+	iprintlnbold_noloc ( "=*= LOADING MAP NOW =*=" )
+	wait 1
+	
+	//force all players into spec to prevent players being in a team when the map is reloaded
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player = $player[local.i]
+		if( local.player != NULL && local.player.dmteam != "spectator" ){
+			local.player join_team ( "spectator" )
+		}	
+	}
+	waitframe
+
+	//this is a ugly way to do this, but the best result so far 
+	setcvar "nextmap" (getcvar("mapname"))
+	setcvar "g_gametype" 0
+	bsptransition nextmap
+	setcvar "g_gametype" 2
+	
+	//local.trigger = spawn trigger_changelevel map (getcvar("mapname"))
+	//waitframe
+	//local.trigger doActivate $world
+}end
+
+//=========================================================================
+forceTeam local.player:{
+//=========================================================================
+	if( local.player == NIL || local.player == NULL ){ end }
+	
+	local.player.flags["coop_isActive"] = 0
+	local.player.flags["coop_team"] = local.player.dmteam
+	waitthread resetSpawn local.player
+	local.player stufftext ( "popmenu 0" )
+	
+	if( local.player.dmteam == "axis" ){
+		thread global/throbtext.scr::throbtext "Only allies are allowed in Coop!" 5
+		
+		local.player stufftext ( "popmenu 1;popmenu 0" )
+	}
+	
+	local.player join_team ( "allies" )
+}end
+
+//=========================================================================
+resetSpawn local.player:{
+//=========================================================================
+	local.player.flags["coop_respawnOrigin"] = ( 0 0 0 )
+	local.player.flags["coop_respawnAngle"] = 0
+	local.player.flags["coop_respawning"] = FALSE	
+}end
+
+
+//[200] chrissstrahl - handle setup cmds for this player
+//this has to be seperate here, because the 
+//=========================================================================
+setupCmds local.player:{
+//=========================================================================
+	if(local.player == NIL || local.player== NULL){
+		error ("coop_mod/main.scr::setupCmds Fatal - Invalid player")
+		end
+	}
+
+	//we need to give the host some more tzime, because he is running all the scripts and calculations
+	if(local.player.flags["coop_isHost"] == 1){
+		wait 1
+	}
+	
+	wait 0.25
+	
+	if(local.player == NIL || local.player== NULL){
+		error ("coop_mod/main.scr::setupCmds Fatal - Invalid player")
+		end
+	}
+	
+	local.detectionValid = 1
+	if(local.player.dmteam != "spectator"){
+		local.detectionValid = 0
+		//iprintlnbold_noloc("NOT VALID DETECT")
+	}
+	
+	//local.player stufftext ( "tmstop" ) //[200] chrissstrahl - moved to detect.cfg
+	//[200] chrissstrahl - used to detect if a player has the coop mod installed
+	local.player stufftext ( "exec coop_mod/cfg/detect.cfg\n" )
+	
+	
+	//this is used for playing current music, if the player joins mid-game
+	//i suspect we only need to have one command, because tmstart/tmloop are overwriting each other
+	if( level.coop_musicCommand != NIL ){
+		local.player stufftext ( level.coop_musicCommand )					
+	}
+	//this is used to set volume of current music, if the player joins mid-game
+	if( level.coop_musicCommandVol != NIL ){
+		local.player stufftext ( level.coop_musicCommandVol )					
+	}
+	//this is used to set current music loop, if the player joins mid-game
+	//if( level.coop_musicCommandLoop != NIL ){
+		//local.player stufftext ( level.coop_musicCommandLoop )					
+	//}
+	
+	//check for 1 sec after this thread is started
+	if(local.detectionValid != 1){
+		//iprintlnbold_noloc("NOT VALID DETECT")
+		end
+	}
+	
+	//iprintlnbold_noloc("DETECTING")
+	
+	local.waitFrames = (1 * int(getcvar("sv_fps")))
+	while(local.waitFrames > 0){
+		if(local.player.dmteam == "allies"){
+			//iprintlnbold_noloc("DETECTED!!!!")
+			local.player.flags["coop_installed"] = 1
+			end
+		}
+		local.waitFrames--
+		waitframe
+	}
+}end
+
+//=========================================================================
+managePlayers:{
+//=========================================================================
+	//chrissstrahl
+	//1. respawn players right at where they die
+	//note that this might be very troublesome on some missions
+	//this needs to be figured out as we go along
+	////Going into spectator and then joing back in will spawn players at the default spawn
+	//2. sets player max health, based on dificulty settings
+	while(1){
+		//if no player on server
+		if( $player == NULL || $player.size == 0 ){
+			level.coop_playerReady = 0
+			waitframe
+			continue
+		}
+		
+		//chrissstrahl - if a health is specified in a cvar
+		if( int(getCvar("coop_health")) > 100 ){
+			level.coop_health = int(getCvar("coop_health"))
+		}
+		
+		//chrissstrahl - calculate health factor based on dificulty settings
+		/* Not implemented yet
+		if(getcvar("coop_skill") == "Normal"){
+			local.health = ( level.coop_health / 2 )
+		}else if(getcvar("coop_skill") == "Hard"){
+			local.health = ( level.coop_health / 4 )
+		}
+		*/
+
+		//chrissstrahl - setup health
+		local.health = level.coop_health
+		
+//warp player back to the place he was alive last		
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+			if( local.player != NULL ){
+				//local.weaponTargetName = "playerWeapon" + local.i + ""
+/////////////////////////////////////////SETUP
+				if(	local.player.flags["coop_isActive"] == NIL){
+				
+					//[200] chrissstrahl - detect host
+					if(int(getcvar("dedicated")) == 0){
+						local.entTemp = getentbyentnum( 0 )
+						if(local.entTemp != NULL && local.entTemp == local.player){
+							local.player.flags["coop_isHost"] = 1
+						}
+						else{
+							local.player.flags["coop_isHost"] = 0
+						}
+					}				
+
+					local.player.flags["coop_iAmTruelyActive"] = 0
+					local.player.flags["coop_isActive"] = 0
+					local.player.flags["coop_justSpawnedDone"] = NIL
+					local.player.flags["coop_team"] = "None"
+					local.player.flags["coop_lastRespawn"] = -1
+					local.player.flags["coop_joinedGameAt"] = level.time //[200] chrissstrahl - used for variouse checks
+					local.player max_health local.health
+					local.player healthonly local.health
+					thread playerAttachTrigger local.player
+					//this is used for friendly orientation see global/friendly::playernode
+					local.player.fnum = -100
+					
+					//[200] chrissstrahl - handle delayed setup
+					thread setupCmds local.player
+					
+					if( level.coop_playerHide ){
+						local.player hide
+					}
+					
+					//[200] chrissstrahl - check if physics is off
+					if( level.coop_physicsOff != NIL && level.coop_physicsOff == 1){
+						local.player physics_off
+					}
+					
+					thread resetSpawn local.player
+					
+					if( level.coop_playerHasDisguise != NIL ){
+						local.player.has_disguise = level.coop_playerHasDisguise
+						//local.player.is_disguised = level.coop_playerHasDisguise //this is suppose to be read only
+					}
+				}
+/////////////////////////////////////////SPECTATOR
+				if( local.player.dmteam == "spectator" ){
+					local.player.flags["coop_iAmTruelyActive"] = 0
+					if(	local.player.flags["coop_isActive"] != -1 ){
+						local.player.flags["coop_justSpawnedDone"] = NIL
+						local.player.flags["coop_team"] = local.player.dmteam
+						local.player.flags["coop_isActive"] = -1
+						waitthread resetSpawn local.player
+						local.player unglue
+						//local.player notarget 1
+						local.player threatbias ignoreme
+						local.player.fnum = -100 //this is used for friendly orientation see global/friendly::playernode
+					}
+				}else{
+					//[200] chrissstrahl - check if physics is off
+					if( level.coop_physicsOff != NIL && level.coop_physicsOff == 1){
+						local.player physics_off
+					}
+					
+/////////////////////////////////////////ALIVE
+					if( local.player.health > 0 ){
+						//CHANGED TEAM/////////////////////////////////////////
+						if( local.player.flags["coop_team"] != local.player.dmteam ){
+							local.player.flags["coop_team"] = local.player.dmteam
+							local.player.flags["coop_justSpawnedDone"] = NIL
+							local.player.flags["coop_isActive"] = 0
+							waitthread resetSpawn local.player
+							
+							//move player to spawn
+							thread playerPlaceAtSpawn local.i
+						}
+						//NOT ACTIVE YET///////////////////////////////////////
+						if(local.player.flags["coop_isActive"] != 1){
+							//iprintlnbold_noloc("not active")
+							if( local.player.flags["coop_iAmTruelyActive"] != 1 ){
+								//move player to spawn
+								thread playerPlaceAtSpawn local.i
+								
+								//iprintlnbold_noloc("not truely active")
+								continue
+							}
+						//FIST ACTIVE AFTER INACTIVE - SETUP////////////////////
+							//iprintlnbold_noloc("first time active")
+							//move player to spawn
+							thread playerPlaceAtSpawn local.i
+							
+							//see if the level script has a special handling for players that just spawned
+							if( local.player.flags["coop_justSpawnedDone"] == NIL ){
+								local.player.flags["coop_justSpawnedDone"] = TRUE
+								//[200] chrissstrahl - added trigger activator (this player)
+								thread startThread ( "maps/"+getcvar("mapname")+".scr::coop_playerJustSpawned"+local.i ) (local.player)
+							}
+							local.player max_health local.health
+							local.player healthonly local.health
+							//get all items
+							local.player thread itemGetAll
+							
+							level.coop_playerReady = 1
+							local.player.flags["coop_isActive"] = 1
+							//local.player notarget 0
+							local.player threatbias level.coop_threatbias
+							local.player solid
+							local.player american
+							local.player.fnum = -1 //this is used for friendly orientation see global/friendly::playernode
+							
+							if( level.coop_noWeapons ){
+								thread playerTakeAll local.player
+							}
+							
+//TAKE SMOKE GRANADES AWAY
+							//chrissstrahl - oh gosh how much I hate this stupid useless pice of shitt, useless in coop
+							local.player take "models/weapons/M18_smoke_grenade.tik"
+							local.player take "models/weapons/RDG-1_Smoke_grenade.tik"
+							local.player take "models/weapons/nebelhandgranate.tik"
+							
+//FORCE PRIMARY
+							if(local.player.flags["coop_specialWeaponPrimary"] != NIL){
+								thread playerForcePrimary local.player local.player.flags["coop_specialWeaponPrimary"]
+							}else if(level.coop_forcePrimary != NIL){
+								thread playerForcePrimary local.player level.coop_forcePrimary
+							}
+//FORCE SECONDARY
+							if(local.player.flags["coop_specialWeaponSecondary"] != NIL){
+								thread playerForceSecondary local.player local.player.flags["coop_specialWeaponSecondary"]
+							}else if(level.coop_forceSecondary != NIL){
+								thread playerForceSecondary local.player level.coop_forceSecondary
+							}
+//FORCE PRIMARY
+							if(local.player.flags["coop_specialInventory"] != NIL){
+								thread playerForceInventory local.player local.player.flags["coop_specialInventory"]
+							}else if(level.coop_forceInventory != NIL){
+								thread playerForceInventory local.player level.coop_forceInventory
+							}
+							
+//HIDE PLAYER
+							if( level.coop_playerHide ){
+								local.player hide
+							}
+							
+							//move player to spawn
+							thread playerPlaceAtSpawn local.i
+
+							//glue player
+							if( level.coop_playerGlue ){
+								if( local.player.flags["coop_glue"] != NIL && (local.player.flags["coop_glue"]) != NULL){
+								
+									local.player physics_off
+									local.player notsolid
+									local.player hide
+									local.player threatbias ignoreme
+									local.player glue (local.player.flags["coop_glue"])
+									
+									if( local.player.flags["coop_glueAngle"] ){
+										local.face = (0 0 0)
+										local.face[1] = local.player.flags["coop_glueAngle"]
+										local.player face local.face
+									}
+								}
+							}
+						}
+						// RESPAWNING & RESTORE /////////////////////////////////////////
+						if(local.player.flags["coop_respawning"] == TRUE){
+							if( level.coop_disableSpawnWarper != TRUE && vector_length( local.player.flags["coop_respawnOrigin"] ) > 10){
+								thread playerMakeSolidAsap local.i
+								local.player.flags["coop_lastRespawn"] = level.time //remember when we last respawned, prevent place at spawn
+								local.player origin ( local.player.flags["coop_respawnOrigin"] )
+								if(local.player.flags["coop_respawnAngle"] != 0){
+									//need to call this delayed or it will not work most of the time in mp
+									local.player thread playerFace ( 0 local.player.flags["coop_respawnAngle"] 0 )
+								}
+								local.player.flags["coop_respawning"] = FALSE								
+							}
+							else{
+								thread playerPlaceAtSpawn local.i
+								local.player.flags["coop_respawning"] = FALSE	
+							}
+						}
+						else if( level.coop_disableSpawnWarper != TRUE ){
+							if(	local.player.flags["coop_respawnTime"] == NIL ||
+								local.player.flags["coop_respawnTime"] < (level.time + 2) ){
+								local.player.flags["coop_respawnTime"] = level.time
+								local.player.flags["coop_respawnOrigin"] = local.player.origin
+								local.player.flags["coop_respawnAngle"] = local.player.viewangles[1]
+							}
+						}
+						//ALLOW ONLY ALLIES//////////////////////////////////////////////
+						if( local.player.dmteam == "axis" ){
+							if( local.player.flags["coop_forcedLast"] == NIL ){
+								local.player.flags["coop_forcedLast"] = -10
+							}
+							//don't force if the game won't let us anymore
+							if( (local.player.flags["coop_forcedLast"] + 3 ) < level.time ){
+								thread forceTeam local.player
+								local.player.flags["coop_forcedLast"] = level.time
+							}else{
+								local.player kill
+							}
+						}
+					}
+/////////////////////////////////////////DEAD
+					else{
+						local.player.flags["coop_iAmTruelyActive"] = 0
+						if(	local.player.flags["coop_isActive"] != -2 ){
+							local.player.flags["coop_justSpawnedDone"] = NIL
+							local.player.flags["coop_isActive"] = -2
+							local.player.flags["coop_respawning"] = TRUE
+							
+							//local.player notarget 1
+							local.player unglue
+							local.player physics_on
+							local.player threatbias ignoreme
+							local.player.fnum = -100 //this is used for friendly orientation see global/friendly::playernode
+						}
+						//remove weapon right away if dropped/////////////////////////////////////////
+						if($(local.weaponTargetName) != NULL){
+							$(local.weaponTargetName) delete 
+						}
+					}
+				}
+			}
+		}
+		waitframe
+	}
+}end
+
+//chrissstrahl - prints a info to player hud, only each 3 sec
+//bold set to 1 prints it in bold
+//strictTime set to 1 does allways wait 3 sec before next message regardless if the message text has changed
+//=========================================================================
+printInfo local.player local.message local.bold local.strictTime:{
+//=========================================================================
+	if(local.player == NULL || local.message.size < 1){ end }
+	
+	//keep timelimit only if same message
+	if(local.strictTime == NIL || local.strictTime != 1 ) {
+		if(	local.player.flags["coop_lastInfoPrintText"] != NIL &&
+			local.message == local.player.flags["coop_lastInfoPrintText"] &&
+			level.time < int(local.player.flags["coop_lastInfoPrint"] + 3))
+		{
+			end
+		}
+	}
+	//keep strict time limit, exit if last msg was send under 3 sec
+	else if(local.player.flags["coop_lastInfoPrint"] != NIL && level.time < (int(local.player.flags["coop_lastInfoPrint"])+3)){
+		end	
+	}
+
+	if(local.bold == NIL){
+		local.bold = 0
+	}
+	local.player iprint local.message local.bold
+	local.player.flags["coop_lastInfoPrint"] = level.time
+	local.player.flags["coop_lastInfoPrintText"] = local.message
+}end
+
+//chrissstrahl - glues a fucking stupid trigger to a player to detect if a player is active
+//=========================================================================
+playerAttachTrigger local.player:{
+//=========================================================================
+	if(local.player == NULL || local.player == NIL){ end }
+	//iprintlnbold_noloc("playerAttachTrigger")
+	
+	if($("coop_plActDetect" + local.player.entnum) == NULL){
+		//iprintlnbold_noloc("trigger spawned")
+		local.trigger = spawn trigger_multiple targetname ("coop_plActDetect" + local.player.entnum) setthread "coop_mod/main.scr::playerActive"
+		waitframe
+		if(local.player == NULL){
+			iprintlnbold_noloc("trigger removed early")
+			$("coop_plActDetect" + local.player.entnum) delete
+			end
+		}		
+	}else{
+		iprintlnbold_noloc("trigger was there")
+	}
+	
+	/*
+	while( 1 ){
+		wait 1
+		local.model glue local.trigger
+		local.trigger origin (local.player.origin)
+	}*/
+	
+	//iprintlnbold_noloc("trigger glued")
+	local.player.flags["coop_myActivityTriggerName"] = ("coop_plActDetect" + local.player.entnum)
+	local.trigger wait 0.1
+	local.trigger glue local.player
+	
+	//$("coop_plActDetect" + local.player.entnum) wait 0.1
+	//$("coop_plActDetect" + local.player.entnum) glue local.player
+	while(local.player != NULL){
+		waitframe
+	}
+	//$("coop_plActDetect" + local.player.entnum) delete
+	local.trigger delete
+	//iprintlnbold_noloc("trigger removed")
+}end
+
+//chrissstrahl - make sure the trigger will only activate for the assigned player
+//=========================================================================
+playerActive:{
+//=========================================================================
+	if( parm.other == NULL ){
+		waitframe //prevent infinity loop error
+		end
+	}
+	if( parm.other.flags["coop_myActivityTriggerName"] == self.targetname ){
+		parm.other.flags["coop_iAmTruelyActive"] = 1
+		//iprintlnbold_noloc("matching player")
+	}//else{
+		//iprintlnbold_noloc("not matching player")
+	//}
+}end
+
+//chrissstrahl - this fixes the facing not working most of the time, can't tell what the exact cause might be
+//=========================================================================
+playerFace local.direction:{
+//=========================================================================
+	for(local.i=0;local.i<4;local.i++){
+		waitframe
+		if(self == NULL){
+			break
+		}
+		self face local.direction
+	}
+}end
+
+//=========================================================================
+playerTakeAll  local.player:{
+//=========================================================================
+	waitframe
+	if(local.player != NULL){
+		local.player takeall
+		//iprintlnbold_noloc ( "take all from: " + local.player.entnum )
+	}
+}end
+
+//warps all players to a specific coord
+//- if local.origin is NIL players will be warped to their spawnlocations
+//- if local.setSpawn set to 1 it will set this location as new spawn for all players
+//
+//this might need some attention, as it does not handle vehicle players - see func below: playerPlaceAtSpawn
+//=========================================================================
+playersWarpto local.origin local.angle local.setSpawn:{
+//=========================================================================
+	if(local.origin == NIL){
+		for (local.pl = 1;local.pl <= $player.size;local.pl++){
+			local.player =  $player[local.pl]
+			if(local.player == NULL){
+				continue
+			}
+			thread playerPlaceAtSpawn local.pl
+		}
+	}
+	else if(local.setSpawn == 1){
+		for( local.i = 1;local.i<=8;local.i++){
+			if(local.angle==NIL){
+				local.angle = ( 0 1 0 )
+			}
+			level.flags["coop_spawn"+local.i+"angles"] = ( local.angle )
+			level.flags["coop_spawn"+local.i+"origin"] = ( local.origin )
+		}
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if(local.player == NULL){
+			continue
+		}
+		//make sure that local.origin is set, grab origin from spawn loc
+		if(local.origin == NIL){
+			local.origin = level.flags["coop_spawn"+local.i+"origin"]
+		}
+		//elevate a little that we can use dropfloor, just in case...
+		local.player origin (local.origin+(0 0 1))
+		local.player droptofloor
+		//clear respawn coord
+		thread resetSpawn local.player
+
+		//need to call this delayed or it will not work most of the time in mp
+		if(local.angle != NIL){
+			local.player thread playerFace local.angle
+		}
+
+		//make sure players don't get stuck even if there are no valid spawns
+		thread playerMakeSolidAsap local.i
+	}
+}end
+
+//=========================================================================
+playerPlaceAtSpawn local.i:{
+//=========================================================================
+	local.player = $player[local.i]
+	if( local.player == NULL){ end }
+	
+	if( local.player.flags["coop_playerTankExit"] != NIL && $coop_tankExit != NULL){
+		local.player origin ( $coop_tankExit.origin + (0 0 150) )
+		local.player droptofloor
+		if(local.player.flags["coop_isActive"] == 1){
+			local.player.flags["coop_playerTankExit"] = NIL
+		}
+	}
+	else if(level.flags["coop_spawn"+local.i+"origin"] != NIL ){
+		if( (local.player.flags["coop_lastRespawn"] + 1.5) < level.time){
+			local.player origin	level.flags["coop_spawn"+local.i+"origin"]
+			
+			if(level.flags["coop_spawn"+local.i+"angles"] != NIL){
+				//need to call this delayed or it will not work most of the time in mp
+				local.player thread playerFace level.flags["coop_spawn"+local.i+"angles"]
+			}
+			//if(level.coop_spawnForceState != NIL){
+				//local.player forcelegsstate level.coop_spawnForceState
+			//}
+		}
+	}
+	//make sure players don't get stuck even if there are no valid spawns
+	thread playerMakeSolidAsap local.i
+}end
+
+//makes a player solid as soon as it is saftly possible
+//checking for other players and certain general entities
+//=========================================================================
+playerMakeSolidAsap local.i:{
+//=========================================================================
+	//println("playerMakeSolidAsap Make solid...")
+	if(local.i == NIL || local.i == NULL){ end }
+	
+	local.player = NULL
+	
+	//if we are given a entity instead of a number, deal with it
+	//detecting a single player entity as 0
+	//detecting a interger as 1 or
+	local.varType = waitthread returnVarType local.i
+	//entity - fine grab directly
+	if(local.varType == 2){
+		local.player = local.i
+	}
+	//int - grab by player number
+	else if(local.varType == 4){
+		local.player = $player[int(string(local.i))] //just to be sure convert to string then int, a player in a var can also be returned as a number, this is why we make sure to convert it over
+	}
+	//error out, it is better than never finding out whats wrong
+	else{
+		local.typename = waitthread returnVarTypename(local.varType)
+		error ( "coop_mod/main.scr::playerMakeSolidAsap - does not support var type: "+local.typename ) 1000
+	}
+	
+	//run only once per player
+	if(local.player.flags["coop_makesolid"] != NIL){ end }
+	
+	//println("playerMakeSolidAsap 1")
+	
+	local.player.flags["coop_makesolid"] = 1
+	while( local.player != NULL && local.player.flags["coop_makesolid"] != NIL ){
+		if(local.player.health <= 0){
+			local.player.flags["coop_makesolid"] = NIL
+			//println("playerMakeSolidAsap 2")
+			end
+		}
+		if(level.gametype != 0){
+			if(local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1 ){
+				local.player.flags["coop_makesolid"] = NIL
+				//println("playerMakeSolidAsap 3")
+				end
+			}
+		}		
+		//check if this player is inside another
+		local.touch = 0
+		for (local.iOther = 1;local.iOther <= $player.size;local.iOther++){
+			local.otherPlayer =  $player[local.iOther]
+			
+			//check other special entites, like tanks
+			if( $playertank_trigger != NULL && local.player isTouching $playertank_trigger){ //king tiger tank m5l2a,m5l2a
+				local.player notsolid
+				local.touch = 1
+				//iprintlnbold_noloc("DEV: TOUCHING $playertank_trigger")
+			}
+			if( $panzer_mask != NULL && local.player isTouching $panzer_mask){ //german panzer m5l2a
+				local.player notsolid
+				local.touch = 1
+				//iprintlnbold_noloc("DEV: TOUCHING $panzer_mask")
+			}
+			if( $tank_mask != NULL && local.player isTouching $tank_mask){ //german panzer m5l1b,m5l2a
+				local.player notsolid
+				local.touch = 1
+				//iprintlnbold_noloc("DEV: TOUCHING $tank_mask")
+			}
+			if( $t214 != NULL && level.coop_mapname == "m5l2a" && local.player isTouching $t214){ //german strange vehicle m5l2a
+				local.player notsolid
+				local.touch = 1
+				//iprintlnbold_noloc("DEV: TOUCHING $t214")
+			}
+			if( $kingtigercollision != NULL && local.player isTouching $kingtigercollision ){ //king tiger m5l3
+				local.player notsolid
+				local.touch = 1
+				//iprintlnbold_noloc("DEV: TOUCHING $kingtigercollision")
+			}
+//friendlies
+			if(isalive level.friendly1 && local.player isTouching level.friendly1){
+				local.player notsolid
+				local.touch = 1
+			}
+			if(isalive level.friendly2 && local.player isTouching level.friendly2){
+				local.player notsolid
+				local.touch = 1
+			}
+			if(isalive level.friendly3 && local.player isTouching level.friendly3){
+				local.player notsolid
+				local.touch = 1
+			}
+			if(isalive level.friendly4 && local.player isTouching level.friendly4){
+				local.player notsolid
+				local.touch = 1
+			}
+			if(isalive level.friendly5 && local.player isTouching level.friendly5){
+				local.player notsolid
+				local.touch = 1
+			}
+			if(isalive level.friendly6 && local.player isTouching level.friendly6){
+				local.player notsolid
+				local.touch = 1
+			}
+//check player to player - don't check the player against him self
+			if(local.player == local.otherPlayer){
+				continue			
+			}
+			//if multiplayer skip player who is a spectator or not active 
+			if(local.otherPlayer != NULL && local.otherPlayer.health > 0){
+				if( level.gametype != 0){
+					if(local.otherPlayer.dmteam == "spectator" || local.otherPlayer.flags["coop_isActive"] != 1 ){ 
+						//println("playerMakeSolidAsap 4")
+						continue
+					}
+				}
+				if(local.player isTouching local.otherPlayer){
+					//println("playerMakeSolidAsap 5")
+					//iprintlnbold_noloc ( "OMG, YOU DID TOUCH EACH OTHER" )
+					local.otherPlayer notsolid
+					thread playerMakeSolidAsap local.iOther
+					local.player notsolid
+					local.touch = 1
+				}
+			}
+		}
+		if(local.touch == 0){
+			//println("playerMakeSolidAsap NOW SOLID...")
+			local.player.flags["coop_makesolid"] = NIL
+			local.player solid
+			end			
+		}
+		//println("playerMakeSolidAsap loop")
+		waitframe
+	}
+}end
+
+//=========================================================================
+itemGetAll:{
+//=========================================================================
+//gives all items to the player
+	if(self == NULL || self.health <= 0 ){
+		end
+	}
+	
+	if(level.coop_playerItem1 != NIL ){	self item level.coop_playerItem1 }
+	if(level.coop_playerItem2 != NIL ){	self item level.coop_playerItem2 }
+	if(level.coop_playerItem3 != NIL ){	self item level.coop_playerItem3 }
+	if(level.coop_playerItem4 != NIL ){	self item level.coop_playerItem4 }
+	if(level.coop_playerItem5 != NIL ){	self item level.coop_playerItem5 }
+	if(level.coop_playerItem6 != NIL ){	self item level.coop_playerItem6 }
+}end
+
+//=========================================================================
+giveammo:{
+//=========================================================================
+	iprintlnbold_noloc("DEV: Critical WARNING: main.scr::giveammo used but has no function")
+}end
+
+//=========================================================================
+//=========================================================================
+//=========================================================================
+//=========================================================================
+//========================================================== FRIENDLY STUFF
+//=========================================================================
+//=========================================================================
+//=========================================================================
+//=========================================================================
+
+//=========================================================================
+friendlyPlayerOrigin:{
+//=========================================================================
+//return the origin of player that is currently set as ai follow target
+	if( level.coop_player != NULL ){
+		end level.coop_player.origin
+	}
+}end (0 0 0)
+
+//set destination for ai
+//=========================================================================
+destination:{
+//=========================================================================
+	if(self == NULL){ end }
+	
+	//try to follow current follow-player
+	self.destination = level.coop_player
+	
+	thread managePlayerToFollow
+}end
+
+//set tether for ai
+//=========================================================================
+tether:{
+//=========================================================================
+	if(self == NULL){ end }
+	
+	//try to leash to current follow-player
+	self tether level.coop_player
+	
+	thread managePlayerToFollow
+}end
+
+//set tether for ai
+//=========================================================================
+managePlayerToFollow:{
+//=========================================================================
+	if(level.coop_managePlayerToFollow != NIL){ end }
+	
+	level.coop_managePlayerToFollow = 1
+	local.grabNewPlayer = 1
+	
+	local.tries = 0
+	local.triesMax = 30
+	
+	//run this loop until we decide to cancel it (probably never)
+	while( level.coop_managePlayerToFollow ){
+		
+		//if everything is ok, wait a moment then try again
+		if(level.coop_player != NULL && local.grabNewPlayer != 1){
+			if(	level.coop_player.dmteam == "spectator" ||
+				level.coop_player.health <= 0 ||
+				level.coop_player.flags["coop_isActive"] != 1)
+			{
+				local.tries++
+			}
+			
+			//if max tries exceeded, find new player
+			if(level.coop_player == NULL || local.tries >= local.triesMax){
+				local.grabNewPlayer = 1
+			}
+			
+			wait 1
+			continue
+		}
+		
+		//pause if there is no player
+		while( $player == NULL ){
+			iprintlnbold_noloc("DEV: no $player, doing pause")
+			local.grabNewPlayer = 1
+			wait 2
+		}
+		
+		//try to find next best player to follow
+		//iprintlnbold_noloc ( "find player to follow" ) //chrissstrahl
+		local.grabNewPlayer = 0
+		local.tries = 0
+		waitthread fiendlyFindPlayer
+		waitframe
+	}
+}end
+
+//=========================================================================
+followPlayer local.setPlayerDest:{
+//=========================================================================
+	error ( "coop_mod/main.scr::followPlayer - needs to be replaced with destination/tether" ) 1000
+}end
+
+//=========================================================================
+followPlayerStop:{
+//=========================================================================
+	error ( "coop_mod/main.scr::followPlayerStop - needs to be replaced" ) 1000
+	//self.flags["coop_followingPlayer"] = 0
+}end
+
+//=========================================================================
+fiendlyFollow local.setPlayerDest:{
+//=========================================================================
+	error ( "coop_mod/main.scr::fiendlyFollow - needs to be replaced" ) 1000
+	end
+	
+//update destination for ai following player
+//early stage might needs more thougth with thether combined
+//FOLLOW .fnum = -1
+//not FOLLOW .fnum = NIL?
+//update destination for ai following player
+//early stage might needs more thougth with thether combined
+//FOLLOW .fnum = -1
+//not FOLLOW .fnum = NIL?
+	if( level.gametype == 0 ){
+		if(local.setPlayerDest == NIL || local.setPlayerDest == 1 || local.setPlayerDest == true ){
+			self.destination = $player
+		}
+		self tether $player
+		end
+	}
+	println ( self.targetname + " : fiendlyFollow" )
+	
+	if( self.flags["coop_followingPlayer"] == 1){
+		end
+	}
+	
+	//flag this actor to be following
+	self.flags["coop_followingPlayer"] = 1
+	local.tries = 0
+	local.triesMax = 10
+	
+	while( self != NULL && isAlive self ){
+		//terminate if no more following player
+		if( self.flags["coop_followingPlayer"] != 1 ){
+			iprintlnbold_noloc ( self.targetname + " : FOLLOW STOPING" )
+			println ( self.targetname + " : FOLLOW STOPING" )
+			break
+		}
+		//get new player if current player is missing
+		if( level.coop_player == NULL ){
+			iprintlnbold_noloc ( self.targetname + " : NULL "  )
+			println ( self.targetname + " : NULL "  )
+			local.tries = local.triesMax
+		}
+		//keep track of failed atempts
+		else if( level.coop_player.dmteam == "spectator" ||
+			level.coop_player.health <= 0 ||
+			level.coop_player.flags["coop_isActive"] != 1 )
+		{
+			local.tries++
+			iprintlnbold_noloc ( self.targetname + " : TRYING " + local.tries  )
+			println ( self.targetname + " : TRYING " + local.tries  )
+		}
+		//get new player and reset
+		if( local.tries >= local.triesMax ){
+			while(level.coop_player == NULL){
+				wait 5
+				if(self == NULL){
+					end
+				}
+				waitthread fiendlyFindPlayer
+				iprintlnbold_noloc ( self.targetname + " : FINDING"  )
+				println ( self.targetname + " : FINDING"  )
+			}
+			iprintlnbold_noloc ( self.targetname + " : FOUND and SET"  )
+			println ( self.targetname + " : FOUND and SET"  )
+			self.destination = level.coop_player
+			self tether level.coop_player
+			local.tries = 0
+		}
+		wait 1
+	}
+}end
+
+//=========================================================================
+fiendlyFindPlayer:{
+//=========================================================================
+//find a valid player to follow, this is used to direct the ai to a player to follow
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1){
+			level.coop_player = local.player
+			//iprintlnbold_noloc ( "player found..." + local.i + "::" + level.coop_player )
+			end
+		}
+	}
+	level.coop_player = NULL
+}end
+
+//=========================================================================
+isPlayerActive local.player:{
+//=========================================================================
+//checks if a player is valid
+	if(level.gametype == 0){
+		if($player != NULL && $player.health > 0){
+			end 1
+		}
+	}
+	if( local.player == NIL ){
+		error ( "coop_mod/main.scr::isPlayerActive - parameter 1 was NIL, needs to be player" ) 1000
+		end 0
+	}
+	
+	if( local.player != NULL ){
+		if( local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+			end 1
+		}
+	}
+}end 0
+
+//=========================================================================
+playerActives:{
+//=========================================================================
+	error ( "coop_mod/main.scr::playerActives - used, use player_numActive in replace.scr instead" ) 1000
+	end
+//returns how many active players there are
+	if(level.gametype == 0){
+		if(isAlive $player){
+			end 1
+		}
+	}
+	
+	local.actives = 0
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player != NULL ){
+			if( local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+				local.actives++
+			}
+		}
+	}
+//	level.coop_player = NULL //wtf
+}end local.actives
+
+//PLEASE NOTE! THIS FUNCTION HAS A INTENTIONAL 1 FRAME DELAY!
+//=========================================================================
+startThread local.script local.entity:{ //[200] chrissstrahl - add optional caller (the idea is to allow a entity to be passed)
+//=========================================================================
+	local.trigger = spawn trigger_once setthread local.script
+	waitframe
+	
+	//[200] chrissstrahl - optional caller
+	if(local.entity == NIL || local.entity == NULL || local.entity.size > 1){
+		local.entity = $world
+	}
+	
+	if( local.trigger != NULL ){
+		if($world == NULL){error ( "coop_mod/main.scr::startThread - NO $world FOUND - FATAL ERROR" ) 1000}
+		local.trigger doActivate local.entity
+	}
+}end
+
+//=========================================================================
+getPlayerId local.player:{
+//=========================================================================
+//returns $player entity number id like $player[3] returns 3
+	if(level.gametype == 0){ end 1 }
+	
+	if(local.player != NULL){
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			if( $player[local.i] == local.player ){
+				end local.i
+			}
+		}
+	}
+}end NIL
+
+//return weapon of given player
+//=========================================================================
+getActiveWeapon local.player:{
+//=========================================================================
+	if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator"){
+		local.playerOrigin1 = local.player gettagposition "tag_weapon_right"
+		local.playerOrigin2 = local.player gettagposition "tag_weapon_left"
+		local.maxentities = int(getcvar("maxentities"))
+		
+		for (local.i = 0; local.i < local.maxentities; local.i++) {
+			local.ent = getentbyentnum local.i
+			if ( local.ent != NULL && local.ent.model != NIL){	
+				local.entOrigin = local.ent.origin
+				if( vector_length(local.entOrigin - local.playerOrigin1) < 2 || vector_length(local.entOrigin - local.playerOrigin2) < 2 ){
+					if( waitthread isWeaponModel local.ent.model ){
+						//println ("returning: " + local.ent.model)
+						end local.ent.model
+					}
+				}
+			}
+		}	
+	}
+}end "weaponless"
+
+//check if primary weapon of given player is active
+//=========================================================================
+isPrimaryWeaponActive local.player:{
+//=========================================================================
+	local.weapon = (waitthread getActiveWeapon local.player)
+	local.result = (waitthread isPrimaryWeapon local.weapon)
+	end local.result
+}end 0
+
+//checks if the given model path contains the word weapons
+//=========================================================================
+isWeaponModel local.model:{
+//=========================================================================
+	local.construct = ""
+	for(local.i=0;local.i < local.model.size;local.i++){
+		//reset after each folder
+		if(local.model[local.i] == "/"){
+			if(local.construct == "weapons"){
+				end 1
+			}
+			else{
+				local.construct = ""
+			}
+			continue
+		}
+		local.construct += local.model[local.i]
+	}
+}end 0
+
+//Checks if the given Model is a primary Weapon
+//=========================================================================
+isPrimaryWeapon local.weapon:{
+//=========================================================================
+	if(local.weapon == "" || local.weapon == NIL){ end 0 }
+	
+	if(local.weapon == "models/weapons/US_W_MineDetector.tik"){ end 1 }
+	if(local.weapon == "models/weapons/Gr_W_MineDetector.tik"){ end 1 }
+	//recognize all primary aa weapons
+	if(local.weapon == "models/weapons/bar.tik"){ end 1 }
+	if(local.weapon == "models/weapons/bazooka.tik"){ end 1 }
+	if(local.weapon == "models/weapons/kar98.tik"){ end 1 }
+	if(local.weapon == "models/weapons/KAR98sniper.tik"){ end 1 }
+	if(local.weapon == "models/weapons/m1_garand.tik"){ end 1 }
+	if(local.weapon == "models/weapons/mp40.tik"){ end 1 }
+	if(local.weapon == "models/weapons/mp42.tik"){ end 1 }
+	if(local.weapon == "models/weapons/mp44.tik"){ end 1 }//chrissstrahl - added as it is given to player in m6l1c
+	if(local.weapon == "models/weapons/panzerschreck.tik"){ end 1 }
+	if(local.weapon == "models/weapons/shotgun.tik"){ end 1 }
+	if(local.weapon == "models/weapons/springfield.tik"){ end 1 }
+	if(local.weapon == "models/weapons/thompsonsmg.tik"){ end 1 }
+	//iprintlnbold_noloc( local.weapon ) //debug
+}end 0
+
+//used to force a primary weapon on players
+//=========================================================================
+playerForcePrimary local.player local.weapon:{
+//=========================================================================
+	if(local.player == NULL || local.player == NIL){ end }
+	
+	//added for bt
+	local.player take "models/weapons/It_W_Moschetto.tik"	
+	local.player take "models/weapons/It_W_Breda.tik"	
+	local.player take "models/weapons/US_W_MineDetector.tik"
+	local.player take "models/weapons/US_W_Mine.tik"
+	local.player take "models/weapons/Uk_W_L42A1.tik"
+	local.player take "models/weapons/Uk_W_Piat.tik"
+	local.player take "models/weapons/Uk_W_Vickers.tik"	
+	local.player take "models/weapons/Gr_W_MineDetector.tik"
+	local.player take "models/weapons/DeLisle.tik"
+	local.player take "models/weapons/enfield.tik"
+	local.player take "models/weapons/G43.tik"
+	local.player take "models/weapons/It_W_Carcano.tik"
+	local.player take "models/weapons/kar98_mortar.tik"
+	local.player take "models/weapons/Mosin_Nagant_Rifle.tik"
+	local.player take "models/weapons/ppsh_smg.tik"
+	local.player take "models/weapons/sten.tik"
+	local.player take "models/weapons/svt_rifle.tik"
+	
+	//not sure about these
+	local.player take "models/weapons/mg42portable_placed.tik"	
+	local.player take "models/weapons/mg42carryable.tik"	
+
+	//take all primary aa weapons
+	local.player take "models/weapons/bar.tik"
+	local.player take "models/weapons/bazooka.tik"
+	local.player take "models/weapons/kar98.tik"
+	local.player take "models/weapons/KAR98sniper.tik"
+	local.player take "models/weapons/m1_garand.tik"
+	local.player take "models/weapons/mp40.tik"
+	local.player take "models/weapons/mp42.tik"
+	local.player take "models/weapons/mp44.tik"
+	local.player take "models/weapons/panzerschreck.tik"
+	local.player take "models/weapons/shotgun.tik"
+	local.player take "models/weapons/springfield.tik"
+	local.player take "models/weapons/thompsonsmg.tik"
+	waitframe
+	
+	//set new primary
+	if(local.weapon != NIL){
+		local.player item local.weapon
+		local.player use local.weapon
+	}
+}end
+
+//used to force a primary weapon on players
+//=========================================================================
+playerForceInventory local.player local.item:{
+//=========================================================================
+	if(local.player == NULL || local.player == NIL){ end }
+
+	//take conflicting inventory stuff
+	local.player take "models/items/binoculars.tik"
+	local.player take "models/items/papers.tik"
+	waitframe
+	
+	//set new primary
+	if(local.item != NIL){
+		local.player item local.item
+	}
+}end
+
+//used to force a primary weapon on players
+//=========================================================================
+playerForceSecondary local.player local.weapon:{
+//=========================================================================
+	if(local.player == NULL || local.player == NIL){ end }
+	
+	//bt
+	local.player take "models/weapons/It_W_Beretta.tik"
+	local.player take "models/weapons/Webley_Revolver.tik"	
+	//take all Secondary aa weapons
+	local.player take "models/weapons/colt45.tik"
+	local.player take "models/weapons/p38.tik"
+	local.player take "models/weapons/silencedpistol.tik"
+	waitframe
+	
+	//set new primary
+	if(local.weapon != NIL){
+		local.player item local.weapon
+		local.player use local.weapon
+	}
+}end
+
+//clears the primary weapon swap remember variable
+//=========================================================================
+playerPrimarySwapCancel local.player:{
+//=========================================================================
+	if(local.player == NULL){
+		end 1
+	}
+	
+	if( local.player.health < 1 ||
+		local.player.dmteam == "spectator" ||
+		local.player.flags["coop_isActive"] != 1)
+	{
+		local.player.flags["coop_swapedWeaponPrimary"] = NIL
+		end 1
+	}	
+}end 0
+
+//used to swap a primary weapon of a player with a new one, remembers the swapped weapon
+//=========================================================================
+playerPrimarySwap local.player local.weaponNew:{
+//=========================================================================
+	if(local.player == NULL || local.player == NIL ){ end }
+	if( local.player.flags["coop_swapedWeaponPrimary"] == NIL && local.weaponNew != NIL){
+		for(local.x=0;local.x<4;local.x++){
+			for(local.y=0;local.y<4;local.y++){
+				if(waitthread playerPrimarySwapCancel local.player){ end }
+				
+				if		(local.y == 0){ local.type = "heavy" }
+				else if	(local.y == 1){ local.type = "smg" }
+				else if	(local.y == 2){ local.type = "rifle" }
+				else if	(local.y == 3){ local.type = "mg" }
+				local.player useweaponclass (local.type)
+				waitframe
+				local.isPrimary = 0
+				local.primary = waitthread getActiveWeapon local.player
+				local.isPrimary = waitthread isPrimaryWeapon local.primary
+				if(local.isPrimary == 1){
+					local.player.flags["coop_swapedWeaponPrimary"] = local.primary
+					break					
+				}
+			}
+		}
+		//if no more player
+		if(waitthread playerPrimarySwapCancel local.player){ end }
+		
+		//if the player still does not have a primary weapon stop right here
+		if(	local.isPrimary == 0 ){
+			local.player iprint ("You need a Primary Weapon in order to Trade your Weapon!") 1
+			end
+		}
+		
+		waitthread playerForcePrimary local.player local.weaponNew
+		local.player item heavy
+	}else{
+		waitthread playerForcePrimary local.player local.player.flags["coop_swapedWeaponPrimary"]
+		local.player.flags["coop_swapedWeaponPrimary"] = NIL
+	}
+}end
+
+//checks if a string contains the given text
+//=========================================================================
+containsText local.source local.text:{
+//=========================================================================
+	if(local.source == NIL || local.text == NIL || local.source.size < local.text.size){ end 0 }
+	
+	local.index = 0
+	local.match = 0
+	for(local.i=0;local.i<local.source.size;local.i++){
+		if(local.source[local.i] == local.text[local.index]){
+			local.index++
+			//match found
+			if(local.index == local.text.size){
+				end 1
+			}
+		}else{
+			local.index = 0
+		}
+	}
+}end 0
+
+//removes the given string from the string - removes only a single car, but can be upgraded
+//=========================================================================
+cleanText local.source local.text:{
+//=========================================================================
+	if(local.source == NIL || local.text == NIL || local.source.size < local.text.size){ end local.source }
+	local.newString = ""
+	for(local.i=0;local.i<local.source.size;local.i++){
+		if(local.source[local.i] != local.text[0]){
+			local.newString += local.source[local.i]
+		}
+	}
+}end local.newString
+
+
+//return type of variable
+//performs a series of checks to determine the variable type ?
+//type: 0-NIL, 1-string,2-entity,3-vector,4-int/float
+//-1 could not detect type
+//=========================================================================
+returnVarType local.var:{
+//=========================================================================
+	if(local.var == NIL){ end 0 }
+
+	local.stringified = string(local.var)
+	local.stringifiedSize = local.stringified.size
+	
+	//println("size:   "+local.var.size)
+	//println("string: "+local.stringified)
+	
+//var is of type entity or string
+	if(local.var.size == 0){
+	//it can be either a empty string or a entity
+		if(local.stringifiedSize == 0 ){ end 1 }
+		else{ end 2 }
+	}
+//var is type of integer, entity or vector or singleletter string
+	else if(local.var.size == 1){
+		local.firstChar = string(local.stringified[0])
+	//assume it is a vector if it is in brackets
+		if( local.stringified[0] == "(" && local.stringified[local.stringifiedSize-1] == ")" ){
+			end 3
+		}
+	//note: cant detect entities with a targetname < 2 chars
+		if(local.stringifiedSize > 1){
+		//entity targetnames never start with a number or a colon not a number will be 0 when converted
+			if(	int(local.firstChar) == 0 && int(local.stringified) == 0 && local.stringified != "0.000" && local.stringified[0] != "."){
+				end 2
+			}			
+			if( waitthread isFloat == 1 || int(local.stringified) != 0){
+				end 4
+			}
+		}else{
+			if(int(local.stringified) != 0 || local.stringified == "0" || local.stringified != "0.000"){
+				end 4
+			}
+		}
+	//fallback to string
+		end 1
+	}
+//must be a string
+	else{
+		end 1
+	}
+}end -1
+
+//returns associated type name of type number
+//=========================================================================
+returnVarTypename local.var:{
+//=========================================================================
+	if(local.var == 1){ end "String" }
+	if(local.var == 2){ end "Entity" }
+	if(local.var == 3){ end "Vector" }
+	if(local.var == 4){ end "Int/Float" }
+}end "Unknown"
+
+//check if it is a float, game makes sure float always has 3 digits after the dot
+//=========================================================================
+isFloat local.var:{
+//=========================================================================
+	local.stringified = string(local.var)
+	if( local.stringified == "0.000" ){ end 1 }
+	if( float(local.stringified) == 0 ){ end 0 }
+	
+	local.dotAt = -1
+	local.afterDot = 0
+	for(local.i=0;local.i<local.stringified.size;local.i++){
+		if(local.afterDot != -1){
+			local.afterDot++
+		}
+		if(local.stringified[local.i] == "."){
+			local.dotAt = local.i
+			local.afterDot = 0
+		}
+	}
+	
+	if(local.afterDot == 3){ end 1 }
+}end 0
+

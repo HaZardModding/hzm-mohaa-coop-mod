@@ -1,0 +1,1846 @@
+// ESCAPING FORT SCHMERTZEN
+// ARCHITECTURE: BENSON/ADAM
+// SCRIPTING: ADAM
+//============================================================================
+main:{
+//============================================================================
+	level.coopNextMap = "m6l3d"			//Pasted by Criminal for coop comp. - set next map (for mom voteing)
+	level.coopPrevMap = "m6l3b"			//Pasted by Criminal for coop comp. - set previouse map (for mom voteing)
+	level.coop_aaMap = 1				//Pasted by Criminal for coop comp. - let global scripts know this is a AA level
+	level.coop_debugSpawn = 1 			//Pasted by Criminal for coop comp. - enable spawnpoint debug (make visible)
+	level.coop_disableSpawnWarper = 1	//Chrissstrahl - prevent players from respawning where they died
+	thread coop_mod/main.scr::main     //Pasted by Criminal for coop comp. - start coop mod extensions
+
+	/* //chrissstrahl - spawn positions coop
+	//inside lift
+	-1988 644 -1024
+	-1988 700 -1024
+	-2044 644 -1024
+	-2044 700 -1024
+	
+	//outside lift
+	-1900 596 -1024
+	-1900 748 -1024
+	-1860 596 -1024
+	-1860 748 -1024
+	*/
+	
+	
+	//*** Give Weapons
+	exec global/loadout.scr maps/m6l3c.scr
+
+	level waittill prespawn
+
+	//*** Exploder Setup
+	thread global/exploder.scr::main
+
+	//*** Give Inventory Items
+	//waitthread global/items.scr::add_item "gasmask"
+
+	//*** Setup Threads
+	thread level_setup
+
+	//*** Locked Doors Script
+	exec global/door_locked.scr
+
+	//*** Ambience Script
+	exec global/ambient.scr m6l3c
+
+	//level waittill spawn//chrissstrahl
+	waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl - coop replacement
+
+	//*** Music
+	//$player stufftext "tmstartloop sound/music/mus_Schmerzen_01a.mp3"			//Criminal.
+	exec coop_mod/replace.scr::tmstartloop "sound/music/mus_Schmerzen_01a.mp3"	//Criminal - coop comp.
+}end
+
+// Setup Level
+//============================================================================
+level_setup:{
+//============================================================================
+	thread flags_setup
+	thread medals_setup
+	thread ai_setup
+	thread objectives_setup
+	thread elevator_setup
+	thread heavy_door_setup
+	thread blast_sequence_start
+	thread blast_seq1_setup
+	thread blast_seq2_setup
+	thread blast_seq3_setup
+	thread blast_seq4_setup
+	thread blast_seq5_setup
+	thread blast_seq6_setup
+	thread blast_seq7_setup
+	thread blast_seq8_setup
+	thread blast_seq9_setup
+	thread blast_seq10_setup
+	thread blast_seq11_setup
+	thread blast_seq12_setup
+	thread blast_seq13_setup
+	thread blast_seq14_setup
+	thread blast_seq15_setup
+	thread blast_seq16_setup
+	thread blast_seq17_setup
+}end
+
+
+// Setup Level Flags & Variables
+//============================================================================
+flags_setup:{
+//============================================================================
+	level.flags[0] = 0 //blast sequence 1
+	level.flags[1] = 0 //blast sequence 2
+	level.flags[2] = 0 //blast sequence 3
+	level.flags[3] = 0 //blast sequence 4
+	level.flags[4] = 0 //blast sequence 5
+	level.flags[5] = 0 //blast sequence 6
+	level.flags[6] = 0 //blast sequence 7
+	level.flags[7] = 0 //blast sequence 8
+	level.flags[8] = 0 //blast sequence 9
+	level.flags[9] = 0 //blast sequence 10
+	level.flags[10] = 0 //blast sequence 11
+	level.flags[11] = 0 //blast sequence 12
+	level.flags[12] = 0 //blast sequence 13
+	level.flags[13] = 0 //blast sequence 14
+	level.flags[14] = 0 //blast sequence 15
+	level.flags[15] = 0 //blast sequence 16
+	level.flags[16] = 0 //blast sequence 17
+
+	level.heavydoor1 = 0
+	level.heavydoor1moving = 0
+}end
+
+// Setup Ai
+//============================================================================
+ai_setup:{
+//============================================================================
+	$blast_seq3_dude1 exec global/disable_ai.scr
+	$blast_seq3_dude2 exec global/disable_ai.scr
+
+	//$ranger1 exec global/disable_ai.scr
+	//$ranger2 exec global/disable_ai.scr
+	//$ranger3 exec global/disable_ai.scr
+	//$ranger1 exec global/crouch.scr
+	//$ranger2 exec global/crouch.scr
+}end
+
+// Setup Objectives
+//============================================================================
+objectives_setup:{
+//============================================================================
+	//waitthread global/objectives.scr::reset_objectives
+	//waitthread global/objectives.scr::blank_objectives
+	waitthread global/objectives.scr::add_objectives 1 2 "Escape Fort Schmerzen." $blast_seq17_firedeath1.origin
+	waitthread global/objectives.scr::current_objectives 1
+	
+	//$player playsound objective_text	//Criminal.
+	exec coop_mod/replace.scr::playsound objective_text //Criminal - coop comp.
+}end
+
+// Setup Medals
+//============================================================================
+medals_setup:{
+//============================================================================
+	//*** commented out following lines since this is no longer needed here - Steve 
+	//	setcvar g_medal0 "1"
+	//	setcvar g_eogmedal0 "1"
+	//	setcvar g_eogmedal1 "1"
+	//	setcvar g_eogmedal2 "1"
+}end
+
+// Intro Elevator
+//============================================================================
+elevator_setup:{
+//============================================================================
+	waitframe
+	if(level.gametype==0){ //chrissstrahl - sp
+		//chrissstrahl - wait for players to spawn in sp
+		waitthread coop_mod/replace.scr::waitForPlayer	
+		
+		$starting_elevator_cab time 1
+		$starting_elevator_gate time 1.5
+		$elevator_switch2 bind $starting_elevator_cab
+		$starting_elevator_cab playsound elevator_run
+		
+		for (local.i = 1 ; local.i <= 4 ; local.i ++){
+			$starting_elevator_cab moveto $("starting_elevator_way" + local.i)
+			$starting_elevator_cab waitmove
+		}
+	}else{//chrissstrahl - mp/coop
+		$starting_elevator_gate time 1.5
+		$starting_elevator_cab time 0.01
+		$elevator_switch2 bind $starting_elevator_cab
+		for (local.i = 1 ; local.i <= 4 ; local.i ++){
+			$starting_elevator_cab moveto $("starting_elevator_way" + local.i)
+			$starting_elevator_cab waitmove
+		}
+		//chrissstrahl - wait for players to spawn in coop
+		waitthread coop_mod/replace.scr::waitForPlayer	
+	}
+
+	thread e1_start
+	wait .5
+
+	$starting_elevator_gate playsound elevator_gate
+	$starting_elevator_gate movedown 70
+	$starting_elevator_gate waitmove
+}end
+
+// End Level Trigger
+//============================================================================
+change_level:{
+//============================================================================
+	exec global/missioncomplete.scr m6l3e 1
+}end
+
+// Blast Sequence Start Timer
+//============================================================================
+blast_sequence_start:{
+//============================================================================
+	$blast_sequence_start waittill trigger
+	$starting_elevator_cab playsound m6l3_explode_interior
+	wait 2
+
+	$starting_elevator_cab playsound m6l3_explode_interior
+	wait 2
+
+	$starting_elevator_cab playsound m6l3_explode_interior
+	wait 8
+
+	if (level.flags[0] == 0){	
+		trigger $blast_seq1_trigger
+	}
+}end
+
+// Blast Sequence 1 - Barracks Hallway
+//============================================================================
+blast_seq1_setup:{
+//============================================================================
+	$blast_seq1_firedeath1 nottriggerable
+	$blast_seq1_hurt1 nottriggerable
+	$blast_seq1_model1 hide
+	goto blast_seq1_start
+
+	blast_seq1_start:
+
+	$blast_seq1_trigger waittill trigger
+	
+	//chrissstrahl - update spawns
+	exec coop_mod/spawnlocations.scr::m6l3c_update1
+
+	level.flags[0] = 1
+	thread jitter_medium 0
+
+	$blast_seq1_exploder1 anim start
+	$blast_seq1_hurt1 triggerable
+	$blast_seq1_hurt1 thread move_object (0 -1376 0) 4.5
+	wait .5
+
+	$blast_seq1_exploder2 anim start
+	$blast_seq1_fire1 anim start
+	wait .5
+
+	$blast_seq1_exploder3 anim start
+	$blast_seq1_fire2 anim start
+	wait .5
+
+	thread jitter_large 0
+
+	$blast_seq1_exploder4 anim start
+	thread global/exploder.scr::explode 61
+	thread global/exploder.scr::explode 62
+	$blast_seq1_model1 show
+	wait .25
+
+	$blast_seq1_exploder5 anim start
+	$blast_seq1_fire3 anim start
+	wait 1.5
+
+	if (level.flags[1] == 0 && level.gametype == 0){ //chrissstrahl - prevent timed explosion in mp
+		trigger $blast_seq2_trigger
+	}
+}end
+
+// Blast Sequence 2 - Elevator Hallway
+//============================================================================
+blast_seq2_setup:{
+//============================================================================
+	$blast_seq2_firedeath1 nottriggerable
+	$blast_seq2_hurt1 nottriggerable
+	$blast_seq2_model1 hide
+	$blast_seq2_model2 hide
+	$blast_seq2_model3 hide
+	goto blast_seq2_start
+
+	blast_seq2_start:
+
+	$blast_seq2_trigger waittill trigger
+	
+	//iprintlnbold_noloc("blast_seq2_setup")
+	
+	//chrissstrahl - update spawns
+	exec coop_mod/spawnlocations.scr::m6l3c_update1
+
+	level.flags[1] = 1
+	if (level.flags[0] == 0){
+		trigger $blast_seq1_trigger
+	}
+
+	thread jitter_medium 0
+	thread global/exploder.scr::explode 71
+
+	$blast_seq2_exploder1 anim start
+	$blast_seq2_hurt1 triggerable
+	$blast_seq2_hurt1 thread move_object (1056 0 0) 4.5
+	$blast_seq2_firedeath1 triggerable
+	wait 1
+
+	$blast_seq2_model1 show
+	$blast_seq2_exploder2 anim start
+	wait .5
+
+	$blast_seq2_model2 show
+	$blast_seq2_exploder3 anim start
+	wait 1
+
+	$blast_seq2_fire2 anim start
+	$blast_seq2_exploder4 anim start
+	wait 1
+
+	$blast_seq2_exploder5 anim start
+	wait .5
+
+	$blast_seq2_fire3 anim start
+	$blast_seq2_model3 show
+	wait 4
+
+	if (level.flags[2] == 0 && level.gametype == 0){ //chrissstrahl - prevent timed explosion in mp
+		trigger $blast_seq3_trigger
+	}
+}end
+
+// Blast Sequence 3 - Stairwell
+//============================================================================
+blast_seq3_setup:{
+//============================================================================
+	$blast_seq3_firedeath1 nottriggerable
+	$blast_seq3_hurt1 nottriggerable	
+	$blast_seq3_hurt2 nottriggerable
+	$blast_seq3_hurt3 nottriggerable
+	$blast_seq3_model1 hide
+	$blast_seq3_model2 hide
+	$blast_seq3_model3 hide
+	$blast_seq3_model4 hide
+	$blast_seq3_model5 hide
+	goto blast_seq3_start
+
+	blast_seq3_start:
+
+	$blast_seq3_trigger waittill trigger	
+	level.flags[2] = 1
+	
+	//chrissstrahl - update spawns
+	exec coop_mod/spawnlocations.scr::m6l3c_update2
+
+	thread jitter_medium 0
+	thread global/exploder.scr::explode 70
+
+	$blast_seq3_firedeath1 triggerable
+	$blast_seq3_exploder1 anim start
+	$blast_seq3_dust1 anim start
+	wait .25
+
+	$blast_seq3_exploder2 anim start
+	$blast_seq3_model1 show
+	$blast_seq3_model2 show	
+	$blast_seq3_dust2 anim start
+	$blast_seq3_fire1 anim start
+	$blast_seq3_fire2 anim start
+	$blast_seq3_fire3 anim start		
+	$blast_seq3_fire4 anim start	
+	$blast_seq3_hurt1 triggerable	
+	wait .25
+
+	$blast_seq3_exploder3 anim start
+	$blast_seq3_dust3 anim start
+	wait 8
+
+	$blast_seq3_exploder2 anim start
+	wait .5
+	
+	$blast_seq3_exploder3 anim start
+	wait .5
+
+	thread jitter_medium 0
+	$blast_seq3_exploder4 anim start
+	$blast_seq3_exploder5 anim start
+	$blast_seq3_hurt2 triggerable
+	wait .5
+
+	$blast_seq3_exploder6 anim start
+	$blast_seq3_fire5 anim start
+	$blast_seq3_fire6 anim start
+ 	wait .5	
+
+	$blast_seq3_fire7 anim start
+	$blast_seq3_model3 show
+	$blast_seq3_model4 show
+	$blast_seq3_model5 show
+	$blast_seq3_hurt3 triggerable
+	wait 3.5
+
+	if (level.flags[3] == 0 && level.gametype == 0){ //chrissstrahl - prevent timed explosion in mp
+		trigger $blast_seq4_trigger
+	}
+}end
+
+// Blast Sequence 4 - Furnace Room Part 1
+//============================================================================
+blast_seq4_setup:{
+//============================================================================
+	$blast_seq4_model1 hide
+	$blast_seq4_model2 hide	
+	goto blast_seq4_start
+
+	blast_seq4_start:
+
+	$blast_seq4_trigger waittill trigger	
+	level.flags[3] = 1
+	
+	//iprintlnbold_noloc("blast_seq4_setup")
+	
+	//chrissstrahl - update spawns
+	exec coop_mod/spawnlocations.scr::m6l3c_update2
+
+	thread jitter_large 0
+	$blast_seq4_exploder1 anim start
+	$blast_seq4_fire1 anim start
+	$blast_seq4_model1 show	
+	thread e3_start	
+	wait .25
+
+	$blast_seq4_exploder2 anim start
+	$blast_seq4_fire2 anim start
+	$blast_seq4_model2 show
+	wait .5	
+
+	$blast_seq4_fire3 anim start	
+	wait .25
+
+	$blast_seq4_exploder3 anim start	
+	wait .5
+
+	thread global/exploder.scr::explode 50
+	$blast_seq4_fire3 anim start
+	$blast_seq4_exploder4 anim start	
+	wait 2
+
+	if (level.flags[4] == 0 && level.gametype == 0){ //chrissstrahl - prevent timed explosion in mp
+		trigger $blast_seq5_trigger
+	}
+}end
+
+// Blast Sequence 5 - Furnace Room Part 2
+//============================================================================
+blast_seq5_setup:{
+//============================================================================
+	$blast_seq5_model1 hide
+	$blast_seq5_hurt1 nottriggerable
+	$blast_seq5_firedeath1 nottriggerable
+	goto blast_seq5_start
+
+	blast_seq5_start:
+
+	$blast_seq5_trigger waittill trigger
+	level.flags[4] = 1
+	
+	//iprintlnbold_noloc("blast_seq5_setup")
+	
+	//chrissstrahl - update spawns
+	exec coop_mod/spawnlocations.scr::m6l3c_update3
+	
+	wait 1
+
+	thread blast_seq5_furnaces 1 3 2 4	
+	$blast_seq5_exploder1 anim start
+	$blast_seq5_hurt1 triggerable
+	$blast_seq5_hurt1 thread move_object (384 0 0) 5
+	wait .5
+
+	$blast_seq5_exploder2 anim start	
+	$blast_seq5_model1 show
+	$blast_seq5_model1 thread move_object (0 0 -172) .3
+	$blast_seq5_fire1 anim start
+	wait .25
+
+	$blast_seq5_firedeath1 triggerable
+	wait 1.5
+
+	if (level.flags[5] == 0 && level.gametype == 0){ //chrissstrahl - prevent timed explosion in mp	
+		trigger $blast_seq6_trigger
+	}
+}end
+
+//============================================================================
+blast_seq5_furnaces local.first local.second local.third local.fourth:{
+//============================================================================
+	thread global/exploder.scr::explode local.first
+	$furnace1 playsound explode_tank
+	thread jitter_medium 0
+	wait .25
+
+	thread global/exploder.scr::explode local.second
+	$furnace2 playsound explode_tank
+	thread jitter_medium 0
+	wait .5
+
+	thread global/exploder.scr::explode local.third
+	$furnace3 playsound explode_tank
+	thread jitter_large 0
+	wait .25
+
+	thread global/exploder.scr::explode local.fourth
+	$furnace4 playsound explode_tank
+}end
+
+// Blast Sequence 6 - Furnace Room Part 3
+//============================================================================
+blast_seq6_setup:{
+//============================================================================
+	$blast_seq6_hurt1 nottriggerable
+	$blast_seq6_hurt2 nottriggerable
+	$blast_seq6_hurt3 nottriggerable
+	$blast_seq6_hurt4 nottriggerable
+	goto blast_seq6_start
+
+	blast_seq6_start:
+
+	$blast_seq6_trigger waittill trigger
+	level.flags[5] = 1
+	$blast_seq6_hurt1 triggerable
+	$blast_seq6_steam1 anim start
+	
+	//iprintlnbold_noloc("blast_seq6_setup")
+	
+	//chrissstrahl - update spawns
+	exec coop_mod/spawnlocations.scr::m6l3c_update3
+	
+	wait .5
+
+	$blast_seq6_hurt2 triggerable
+	$blast_seq6_steam2 anim start
+	wait .5
+
+	$blast_seq6_hurt3 triggerable
+	$blast_seq6_steam3 anim start
+	wait .5
+	
+	$blast_seq6_exploder1 anim start
+	thread jitter_medium 0	
+	wait .5
+
+	$blast_seq6_exploder2 anim start
+	wait .5
+
+	$blast_seq6_fire1 anim start
+	$blast_seq6_hurt4 triggerable
+	wait 1.5
+
+	if (level.flags[6] == 0 && level.gametype == 0){ //chrissstrahl - prevent timed explosion in mp
+		trigger $blast_seq7_trigger
+	}
+}end
+
+// Blast Sequence 7 - Triangle Hallway
+//============================================================================
+blast_seq7_setup:{
+//============================================================================
+	$blast_seq7_hurt1 nottriggerable
+	$blast_seq7_hurt2 nottriggerable
+	$blast_seq7_model1 hide
+	goto blast_seq7_start
+
+	blast_seq7_start:
+
+	$blast_seq7_trigger waittill trigger
+	level.flags[6] = 1
+	
+	//iprintlnbold_noloc("blast_seq7_setup")
+	
+	//chrissstrahl - update spawns
+	exec coop_mod/spawnlocations.scr::m6l3c_update3
+
+	$blast_seq7_exploder1 anim start
+	thread global/exploder.scr::explode 10001
+	$blast_seq7_hurt1 triggerable
+	$blast_seq7_steam1 anim start	
+	thread jitter_large 0
+	wait .25
+		
+	$blast_seq7_model1 show
+	$blast_seq7_exploder2 anim start
+	thread global/exploder.scr::explode 51
+	wait .25	
+
+	$blast_seq7_fire1 anim start
+	$blast_seq7_hurt2 triggerable
+	wait .25
+
+	$blast_seq7_fire2 anim start
+	$blast_seq7_hurt3 triggerable
+	wait 3.5
+
+	if (level.flags[7] == 0 && level.gametype == 0){ //chrissstrahl - prevent timed explosion in mp
+		trigger $blast_seq8_trigger
+	}
+}end
+
+// Blast Sequence 8 - Blue Pipe Hallway Part 1
+//============================================================================
+blast_seq8_setup:{
+//============================================================================
+	$blast_seq8_firedeath1 nottriggerable
+	$blast_seq8_hurt1 nottriggerable
+	$blast_seq8_hurt2 nottriggerable
+	$blast_seq8_hurt3 nottriggerable
+	$blast_seq8_model1 hide
+	$blast_seq8_model2 hide
+	$blast_seq8_model3 hide
+	goto blast_seq8_start
+
+	blast_seq8_start:
+
+	$blast_seq8_trigger waittill trigger
+	level.flags[7] = 1
+	
+	//iprintlnbold_noloc("blast_seq8_setup")
+	
+	//chrissstrahl - update spawns
+	exec coop_mod/spawnlocations.scr::m6l3c_update4
+
+	thread blast_seq8_pipe_bursts
+	thread global/exploder.scr::explode 52
+	$blast_seq8_exploder1 anim start
+	$blast_seq8_fire1 anim start
+	$blast_seq8_firedeath1 triggerable
+	$blast_seq8_model2 show
+	thread jitter_medium 0
+	wait .25
+
+	$blast_seq8_fire2 anim start
+	$blast_seq8_hurt1 triggerable
+	wait 1
+
+	$blast_seq8_exploder2 anim start
+	$blast_seq8_model1 show
+	$blast_seq8_hurt2 triggerable
+	$blast_seq8_hurt2 thread move_object (512 0 0) 4
+	wait .5
+
+	$blast_seq8_exploder3 anim start
+	$blast_seq8_fire3 anim start
+	wait .5
+
+	$blast_seq8_exploder4 anim start	
+	$blast_seq8_fire4 anim start
+	thread jitter_medium 0
+	wait .5
+
+	$blast_seq8_exploder5 anim start
+	$blast_seq8_fire5 anim start
+	wait 4
+
+	if (level.flags[8] == 0 && level.gametype == 0){ //chrissstrahl - prevent timed explosion in mp
+		trigger $blast_seq9_trigger
+	}
+}end
+
+//============================================================================
+blast_seq8_pipe_bursts:{
+//============================================================================
+	$blast_seq8_steam1 anim start
+	wait .5
+
+	$blast_seq8_steam2 anim start
+	thread global/exploder.scr::explode 53
+	wait .5
+
+	$blast_seq8_steam3 anim start
+	thread global/exploder.scr::explode 54
+	wait .5
+
+	$blast_seq8_steam4 anim start
+	$blast_seq8_hurt3 triggerable
+}end
+
+// Blast Sequence 9 - Blue Pipe Hallway Part 2
+//============================================================================
+blast_seq9_setup:{
+//====================-=======================================================
+	$blast_seq9_firedeath1 nottriggerable
+	$blast_seq9_hurt1 nottriggerable
+	$blast_seq9_hurt2 nottriggerable
+	$blast_seq9_model1 hide
+	$blast_seq9_model2 hide
+	$blast_seq9_model3 hide
+	$blast_seq9_model4 hide
+	$blast_seq9_model5 hide
+	goto blast_seq9_start
+
+	blast_seq9_start:
+
+	$blast_seq9_trigger waittill trigger
+	level.flags[8] = 1
+	
+	//iprintlnbold_noloc("blast_seq9_setup")
+	
+	//chrissstrahl - update spawns
+	exec coop_mod/spawnlocations.scr::m6l3c_update5
+
+	thread jitter_medium 0
+	$blast_seq9_exploder1 anim start
+	wait .5
+
+	$blast_seq9_exploder2 anim start
+	$blast_seq9_exploder5 anim start
+	wait .5
+
+	$blast_seq9_exploder3 anim start
+	wait .5
+
+	$blast_seq9_exploder4 anim start
+	wait 6
+
+	thread jitter_large 0
+	$blast_seq9_hurt1 triggerable
+	$blast_seq9_hurt1 thread move_object (0 -680 0) 4
+	$blast_seq9_exploder6 anim start
+	$blast_seq9_fire1 anim start
+	wait 2
+
+	$blast_seq9_exploder7 anim start
+	$blast_seq9_fire2 anim start
+	$blast_seq9_firedeath1 triggerable
+	wait 1
+
+	thread jitter_medium 0
+	$blast_seq9_hurt2 triggerable
+	$blast_seq9_hurt2 thread move_object ( -680 0 0) 4
+	$blast_seq9_exploder8 anim start
+	$blast_seq9_fire3 anim start
+	wait .5
+
+	thread global/exploder.scr::explode 55
+	thread global/exploder.scr::explode 56
+	$blast_seq9_fire4 anim start
+	$blast_seq9_model1 show
+	wait .5
+
+	thread global/exploder.scr::explode 59
+	$blast_seq9_exploder9 anim start
+	$blast_seq9_fire5 anim start
+	$blast_seq9_fire6 anim start
+	$blast_seq9_model2 show
+	
+	$e4x1 exec global/bullethit.scr (0 -1 90) 1000 50 1
+	$e4x2 exec global/bullethit.scr (0 -1 90) 1000 50 1
+	$e4x3 exec global/bullethit.scr (0 -1 90) 1000 50 1
+	wait 1
+
+	$blast_seq9_exploder10 anim start
+	$blast_seq9_fire7 anim start
+	$blast_seq9_model3 show
+	wait .5	
+
+	$blast_seq9_fire8 anim start
+	$blast_seq9_model4 show
+	thread global/exploder.scr::explode 57
+	thread global/exploder.scr::explode 58
+	wait .25
+
+	thread global/exploder.scr::explode 60
+	$blast_seq9_model5 show
+	wait .25
+
+	$blast_seq9_fire9 anim start
+}end
+
+// Blast Sequence 10 - Map Room
+//============================================================================
+blast_seq10_setup:{
+//============================================================================
+	$blast_seq10_firedeath1 nottriggerable
+	$blast_seq10_model1 hide
+	$blast_seq10_model2 hide
+	goto blast_seq10_start
+
+	blast_seq10_start:
+
+	$blast_seq10_trigger waittill trigger
+	level.flags[9] = 1
+	
+	//chrissstrahl - update spawns
+	exec coop_mod/spawnlocations.scr::m6l3c_update5
+	
+	//iprintlnbold_noloc("blast_seq10_setup")
+	
+	thread e5_start
+	$blast_seq10_model1 show
+	$blast_seq10_model2 show
+	wait .25
+
+	$blast_seq10_exploder1 anim start
+	$blast_seq10_fire1 anim start
+	thread jitter_medium 0
+	wait .25
+
+	$blast_seq10_exploder2 anim start
+	$blast_seq10_firedeath1 triggerable
+}end
+
+// Blast Sequence 11 - Angle Hallway
+//============================================================================
+blast_seq11_setup:{
+//============================================================================
+	$blast_seq11_firedeath1 nottriggerable
+	$blast_seq11_firedeath2 nottriggerable
+	$blast_seq11_firedeath3 nottriggerable
+	$blast_seq11_firedeath4 nottriggerable
+	$blast_seq11_model1 hide
+	$blast_seq11_model2 hide
+	$blast_seq11_model3 hide
+	$blast_seq11_model4 hide
+	$blast_seq11_model5 hide
+	$blast_seq11_model6 hide
+	goto blast_seq11_start
+
+	blast_seq11_start:
+
+	$blast_seq11_trigger waittill trigger
+	level.flags[10] = 1
+	
+	//iprintlnbold_noloc("blast_seq11_setup")
+	
+	//chrissstrahl - update spawns
+	exec coop_mod/spawnlocations.scr::m6l3c_update6
+
+	$blast_seq11_exploder1 anim start
+	$blast_seq11_steam1 anim start
+	$blast_seq11_fire1 anim start
+	thread jitter_medium 0
+	wait .25
+
+	$blast_seq11_exploder2 anim start
+	$blast_seq11_dust1 anim start
+	$blast_seq11_model1 show
+	$blast_seq11_fire2 anim start
+	wait 3
+
+	$blast_seq11_exploder3 anim start
+	thread jitter_large 0
+	wait .25
+
+	$blast_seq11_exploder4 anim start
+	$blast_seq11_firedeath1 triggerable
+	wait .5 
+
+	$blast_seq11_exploder5 anim start
+	$blast_seq11_fire3 anim start
+	wait .5
+
+	$blast_seq11_exploder6 anim start
+	wait .5
+
+	$blast_seq11_exploder7 anim start
+	$blast_seq11_firedeath2 triggerable
+	thread jitter_medium 0
+	wait .5
+
+	$blast_seq11_exploder8 anim start
+	$blast_seq11_model2 show
+	wait .25
+
+	$blast_seq11_exploder8 anim start
+	wait .5
+	
+	$blast_seq11_exploder9 anim start
+	wait .25
+
+	$blast_seq11_exploder10 anim start
+	wait .25
+
+	$blast_seq11_exploder11 anim start
+	wait .5
+
+	$blast_seq11_exploder12 anim start
+	$blast_seq11_exploder13 anim start	
+	wait .25
+
+	$blast_seq11_exploder14 anim start
+	$blast_seq11_model3 show
+	$blast_seq11_fire4 anim start
+	wait .5
+
+	$blast_seq11_exploder15 anim start	
+	$blast_seq11_model4 show
+	$blast_seq11_fire5 anim start
+	wait .25
+
+	$blast_seq11_exploder16 anim start
+	$blast_seq11_fire6 anim start
+	wait .5	
+
+	$blast_seq11_exploder17 anim start
+	$blast_seq11_firedeath3 triggerable
+	$blast_seq11_fire7 anim start
+	thread jitter_medium 0
+	wait .5
+
+	$blast_seq11_exploder18 anim start
+	$blast_seq11_fire8 anim start
+	$blast_seq11_fire9 anim start
+	wait .25
+
+	$blast_seq11_exploder19 anim start
+	$blast_seq11_exploder20 anim start
+	$blast_seq11_model5 show
+	$blast_seq11_fire10 anim start
+	wait .5
+
+	$blast_seq11_exploder21 anim start
+	$blast_seq11_fire11 anim start
+	wait .5
+
+	$blast_seq11_exploder22 anim start
+	$blast_seq11_firedeath4 triggerable
+	$blast_seq11_model6 show
+
+	$e6x1 exec global/bullethit.scr (0 -1 90) 1000 50 1
+	$e6x2 exec global/bullethit.scr (0 -1 90) 1000 50 1
+	$e6x3 exec global/bullethit.scr (0 -1 90) 1000 50 1
+	$e6x4 exec global/bullethit.scr (0 -1 90) 1000 50 1	
+	wait 5
+
+	if (level.flags[11] == 0 && level.gametype == 0){ //chrissstrahl - prevent timed explosion in mp
+		trigger $blast_seq12_trigger
+	}
+}end
+
+// Blast Sequence 12 - Maintenance Stairwell
+//============================================================================
+blast_seq12_setup:{
+//============================================================================
+	$blast_seq12_hurt1 nottriggerable
+	$blast_seq12_blown_vent1 hide
+	$blast_seq12_blown_vent2 hide
+	$blast_seq12_blown_supports1 hide
+	$blast_seq12_blown_vent3 hide
+	$blast_seq12_blown_supports2 hide
+	$blast_seq12_blown_railing1 hide
+	$blast_seq12_blown_steps1 hide
+	$blast_seq12_pipe_blown_supports1 hide
+	goto blast_seq12_start
+
+	blast_seq12_start:
+
+	$blast_seq12_trigger waittill trigger
+	level.flags[11] = 1
+	
+	//iprintlnbold_noloc("blast_seq12_setup")
+	
+	//chrissstrahl - update spawns
+	exec coop_mod/spawnlocations.scr::m6l3c_update7
+
+	thread jitter_large 0
+	$blast_seq6_exploder1 anim start
+	wait .75
+
+	thread jitter_large 0
+	$blast_seq6_exploder2 anim start
+	$blast_seq12_vent1 remove
+	$blast_seq12_supports1 remove
+	$blast_seq12_blown_vent1 show
+	$blast_seq12_blown_vent2 show
+	$blast_seq12_blown_supports1 show
+	$blast_seq12_blown_vent2 time .6
+	$blast_seq12_blown_vent2 rotatexup 10
+	$blast_seq12_blown_vent2 waitmove
+	wait .3
+
+	thread jitter_large 0
+	$blast_seq12_exploder5 anim start
+	wait .5
+
+	thread jitter_large 0
+	$blast_seq12_exploder3 anim start
+	$blast_seq12_vent2 remove
+	$blast_seq12_supports2 remove
+	$blast_seq12_blown_vent3 show
+	$blast_seq12_blown_supports2 show
+	$blast_seq12_blown_vent2 time .8
+	$blast_seq12_blown_vent2 rotatexup 34
+	$blast_seq12_blown_vent2 rotateyup 5
+	$blast_seq12_blown_vent2 movenorth 12
+	$blast_seq12_blown_vent2 movedown 190
+	
+	thread jitter_large 0
+	$blast_seq12_exploder6 anim start
+	thread blast_seq12_pipes
+
+	$blast_seq12_blown_vent2 waitmove
+	$blast_seq12_railing1 remove
+	$blast_seq12_steps1 remove
+	$blast_seq12_blown_railing1 show
+	$blast_seq12_blown_steps1 show
+
+	thread jitter_medium 0
+	$blast_seq12_exploder4 anim start
+	wait .5
+
+	thread jitter_large 0
+	$blast_seq12_exploder7 anim start
+}end
+
+//============================================================================
+blast_seq12_pipes:{
+//============================================================================
+	wait .3
+
+	$blast_seq12_pipes1 remove
+	$blast_seq12_pipe_supports1 remove
+	$blast_seq12_pipe_blown_supports1 show
+
+	$blast_seq12_pipes2 time .35
+	$blast_seq12_pipes3 time .3
+	$blast_seq12_pipes4 time .45
+	$blast_seq12_pipes5 time .35
+
+	$blast_seq12_pipes2 rotatexdown 44
+	$blast_seq12_pipes2 rotateyup 12
+
+	$blast_seq12_pipes3 rotatexdown 45
+	$blast_seq12_pipes3 rotateyup 6
+
+	$blast_seq12_pipes4 rotatezdown 38
+	$blast_seq12_pipes4 rotateydown 17
+
+	$blast_seq12_pipes5 rotatezdown 47
+	$blast_seq12_pipes5 rotateydown 7
+
+	$blast_seq12_pipes2 move
+	wait .1
+
+	$blast_seq12_pipes4 move
+	wait .1
+
+	$blast_seq12_pipes3 move
+	wait .1
+
+	$blast_seq12_pipes5 move
+}end
+
+// Blast Sequence 13 - Elevator Drop
+//============================================================================
+blast_seq13_setup:{
+//============================================================================
+	$blast_seq13_model1 hide
+	$elevator_cab_destroyed hide
+	$elevator_cab_destroyed notsolid
+	$elevator_cab_drop time 1.25
+
+	$elevator_cab_scientist1 exec global/disable_ai.scr
+	$elevator_cab_scientist2 exec global/disable_ai.scr
+	$elevator_cab_scientist3 exec global/disable_ai.scr
+
+	$elevator_cab_scientist_origin1 bind $elevator_cab_drop
+	$elevator_cab_scientist_origin2 bind $elevator_cab_drop
+	$elevator_cab_scientist_origin3 bind $elevator_cab_drop
+
+	$elevator_cab_scientist1 glue $elevator_cab_scientist_origin1
+	$elevator_cab_scientist2 glue $elevator_cab_scientist_origin1
+	$elevator_cab_scientist3 glue $elevator_cab_scientist_origin1
+	goto blast_seq13_start
+
+	blast_seq13_start:
+
+	$blast_seq13_trigger waittill trigger
+	level.flags[12] = 1
+	
+	//iprintlnbold_noloc("blast_seq13_setup")
+
+	$blast_seq13_exploder6 anim start
+	thread jitter_medium 0
+	wait .5
+
+	$elevator_cab_destroyed playsound m6l3c_elevator_clang
+	wait 1
+
+	$elevator_cab_drop playsound m6l3c_elevator_fall
+	$elevator_cab_scientist1 say snd_den_death_generic71
+	$elevator_cab_scientist2 say snd_den_death_generic74
+	$elevator_cab_scientist3 say snd_den_death_generic80
+	wait .5
+
+	thread blast_seq13_elevator
+	thread jitter_medium 0
+	$blast_seq13_dust1 anim start
+	wait 1
+
+	$blast_seq13_exploder1 anim start
+	$blast_seq13_exploder2 anim start
+	$blast_seq13_exploder3 anim start
+	wait .25
+
+	$blast_seq13_model1 show
+	$blast_seq13_exploder4 anim start
+	$blast_seq13_exploder5 anim start
+	wait 4
+
+	if (level.flags[13] == 0 && level.gametype == 0){ //chrissstrahl - prevent timed explosion in mp
+		trigger $blast_seq14_trigger
+	}
+}end
+
+//============================================================================
+blast_seq13_elevator:{
+//============================================================================
+	$elevator_cab_drop movedown 570
+	$elevator_cab_drop waitmove
+	
+	thread jitter_medium 0
+	$elevator_cab_drop remove
+	$elevator_cab_destroyed show
+
+	$elevator_cab_scientist1 exec global/bullethit.scr (0 -1 0) 1000 0 0
+	$elevator_cab_scientist2 exec global/bullethit.scr (0 -1 0) 1000 0 0
+	$elevator_cab_scientist3 exec global/bullethit.scr (0 -1 0) 1000 0 0	
+}end
+
+// Blast Sequence 14 - Elevator Room
+//============================================================================
+blast_seq14_setup:{
+//============================================================================
+	goto blast_seq14_start
+
+	blast_seq14_start:
+
+	$blast_seq14_trigger waittill trigger
+	level.flags[13] = 1
+	
+	//iprintlnbold_noloc("blast_seq14_setup")
+}end
+
+// Blast Sequence 15 - Radio Room Hallway
+//============================================================================
+blast_seq15_setup:{
+//============================================================================
+	$blast_seq15_firedeath1 nottriggerable
+	$blast_seq15_firedeath2 nottriggerable
+	$blast_seq15_hurt1 nottriggerable
+	$blast_seq15_hurt2 nottriggerable
+	$blast_seq15_model1 hide
+	$blast_seq15_model2 hide
+	$blast_seq15_model3 hide
+	$blast_seq15_model4 hide
+	$blast_seq15_model5 hide
+	goto blast_seq15_start
+
+	blast_seq15_start:
+
+	$blast_seq15_trigger waittill trigger
+	level.flags[14] = 1
+	thread e8_start
+	
+	//iprintlnbold_noloc("blast_seq15_setup")
+	
+	//chrissstrahl - update spawns
+	exec coop_mod/spawnlocations.scr::m6l3c_update8
+
+	$blast_seq15_firedeath1 triggerable
+	$blast_seq15_firedeath2 triggerable
+	$blast_seq15_exploder1 anim start
+	$blast_seq15_hurt1 triggerable
+	$blast_seq15_hurt1 thread move_object (0 -448 0) 2.5
+
+	$e7x1 exec global/bullethit.scr (0 -1 90) 1000 50 1
+	$e7x2 exec global/bullethit.scr (0 -1 90) 1000 50 1
+	$e7x3 exec global/bullethit.scr (0 -1 90) 1000 50 1
+	$e7x4 exec global/bullethit.scr (0 -1 90) 1000 50 1
+
+	thread jitter_large 0
+	wait .25
+
+	$blast_seq15_exploder2 anim start
+	$blast_seq15_fire1 anim start
+	$blast_seq15_model1 show
+	wait .5
+
+	$blast_seq15_exploder3 anim start
+	$blast_seq15_fire2 anim start
+	wait .5	
+
+	thread jitter_medium 0
+	$blast_seq15_exploder3 anim start
+	$blast_seq15_fire3 anim start
+	wait .25
+
+	$blast_seq15_exploder4 anim start
+	$blast_seq15_fire4 anim start
+	$blast_seq15_model2 show
+	wait .5
+
+	$blast_seq15_exploder5 anim start
+	wait 1
+
+	$blast_seq15_exploder6 anim start
+	$blast_seq15_hurt2 triggerable
+	$blast_seq15_hurt2 thread move_object (0 360 0) 1.5
+	thread jitter_large 0
+	wait .25
+
+	$blast_seq15_exploder7 anim start
+	$blast_seq15_fire5 anim start
+	$blast_seq15_model3 show
+	wait .5
+
+	$blast_seq15_exploder8 anim start
+	$blast_seq15_fire6 anim start
+	wait .25
+
+	$blast_seq15_exploder9 anim start
+	$blast_seq15_model4 show
+	wait .5
+
+	thread jitter_medium 0
+	$blast_seq15_exploder10 anim start
+	thread global/exploder.scr::explode 65
+	wait .25
+
+	thread global/exploder.scr::explode 66
+	wait .25
+
+	thread global/exploder.scr::explode 67
+	$blast_seq15_model5 show
+	wait 4
+
+	if (level.flags[15] == 0 && level.gametype == 0){ //chrissstrahl - prevent timed explosion in mp
+		trigger $blast_seq16_trigger
+	}
+}end
+
+// Blast Sequence 16 - Metal Gear Tunnel
+//============================================================================
+blast_seq16_setup:{
+//============================================================================
+	$blast_seq16_firedeath1 nottriggerable
+	$blast_seq16_firedeath2 nottriggerable
+	$blast_seq16_hurt1 nottriggerable
+	$blast_seq16_model1 hide
+	$blast_seq16_model2 hide
+	$blast_seq16_model3 hide
+	goto blast_seq16_start
+
+	blast_seq16_start:
+
+	$blast_seq16_trigger waittill trigger
+	level.flags[15] = 1
+	
+	//iprintlnbold_noloc("blast_seq16_setup")
+
+	thread global/exploder.scr::explode 10
+	$blast_seq16_exploder1 anim start
+	$blast_seq16_steam1 anim start
+	thread jitter_large 0
+	wait .5
+
+	thread global/exploder.scr::explode 11
+	$blast_seq16_exploder2 anim start
+	$blast_seq16_steam2 anim start
+	thread jitter_medium 0
+	wait .5
+
+	thread global/exploder.scr::explode 12
+	$blast_seq16_exploder3 anim start
+	$e9x1 exec global/bullethit.scr (0 -1 90) 1000 50 1
+	wait .25
+
+	$blast_seq16_exploder4 anim start
+	$blast_seq16_steam3 anim start
+	wait .5
+
+	$blast_seq16_exploder5 anim start
+	thread jitter_medium 0
+	wait .5
+
+	thread global/exploder.scr::explode 13
+	$blast_seq16_exploder6 anim start
+	$blast_seq16_steam4 anim start
+	wait .25
+
+	$blast_seq16_exploder7 anim start
+	$blast_seq16_exploder8 anim start
+	wait .5
+
+	thread global/exploder.scr::explode 14
+	$blast_seq16_exploder9 anim start
+	$blast_seq16_steam5 anim start
+	thread jitter_medium 0
+	wait .25
+
+	$blast_seq16_exploder10 anim start	
+	wait 1
+
+	$blast_seq16_hurt1 triggerable
+	$blast_seq16_hurt1 thread move_object ( -960 0 0) 2.5
+	wait 1
+
+	$blast_seq16_exploder11 anim start
+	$blast_seq16_model1 show
+	$blast_seq16_fire1 anim start
+	thread jitter_medium 0
+	wait 1
+
+	$blast_seq16_exploder12 anim start
+	$blast_seq16_firedeath1 triggerable
+	$blast_seq16_model2 show
+	$blast_seq16_fire2 anim start
+	wait .25
+
+	$blast_seq16_exploder13 anim start
+	$blast_seq16_firedeath2 triggerable
+	$blast_seq16_model3 show
+	$blast_seq16_fire3 anim start
+}end
+
+// Blast Sequence 17 - Heavy Door Hallway
+//============================================================================
+blast_seq17_setup:{
+//============================================================================
+	$blast_seq17_firedeath1 nottriggerable
+	$blast_seq17_hurt1 nottriggerable
+	$blast_seq17_model1 hide
+	$blast_seq17_model2 hide
+	$blast_seq17_model3 hide
+	$blast_seq17_model4 hide
+	$blast_seq17_model5 hide
+	goto blast_seq17_start
+
+	blast_seq17_start:
+
+	$blast_seq17_trigger waittill trigger
+	level.flags[16] = 1
+	
+	//iprintlnbold_noloc("blast_seq17_setup")
+	
+	wait 4
+
+	$blast_seq17_hurt1 triggerable
+	$blast_seq17_hurt1 thread move_object (0 960 0) 6
+	$blast_seq17_exploder1 anim start
+	wait .5
+
+	$blast_seq17_exploder2 anim start
+	$blast_seq17_model1 show
+	wait .5
+
+	$blast_seq17_exploder3 anim start
+	$blast_seq17_fire1 anim start
+	wait .5
+
+	$blast_seq17_exploder4 anim start
+	$blast_seq17_model2 show
+	wait .5
+
+	$blast_seq17_exploder5 anim start
+	wait .5
+
+	$blast_seq17_exploder6 anim start
+	$blast_seq17_fire2 anim start
+	wait .5
+
+	$blast_seq17_exploder7 anim start
+	$blast_seq17_model3 show
+	wait .5
+
+	$blast_seq17_exploder8 anim start
+	$blast_seq17_fire3 anim start
+	wait .5
+
+	$blast_seq17_exploder9 anim start
+	wait .5
+
+	$blast_seq17_exploder10 anim start
+	$blast_seq17_model4 show
+	wait .5
+
+	$blast_seq17_exploder11 anim start
+	wait .5
+
+	$blast_seq17_exploder12 anim start
+	$blast_seq17_fire4 anim start
+	wait .5
+
+	$blast_seq17_exploder13 anim start
+	wait .5
+
+	$blast_seq17_exploder14 anim start
+	wait .5
+
+	thread global/exploder.scr::explode68
+	thread global/exploder.scr::explode69
+	$blast_seq17_exploder15 anim start
+	wait .5
+
+	$blast_seq17_exploder16 anim start
+	$blast_seq17_fire5 anim start
+	wait .5
+
+	$blast_seq17_exploder17 anim start
+	wait .5
+
+	$blast_seq17_exploder18 anim start
+	$blast_seq17_model5 show
+	wait .5
+
+	$blast_seq17_exploder19 anim start
+	wait .5
+
+	$blast_seq17_exploder20 anim start
+	wait 4
+
+	$blast_seq17_exploder21 anim start
+	wait .25
+
+	$blast_seq17_exploder22 anim start
+	$blast_seq17_exploder23 anim start
+	$blast_seq17_firedeath1 triggerable
+}end
+
+// Ecounter Sequence 1 - Elevator Hallway
+//============================================================================
+e1_start:{
+//============================================================================
+	trigger $e1x1
+	$e1x1 forceactivate
+	wait .3
+
+	trigger $e1x2
+	$e1x2 forceactivate
+}end
+
+// Ecounter Sequence 2 - Stairwell
+//============================================================================
+e2_start:{
+//============================================================================
+	trigger $e2x1
+	$e2x1 forceactivate
+}end
+
+// Ecounter Sequence 3 - Furnace Room
+//============================================================================
+e3_start:{
+//============================================================================
+	trigger $e3x1
+	$e3x1 forceactivate
+
+	trigger $e3x2
+	$e3x2 forceactivate
+	wait .5
+
+	$e3x1 exec global/bullethit.scr (0 -1 90) 1000 50 1
+	wait .25
+
+	$e3x2 exec global/bullethit.scr (0 -1 90) 1000 50 1
+}end
+
+// Ecounter Sequence 4 - Blue Pipe Hallway
+//============================================================================
+e4_start:{
+//============================================================================
+	trigger $e4x1
+	$e4x1 forceactivate
+
+	trigger $e4x2
+	$e4x2 forceactivate
+
+	trigger $e4x3
+	$e4x3 forceactivate
+}end
+
+// Ecounter Sequence 5 - Map Room
+//============================================================================
+e5_start:{
+//============================================================================
+	trigger $e5x1
+	$e5x1 forceactivate
+
+	trigger $e5x2
+	$e5x2 forceactivate
+
+	trigger $e5x3
+	$e5x3 forceactivate
+	wait 1.5
+
+	$e5x2 exec global/bullethit.scr (0 -1 90) 1000 50 1
+}end
+
+// Ecounter Sequence 6 - Angle Hallway
+//============================================================================
+e6_start:{
+//============================================================================
+	trigger $e6x1
+	$e6x1 forceactivate
+
+	trigger $e6x2
+	$e6x2 forceactivate
+
+	trigger $e6x3
+	$e6x3 forceactivate
+
+	trigger $e6x4
+	$e6x4 forceactivate
+}end
+
+// Ecounter Sequence 7 - Elevator Drop Room
+//============================================================================
+e7_start:{
+//============================================================================
+	trigger $e7x1
+	$e7x1 forceactivate
+
+	trigger $e7x2
+	$e7x2 forceactivate
+
+	trigger $e7x3
+	$e7x3 forceactivate
+
+	trigger $e7x4
+	$e7x4 forceactivate
+}end
+
+// Ecounter Sequence 8 - Radio Room Hallway
+//============================================================================
+e8_start:{
+//============================================================================
+	trigger $e8x1
+	$e8x1 forceactivate
+
+	trigger $e8x2
+	$e8x2 forceactivate
+	wait 2
+
+	$e8x1 exec global/bullethit.scr (0 -1 0) 1000 50 1
+	wait .5
+
+	$e8x2 exec global/bullethit.scr (0 -1 0) 1000 50 1
+}end
+
+// Heavy Flywheel Door
+//============================================================================
+heavy_door_setup:{
+//============================================================================
+	$heavy_door1_flywheel notsolid
+	$heavy_door1_flywheel hide
+}end
+
+//============================================================================
+heavy_door1_start:{
+//============================================================================
+	$heavy_door1_flywheel_pulse hide
+	$heavy_door1_flywheel show
+
+	if (level.heavydoor1 == 0 && level.heavydoor1moving == 0){
+		level.heavydoor1 = 1
+		level.heavydoor1moving = 1
+
+		//$heavy_door1 open $player //chrissstrahl
+		$heavy_door1 open $world //chrissstrahl - make coop compatible
+		$heavy_door1 playsound door_vault_roll_open	
+		$heavy_door1_flywheel thread flywheel_z360_open
+		wait 3
+		
+		level.heavydoor3moving = 0
+	}else if (level.heavydoor1 == 1 && level.heavydoor1moving == 0){
+		level.heavydoor1 = 0
+		level.heavydoor1moving = 1
+
+		$heavy_door1 close
+		$heavy_door1 playsound door_vault_roll_close	
+		$heavy_door1_flywheel thread flywheel_z360_close
+		wait 3
+		
+		level.heavydoor1moving = 0
+	}
+}end
+
+//============================================================================
+heavy_door1_reverse:{
+//============================================================================
+	if (level.heavydoor1 == 0 && level.heavydoor1moving == 0){
+		level.heavydoor1 = 1
+		level.heavydoor1moving = 1
+
+		//$heavy_door1 open $player //chrissstrahl
+		$heavy_door1 open $world //chrissstrahl - make coop compatible
+		$heavy_door1 playsound door_vault_roll_open
+		$heavy_door1_flywheel_reverse thread flywheel_x360_open
+		wait 3
+		
+		level.heavydoor1moving = 0
+	}else if (level.heavydoor1 == 1 && level.heavydoor1moving == 0){
+		level.heavydoor1 = 0
+		level.heavydoor1moving = 1
+
+		$heavy_door1 close
+		$heavy_door1 playsound door_vault_roll_close	
+		$heavy_door1_flywheel_reverse thread flywheel_x360_close
+		wait 3
+		
+		level.heavydoor1moving = 0
+	}
+}end
+
+//============================================================================
+flywheel_z360_open:{
+//============================================================================
+	self time 3
+	self rotateZup 360
+	self playsound flywheel
+	self waitmove
+}end
+
+//============================================================================
+flywheel_z360_close:{
+//============================================================================
+	self time 3
+	self rotateZdown 360
+	self playsound flywheel
+	self waitmove
+}end
+
+//============================================================================
+flywheel_x360_open:{
+//============================================================================
+	self time 3
+	self rotateXup 360
+	self playsound flywheel
+	self waitmove
+}end
+
+//============================================================================
+flywheel_x360_close:{
+//============================================================================
+	self time 3
+	self rotateXdown 360
+	self playsound flywheel
+	self waitmove
+}end
+
+// Volume Damage
+//============================================================================
+hurt_5:{
+//============================================================================
+	local.self volumedamage 5
+	parm.other playsound firetouch
+}end
+
+//============================================================================
+hurt_10:{
+//============================================================================
+	local.self volumedamage 10
+	parm.other playsound firetouch
+}end
+
+//============================================================================
+hurt_20:{
+//============================================================================
+	local.self volumedamage 20
+	parm.other playsound firetouch
+}end
+
+//============================================================================
+hurt_50:{
+//============================================================================
+	local.self volumedamage 50
+	parm.other playsound firetouch
+}end
+
+//============================================================================
+hurt_500:{
+//============================================================================
+	local.self volumedamage 50
+	parm.other playsound firetouch
+}end
+
+// Fire Death
+//============================================================================
+firedeath:{
+//============================================================================
+	local.poorbastard = parm.other
+	wait (randomfloat .5 + .5)
+
+	if (local.poorbastard istouching self){
+		local.poorbastard playsound firetouch
+		local.ent = spawn script_model
+		local.ent model "animate/explosion_conflagration.tik"
+		local.ent.origin = local.poorbastard.origin
+		local.ent anim start
+
+		radiusdamage local.ent.origin 4000 256
+		wait 1
+
+		local.ent remove
+	}
+}end
+
+// Take Path - $targetname takepath <name of path> <movement method> [attack type|0 - bypass]
+//============================================================================
+takepath local.path local.movement local.attack_type:{
+//============================================================================
+	switch (local.movement){
+		case "walk":
+			println ("XXX " + local.self.targetname + " start walking on path " + local.path)
+			local.self exec global/walkto.scr local.path
+			local.self waittill movedone
+			break
+
+		default:
+			println ("XXX " + local.self.targetname + " start running on path " + local.path)
+			local.self exec global/runto.scr local.path
+			local.self waittill movedone
+			break
+	}
+
+	if (local.attack_type != "0"){
+		println ("XXX " + local.self.targetname + " enabling AI")
+		local.self type_attack local.attack_type
+		local.self exec global/enable_ai.scr
+	}
+}end
+
+// Move Object - move_object <distance to move to|vector> <time to take>
+//============================================================================
+move_object local.distance local.time:{
+//============================================================================
+	local.index = local.time / .05
+	local.move_distance_x = local.distance[0] / local.index
+	local.move_distance_y = local.distance[1] / local.index
+	local.move_distance_z = local.distance[2] / local.index
+
+	for (local.i = 0 ; local.i <= local.time ; local.i += .05){
+		local.newx = local.self.origin[0] + local.move_distance_x
+		local.newy = local.self.origin[1] + local.move_distance_y
+		local.newz = local.self.origin[2] + local.move_distance_z
+		local.self.origin = (local.newx local.newy local.newz)
+
+		//chrissstrahl - make coop compatible
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+			if( local.player != NULL && local.player.health > 0 && vector_length(local.self.origin - local.player.origin) < 125 && local.player.dmteam != "spectator" /*&& local.player.flags["coop_isActive"] == 1*/ ){
+				local.player exec global/bullethit.scr (0 0 250) 500 25 1
+			}
+		}
+		
+		//if (vector_length(local.self.origin - $player.origin) < 125){
+			//$player exec global/bullethit.scr (0 0 250) 500 25 1
+		//}
+		wait .05
+	}
+}end
+
+// Screen Shake Effects
+//============================================================================
+jitter_medium local.time:{
+//============================================================================
+	if (local.time){
+		wait local.time
+	}
+
+	waitexec global/earthquake.scr .23 .7 0 0
+	waitexec global/earthquake.scr .8 .6 0 0
+	waitexec global/earthquake.scr 1 .6 0 .5
+}end
+
+//============================================================================
+jitter_large local.time:{
+//============================================================================
+	if (local.time){
+		wait local.time
+	}
+
+	waitexec global/earthquake.scr .4 .9 0 0
+	waitexec global/earthquake.scr .7 .6 0 0
+	waitexec global/earthquake.scr 1 1 0 0
+	waitexec global/earthquake.scr 1 .5 0 .3
+}end
+
+
+//=========================================================================
+coop_playerJustSpawned local.i:{
+//=========================================================================
+//chrissstrahl - handle gasmask for player
+
+	local.player = $player[local.i]
+	if(local.player != NULL){
+		if(local.player.dmteam != "spectator" && local.player.health > 0 && local.player.flags["coop_isActive"] == 1){
+			// JBW - moved huddraw stuff out of refresh since refresh never happens
+			huddraw_shader 200 "textures/hud/gasmask_overlay"
+			huddraw_align 200 left top
+			huddraw_rect 200 0 0 640 480
+			huddraw_virtualsize 200 1
+			huddraw_color 200 1 1 1
+			huddraw_alpha 200 1
+		}
+	}
+}end
+
+//=========================================================================
+coop_playerJustSpawned1:{
+//=========================================================================
+	thread coop_playerJustSpawned 1
+}end
+
+//=========================================================================
+coop_playerJustSpawned2:{
+//=========================================================================
+	thread coop_playerJustSpawned 2
+}end
+
+//=========================================================================
+coop_playerJustSpawned3:{
+//=========================================================================
+	thread coop_playerJustSpawned 3
+}end
+
+//=========================================================================
+coop_playerJustSpawned4:{
+//=========================================================================
+	thread coop_playerJustSpawned 4
+}end
+
+//=========================================================================
+coop_playerJustSpawned5:{
+//=========================================================================
+	thread coop_playerJustSpawned 5
+}end
+
+//=========================================================================
+coop_playerJustSpawned6:{
+//=========================================================================
+	thread coop_playerJustSpawned 6
+}end
+
+//=========================================================================
+coop_playerJustSpawned7:{
+//=========================================================================
+	thread coop_playerJustSpawned 7
+}end
+
+//=========================================================================
+coop_playerJustSpawned8:{
+//=========================================================================
+	thread coop_playerJustSpawned 8
+}end
+
+

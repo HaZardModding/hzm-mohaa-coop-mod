@@ -1,0 +1,121 @@
+//
+// aicleanup.scr
+//
+// ccaron 5.29.03
+//
+// usage : exec /.../aicleanup.scr
+//
+// remove a set of guys on a trigger event
+// initialized during startup
+//
+// In the map...
+//
+// place a trigger_once targetname triggercleanup(n).
+// this will automatically cleanup all guys with
+// $targetname cleanup(n)
+//
+// To integrate with enemyspawners...
+// set the $enemyname field of the spawners
+// to cleanup(n)
+//
+// You can use the field #min_dist in the cleanuptrigger
+// to determine the minimum distance away player needs
+// to be to delete the guy. (DEFAULT min_dist = 1000)
+// 
+// ------------------------------------------------
+
+// Find all triggercleanup(s) and start
+// a thread on each
+//============================================================================
+init: {
+//============================================================================
+	println "AICLEANUP >>> initializing aicleanup"
+
+	local.i = 1
+	while (local.i <= 25) {
+		local.trigger = $("triggercleanup" + local.i)
+
+		if (local.trigger != NULL) {
+			println "AICLEANUP >>> found triggercleanup" local.i
+			thread CleanupThread local.trigger ("cleanup" + local.i) local.trigger.min_dist
+		}
+		local.i ++
+	}
+
+	println "AICLEANUP >>> aicleanup initialized"
+}end
+
+// Try to delete a set of guys when their
+// cleanup trigger is hit
+//============================================================================
+CleanupThread local.trigger local.guys_string local.min_dist: {
+//============================================================================
+	if (!local.min_dist) {
+		local.min_dist = 1000
+	}
+
+	if (!local.trigger) {
+		println "AICLEANUP >>>> local. trigger is NULL"
+		end
+	}
+
+	local.trigger waittill trigger
+
+	///// kind of dangerous and not necessary to do this:
+	//	if (local.trigger)
+	//		local.trigger delete
+
+	println "AICLEANUP >>> Cleaning up " local.guys_string
+
+	if (local.trigger.target) {
+		println "AICLEANUP >>> targeting " local.trigger.target ", deleting"
+		thread TryDelete local.trigger.target local.min_dist
+	}
+	
+	if (!$(local.guys_string)) {
+		println "AICLEANUP >>> could not find " local.guys_string " guys"
+		end
+	}
+
+	local.arr = exec global/makearray.scr $(local.guys_string)
+	local.num = $(local.guys_string).size
+
+	for (local.i=1; local.i<=local.num; local.i++) {
+		thread TryDelete local.arr[local.i] local.min_dist
+		//local.arr[local.i] delete
+	}
+
+	println "AICLEANUP >>> deleted " local.num " guys"
+}end
+
+// If a guy to close, then wait for for him to be far
+// enough away to delete.
+//============================================================================
+TryDelete local.ent local.dist: {
+//============================================================================
+	if (local.dist == NIL) {
+		local.dist = 2000
+	}
+
+	if (!local.ent) {
+		end
+	}
+
+	if (vector_within $player.origin local.ent.origin local.dist) {
+		local.ent waitthread WaitTillOutOfSight local.dist
+	}
+
+	local.ent delete
+}end
+
+// tracks a guys distance to player
+// local.dist is distance guy must
+// be away from player before he is
+// deleted.
+//============================================================================
+WaitTillOutOfSight local.dist: {
+//============================================================================
+	while (vector_within self.origin $player.origin local.dist) {
+		wait 1
+	}
+}end

@@ -1,0 +1,216 @@
+
+
+
+//=================================================
+//=================================================
+Start local.animbasename local.shootwhilemoving local.shootpct:
+	//***NOTE: The caller is responsible for setting self.position before calling this routine
+
+	local.spawnedshootthread = 0
+	local.spawnedanimthread = 0
+	self.inreload = 0
+
+	while(1)
+	{
+		if (self.movedir != (0 0 0))
+		{
+			//println "Motion blend with move dir: " self.movedir
+
+			if (local.shootwhilemoving == 1)
+			{
+				if (local.spawnedshootthread == 0)
+				{
+					thread ShootInMotion local.shootpct
+					local.shootthread = parm.previousthread
+					local.spawnedshootthread = 1
+				}
+			}
+			else
+			{
+				local.spawnedshootthread = 0
+			}
+
+			if (local.spawnedanimthread == 0)
+			{
+				thread AnimThread local.animbasename
+				local.animthread = parm.previousthread
+				local.spawnedanimthread = 1
+			}
+
+			//waitexec anim/motionblend.scr::PlayAnim local.animbasename
+			waitframe
+		}
+		else
+		{
+			if (local.spawnedanimthread == 1)
+			{
+				local.animthread delete
+				local.spawnedanimthread = 0
+			}
+			
+			if (local.spawnedshootthread == 1)
+			{
+				
+				if (self.inreload == 1)
+				{
+					self setmotionanim (self.weapongroup + "_stand_alert_legs")
+					//wait for the reload to finish
+					while (self.inreload == 1)
+					{
+						waitframe
+					}
+				}
+
+				local.shootthread delete
+				local.spawnedshootthread = 0
+			}
+
+			//self setmotionanim (self.weapongroup + "_stand_alert")
+			//self waittill flaggedanimdone
+			waitexec anim/stand.scr
+		}
+	}
+
+	//if (local.spawnedshootthread == 1)
+	//{
+	//	local.shootthread delete
+	//	local.spawnedshootthread = 0
+	//}
+end
+
+//=================================================
+//=================================================
+PlayAnim local.animbasename:
+	if (self.movedir != (0 0 0))
+	{
+		local.dotvec = self.forwardvector * self.movedir
+		local.sidevec = self.leftvector * self.movedir
+		// (Boon) Divide by forward+side since it's the "correct" thing to do.  Might not make any noticeable improvement though.
+		local.forwardbackblend = abs(local.dotvec) / ( abs(local.dotvec) + abs(local.sidevec) )
+		local.sideblend = 1.0 - local.forwardbackblend
+	}
+	else
+	{
+		local.dotvec = 1.0
+		local.sidevec = 0.00
+		local.forwardbackblend = 1.0
+		local.sideblend = 0.00
+	}
+
+	//sanity checks
+	if (local.sideblend < 0.00)
+	{
+		println "motionblend: sideblend is less than 0, how did that happen!?"
+		println "self.movedir " self.movedir
+		println "self.forward " self.forwardvector
+		local.sideblend = 0.00
+		local.forwardbackblend = 1.00
+	}
+
+	if (local.sideblend > 1.0)
+	{
+		println "motionblend: sideblend is more than 1, how did that happen!?"
+		local.sideblend = 1.0
+		local.forwardbackblend = 0.00
+	}
+
+	//println "Forward: " local.forwardbackblend " Side: " local.sideblend
+
+	self.blendtime = 0.20
+
+	if (local.dotvec >= 0.00)
+	{
+		//move forward
+		self setanim (local.animbasename + "forward") 0 local.forwardbackblend
+	}
+	else
+	{
+		self setanim (local.animbasename + "back") 0 local.forwardbackblend
+	}
+
+	if (local.sidevec >= 0.00)
+	{
+		//move left
+		self setanim (local.animbasename + "left") 1 local.sideblend
+	}
+	else
+	{
+		//move right
+		self setanim (local.animbasename + "right") 1 local.sideblend
+	}
+
+	wait 0.20
+end
+
+//=================================================
+//=================================================
+ShootInMotion local.shootpct:
+	while (1)
+	{
+		// JBW - coverguy reload sets this when it runs to cover because of a reload
+		if ( self . forceReload == 1 )
+		{
+			self . roundsinclip = 0;
+			self . needreload = 1;			
+			self . forceReload = 0;
+		}
+
+		if (self.needreload == 1)
+		{
+			waitexec anim/reload.scr::Reload 1
+		}
+		else
+		{
+			self.playedreloadanim = 0
+			self.playedrechamberanim = 0
+			self.inreload = 0
+		}
+
+		waitexec anim/shoot.scr::CanShoot
+		if (self.canshoot == 1)
+		{
+			//chrissstrahl - fix mg42 gunners having no weapon
+			if(self.weapongroup == "unarmed" && level.coop_aaMap != NIL && level.coop_aaMap == 1){
+				self waitthread coop_mod/mg42_hack.scr::main
+			}
+		
+			self setactionanim (self.weapongroup + "_aim") -60 60
+			self.needreload = 0
+			wait self.blendtime
+
+			local.randnum = randomint 100
+			if (local.randnum < local.shootpct)
+			{
+				waitexec anim/shoot.scr::CanShoot
+				if (self.canshoot == 1)
+				{
+					self setactionanim (self.weapongroup + "_shoot") -60 60
+					self.needreload = 1
+					self waittill upperanimdone
+				}
+				else
+				{
+					//println "Not shooting while running"
+					self endactionanim
+					waitframe
+				}
+			}
+		}
+		else
+		{
+			//println "Not shooting while running"
+			self endactionanim
+			waitframe
+		}
+	}
+end
+
+
+//=================================================
+//=================================================
+AnimThread local.animbasename:
+	while (1)
+	{
+		waitexec anim/motionblend.scr::PlayAnim local.animbasename
+	}
+end

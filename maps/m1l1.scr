@@ -1,0 +1,2829 @@
+//chrissstrahl - modified for coop
+//2018.07.24
+//=========================================================================
+main:{
+//=========================================================================
+// Mackey was here
+	level.coopPrevMap = "briefing/briefing1"	//chrissstrahl - set previouse map (for mom voteing)
+	level.coopNextMap = "m1l2a"					//chrissstrahl - set next map (for mom voteing)
+	level.coop_aaMap = 1						//chrissstrahl - let global scripts know this is a AA level
+	level.coop_disableSpawnWarper	= TRUE		//chrissstrahl - disable respawn warper
+	//level.coop_noWeapons			= 1			//chrissstrahl - disable weapons
+	level.coop_spawnInsideTruck		= 1			//chrissstrahl - let the script know that players spawn inside the truck
+	thread coop_mod/main.scr::main 				//chrissstrahl - start coop mod extensions
+//	setcvar debug 1
+//	getcvar(debug) = getcvar (debug)
+//	println ("getcvar(debug) is " + getcvar(debug))
+
+//	if (getcvar(debug) == NIL)
+//		getcvar(debug) = 0
+	
+	$door notsolid
+
+	exec global/ai.scr
+	exec global/exploder.scr
+	
+//chrissstrahl - deactivated for coop
+	//exec global/loadout.scr "maps/m1l1.scr"
+
+	$newtruckclip notsolid
+
+	$temptruck1 notsolid
+	$temptruck2 notsolid
+	exec global/disc.scr $door_left
+	exec global/disc.scr $door_right
+	$hahaha notsolid
+
+	$hahaha notsolid
+	$truckclip notsolid
+	$truckclip2 notsolid
+	$deadtruck notsolid
+	$ending_save_player notsolid
+level waittill prespawn
+	$firstguy delete
+
+	$clippy notsolid
+	$hahaha delete
+	$truckclip delete
+	$truckclip2 delete
+	$deadtruck delete
+	$intro_bazooka_target nottriggerable //chrissstrahl - make sure that bazooka trigger does not respond to players
+
+	exec global/door_locked.scr
+	exec global/ambient.scr m1l1
+
+	local.ent1 = waitthread global/spawner.scr::spawner_create $bazookaspawner
+	local.ent2 = waitthread global/spawner.scr::spawner_create $dooropenspawner
+	local.ent3 = waitthread global/spawner.scr::spawner_create $ending_attack
+	local.count = 0
+
+//chrissstrahl - fixed infinity loop during multiplayer
+	for(local.i=1;local.i<=$ending_spawner.size;local.i++){
+		//println( "level.ending_spawner: " + local.i ) //debug
+		level.ending_spawner[local.i] = waitthread global/spawner.scr::spawner_create $ending_spawner[local.i]		
+	}
+
+	local.ent1.targetname = "bazookaspawner"
+	local.ent2.targetname = "dooropenspawner"
+	local.ent3.targetname = "ending_attack"
+
+
+	fadeout 0.01 0 0 0 1
+
+//	setcvar "g_syncronousClients" "0"
+//	setcvar "cg_rain_density" "0.0"
+//	setcvar "ui_crosshair" "1"
+//	setcvar "r_light_emphasize" "0"
+//	setcvar cg_playermodel 0
+
+
+
+
+//		$player item weapons/m1_garand.tik
+//		$player use weapons/m1_garand.tik
+//		$player ammo rifle 1000
+//		$player useweaponclass rifle
+
+
+
+
+//	waitthread global/friendly.scr::debug // Add's helpful messages
+	exec global/friendly.scr
+	exec global/shutter.scr
+
+	$mg42guy exec global/disable_ai.scr
+	$mg42 turnspeed 1000
+	$mg42guy threatbias ignoreme
+
+	level.exiting[1] = 0
+	level.exiting[2] = 0
+	level.exiting[3] = 0
+	level.exiting[4] = 0
+	level.exitanim = 0
+	level.flags[gotshot] = 0
+	level.flags[ride] = readytogo
+	level.flags[killplayer] = 0
+	level.flags[rocked] = 0
+	level.flags[introbazooka] = 0
+	level.flags[checkdoor] = 0
+	level.flags[ridecomplete] = 0
+	level.flags[lantern] = 0 
+	level.flags[asking_papers] = 0
+	level.flags[triggergun] = 0
+	level.ending_dead = 0
+	level.glueplayer = 1
+	
+//	getcvar(debug) = 1
+
+level waittill spawn
+
+	for (local.i=1;local.i<$bazooka_wall.size+1;local.i++)
+	{
+		if (isalive $bazooka_wall[local.i])
+		{
+			$bazooka_wall[local.i] threatbias ignoreme
+			$bazooka_wall[local.i] dontdropweapons
+		}
+	}
+
+	for (local.i=1;local.i<$barrel_guy.size+1;local.i++)
+	{
+		if (isalive $barrel_guy[local.i])
+		{
+			$barrel_guy[local.i] threatbias ignoreme
+			$barrel_guy[local.i] nodamage
+			$barrel_guy[local.i] gren_awareness 0
+			$barrel_guy[local.i] thread barrel_guy
+		}
+	}
+
+	$newtruckclip hide
+
+	$toss hide
+	$toss notsolid
+	$temptruck1 delete
+	$temptruck2 delete
+
+//	$enddoorL delete
+//	$enddoorR delete
+
+
+
+	exec coop_mod/replace.scr::threatbias -100 //chrissstrahl - made coop compatible
+
+	$door solid
+	$door disconnect_paths
+
+	exec coop_mod/replace.scr::tmstartloop sound/music/mus_03c_suspense.mp3 //chrissstrahl - made coop compatible
+
+	level.intro = getcvar(intro)
+
+	if (level.intro != "0"){
+		level.intro = 1
+	}
+	else{
+		level.intro = 0
+	}
+
+	level.actor1 = level.friendly1
+	level.actor2 = level.friendly2
+	level.actor3 = level.friendly3
+	level.actor4 = level.friendly4
+
+	if (level.intro == 1){
+		waitframe
+
+		level.bazooka = $intro_bazooka
+		level.bazooka exec global/disable_ai.scr
+		level.bazooka notsolid
+	
+		thread walkers
+/*
+		level.friendly1 physics_off
+		level.friendly2 physics_off
+		level.friendly3 physics_off
+		level.friendly4 physics_off
+*/
+
+		level.friendly1 notsolid
+		level.friendly2 notsolid
+		level.friendly3 notsolid
+		level.friendly4 notsolid
+
+		level.friendly1 exec global/disable_ai.scr
+		level.friendly2 exec global/disable_ai.scr
+		level.friendly3 exec global/disable_ai.scr
+		level.friendly4 exec global/disable_ai.scr
+
+//		spawn script_model "targetname" "intropath"
+		level.intropath = spawn script_model
+		level.intropath model "vehicles/gmctruckpath_opening.tik"
+		level.intropath.origin = (0 0 1)
+		level.intropath.angles = (0 270 0)
+
+		spawn script_model "targetname" "intropath3"
+		$intropath3 model "vehicles/gmctruckpath_opening.tik"
+		$intropath3.origin = (0 0 1)
+		$intropath3.angles = (0 270 0)
+		$intropath3.no_idle = 1
+
+		spawn script_model "targetname" "intropath2"
+		$intropath2 model "vehicles/truck2path_opening.tik"
+		$intropath2.origin = (0 0 1)
+		$intropath2.angles = (0 270 0)
+
+		level.intropath notsolid
+		$intropath2 notsolid
+		$intropath3 notsolid
+
+
+
+		level.driver = spawn human/german_afrika_private.tik
+		level.driver american
+		level.passenger = spawn human/german_afrika_private.tik
+		level.passenger american
+		level.guard2 = $intro_papers2
+		level.guard2 exec global/disable_ai.scr
+		level.guard2 holster
+		level.guard = $intro_papers
+		level.guard lookat level.driver
+		level.guard exec global/disable_ai.scr
+		level.guard holster
+		level.driver holster
+		level.passenger holster
+		level.driver notsolid
+		level.guard notsolid
+		level.passenger notsolid
+
+
+//		thread driveranim
+
+		level.passenger.weapon = "colt 45"
+		level.driver.no_idle = 1
+		level.passenger.no_idle = 1
+		level.driver exec global/disable_ai.scr
+		level.passenger exec global/disable_ai.scr
+
+		level.driver anim opel_driver
+		level.passenger anim opel_driver
+
+
+		spawn script_model "targetname" "introtruck2" "spawnflags" "2"
+		$introtruck2 model "vehicles/opeltruck.tik"
+
+		$introtruck2 solid
+
+		$2ndtruckclip delete
+//		$2ndtruckclip notsolid
+//		$2ndtruckclip hide
+
+		spawn script_model "targetname" "introtruck" "spawnflags" "2"
+		$introtruck model "vehicles/gmctruck_opening.tik"
+		$introtruck anim idlenolights
+
+//		$truckclip glue $introtruck
+//		$truckclip2 glue $introtruck
+
+		level.actor1.angles = (0 270 0)
+		level.actor2.angles = (0 270 0)
+		level.actor3.angles = (0 270 0)
+		level.actor4.angles = (0 270 0)
+
+
+		spawn script_origin "targetname" "org_1"
+		spawn script_origin "targetname" "org_2"
+		spawn script_origin "targetname" "org_3"
+		spawn script_origin "targetname" "org_4"
+
+		level.actororg1 = $org_1
+		level.actororg2 = $org_2
+		level.actororg3 = $org_3
+		level.actororg4 = $org_4
+
+	}
+
+	level.flags[door] = 0 // 
+	level.flags[bazooka] = 0 // 
+	level.flags1 = 0
+
+	//chrissstrahl - wait until a player has spawned
+	waitthread coop_mod/replace.scr::waitForPlayer
+	//chrissstrahl - make coop compatible - hide all players
+	exec coop_mod/replace.scr::hide
+	//end chrissstrahl
+	
+	exec global/entsound.scr $introtruck "driver" "dfr_m1l1_add01" 2 // Two hundred yards
+	wait 2
+	thread fader
+	
+	//chrissstrahl - moved here so that the sounds will be played once most of the players are on the server
+	$introtruck playsound truck1_run
+	$introtruck2 loopsound truck2_run
+	$introtruck2 anim start_wheels
+	
+	
+	if (level.intro == 0){
+		goto temp
+	}
+	else{
+		thread playerstuck
+		$introtruck notsolid
+		wait 1
+
+		$intropath2.no_idle = 1
+		$intropath2 anim "idle"
+	
+	
+		if (getcvar(origincheck) == "1")
+		thread originthing
+
+
+		level.intropath thread scenestart
+		level.intropath.no_idle = 1
+		level.intropath anim "idle"
+//		level.intropath anim "explosion"
+
+		level.actor1 thread truckanim 1 "truck_watch_captain" "truck_shot_captain" "truck_idle_captain" "truck_twitch_captain" "FULLBODY_m1l1_101" "truck_rock_captain" "truck_out_captain"
+		level.actor2 thread truckanim 2 "truck_watch_guy01" "truck_shot_guy01" "truck_idle_guy01" "truck_twitch_guy01" "truck_react_guy01" "truck_rock_guy01" "truck_out_guy01"
+		level.actor3 thread truckanim 3 "truck_watch_guy02" "truck_shot_guy02" "truck_idle_guy02" "truck_twitch_guy02" "truck_react_guy02" "truck_rock_guy02" "truck_out_guy02" -1 "truck_twitch2_guy02"
+		level.actor4 thread truckanim 4 "truck_watch_guy03" "truck_shot_guy03" "truck_idle_guy03" "truck_twitch_guy03" "truck_react_guy03" "truck_rock_guy03" "truck_out_guy03" "truck_idle2_guy03" "truck_twitch2_guy03"
+
+
+		wait 6		
+	}
+}end
+
+//=========================================================================
+walkers:{
+//=========================================================================
+	$walkerLF exec global/disable_ai.scr
+	$walkerLB exec global/disable_ai.scr
+	$walkerRF exec global/disable_ai.scr
+	$walkerRB exec global/disable_ai.scr
+	$walkerM exec global/disable_ai.scr
+
+	$walkerLF.interval = 0
+	$walkerLB.interval = 0
+	$walkerRF.interval = 0
+	$walkerRB.interval = 0
+	$walkerM.interval = 0
+
+	$walkerLF thread walkover "LF"
+	$walkerLB thread walkover "LB"
+	$walkerRF thread walkover "RF"
+	$walkerRB thread walkover "RB"
+	$walkerM thread walkover "M"
+	$walkerLB lookat $introtruck
+}end
+
+//=========================================================================
+walkover local.walk:{
+//=========================================================================
+	self walkto $("walkpath" + local.walk)
+	self waittill movedone
+	self delete
+}end
+
+//=========================================================================
+door_locked:{
+//=========================================================================
+	if (self.timer == NIL){
+		self.timer = level.time - 5
+	}
+
+	if (level.time > self.timer){
+		self.timer = level.time + 5
+		self playsound door_metal_locked wait
+		self waittill sounddone
+		self.timer = level.time - 5
+	}
+}end
+
+//=========================================================================
+driveranim:{
+//=========================================================================
+/* EMPTY */
+}end
+
+//=========================================================================
+ride local.idle1 local.twitch1 local.idle2 local.twitch2:{
+//=========================================================================
+	self.no_idle = 1
+
+	while (1){
+		local.rand = 100
+		
+		if ((local.twitch1 != NIL) && (local.twitch1 != -1)){
+			if (randomint(local.rand) > 50){
+				self anim_scripted local.twitch1
+				self waittill animdone
+			}
+		}
+
+
+		if ((local.twitch2 != NIL) && (local.twitch2 != -1)){
+			if (randomint(local.rand) > 30){
+				self anim_scripted local.twitch2
+				self waittill animdone
+			}
+		}
+
+		if (randomint(local.rand) > 70){
+			self anim_scripted local.idle1
+			self waittill animdone
+		}
+
+		if ((local.idle2 != NIL) && (local.idle2 != -1)){
+			if (randomint(local.rand) > 50){
+				self anim_scripted local.idle2
+				self waittill animdone
+			}
+		}
+		waitframe
+	}
+}end
+
+
+//=========================================================================
+deathmessage local.num:{
+//=========================================================================
+	self waittill death
+	if (local.num == 1){
+		iprintlnbold "Captain Richards has been killed in action."
+	}
+	else if (local.num == 2){
+		iprintlnbold "Private Wilson has been killed in action."
+	}
+	else if (local.num == 3){
+		iprintlnbold "Private Thomas has been killed in action."
+	}
+	else if (local.num == 4){
+		iprintlnbold "Private Allen has been killed in action."
+	}
+}end
+
+//=========================================================================
+truckanim local.num local.watch local.shot local.idle1 local.twitch1 local.reaction local.rock local.exit local.idle2 local.twitch2:{
+//=========================================================================
+
+	self nodamage
+	
+	self thread ride local.idle1 local.twitch1 local.idle2 local.twitch2
+	local.thread = parm.previousthread
+
+	while (level.flags[ride] == driving){
+		waitframe
+	}
+
+//	println level.flags[ride]
+
+	while (level.flags[ride] == early){
+		waitframe
+	}
+
+	self anim_scripted local.reaction
+
+	self waittill animdone
+
+	while (level.flags[asking_papers] == 0){
+		waitframe
+	}
+
+	self anim_scripted local.watch
+
+	while (level.flags[gotshot] == 0){
+		waitframe
+	}
+
+
+	self anim_scripted local.shot
+
+
+//	self thread ride local.idle1 local.twitch1 local.idle2 local.twitch2
+//	local.thread = parm.previousthread
+	
+	while (level.flags[ride] != bazooka_attack ){
+		waitframe
+	}
+
+	self anim_scripted local.rock
+	self waittill animdone
+	level.flags[rocked] = 1
+
+
+	local.thread delete
+//	println ("Exit time is " + level.time)
+	level.exiting[local.num] = 1
+	self anim_noclip local.exit
+	self waittill animdone
+	println ("done " + level.time)
+	level.exitanim++
+
+//	self runto $aipath[local.num]
+	self thread deathmessage local.num
+	self thread minmax 5 20
+	self thread initfriend
+	self.no_idle = 0
+	self.friendtype = 0
+	self exec global/enable_ai.scr
+	self solid
+	//self tether $player
+	self exec coop_mod/main.scr::tether 	//chrissstrahl - make coop compatible
+	self leash 512
+	self.health = 20000
+
+	if (getcvar(alive) != "1"){
+		self takedamage
+	}
+
+	if (local.num == 4){
+		self takedamage
+		self.health = 5
+		self.threatbias = 10000
+		self thread die_thread
+	}
+	else{
+		self.killable = 0
+		self thread killable
+	}
+//	println "#finished exit anim"
+}end
+
+//=========================================================================
+killable:{
+//=========================================================================
+	while (isalive self){
+		if (self.health < 5000){
+			self.health = 30000
+		}
+		wait 1
+	}
+}end
+
+//=========================================================================
+standup:{
+//=========================================================================
+	//chrissstrahl - do this only in sp
+	if( level.gametype == 0 ){
+		$player forcelegsstate STAND
+	}
+	
+	wait 2
+	for (local.i=1;local.i<$bazooka_wall.size+1;local.i++){
+		if (isalive $bazooka_wall[local.i]){
+			$bazooka_wall[local.i] threatbias 0
+		}
+	}
+
+	for (local.i=1;local.i<$barrel_guy.size+1;local.i++){
+		if (isalive $barrel_guy[local.i]){
+			$barrel_guy[local.i] threatbias 0
+		}
+	}
+}end
+
+//=========================================================================
+die_thread:{
+//=========================================================================
+	self waittill death
+	local.ent = spawn script_origin
+	local.ent.origin = self.origin
+	wait 1
+	if (isalive level.friendly1){
+		level.friendly1 lookat local.ent
+	}
+	wait 0.5
+	if (isalive level.friendly1){
+		level.friendly1 say dfr_panic_35c_118 // Man down!!
+	}
+	local.ent delete
+}end
+
+//=========================================================================
+croucher:{
+//=========================================================================
+	waitframe
+	
+	//chrissstrahl - do this only in sp
+	if( level.gametype == 0 ){
+		$player forcelegsstate CROUCH_IDLE
+	}
+}end
+
+//=========================================================================
+hint_reach:{
+//=========================================================================
+	//chrissstrahl - make sure message works in mp right
+	if( level.gametype == 0 ){
+		local.key = getboundkey1 "+use"
+		iprintlnbold_noloc (loc_convert_string "Press the USE key  ( ") (loc_convert_string local.key) (loc_convert_string " ) to grab items off tables.")
+	}else{
+		iprintlnbold_noloc (loc_convert_string "Press the USE key to grab items off tables.")
+	}
+}end
+
+//=========================================================================
+hint_use:{
+//=========================================================================
+	if ($world.usehint == NIL){	//chrissstrahl - make coop compatible
+		$world.usehint = 1		//chrissstrahl - make coop compatible
+		//chrissstrahl - make sure message works in mp right
+		if( level.gametype == 0 ){
+			local.key = getboundkey1 "+use"
+			iprintlnbold_noloc (loc_convert_string "Press the USE key  ( ") (loc_convert_string local.key) (loc_convert_string " ) to use mounted weapons.")
+		}else{
+			iprintlnbold_noloc (loc_convert_string "Press the USE key to use mounted weapons.")
+			wait 3 //chrissstrahl - have some delay here
+			thread blowthedoor //chrissstrahl - make sure this really triggers, because it dosen't work quite as good as in singleplayer			
+		}
+	}
+}end
+
+//=========================================================================
+dostuff:{
+//=========================================================================
+// huh
+	if (level.glueplayer == 1){
+		$clippy notsolid
+		
+		$introtruck anim open_gate 
+		$introtruck playsound tailgate
+		
+		//chrissstrahl - make coop compatible
+		exec coop_mod/replace.scr::show		
+		exec coop_mod/replace.scr::unglue
+		
+		//chrissstrahl - spawn/place players inside truck //viewpos -50z
+		if( level.gametype == 0 ){
+			$player forcelegsstate CROUCH_IDLE
+			$player origin $player.origin
+			$player face (0 1 0)		
+		}
+		else{
+			//chrissstrahl - create spawnpoints for coop
+			waitthread coop_mod/spawnlocations.scr::m1l1_update1
+			//chrissstrahl - move player to spawn before unglue
+			for (local.i = 1;local.i <= $player.size;local.i++){
+				local.player = $player[local.i]
+				if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 ){
+					local.player forcelegsstate CROUCH_IDLE
+					local.player origin level.flags["coop_spawn"+local.i+"origin"]
+					local.player face level.flags["coop_spawn"+local.i+"angles"]
+					local.player show
+					thread coop_playerJustSpawned local.i
+				}
+			}
+			exec coop_mod/replace.scr::show		//chrissstrahl - make coop compatible
+			exec coop_mod/replace.scr::unglue	//chrissstrahl - make coop compatible
+		}
+	}
+
+	//chrissstrahl - make sure message works in mp right
+	if( level.gametype == 0 ){
+		local.key = getboundkey1 "+forward"
+		iprintlnbold_noloc (loc_convert_string "Press the FORWARD key  ( ") (loc_convert_string local.key) (loc_convert_string " ) to move out of the truck.")
+	}else{
+		iprintlnbold_noloc (loc_convert_string "Press the FORWARD key to move out of the truck.")
+	}
+	
+//	println "#disconnecting path"
+	/*
+	$truckclip unglue
+	$truckclip solid
+	$truckclip disconnect_paths
+	$truckclip delete
+	$truckclip2 unglue
+	$truckclip2 solid
+	$truckclip2 disconnect_paths
+	$truckclip2 delete
+	*/
+	level.flags[ridecomplete] = 1
+	wait 5
+	exec global/autosave.scr 1
+
+	wait 15
+	
+	//chrissstrahl - make sure message works in mp right
+	if( level.gametype == 0 ){
+		local.key = getboundkey1 "+scores"
+		iprintlnbold_noloc (loc_convert_string "Press the OBJECTIVE key  ( ") (loc_convert_string local.key) (loc_convert_string " ) to see your objectives.")
+	}else{
+		iprintlnbold_noloc (loc_convert_string "Press the OBJECTIVE key to see your objectives.")
+	}
+
+	wait 20
+	iprintlnbold ( "Use your compass to guide you to your next objective." )
+}end
+
+// 38 45	
+
+
+//=========================================================================
+originthing:{
+//=========================================================================
+	while (1){
+//		 println ("truckclip2 " + $truckclip2.origin)
+		 local.o = $introtruck2 gettagposition "visa_guard"
+		 println ("Visa guard" + local.o)
+		 local.o = $intropath2 gettagposition "truck2 dummy"
+		 local.a = $intropath2 gettagangles "truck2 dummy"
+//		 println ("truck2 position: " + local.o + " angles " + local.a)
+		 println ("truck2 position: " + $introtruck2.origin + " angles " + $introtruck2.angles)
+		 println ("truck1 position: " + $introtruck.origin + " angles " + $introtruck.angles)
+
+		 println local.o
+		 wait 1
+	} 
+}end
+
+//=========================================================================
+gluetoorigin local.ent local.tag local.angles:{ //chrissstrahl - modified for coop use
+//=========================================================================
+	end //chrissstrahl, screw this shitt, make it simple, why attach him in the first place !!!
+	
+	local.operateWithVec = 0
+	//chrissstrahl - if tag can't be found we will operate with vectors instead
+	if( (local.ent gettagposition local.tag) == NIL && (local.ent gettagangles local.tag) == NIL){
+		local.operateWithVec = 1
+	}
+	//end chrissstrahl
+	
+	while (level.flags[introbazooka] == 0){
+		//chrissstrahl - if we operate with vectors instead of tagname
+		if(local.operateWithVec){
+			self.origin = (local.ent.origin + local.tag)
+			self.angles = local.angles
+		}
+		//end chrissstrahl
+		else{
+			self.origin = local.ent gettagposition local.tag
+			self.angles = local.ent gettagangles local.tag
+		}
+		waitframe
+	}
+}end
+
+//=========================================================================
+intro_exploder:{
+//=========================================================================
+	if (level.flags[introbazooka] == 0){
+		local.maskbrush = $toss
+		local.truck = $introtruck2
+
+		local.truck bind local.maskbrush
+		local.truck notsolid
+		waitframe
+
+		level.flags[introbazooka] = 1
+		thread global/exploder.scr::explode 280
+		thread global/ai.scr::spawn 300 2
+		$introtruck2 playsound truck2_explode
+		local.maskbrush solid // was notsolid
+		level.passenger hide
+		level.driver hide
+		level.guard american
+		level.guard2 damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+
+		local.vec = (0 0 0)//chrissstrahl - damn you had me fooled for a moment, you just wanted to have a vector you didn't need player origin at all
+		local.vec[0] = 0
+		local.vec[1] = -120
+		local.vec[2] = 280
+		local.maskbrush physics_velocity ( local.vec )
+	//	local.maskbrush rotatex 90
+		local.maskbrush rotatey 0
+		local.maskbrush rotatez 50
+		wait 0.2
+		local.maskbrush physics_on 1
+		local.maskbrush physics_velocity ( local.vec )
+		wait 1.75
+		local.truck unbind $toss
+		$toss delete
+
+		$newtruckclip solid
+		$newtruckclip disconnect_paths
+
+		wait 10
+
+		if (level.guard){
+			level.guard delete
+		}
+
+		if (level.guard2){
+			level.guard2 delete
+		}
+	}
+}end
+
+//=========================================================================
+windowguard:{
+//=========================================================================
+	wait 8
+	waitthread global/entsound.scr::main $introtruck "driver" "truck1_window" // Papers please
+	wait 2
+	waitthread global/entsound.scr::main $introtruck "driver" "truck1_papers" // Papers please
+	end
+	wait 2
+	waitthread global/entsound.scr::main $introtruck "driver" "den_disguise_057d1" // Papers please
+	println "#papers please!!!"
+	wait 3
+	waitthread global/entsound.scr::main $introtruck "driver" "snd_den_thanksir_generic01" // These are niiice.
+	println "#good papers!"
+	
+	while (level.flags[introbazooka] == 0){
+		wait 0.1
+	}
+
+	wait 2
+	exec global/entsound.scr $introtruck "driver" "den_disguise_041d2" // Intruder!
+}end
+
+//=========================================================================
+killtruck:{
+//=========================================================================
+	level.driver anim driver_killvisa
+	level.passenger anim passenger_killvisa
+	level.guard anim guard_killvisa
+//	level.driver waittill animdone
+
+	wait 3
+	self notsolid
+	self runto $intro_bazooka_spot
+	self waittill movedone
+	self exec global/aimat.scr $intro_bazookatarget
+	
+	while (level.flags[introbazooka] == 0){
+//		exec global/model.scr $intro_bazooka_target.origin "models/emitters/explosion_mine.tik"
+		wait 0.25
+		self exec global/shoot.scr
+		wait 3
+	}
+}end
+
+
+//=========================================================================
+gotshot:{
+//=========================================================================
+	wait 0.8
+	level.flags[gotshot] = 1
+}end
+
+
+//=========================================================================
+waitwalk local.dest local.pause:{
+//=========================================================================
+	wait local.pause
+	self walkto local.dest
+}end
+
+//=========================================================================
+lanternoff:{
+//=========================================================================
+	wait 2
+	if (level.flags[lantern] == 0){
+		level.flags[lantern] = 1
+	}
+}end
+
+//=========================================================================
+scenestart:{
+//=========================================================================
+//	self waittill animdone
+	level.flags[ride] = driving
+	thread lantern
+	wait 2
+	level.flags[ride] = early
+	wait 3
+	level.flags[ride] = briefing
+	
+	$introtruck2 anim start_wheels
+	wait 20
+	$introtruck2 anim idlenolights
+	$introtruck2.corona = 0
+	wait 2
+	
+	level.actor1 say dfr_m1l1_add02
+	thread lanternoff
+	wait 8.5
+
+
+	//local.o = ( -2128 -3532 31 ) //chrissstrahl - -2130 -3538 31 good pos - this stitt took hours to adjust
+	//local.o = ( -2140 -3500 31 ) //chrissstrahl - -2130 -3538 31 good pos - this stitt took hours to adjust
+	local.o = ( -2145 -3518 31 ) //chrissstrahl - -2130 -3538 31 good pos - this stitt took hours to adjust
+	//local.o = $introtruck2 gettagposition "visa_guard" //chrissstrahl - ^~^~^ Script Error: Could not find tag 'visa_guard' in 'models/vehicles/opeltruck.tik'
+	//local.a = $introtruck2 gettagangles "visa_guard" //chrissstrahl - doesn't work as expected, disabled
+
+	level.guard.no_idle = 1
+	level.guard2 thread waitwalk $walk_here 5.5
+	local.break = 0
+
+	level.guard walkto local.o
+	wait 0.3
+	
+	$introtruck2 anim stop_wheels
+	wait 1.7
+	
+	level.guard walkto local.o
+	level.guard waittill movedone
+	$introtruck2 stoploopsound
+	exec coop_mod/replace.scr::tmstartloop sound/music/mus_11a_surprise.mp3
+
+	thread windowguard
+	
+	//level.guard thread gluetoorigin $introtruck2 "visa_guard" //chrissstrahl - not working for some reason
+	//level.guard thread gluetoorigin $introtruck2 (0 0 0) (100 100 0) //chrissstrahl - didn't work managed it otherwise
+
+	level.guard.origin = local.o
+	//level.guard.angles = local.a //chrissstrahl - doesn't work as expected, disabled
+
+	level.flags[ride] = stopped
+
+	level.flags[asking_papers] = 1
+
+	level.driver anim driver_getvisa
+	level.passenger anim passenger_getvisa
+	level.guard anim guard_getvisa
+	level.driver waittill animdone
+
+	level.driver anim driver_idlevisa
+	level.passenger anim passenger_idlevisa
+	level.guard anim guard_idlevisa
+	level.driver waittill animdone
+
+	thread gotshot
+	
+	$intro_bazooka_target triggerable //chrissstrahl - allow the trigger to fire now
+
+	level.bazooka thread killtruck
+	wait 1
+	
+	exec global/entsound.scr $introtruck "driver" "truck1_start" // Truck starts again
+	wait 2
+	
+	while (level.flags[introbazooka] == 0){
+		waitframe
+	}
+
+	level.flags[ride] = bazooka_attack
+	level.bazooka.weapon = "Mauser KAR 98K"	
+	level.bazooka solid
+	level.bazooka exec global/enable_ai.scr
+	level.bazooka attackplayer
+	
+	level.intropath = $intropath3
+	level.intropath anim "explosion" 
+//		println ("Explosion time is " + level.time)
+
+	wait 2
+
+//	freezeplayer
+//	setcvar "sv_runspeed" "1"
+	
+	//chrissstrahl - enable weapons again
+	level.coop_noWeapons = 0
+	
+	//chrissstrahl - do this only in singleplayer
+	if( level.gametype == 0 ){
+		println "#should be able to shoot now"
+		$player item weapons/colt45.tik
+		$player item weapons/m1_garand.tik
+		$player ammo rifle 1000
+		$player ammo pistol 1000
+		$player useweaponclass rifle
+		$player ammo agrenade 5
+		
+		$player.turretride setPlayerUsable 1
+		$player.turretride doUse $player
+		$player.turretride setPlayerUsable 0	
+		$player.turretride notsolid		//### this will ensure the turret doesn't block the player, 
+											// regardless of any weird stuff having been done to it								
+		exec coop_mod/replace.scr::show		//chrissstrahl - make coop compatible
+		exec coop_mod/replace.scr::unglue	//chrissstrahl - make coop compatible
+		exec coop_mod/replace.scr::forcelegsstate CROUCH_IDLE
+		$player.origin = $player.origin + (0 0 50)
+		
+		waitframe
+		local.ent = spawn script_origin
+		local.ent.origin = $player.origin
+		$player.localent = local.ent
+		$player glue local.ent
+
+		waitframe		
+	}
+	
+	$clippy solid
+
+	while (level.exitanim < 4){
+		level waittill postthink
+	}
+	
+	$introtruck thread dostuff
+
+//#######################################################
+temp:
+//#######################################################
+	if (level.intro != 1){
+		wait 15
+
+		//chrissstrahl - we don't use this in coop
+		if( level.gametype == 0 ){
+			$player item weapons/colt45.tik
+			$player item weapons/m1_garand.tik
+			$player ammo rifle 1000
+			$player ammo pistol 1000
+			$player useweaponclass rifle
+		}
+		//end chrissstrahl
+
+		level.friendly1.origin = $aispawn.origin
+		level.friendly1.angles = $aispawn.angles
+
+		level.friendly2.origin = $aispawn.origin
+		level.friendly2.angles = $aispawn.angles
+
+		level.friendly3.origin = $aispawn.origin
+		level.friendly3.angles = $aispawn.angles
+
+		level.friendly4.origin = $aispawn.origin
+		level.friendly4.angles = $aispawn.angles
+
+
+		level.friendly1 thread initfriend
+		level.friendly2 thread initfriend
+		level.friendly3 thread initfriend
+		level.friendly4 thread initfriend
+		level.friendly1 thread minmax 5 20
+		level.friendly2 thread minmax 5 20
+		level.friendly3 thread minmax 5 20
+		level.friendly4 thread minmax 5 20
+		level.friendly1.friendtype = 0
+		level.friendly2.friendtype = 0
+		level.friendly3.friendtype = 0
+		level.friendly4.friendtype = 0
+		level.friendly1 exec global/enable_ai.scr
+		level.friendly2 exec global/enable_ai.scr
+		level.friendly3 exec global/enable_ai.scr
+		level.friendly4 exec global/enable_ai.scr
+		
+		level.friendly1 runto $aipath[1]
+		level.friendly2 runto $aipath[2]
+		level.friendly3 runto $aipath[3]
+		level.friendly4 runto $aipath[4]
+		level.friendly1 solid
+		level.friendly2 solid
+		level.friendly3 solid
+		level.friendly4 solid
+	}
+	wait 1
+
+	level.friendly1 thread global/friendly.scr::friendlythink
+	level.friendly2 thread global/friendly.scr::friendlythink
+	level.friendly3 thread global/friendly.scr::friendlythink
+	level.friendly4 thread global/friendly.scr::friendlythink
+	thread scene1
+}end
+
+//=========================================================================
+ratedir:{
+//=========================================================================
+	wait (randomfloat(1.6))
+
+	if (level.ratedir == 0){
+		level.ratedir = 1
+	}
+	else{
+		level.ratedir = 0
+	}
+
+	goto ratedir
+}end
+
+
+//=========================================================================
+lanterncolors:{
+//=========================================================================
+	level.lanternR = 1
+	level.lanternG = 0.8
+	level.lanternB = 0.5
+	level.lanternV = 140
+
+	local.lanternR_min = 0.8
+	local.lanternR_max = 1.2
+
+	local.lanternG_min = 0.7
+	local.lanternG_max = 0.9
+
+	local.lanternB_min = 0.45
+	local.lanternB_max = 0.55
+
+	local.lanternR_D = 0
+	local.lanternG_D = 0
+	local.lanternB_D = 0
+	
+	local.cur[0] = 1
+	local.cur[1] = 0.8
+	local.cur[2] = 0.5
+	local.cur[3] = 140
+
+	local.min[0] = 0.8
+	local.min[1] = 0.7
+	local.min[2] = 0.45
+	local.min[3] = 125
+
+	local.max[0] = 1.2
+	local.max[1] = 0.9
+	local.max[2] = 0.55
+	local.max[3] = 155
+
+
+	local.min[0] = 0.75
+	local.min[1] = 0.45
+	local.min[2] = 0.35
+	local.min[3] = 136
+
+	local.max[0] = 1.0
+	local.max[1] = 0.8
+	local.max[2] = 0.45
+	local.max[3] = 155
+
+	local.rate = 0.12
+
+	local.ratechange = 0.0
+	level.ratedir = 0
+	local.ratemin = 0.02
+	local.ratemax = 0.3
+
+	local.dir = 0
+	thread ratedir
+
+
+	while (1){
+		if (local.dir == 0){
+			local.ratechange += randomfloat (0.14) + 0.04
+		}
+		else{
+			local.ratechange -= randomfloat (0.14) + 0.04
+		}
+
+		if (local.ratechange > local.ratemax){
+			local.dir = 1
+			local.ratechange = local.ratemax
+		}
+		else if (local.ratechange < local.ratemin){
+			local.dir = 0
+			local.ratechange = local.ratemin
+		}
+
+		if (level.ratedir == 0){
+			if (local.rate > 0.0){
+				local.rate = local.rate - local.ratechange
+			}
+			else{
+				local.rate = 0.0
+				level.ratedir = 1
+			}
+		}
+		else{
+			if (local.rate < 1.0){
+				local.rate = local.rate + local.ratechange
+			}
+			else{
+				local.rate = 1.0
+				level.ratedir = 0
+			}
+		}
+
+		for (local.i=0;local.i<4;local.i++){
+			local.cur[local.i] = ((local.max[local.i] - local.min[local.i]) * local.rate) + local.min[local.i]
+		}
+		
+//		println ((level.lanternR) + " " + (level.lanternG) + " " + (level.lanternB) + " " + (level.lanternV))
+		wait 0.1
+		level.lanternR = local.cur[0]
+		level.lanternG = local.cur[1]
+		level.lanternB = local.cur[2]
+		level.lanternV = local.cur[3]
+	}
+}end
+
+
+//=========================================================================
+lanterncolors2:{
+//=========================================================================
+	level.lanternR = 1
+	level.lanternG = 0.8
+	level.lanternB = 0.5
+	level.lanternV = 140
+
+	local.lanternR_min = 0.8
+	local.lanternR_max = 1.2
+
+	local.lanternG_min = 0.7
+	local.lanternG_max = 0.9
+
+	local.lanternB_min = 0.45
+	local.lanternB_max = 0.55
+
+	local.lanternR_D = 0
+	local.lanternG_D = 0
+	local.lanternB_D = 0
+	
+	local.cur[0] = 1
+	local.cur[1] = 0.8
+	local.cur[2] = 0.5
+	local.cur[3] = 140
+
+	local.min[0] = 0.8
+	local.min[1] = 0.7
+	local.min[2] = 0.45
+	local.min[3] = 125
+
+	local.max[0] = 1.2
+	local.max[1] = 0.9
+	local.max[2] = 0.55
+	local.max[3] = 155
+
+
+	local.min[0] = 0.6
+	local.min[1] = 0.4
+	local.min[2] = 0.3
+	local.min[3] = 136
+
+	local.max[0] = 1.4
+	local.max[1] = 1.0
+	local.max[2] = 0.75
+	local.max[3] = 155
+
+	local.rate[0] = 0.12
+	local.rate[1] = 0.12
+	local.rate[2] = 0.12
+	local.rate[3] = 1
+
+	local.ratedir[0] = 0
+	local.ratedir[1] = 0
+	local.ratedir[2] = 0
+	local.ratedir[3] = 0
+
+	local.dir[0] = 0
+	local.dir[1] = 0
+	local.dir[2] = 0
+	local.dir[3] = 0
+
+
+/*
+	local.cur = (1 0.8 0.5)
+	local.min = (0.8 0.7 0.45)
+	local.max = (1.2 0.9 0.55)
+	local.rate = (0.012 0.012 0.012)
+	local.dir = (0 0 0)
+*/
+
+	while (1){
+		for (local.i=0;local.i<4;local.i++){
+			/*
+			local.rate[local.i] = randomfloat (0.08) + 0.03
+			if (local.ratedir[local.i] == 0)
+			if (local.cur[local.i] > local.min[local.i])
+			{
+				local.cur[local.i] = local.cur[local.i] - local.rate[local.i]
+				if (local.cur[local.i] < local.min[local.i])
+				{
+					local.cur[local.i] = local.min[local.i]
+					local.
+				}
+			}
+			else
+			if (local.cur[local.i] < local.max[local.i])
+			{
+				local.cur[local.i] = local.cur[local.i] + local.rate[local.i]
+				if (local.cur[local.i] > local.max[local.i])
+					local.cur[local.i] = local.max[local.i]
+			}
+			*/
+
+			local.rate[local.i] = randomfloat (0.08) + 0.03
+//			println (local.dir[local.i] + " [" + local.i + "]")
+			if (local.dir[local.i] == 0){
+				if (local.cur[local.i] > local.min[local.i]){
+				
+					local.cur[local.i] = local.cur[local.i] - local.rate[local.i]
+					
+					if (local.cur[local.i] < local.min[local.i]){
+						local.cur[local.i] = local.min[local.i]
+						local.dir[local.i] = 1
+					}
+				}
+			}
+			else if (local.cur[local.i] < local.max[local.i]){
+				local.cur[local.i] = local.cur[local.i] + local.rate[local.i]
+//				println (local.cur[local.i] + " + " + local.rate[local.i] + " = " + local.cur[local.i])
+
+				if (local.cur[local.i] > local.max[local.i]){
+					local.cur[local.i] = local.max[local.i]
+					local.dir[local.i] = 0
+				}
+			}
+
+		}
+		
+//		println ((level.lanternR) + " " + (level.lanternG) + " " + (level.lanternB) + " " + (level.lanternV))
+		wait 0.1
+		level.lanternR = local.cur[0]
+		level.lanternG = local.cur[1]
+		level.lanternB = local.cur[2]
+		level.lanternV = local.cur[3]
+	}
+}end
+
+//=========================================================================
+lantern:{
+//=========================================================================
+	local.ent2 = spawn script_model
+	local.ent2 lightOn
+	local.ent2 light (1 0.8 0.5)
+	local.ent2 lightRadius 140
+	local.ent2 model "fx/dummy.tik" 
+//	local.ent2 model "lights/swinging_lantern.tik" 
+	local.ent2 notsolid
+	
+	local.ent = spawn script_model
+//	local.ent lightOn
+//	local.ent light (1 0.8 0.5)
+//	local.ent lightRadius 140
+	local.ent model "lights/swinging_lantern.tik" 
+	local.ent notsolid
+
+	thread lanterncolors
+
+//	while (level.flags[ride] != complete)
+	while (level.flags[ridecomplete] == 0){
+		local.a = level.intropath gettagangles "tag_lantern" //gmctruck
+		local.ent.angles = local.a
+
+		local.o = level.intropath gettagposition "tag_lantern" //gmctruck
+		local.ent.origin = local.o
+
+		local.o = local.ent gettagposition "tag_barrel" //gmctruck
+
+		if (level.flags[lantern] == 0){
+			local.ent2.origin = local.o
+			local.ent2 light (level.lanternR level.lanternG level.lanternB)
+			local.ent2 lightRadius level.lanternV
+		}
+		else if (level.flags[lantern] == 1){
+			local.ent2 delete
+			level.flags[lantern] = 2
+			local.ent anim light_off
+		}
+		waitframe
+	}
+}end
+
+
+//=========================================================================
+fader:{
+//=========================================================================
+	wait 1.5
+	fadein 3 0 0 0 1
+}end
+
+//=========================================================================
+playerstuck:{
+//=========================================================================
+	spawn script_origin "targetname" "truckorg"
+	local.turret = spawn models/statweapons/m1l1truckride.tik
+
+	if (level.glueplayer == 1){
+//		cuecamera local.camera
+
+		if( level.gametype == 0 ){
+			local.turret setPlayerUsable 1
+			local.turret doUse $player
+			local.turret setPlayerUsable 0
+			$player.turretride = local.turret
+		}
+
+		//$player notsolid
+		//$player physics_off
+		//$player glue $truckorg 0
+		exec coop_mod/replace.scr::glue $truckorg 0
+		
+		local.turret.viewangles = (0 180 0)
+	}
+
+	local.oldangles = level.intropath gettagangles "tag_camera"
+//	local.camera glue $truckorg
+	local.turret glue $truckorg
+
+
+	thread global/spotlight.scr::deadcorona $introtruck2 "light left" 
+	thread global/spotlight.scr::deadcorona $introtruck2 "light right"
+
+	while (level.flags[ridecomplete] == 0)
+	{ 
+
+//		println ("1 " + level.actor1.origin + " 4 " + level.actor4.origin)
+
+		local.a = level.intropath gettagangles "truck dummy"
+		$introtruck.angles = local.a
+		local.o = level.intropath gettagposition "truck dummy"
+		local.v = local.o - $introtruck.origin
+		$introtruck.origin = local.o
+		$introtruck.velocity = local.v
+
+		if (level.flags[introbazooka] == 0)
+		{
+			local.a = $intropath2 gettagangles "truck2 dummy"
+			// Rotate the angles by 90 degrees
+			local.a_pitch = local.a[2]	
+			local.a_roll = -local.a[0]	
+			local.a_yaw = local.a[1] + 270
+			local.a = ( local.a_pitch local.a_yaw local.a_roll )
+			// Now assign it to the truck
+			$introtruck2.angles = local.a
+			local.o = $intropath2 gettagposition "truck2 dummy"
+			$introtruck2.origin = local.o
+//			println $introtruck2.angles
+		}
+
+//		println local.o
+
+		if (level.glueplayer == 1)
+		{
+//			$player hide
+			local.o = level.intropath gettagposition "tag_camera" //gmctruck
+//			local.o = local.o + (0 0 -70)
+//			local.o = local.o + (0 0 -85)
+//			local.o = local.o + (0 0 -45)
+			local.o = local.o + (0 0 0)
+			local.o = local.o + (0 0 0)
+			
+			//chrissstrahl - adjust in mp, because forcelegsstate does not work with glue
+			if( level.gametype != 0 ){
+				local.o += (0 0 -75)
+			}
+			//end chrissstrahl
+			
+			$truckorg.origin = local.o
+			local.a = level.intropath gettagangles "tag_camera"
+			local.a[1] = local.a[1] + 210
+//			local.a[1] = local.a[1] - 130
+			$truckorg.angles = local.a
+//			$player.viewangles = $player.viewangles - (local.oldangles - local.a)
+			local.turret.viewangles = local.turret.viewangles - (local.oldangles - local.a)
+			local.oldangles = local.a
+			local.turret.angles = ( 0 0 0 )
+		}
+
+		if (level.exiting[1] == 0)
+		{
+			local.a = level.intropath gettagangles "Captain01 origin"
+			level.actor1.angles = local.a
+			local.o = level.intropath gettagposition "Captain01 origin" //gmctruck
+			level.actor1.origin = local.o
+		}
+
+		if (level.exiting[2] == 0)
+		{
+			local.a = level.intropath gettagangles "guy01 origin"
+			level.actor2.angles = local.a
+			local.o = level.intropath gettagposition "guy01 origin" //gmctruck
+			level.actor2.origin = local.o
+		}
+
+		if (level.exiting[3] == 0)
+		{
+			local.a = level.intropath gettagangles "guy2 origin"
+			level.actor3.angles = local.a
+			local.o = level.intropath gettagposition "guy2 origin" //gmctruck
+			level.actor3.origin = local.o
+		}
+
+		if (level.exiting[4] == 0)
+		{
+			local.a = level.intropath gettagangles "guy3 origin"
+			level.actor4.angles = local.a
+			local.o = level.intropath gettagposition "guy3 origin" //gmctruck
+			level.actor4.origin = local.o
+		}
+
+		if (level.flags[introbazooka] == 0)
+		{
+			local.a = $introtruck2 gettagangles "driver"
+			level.driver.angles = local.a
+			local.o = $introtruck2 gettagposition "driver" //gmctruck
+			
+			//chrissstrahl - fix issue in mp
+			if( level.gametype != 0 ){
+				local.o[2] = (local.o[2] - 18)
+			}
+			//end chrissstrahl
+			
+			level.driver.origin = local.o
+
+			local.a = $introtruck2 gettagangles "passenger0"
+			level.passenger.angles = local.a
+			local.o = $introtruck2 gettagposition "passenger0" //gmctruck
+			level.passenger.origin = local.o
+		}
+
+		waitframe
+	}
+}end
+
+//=========================================================================
+triggerA1prep:{
+//=========================================================================
+	self waittill trigger
+	level.flagsA = 1
+}end
+
+//=========================================================================
+diedie:{
+//=========================================================================
+	wait 1
+	self damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+}end
+
+//=========================================================================
+endingexploder:{
+//=========================================================================
+	self waittill trigger
+
+	for (local.i=1;local.i<$m1l1_baddie.size+1;local.i++){
+		$m1l1_baddie[local.i] thread diedie
+	}
+
+	$ending_save_player delete
+
+	thread global/exploder.scr::explode 500
+	level.flags[bazooka] = 1
+
+	level.friendly1 thread deathtouch
+	level.friendly2 thread deathtouch
+	level.friendly3 thread deathtouch
+//	level.friendly4 thread deathtouch
+
+	if (isalive level.friendly3){
+		level.friendly3 say dfr_M1L1_106k_1
+	}
+	else if (isalive level.friendly1){
+		level.friendly1 say dfr_M1L1_106k_1
+	}
+	else if (isalive level.friendly2){
+		level.friendly2 say dfr_M1L1_106k_1
+	}	
+}end
+
+//=========================================================================
+deathtouch:{
+//=========================================================================
+		if !(self istouching $endarea){
+			println (self.entref + " painfully dies")
+			self.killable = 1
+			self.health = 1
+			waitframe
+			self damage $world 35000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+		}
+		else{
+			println (self.entref + " was touching end area")
+		} 
+}end
+
+//=========================================================================
+ambush:{
+//=========================================================================
+	wait 1
+	if (isalive level.friendly2){
+		level.friendly2 say dfr_m1l1_add07
+	}else if (isalive level.friendly3){
+		level.friendly3 say dfr_m1l1_add07
+	}
+	else if (isalive level.friendly1){
+		level.friendly1 say dfr_m1l1_add07
+	}
+}end
+
+//=========================================================================
+spawnbazookaguy local.breaksay:{
+//=========================================================================
+	$endingexploder thread endingexploder
+
+//	println "#spawned bazookaguy"
+
+//	println $bazookaspawner.mdl
+	//local.ent = spawn $bazookaspawner.mdl
+	local.ent = waitthread global/spawner.scr::spawner_activate $bazookaspawner
+	
+//	local.ent.origin = $bazookaspawner.origin
+	local.ent forceactivate
+	local.ent notsolid
+	local.ent exec global/disable_ai.scr
+	local.ent.creator = $bazookaspawner
+//	local.ent thread global/ai.scr::spawncheck
+	local.ent gun "Panzerschrek"
+	local.ent accuracy 100
+	local.ent threatbias 50000
+	local.broke = 0
+
+	while (level.flags[bazooka] == 0){
+		local.ent runto $bazookaspot
+		thread ambush
+		local.ent waittill movedone
+		local.ent exec global/aimat.scr $bazookatarget //endingexploder
+		wait 0.25
+		local.ent exec global/shoot.scr
+	
+		wait 0.5
+	}
+
+	local.ent take weapons/panzerschreck.tik
+	waitframe
+	local.ent item weapons/mp40.tik
+
+	local.ent exec global/enable_ai.scr
+	local.ent solid
+
+	local.ent thread bazookadeath
+}end
+
+//=========================================================================
+bazookadeath:{
+//=========================================================================
+	self waittill death
+	level.flags[bazooka] = 2
+}end
+
+//=========================================================================
+spawnending_attack:{
+//=========================================================================
+	if (isalive level.friendly_end){
+		println "#spawned ending_attack guy"
+
+		local.ent = waitthread global/spawner.scr::spawner_activate $ending_attack
+		
+		local.ent forceactivate
+		local.ent notsolid
+		local.ent exec global/disable_ai.scr
+		local.ent accuracy 100
+		local.ent threatbias 50000
+
+		local.ent runto $ending_attack_spot
+		local.ent waittill movedone
+		local.ent exec global/aimat.scr level.friendly_end
+		wait 0.25
+		local.ent exec global/shoot.scr
+		wait 0.25
+		if (isalive level.friendly_end){
+			level.friendly_end damage $world 35000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+		}
+
+		local.ent solid
+
+		local.ent exec global/enable_ai.scr
+		local.ent solid
+	}
+}end
+
+//=========================================================================
+dooropen:{
+//=========================================================================
+/* EMPTY */
+}end
+
+//=========================================================================
+spawndoorguy:{
+//=========================================================================
+	while (level.flags[door] == 0){
+		println "#spawned doorguy"
+		local.ent = waitthread global/spawner.scr::spawner_activate $dooropenspawner
+
+		//local.ent = spawn $dooropenspawner.mdl
+		local.ent.origin = $dooropenspawner.origin
+		local.ent forceactivate
+		local.ent exec global/disable_ai.scr
+		local.ent.creator = $dooropenspawner
+//		local.ent thread global/ai.scr::spawncheck
+
+		local.break = 0
+		local.ent notsolid
+		while (local.break == 0){
+			local.ent runto $dooropen
+			println "#Door guy ran to door"
+			local.ent waittill movedone
+			println "#Door guy got to door"
+			if ((parm.movedone == 1) || !(isalive local.ent)){
+				local.break = 1
+			}
+			waitframe
+		}
+
+		if (isalive local.ent){
+			local.ent solid
+			local.ent exec global/enable_ai.scr
+			level.flags[door] = 1
+
+			$lockeddoor delete
+
+			$door playsound gate_iron_open
+			$door time 0.4
+			$door notsolid
+			$door rotateydown 85
+			$door waitmove
+			
+			$door disconnect_paths
+			
+			if (isalive level.friendly1){
+				level.friendly1 say actor_M1L1_107
+			}
+			else if (isalive level.friendly2){
+				level.friendly2 say actor_M1L1_107
+			}
+			else if (isalive level.friendly3){
+				level.friendly3 say actor_M1L1_107
+			}
+
+	//		waitthread global/objectives.scr::add_objectives 1 3 "Infiltrate the German occupied village." $endarea.origin
+	//		waitthread global/objectives.scr::add_objectives 2 3 "Check the door." $ending_door.origin
+			waitthread global/objectives.scr::add_objectives 3 2 "Man the MG42 mounted machine gun." $mg42.origin
+	//		waitthread global/objectives.scr::add_objectives 4 1 "Hold off the reinforcements." $mg42.origin
+	//		waitthread global/objectives.scr::add_objectives 5 1 "Open the door and get out." $endthelevel.origin
+			waitthread global/objectives.scr::current_objectives 3
+		}
+		waitframe
+	}
+	
+	while (isalive local.ent){
+		wait 0.5
+	}
+
+	if (isalive level.friendly_end){
+		local.break = 0
+		level.friendly_end leash 64
+		level.friendly_end mindist 64
+		level.friendly_end maxdist 2048
+		level.friendly exec global/disable_ai.scr
+
+		while ((isalive level.friendly_end) && (local.break == 0)){
+
+			if (level.flags[triggergun] == 1){
+				level.friendly_end exec global/disable_ai.scr
+			}
+
+			println "#RAN TO END WINDOW"
+			level.friendly_end runto $endwindow
+			level.friendly_end waittill movedone
+			
+			if (parm.movedone == 1){
+				level.friendly_end tether $endwindow
+				$endshutterL2 time 0.4
+				$endshutterL2 thread rotatedown 170
+
+				$endshutterR2 time 0.4
+				$endshutterR2 thread rotateup 170
+				local.break = 1
+				$endshutterR2 playsound shutteropen
+			}
+			wait 1
+		}
+
+		level.friendly_end.avoidplayer = 0
+		level.friendly exec global/enable_ai.scr
+	}
+}end
+
+//=========================================================================
+completedobjective:{
+//=========================================================================
+	if ($world.objs == NIL){//chrissstrahl - make coop compatible
+		$world.objs = -1	//chrissstrahl - make coop compatible
+	}
+
+	$world.objs++			//chrissstrahl - make coop compatible
+
+	if ($world.objs == 0){//chrissstrahl - make coop compatible
+		waitthread global/objectives.scr::add_objectives 1 2 "Infiltrate the German occupied village." ( -6296 1640 480)
+		waitthread global/objectives.scr::add_objectives 2 1 "Check the door." $ending_door.origin
+		waitthread global/objectives.scr::add_objectives 3 1 "Man the MG42 mounted machine gun." $mg42.origin
+		waitthread global/objectives.scr::add_objectives 4 1 "Hold off the reinforcements." $mg42.origin
+		waitthread global/objectives.scr::add_objectives 5 1 "Continue on your mission." $endthelevel.origin
+		waitthread global/objectives.scr::current_objectives 1
+	}
+	else if ($world.objs == 1){//chrissstrahl - make coop compatible
+		waitthread global/objectives.scr::add_objectives 1 3 "Infiltrate the German occupied village." ( -6296 1640 480)
+		waitthread global/objectives.scr::add_objectives 2 1 "Check the door." $ending_door.origin
+		waitthread global/objectives.scr::add_objectives 3 1 "Man the MG42 mounted machine gun." $mg42.origin
+		waitthread global/objectives.scr::add_objectives 4 1 "Hold off the reinforcements." $mg42.origin
+		waitthread global/objectives.scr::add_objectives 5 1 "Continue on your mission." $endthelevel.origin
+		waitthread global/objectives.scr::current_objectives 1
+	}
+	else if ($world.objs == 2){//chrissstrahl - make coop compatible
+		waitthread global/objectives.scr::add_objectives 1 3 "Infiltrate the German occupied village." ( -6296 1640 480)
+		waitthread global/objectives.scr::add_objectives 2 2 "Check the door." $ending_door.origin
+		waitthread global/objectives.scr::add_objectives 3 1 "Man the MG42 mounted machine gun." $mg42.origin
+		waitthread global/objectives.scr::add_objectives 4 1 "Hold off the reinforcements." $mg42.origin
+		waitthread global/objectives.scr::add_objectives 5 1 "Continue on your mission." $endthelevel.origin
+		waitthread global/objectives.scr::current_objectives 2
+	}
+	else if ($world.objs == 3){//chrissstrahl - make coop compatible
+		println "#ready to man the gun next"
+//		waitthread global/objectives.scr::add_objectives 1 3 "Infiltrate the German occupied village." ( -6296 1640 480)
+		waitthread global/objectives.scr::add_objectives 2 3 "Check the door." $ending_door.origin
+//		waitthread global/objectives.scr::add_objectives 3 2 "Man the MG42 mounted machine gun." $mg42.origin
+//		waitthread global/objectives.scr::add_objectives 4 1 "Hold off the reinforcements." $mg42.origin
+//		waitthread global/objectives.scr::add_objectives 5 1 "Continue on your mission." $endthelevel.origin
+//		set_objective_pos $mg42.origin
+		waitthread global/objectives.scr::current_objectives 3
+	}
+	else if ($world.objs == 4){//chrissstrahl - make coop compatible
+		waitthread global/objectives.scr::add_objectives 1 3 "Infiltrate the German occupied village." ( -6296 1640 480)
+		waitthread global/objectives.scr::add_objectives 2 3 "Check the door." $ending_door.origin
+		waitthread global/objectives.scr::add_objectives 3 3 "Man the MG42 mounted machine gun." $mg42.origin
+		waitthread global/objectives.scr::add_objectives 4 2 "Hold off the reinforcements." $mg42.origin
+		waitthread global/objectives.scr::add_objectives 5 1 "Continue on your mission." $endthelevel.origin
+		waitthread global/objectives.scr::current_objectives 4
+	}
+	else if ($world.objs == 5){//chrissstrahl - make coop compatible
+		waitthread global/objectives.scr::add_objectives 1 3 "Infiltrate the German occupied village." ( -6296 1640 480)
+		waitthread global/objectives.scr::add_objectives 2 3 "Check the door." $ending_door.origin
+		waitthread global/objectives.scr::add_objectives 3 3 "Man the MG42 mounted machine gun." $mg42.origin
+		waitthread global/objectives.scr::add_objectives 4 3 "Hold off the reinforcements." $mg42.origin
+		waitthread global/objectives.scr::add_objectives 5 2 "Continue on your mission." $endthelevel.origin
+		waitthread global/objectives.scr::current_objectives 5
+		level.flags[killplayer] = 0
+	}
+	else if ($world.objs == 6){//chrissstrahl - make coop compatible
+		waitthread global/objectives.scr::add_objectives 1 3 "Infiltrate the German occupied village." ( -6296 1640 480)
+		waitthread global/objectives.scr::add_objectives 2 3 "Check the door." $ending_door.origin
+		waitthread global/objectives.scr::add_objectives 3 3 "Man the MG42 mounted machine gun." $mg42.origin
+		waitthread global/objectives.scr::add_objectives 4 3 "Hold off the reinforcements." $mg42.origin
+		waitthread global/objectives.scr::add_objectives 5 3 "Continue on your mission." $endthelevel.origin
+	}
+}end
+
+//=========================================================================
+turret_target local.path:{
+//=========================================================================
+	while (1){
+	//	self flypath local.path
+		self followpath local.path
+		self waitmove
+	}
+}end
+
+//=========================================================================
+spawnmg42guy:{
+//=========================================================================
+	local.ent = $mg42guy
+	$mg42guy exec global/disable_ai.scr
+//	$mg42 exec global/mg42.scr $mg42target $mg42path $endarea $mg42temptrigger local.ent
+	$mg42target thread turret_target $mg42path
+	$mg42 setaimtarget $mg42target
+	$mg42 tracerFrequency 3
+	$mg42 firedelay 0.1
+//	$mg42 burstFireSettings 0 10 1 1
+	$mg42 startFiring
+	wait 0.5
+
+	while (isalive $mg42guy){
+		$mg42 startfiring
+		wait 1
+	}
+}end
+
+//=========================================================================
+rotatedown local.amount:{
+//=========================================================================
+	self rotateydown local.amount
+	self waitmove
+}end
+
+//=========================================================================
+rotateup local.amount:{
+//=========================================================================
+	self rotateyup local.amount
+	self waitmove
+}end
+
+//=========================================================================
+minmax local.min local.max:{
+//=========================================================================
+	self.mins = local.min
+	self.maxs = local.max
+}end
+
+//=========================================================================
+initfriend:{
+//=========================================================================
+	self.health = 50000
+	self.distance = 150
+	self accuracy 100
+	self mindist 192
+	self maxdist 512
+	self.noticescale = 1
+	self leash 5120
+	self waittill death
+	level.deadfriends++
+}end
+
+//=========================================================================
+destorg:{
+//=========================================================================
+	while (isalive self){
+		println "# "
+		println "# "
+		println "# "
+		println "# "
+		println "# "
+		println self.destination.origin
+		wait 0.1
+	}
+}end
+
+//=========================================================================
+objectives:{
+//=========================================================================
+	thread completedobjective // New  /  Objective 1 Infiltrate
+}end
+
+//=========================================================================
+scene1:{
+//=========================================================================
+	thread objectives
+	level.deadfriends = 0
+	wait 1
+	
+	level.friendly1 say actor_M1L1_102
+	thread global/ai.scr::spawn 100
+
+	level.friendly1 thread minmax 30 60
+	level.friendly2 thread minmax 30 60
+	level.friendly3 thread minmax 30 60
+	level.friendly4 thread minmax 30 60
+	
+	//chrissstrahl - make sure the spawnpoints are updated in time
+	thread coop_updateSpawn2
+}end
+
+//=========================================================================
+getspot local.spot:{
+//=========================================================================
+	self.friendtype = -1
+	
+	//chrissstrahl - make coop compatible
+	/* NO LONGER NEEDED WITH THE NEW HANDLING OF AI TO FOLLOW PLAYER
+	if( level.gametype != 0 ){
+		self exec coop_mod/main.scr::followPlayerStop
+		if( local.spot.size > 1 ){
+			local.spot = NULL
+			local.spot = exec coop_mod/replace.scr::player_closestTo self
+			while(local.spot == NULL){
+				local.spot = exec coop_mod/replace.scr::player_closestTo self
+				wait 1
+			}
+		}
+	}
+	*/
+	//end chrissstrahl
+	
+	self runto local.spot
+	self tether local.spot //  $player
+//	self fixedleash 1
+	self leash 50 //  1350
+	while (vector_length (self.origin - local.spot.origin) > 100){
+		if (getcvar(debug) == "1"){
+			println (self.entref + " is running to his spot")
+		}
+		
+		self runto local.spot
+		self waittill movedone
+		waitframe
+	}
+	if (getcvar(debug) == "1"){
+		println ("got to " + local.spot.grabber)
+	}
+	self.friendtype = -1
+	self.gotspot = 1
+}end
+
+
+//=========================================================================
+killplayer:{
+//=========================================================================
+	if (level.flags[killplayer] == 1){
+		exec coop_mod/replace.scr::killplayer //chrissstrahl - terminate player
+	}
+}end
+
+//=========================================================================
+blowthedoor:{
+//=========================================================================
+	if (level.flags[triggergun] == 0){
+		level.flags[triggergun] = 1
+		wait 8
+		
+		$endshutterL3 time 0.4
+		$endshutterL3 thread rotatedown 170
+
+		$endshutterR3 time 0.4
+		$endshutterR3 thread rotateup 170
+	}
+}end
+
+//=========================================================================
+spawnsomedoorguys:{
+//=========================================================================
+	local.num = 0
+	while (local.num < 5){
+		local.random = randomint(3)
+
+		if (local.random == 0){
+			thread global/ai.scr::spawn 503
+		}
+		else if (local.random == 1){
+			local.leftdoor = level.time + 2
+//			thread global/ai.scr::alarmspawn 501 0 maps/m1l1.scr::blank $spawnerleft
+			thread global/ai.scr::spawn 501
+		}
+		else if (local.random == 2){
+			local.rightdoor = level.time + 2
+			thread global/ai.scr::spawn 502
+//			thread global/ai.scr::alarmspawn 502 0 maps/m1l1.scr::blank $spawnerright
+		}
+		wait (randomint(5) + 1.5)
+		local.num++
+	}
+}end
+
+//=========================================================================
+friendliesalive:{
+//=========================================================================
+	if (level.time < level.endleveltime){
+		end 1
+	}
+	else if (level.time > level.endleveltime + 8){
+		if (isalive level.friendly2){
+			level.friendly2 damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+			level.endleveltime = level.time - 6
+		}
+		else if (isalive level.friendly3){
+			level.friendly3 damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+			level.endleveltime = level.time - 6
+		}
+		else if (isalive level.friendly4){
+			level.friendly4 damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+			level.endleveltime = level.time - 6
+		}
+	}
+
+	if (isalive level.friendly1){ end 1 }
+	if (isalive level.friendly3){ end 1 }
+	if (isalive level.friendly4){ end 1 }
+}end -1
+
+//=========================================================================
+barrel_guy:{
+//=========================================================================
+	while (isalive self)
+	{
+		self exec global/crouch.scr
+		wait 2
+	}
+}end
+
+//=========================================================================
+barrel:{
+//=========================================================================
+	//println ("#other was " +  parm.other.targetname)
+	local.see = 90
+	// (($player cansee $barrel[1] 25) || ($player cansee $barrel[2] 25) || ($player cansee $barrel_guy[1] 25) || ($player cansee $barrel_guy[2] 25)))
+//	if (((parm.other.targetname == "friendly") || (parm.other == $player)) && ((sighttrace ($player.origin + (0 0 50)) ($barrel[1].origin + (0 0 50)) 1) || (sighttrace ($player.origin + (0 0 50)) ($barrel[2].origin + (0 0 50)) 1)))
+	//chrissstrahl - make this right, and also work in mp
+	if ((parm.other.targetname == "friendly") || (parm.other.targetname == "player")){
+		if(	(exec coop_mod/replace.scr::playerCansee $barrel_guy[1] local.see) ||	//chrissstrahl - make coop compatible
+			(exec coop_mod/replace.scr::playerCansee $barrel_guy[2] local.see) ||	//chrissstrahl - make coop compatible
+			(exec coop_mod/replace.scr::playerCansee $barrel[1] local.see) ||		//chrissstrahl - make coop compatible
+			(exec coop_mod/replace.scr::playerCansee $barrel[2] local.see)			//chrissstrahl - make coop compatible
+		
+		){
+			self delete
+			local.num = 0
+			
+			for (local.i=1;local.i<$barrel_guy.size+1;local.i++){
+				if (isalive $barrel_guy[local.i]){
+					$barrel_guy[local.i].health = 5
+					$barrel_guy[local.i] takedamage
+					local.num++
+					if (local.num == 1){
+						$barrel_guy[local.i] exec global/setdeathanim.scr death_grenade
+					}
+					else{
+						$barrel_guy[local.i] exec global/setdeathanim.scr death_grenade_high
+					}
+				}
+			}
+
+			waitframe
+
+			if ($barrel[2]){
+				$barrel[2] damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+				println "#Did massive damage to barrel 2"
+			}
+
+			if ($barrel[1]){
+				$barrel[1] damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+				println "#Did massive damage to barrel 1"
+			}
+		}
+	}
+}end
+
+
+//=========================================================================
+friendlydeath:{
+//=========================================================================
+	local.threatbias = 0
+
+	while (level.flags[killplayer] == 1){
+		local.threatbias = local.threatbias + 1
+		
+		if (isalive level.friendly1){
+			if (level.friendly1.health > 10)
+				level.friendly1.healthonly = level.friendly1.health - 5
+		}
+
+		if (isalive level.friendly3){
+			if (level.friendly3.health > 10){
+				level.friendly3.healthonly = level.friendly3.health - 5
+			}
+			level.friendly3 threatbias local.threatbias
+		}
+
+		if (isalive level.friendly4){
+			if (level.friendly4.health > 10){
+				level.friendly4.healthonly = level.friendly4.health - 5
+			}
+			level.friendly4 threatbias local.threatbias
+		}
+		wait 0.1
+	}
+}end
+
+
+//=========================================================================
+triggerend:{
+//=========================================================================
+	level.friendly1.leash = 128
+	level.friendly2.leash = 128
+	level.friendly3.leash = 128
+
+	level.friendly1.gotspot = 0
+	level.friendly2.gotspot = 0
+	level.friendly3.gotspot = 0
+
+	for (local.i=1;local.i<level.friendlynodes+1;local.i++)
+	{
+		if (level.friendlynode[local.i].grabber != NIL){
+			if (level.friendlynode[local.i].grabber == 1){
+				level.friendly1 thread getspot level.friendlynode[local.i]
+			}
+			else if (level.friendlynode[local.i].grabber == 2){
+				level.friendly2 thread getspot level.friendlynode[local.i]
+			}
+			else if (level.friendlynode[local.i].grabber == 3){
+				level.friendly3 thread getspot level.friendlynode[local.i]
+			}
+		}
+	}
+	
+	$endarea waittill trigger
+	thread completedobjective // Infiltrate
+
+	local.breaksay = 0
+	
+	while (local.breaksay == 0){
+		if (exec coop_mod/replace.scr::istouching $endtrigger){ //chrissstrahl - make coop compatible
+//			println ("friendly1: " + (vector_length ($player.origin - level.friendly1.origin)))
+//			println ("friendly2: " + (vector_length ($player.origin - level.friendly2.origin)))
+//			println ("friendly3: " + (vector_length ($player.origin - level.friendly3.origin)))
+			
+			//chrissstrahl - get closest player to relevant area
+			local.player = NULL
+			while( local.player == NULL ){
+				local.player = exec coop_mod/replace.scr::player_closestTo $endtrigger
+				if(local.player != NULL){
+					break
+				}else{
+					wait 2
+				}
+			}
+			
+			if (vector_length (local.player.origin - level.friendly2.origin) < 450){//chrissstrahl - make coop compatible
+				local.breaksay = 2
+			}
+			else if (vector_length (local.player.origin - level.friendly3.origin) < 450){//chrissstrahl - make coop compatible
+				local.breaksay = 3
+			}
+			else if (vector_length (local.player.origin - level.friendly1.origin) < 450){//chrissstrahl - make coop compatible
+				local.breaksay = 1
+			}
+		}
+		wait 0.1
+	}
+
+	thread completedobjective // check the door
+	
+	level.flags[checkdoor] = 1
+	local.checktime = level.time - 15
+	local.count = 0
+	
+	while (level.flags[checkdoor] == 1){
+		if (level.time > local.checktime){
+			local.checktime = level.time + 12
+			iprintlnbold "Use your compass to guide you to your next objective."
+
+			local.count++
+
+			if (local.count < 6){
+				println ("breaksay was " + local.breaksay + " and count was " + local.count)
+				if (local.breaksay == 1){
+					level.friendly1 say ("dfr_m1l1_add05" + local.count)
+				}
+				else if (local.breaksay == 2){
+					level.friendly2 say ("dfr_m1l1_add05" + local.count)
+				}
+				else if (local.breaksay == 3){
+					level.friendly3 say ("dfr_m1l1_add05" + local.count)
+				}
+			}
+		}
+		wait 0.1
+	}
+
+	if( level.gametype != 0 ){
+		//chrissstrahl - create spawnpoints for coop
+		waitthread coop_mod/spawnlocations.scr::m1l1_update3
+		
+		//chrissstrahl - move players to spawn if they are to far away
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+			if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 ){
+				local.vec = local.player.origin
+				if( local.vec[0] < -6215 && local.vec[1] > 1539 ){
+					continue
+				}
+				thread coop_mod/main.scr::playerPlaceAtSpawn local.i
+			}
+		}
+	}
+	
+	$ending_save_player solid
+	$introtruck delete
+	$introtruck2 delete
+
+	local.newhealth = 600
+	level.friendly2.health = 32000
+	level.friendly1.killable = 1
+	level.friendly3.killable = 1
+
+	if (level.friendly1.health > local.newhealth){
+		level.friendly1.health = local.newhealth
+	}
+
+	if (level.friendly3.health > local.newhealth){
+		level.friendly3.health = local.newhealth
+	}
+	
+	wait 1.0
+
+	if (local.breaksay == 1){
+		level.friendly1 say dfr_m1l1_add06
+	}
+	else if (local.breaksay == 2){
+		level.friendly2 say dfr_m1l1_add06
+	}
+	else if (local.breaksay == 3){
+		level.friendly3 say dfr_m1l1_add06
+	}
+	wait 3.5
+
+	waitthread spawnbazookaguy
+
+	thread global/ai.scr::spawn 508
+
+	level.bodycount = 0
+	local.random = 1
+	local.lastrandom = 1
+
+	for (local.i=1;local.i<level.ending_spawner.size - 1;local.i++){
+		level.ending_spawned[local.i] = waitthread global/spawner.scr::spawner_activate level.ending_spawner[local.i]
+		level.ending_spawned[local.i] thread ending_spawn_think
+		level.bodycount++
+	}
+
+	$endshutterL time 0.4
+	$endshutterL thread rotatedown 170
+
+	$endshutterR time 0.4
+	$endshutterR thread rotateup 170
+
+
+	thread spawnmg42guy
+
+	local.maxbaddies = 6
+	level.friendly_end = level.friendly2
+
+	while (isalive $mg42guy){
+		while (level.bodycount < level.ending_spawner.size - 3){
+			local.random = randomint (level.ending_spawner.size) + 1
+
+			if !(isalive level.ending_spawned[local.random]){
+				level.ending_spawned[local.random] = waitthread global/spawner.scr::spawner_activate level.ending_spawner[local.random]
+				level.ending_spawned[local.random] thread ending_spawn_think
+				level.bodycount++
+			}
+
+		}
+		wait 1
+	}
+
+	thread spawndoorguy
+
+	if (level.totalbaddies == NIL){
+		level.totalbaddies = 0
+	}
+
+	while (level.flags[bazooka] != 2){
+		wait 0.15
+	}
+
+	while ((isalive $mg42guy) || (level.flags[door] == 0)){
+		wait 0.5
+	}
+
+	local.thetimer = level.time - 5
+	while !(level.flags[triggergun]){
+		if (level.time > local.thetimer){
+			if ($world.usehint == NIL){	//chrissstrahl - make coop compatible
+//				local.key = getboundkey1 "+use"
+//				iprintlnbold_noloc (loc_convert_string "Find your way to the MG42 mounted machine gun and press the USE key  ( ") (loc_convert_string local.key) (loc_convert_string " ) to take control.")
+				iprintlnbold "Climb the stairs and find the MG42 mounted machine gun."
+			}
+
+			local.thetimer = level.time + 10 + randomint(5)
+			if (isalive level.friendly1){
+				level.friendly1 say dfr_m1l1_107j // man the machine gun
+			}
+			else if (isalive level.friendly2){
+				level.friendly2 say dfr_m1l1_107j
+			}
+			else if (isalive level.friendly3){
+				level.friendly3 say dfr_m1l1_107j
+			}
+		}
+
+		while (level.bodycount < level.ending_spawner.size - 2){
+			local.random = randomint (level.ending_spawner.size) + 1
+
+			if !(isalive level.ending_spawned[local.random]){
+				level.ending_spawned[local.random] = waitthread global/spawner.scr::spawner_activate level.ending_spawner[local.random]
+				level.ending_spawned[local.random] thread ending_spawn_think
+				level.bodycount++
+			}
+		}
+		wait 1
+	}
+	
+
+	if ($enemyspawnguy.size > 0){
+		for (local.i=1;local.i < $enemyspawnguy.size + 1;local.i++){
+			if (isalive $enemyspawnguy[local.i]){
+				$enemyspawnguy[local.i] damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+			}
+		}
+	}
+
+	thread completedobjective // check the door / man the mounted machine gun
+	
+//	thread global/ai.scr::alarmspawn 509 0 maps/m1l1.scr::rearguys $dooropen 0
+	level.flags[killplayer] = 1
+
+	local.leftdoor = level.time
+	local.rightdoor = level.time
+
+	if (isalive level.friendly1){ level.friendly1 takedamage }
+	if (isalive level.friendly2){ level.friendly2 takedamage }	
+	if (isalive level.friendly3){ level.friendly3 takedamage }
+
+	local.maxbaddies = 12
+	local.endtrigger = 0
+
+	thread friendlydeath
+
+	level.endleveltime = level.time + 16 // was 20
+	level.ending_dead = 0
+
+	while (level.ending_dead < 10){
+		println ("ending dead is " + level.ending_dead)
+//		local.ent = waitthread global/spawner.scr::spawner_activate $dooropenspawner
+
+		println ("bodycount is " + level.bodycount)
+		while ((level.bodycount < level.ending_spawner.size - 1) && (level.ending_dead < 10)){
+			local.random = randomint (level.ending_spawner.size) + 1
+
+			if !(isalive level.ending_spawned[local.random]){
+				level.ending_spawned[local.random] = waitthread global/spawner.scr::spawner_activate level.ending_spawner[local.random]
+				level.ending_spawned[local.random] thread ending_spawn_think
+				level.bodycount++
+			}
+			wait 0.5
+		}
+
+		wait 1
+	}
+
+	if (isalive level.friendly1){
+		level.friendly1 damage $world 35000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	}
+
+	if (isalive level.friendly3){
+		level.friendly3 damage $world 35000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	}
+
+	level.friendly_end thread continueonyourown
+
+	thread completedobjective // hold off reinforcements / Continue on your own
+
+//	wait 2
+
+	$door_left connect_paths
+	$door_right connect_paths
+
+	//chrissstrahl - wait for a player to get close
+	while(1){
+		local.player = exec coop_mod/replace.scr::player_closestTo $door_left
+		if(local.player != NULL && vector_length ($door_left.origin - local.player.origin) < 320){
+			break
+		}
+		wait 0.2
+	}
+	//end chrissstrahl
+
+	thread global/ai.scr::spawn 509 0 NIL 1
+	thread global/exploder.scr::explode 505
+	waitframe
+	
+	$door_left time 0.3
+	$door_left thread rotatedown 170
+	$door_right time 0.4
+	$door_right waitthread rotateup 170
+
+	thread endthelevel
+		
+	
+	if (isalive level.friendly_end){
+		level.friendly_end exec global/disable_ai.scr
+		level.friendly_end runto $endwindow
+		level.friendly_end waittill movedone
+		level.friendly_end tether $endwindow
+		level.friendly_end leash 20
+		level.friendly_end exec global/enable_ai.scr
+	}
+	
+	thread touchcheck
+}end
+
+//=========================================================================
+continueonyourown:{
+//=========================================================================
+	local.num = 1
+	while (isalive self)
+	{
+		if (local.num == 1)
+		self say dfr_m1l1_add08
+		else
+		if (local.num == 2)
+		self say dfr_m1l1_add09
+		else
+		if (local.num == 3)
+		self say dfr_m1l1_add10
+
+		local.num++
+		if (local.num > 3)
+			local.num = randomint (2) + 1
+
+		wait (5 + randomint(5))
+	}
+}end
+
+//=========================================================================
+bodycount:{
+//=========================================================================
+	self waittill death
+	level.ending_dead++
+	level.bodycount--
+}end
+
+//=========================================================================
+ending_spawn_think:{
+//=========================================================================
+	thread bodycount
+	
+	self leash 5000
+	self ammo_grenade (randomint(4))
+	self dontdropweapons
+	
+	println $(self.target).size
+	
+	if ($(self.target).size > 1){
+		local.target = $(self.target)[randomint($(self.target).size) + 1]
+	}
+	else{
+		local.target = $(self.target)
+	}
+
+	self forceactivate
+	self exec global/disable_ai.scr
+	self runto local.target
+	self waittill movedone
+
+//	 println ("spawned an enemy at " + self.origin + " who is " + (vector_length (self.origin - self.target.origin)) + " away from his destination ")
+	while (vector_length (self.origin - local.target.origin) > 80){
+		self runto local.target
+//		println ("AI at origin " + self.origin + " is " + (vector_length (self.origin - self.target.origin)) + " away from destination ")
+		self waittill movedone
+		waitframe
+	}
+
+//	self waittill movedone
+	self exec global/aimat.scr $player
+	wait 0.1
+	
+	self exec global/enable_ai.scr
+	self gren_awareness 0
+	
+	if (self.stick){
+		self tether local.target
+		self leash 64
+	}
+
+	self mindist 64
+	self maxdist 4048
+	self sight 4048
+	self hearing 4048
+}end
+
+//=========================================================================
+ending_kill:{
+//=========================================================================
+	if ((level.flags[killplayer] == 0) && ($world.objs > 4)) {
+		thread spawnending_attack
+		self delete
+	}
+}end
+
+//=========================================================================
+touchcheck:{
+//=========================================================================
+	local.num = 9
+	if (isalive level.friendly_end)
+		level.friendly_end turnto $door_left
+	while (isalive level.friendly_end && $endtrigger != NULL){
+		if (exec coop_mod/replace.scr::istouching $endtrigger){ //chrissstrahl - check if any player is touching the trigger
+			if (isalive level.friendly_end){
+				level.friendly_end lookat (exec coop_mod/replace.scr::player_closestTo level.friendly_end) //chrissstrahl - make him look to closest player
+				level.friendly_end say ("dfr_m1l1_add0" + local.num)
+			}
+			local.num++
+			if (local.num > 10)
+				local.num = 8
+		}
+		wait (4 + randomfloat(3))
+	}
+}end
+
+//=========================================================================
+endthelevel:{
+//=========================================================================
+	if (getcvar(debug) == "1"){
+			println ("Bodycount is still " + level.bodycount)
+	}
+	
+	wait 0.1
+
+	while !(exec coop_mod/replace.scr::istouching $endthelevel){ //chrissstrahl - check if any player is touching the trigger
+		wait 0.1
+	}
+
+	thread completedobjective  // continue on your own / Finished
+	exec global/missioncomplete.scr m1l2a 1
+}end
+
+//=========================================================================
+rearguys:{
+//=========================================================================
+	self runto (exec coop_mod/replace.scr::player_closestTo self)
+}end
+
+//=========================================================================
+killfriends:{
+//=========================================================================
+	level.friendly1 damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	level.friendly2 damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	level.friendly3 damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+//	level.friendly4 damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+}end
+
+
+//=========================================================================
+captain_talk:{
+//=========================================================================
+	if (parm.other == level.friendly1){
+		println ("Captain said dfr_army_g0" + self.add)
+		level.friendly1 say ("dfr_army_g0" + self.add)
+		self delete //remove trigger
+		end
+	}
+}end
+
+
+//=========================================================================
+blank:{
+//=========================================================================
+/* EMPTY */
+}end
+
+//=========================================================================
+doorleft:{
+//=========================================================================
+	self thread rotateup 90
+	wait 2
+	self thread rotatedown 90
+}end
+
+
+//=========================================================================
+doorright:{
+//=========================================================================
+	self thread rotatedown 90
+	wait 2
+	self thread rotateup 90
+}end
+
+
+//=========================================================================
+door_end_open:{
+//=========================================================================
+	$door_end_left playsound gate_iron_open
+	$door_end_left time 2
+	$door_end_right time 2
+	$door_end_left thread rotateup 85
+	$door_end_right waitthread rotatedown 85
+	
+	thread completedobjective  // continue on your own / Finished
+	
+	exec global/missioncomplete.scr m1l2a 1
+}end
+
+//=========================================================================
+ending_door:{
+//=========================================================================
+	if (self.lasttime == NIL){
+		self.lasttime = level.time - 1
+	}
+
+	if (level.time > self.lasttime){
+		self.lasttime = level.time + 1
+		self playsound door_wood_locked //chrissstrahl - play sound on trigger rather than $player
+		
+		if (level.flags[checkdoor] == 1)
+		{
+			level.flags[checkdoor] = 2
+			thread completedobjective // check the door / man the machine gun comes next
+		}
+	}
+}end
+
+//=========================================================================
+coop_updateSpawn2:{
+//=========================================================================
+	if( level.gametype == 0 ){
+		end
+	}
+	
+//chrissstrahl - wait until any player is within a specific coordinate
+//move then the spawnlocations
+	local.wait = 1
+	while(local.wait){
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player =  $player[local.i]
+			if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 && local.player.flags["coop_isActive"] == 1 ){
+				if( (vector_length((local.player.origin) - ( -5000 224 448))) < 300 ){
+					local.wait = 0
+				}
+			}
+		}
+		waitframe
+	}
+	//chrissstrahl - create spawnpoints for coop
+	waitthread coop_mod/spawnlocations.scr::m1l1_update2
+	
+	//chrissstrahl - signal the script that players no longer spawn inside the truck
+	level.coop_spawnInsideTruck		= 0
+}end
+
+//=========================================================================
+coop_playerJustSpawned local.i:{
+//=========================================================================
+//chrissstrahl - handle players once they are just spawned
+//players 1-6 are spawned in the truck, make em crouch so they fit in
+	if(!level.coop_spawnInsideTruck){
+		end
+	}
+
+	local.player = $player[local.i]
+	if(local.i < 7 && local.player != NULL){
+		
+		local.player forcelegsstate CROUCH_IDLE
+		
+		//chrissstrahl - make em stand up again if they are away from the spawn
+		while(local.player != NULL){
+			if(local.player.dmteam != "spectator" && local.player.health > 0){
+				local.vec = local.player.origin
+				if( local.vec[2] < 120 ){
+					local.player forcelegsstate STAND
+					break
+				}
+			}
+			else{
+				break
+			}
+			waitframe
+		}
+	}
+}end
+
+//=========================================================================
+coop_playerJustSpawned1:{
+//=========================================================================
+	thread coop_playerJustSpawned 1
+}end
+
+//=========================================================================
+coop_playerJustSpawned2:{
+//=========================================================================
+	thread coop_playerJustSpawned 2
+}end
+
+//=========================================================================
+coop_playerJustSpawned3:{
+//=========================================================================
+	thread coop_playerJustSpawned 3
+}end
+
+//=========================================================================
+coop_playerJustSpawned4:{
+//=========================================================================
+	thread coop_playerJustSpawned 4
+}end
+
+//=========================================================================
+coop_playerJustSpawned5:{
+//=========================================================================
+	thread coop_playerJustSpawned 5
+}end
+
+//=========================================================================
+coop_playerJustSpawned6:{
+//=========================================================================
+	thread coop_playerJustSpawned 6
+}end
+
+//=========================================================================
+coop_playerJustSpawned7:{
+//=========================================================================
+	//thread coop_playerJustSpawned 7
+	//no action needed
+}end
+
+//=========================================================================
+coop_playerJustSpawned8:{
+//=========================================================================
+	//thread coop_playerJustSpawned 8
+	//no action needed
+}end
+
+/*
+	50: round the corner crew
+
+	100: first guy 
+	101 more
+	102 more
+	103
+	104
+
+	280 truck explosion
+	300 intro wave 1
+	
+
+	500 endingexploder
+	501 spawner enddoorL
+	502 spawner enddoorR
+	503 midguy
+	505 explodedoor
+	506 spawner mg42 place
+	507 spawner attack mg42 player
+	508 spawner friendly roof killers
+
+	509	initial group
+
+	801 initial bombardment
+
+	bazookaspawner/bazookaspot
+	
+	dooropen targetname/setthread // dooropenspawner
+	endtrigger for friendlies/player and endtriggergun for mg42 and player.
+	endshutterL endshutterR
+	mg42, mg42guy, mg42path, endarea, mg42temptrigger
+*/ 
+
+

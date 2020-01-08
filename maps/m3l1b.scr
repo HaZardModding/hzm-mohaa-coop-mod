@@ -1,0 +1,1969 @@
+///////////////////////////////////////////////////////////////////////////////
+//
+//  MoH: Allied Assault Script File  
+//  Level: M3L1b - D-Day, bunker and back-field section
+//  Script Written By: Benson 'elmagoo' Russell
+//
+///////////////////////////////////////////////////////////////////////////////
+
+//*************************************************************
+//*************************************************************
+//*************************************************************
+//
+// INIT SECTION
+//
+//*************************************************************
+//*************************************************************
+//*************************************************************
+//=========================================================================
+main:{
+//=========================================================================
+	//*** set the soundtrack
+	soundtrack music/m3l1b.mus
+	level.coop_aaMap = 1					//chrissstrahl - let global scripts know this is a AA level
+	level.coopPrevMap = "m3l1a"				//chrissstrahl - set previouse map (for mom voteing)
+	level.coopNextMap = "m3l2"				//chrissstrahl - set next map (for mom voteing)
+	level.coop_disableSpawnWarper = TRUE	//chrissstrahl - disable respawn warper - we need all players to spawn at a specific place
+	thread coop_mod/main.scr::main 			//chrissstrahl - start coop mod extensions
+	level.coop_devTest = 0					//chrissstrahl - set to 0 once done testing
+
+	//*** modifications for AI paths with entities in the way
+	$e2_table notsolid
+	$door_bunker_exit notsolid
+
+	//*** prep the players weapons
+	exec global/loadout.scr maps/m3l1b.scr
+
+	//*************************************************************
+	//  wait for the level to spawn
+	//*************************************************************
+	level waittill prespawn
+
+	//*** disconnect paths
+	$door_bunker_exit disconnect_paths
+
+	//*** prep the level and ai
+	thread level_prep
+	thread ai_prep
+	//thread player_prep
+
+	//*** init variables
+	thread variable_prep
+
+	//*** initialize the minefields
+	thread global/minefield.scr::minefield_setup
+
+	//*** setup the crates N barrels
+	thread global/crate.scr::item_crate
+	thread global/crate.scr::explosive_crate
+	thread global/barrel.scr::explosive_barrel
+
+	//*************************************************************
+	//  player enters the game
+	//*************************************************************
+	level waittill spawn
+
+	//*** TEMP reset the Objectives portion of the HUD
+	//waitthread global/objectives.scr::reset_objectives
+	//waitthread global/objectives.scr::blank_objectives
+
+	//*** set the starting objectives for the level
+	/*
+	waitthread global/objectives.scr::add_objectives 1 2 "Destroy the 2 20mm Anti-Aircraft gun emplacements" $20mm_weapon1.origin
+	waitthread global/objectives.scr::add_objectives 2 2 "Destroy the FLAK 88 Artillery emplacement" $88mm_weapon.origin
+	waitthread global/objectives.scr::add_objectives 3 2 "Destroy the 15cm Artillery emplacement" $15cm_weapon.origin
+	waitthread global/objectives.scr::add_objectives 4 2 "Meet up at the rendevous point" $rendevous_point.origin
+	*/
+
+	waitthread global/objectives.scr::add_objectives 1 2 "Clear out the bunker." $mg42_bunker_2_gunner
+	waitthread global/objectives.scr::current_objectives 1
+
+	//*** give starting inventory items
+	//waitthread global/items.scr::add_item "explosives"
+
+	//*** start the bunker dust falling
+	thread bunker_dust_trigger
+
+	//*** play the proper ambient track
+	forcemusic normal normal
+
+	//*** set the current objective
+	waitthread global/objectives.scr::current_objectives 1
+
+	//*** setting ambient sounds on objects
+	thread ambient
+}end
+
+
+//*************************************************************
+//*************************************************************
+//
+// INIT THREADS
+//
+//*************************************************************
+//*************************************************************
+
+//*********************************************
+// init variables
+//*********************************************
+variable_prep:
+
+println "XXX Preping the variables"
+
+//*** player location variable
+level.progress = "bunker_lower"
+
+//*** objective variables
+level.88mm_weapon_objective = 0
+level.20mm_weapon1_objective = 0
+level.20mm_weapon2_objective = 0
+level.15cm_weapon_objective = 0
+level.objective_completed = 0
+
+//*** far bunker counter
+level.far_bunker_done = 0
+level.clear_farbunker_gunner = 0
+level.clear_bunker = 0
+
+end
+
+
+//*********************************************
+// prep the ai
+//*********************************************
+ai_prep:
+
+println "XXX Preping the AI"
+
+//*** lower level troops
+$weh_sol_bunker_lower_1 exec global/disable_ai.scr
+$weh_sol_bunker_lower_1.interval = 0
+$weh_sol_bunker_lower_1 thread weh_sol_bunker_lower_1_death
+
+$weh_sol_bunker_lower_2 exec global/disable_ai.scr
+$weh_sol_bunker_lower_2.interval = 0
+$weh_sol_bunker_lower_2 thread weh_sol_bunker_lower_2_death
+
+$weh_sol_bunker_lower_3.interval = 0
+$weh_sol_bunker_lower_3 thread weh_sol_bunker_lower_3_death
+
+$weh_sol_bunker_lower_4 exec global/disable_ai.scr
+$weh_sol_bunker_lower_4.interval = 0
+$weh_sol_bunker_lower_5 exec global/disable_ai.scr
+$weh_sol_bunker_lower_5.interval = 0
+
+//*** middle level troops
+$weh_sol_bunker_middle_1 exec global/disable_ai.scr
+$weh_sol_bunker_middle_1 exec global/setdeathanim.scr "death_fall_back"
+$weh_sol_bunker_middle_1.health = 10
+$weh_sol_bunker_middle_1.interval = 0
+$weh_sol_bunker_middle_2 exec global/disable_ai.scr
+$weh_sol_bunker_middle_2.interval = 0
+$weh_sol_bunker_middle_3 exec global/enable_ai.scr
+$weh_sol_bunker_middle_3.interval = 0
+$weh_sol_bunker_middle_4 exec global/enable_ai.scr
+$weh_sol_bunker_middle_4.interval = 0
+$weh_sol_bunker_middle_5 exec global/enable_ai.scr
+$weh_sol_bunker_middle_5.interval = 0
+
+$weh_off_bunker_middle_1 exec global/disable_ai.scr
+
+//*** upper level troops
+$weh_sol_bunker_upper_1 exec global/disable_ai.scr
+$weh_sol_bunker_upper_1.interval = 0
+$weh_sol_bunker_upper_1 thread upper_bunker_death
+$weh_sol_bunker_upper_2 exec global/disable_ai.scr
+$weh_sol_bunker_upper_2.interval = 0
+$weh_sol_bunker_upper_2 thread upper_bunker_death
+
+$weh_nco_bunker_upper_1 exec global/disable_ai.scr
+$weh_nco_bunker_upper_1.interval = 0
+$weh_nco_bunker_upper_1 thread upper_bunker_death
+
+$weh_off_bunker_upper_1 exec global/disable_ai.scr
+$weh_off_bunker_upper_1.interval = 0
+$weh_off_bunker_upper_1 thread weh_off_bunker_upper_1_pain
+$weh_off_bunker_upper_1 thread upper_bunker_death
+
+//*** guys running into the bunker
+$weh_nco_bunker_exit_1 exec global/disable_ai.scr
+$weh_nco_bunker_exit_1.interval = 0
+$weh_sol_bunker_exit_1 exec global/disable_ai.scr
+$weh_sol_bunker_exit_1.interval = 0
+$weh_sol_bunker_exit_2 exec global/disable_ai.scr
+$weh_sol_bunker_exit_2.interval = 0
+
+/*
+//*** TEMP TEMP TEMP POOPHEAD ENDING
+$weh_nco_bunker_exit_1 remove
+$weh_sol_bunker_exit_1 remove
+$weh_sol_bunker_exit_2 remove
+*/
+
+//*** top level retreating guys
+$weh_nco_retreat_1 exec global/disable_ai.scr
+$weh_nco_retreat_1.interval = 0
+$weh_sol_retreat_2 exec global/disable_ai.scr
+$weh_sol_retreat_2.interval = 0
+$weh_sol_retreat_3 exec global/disable_ai.scr
+$weh_sol_retreat_3.interval = 0
+
+//*** mg42 gunners
+$mg42_middle1_gunner  exec global/disable_ai.scr
+$mg42_middle2_gunner  exec global/disable_ai.scr
+
+$mg42_bunker_1_gunner thread mg42_bunker_1_gunner_pain
+$mg42_bunker_2_gunner thread mg42_bunker_2_gunner_pain
+$mg42_bunker_1_gunner thread mg42_bunker_1_gunner_death
+$mg42_bunker_2_gunner thread mg42_bunker_2_gunner_death
+$mg42_bunker_1_gunner thread upper_bunker_death
+$mg42_bunker_2_gunner thread upper_bunker_death
+
+end
+
+
+//*********************************************
+// prep the player
+//*********************************************
+player_prep:
+println "XXX Preping the player"
+end
+
+
+//*********************************************
+// prep the level, set initial time values,
+// move objects to starting positions
+//*********************************************
+level_prep:
+
+println "XXX Preping the level"
+
+//*** setup player progress triggers
+thread setup_progress
+
+//*** setup beach rush allied spawners and paths
+thread setup_beach_spawners
+
+//*** setup beach target eligibilty triggers
+thread setup_beach_target_triggers
+
+//*** setup the two mg42s in the main bunker
+$mg42_bunker_1 burstfiresettings 1 3 .2 .75
+$mg42_bunker_1 firedelay .08
+$mg42_bunker_1 tracerfrequency 4
+$mg42_bunker_1 maxyawoffset 30
+$mg42_bunker_1 pitchcaps (0 30 0)
+$mg42_bunker_1 setplayerusable 0
+$mg42_bunker_1 bulletspread 5 7
+$mg42_bunker_1 setaimtarget $mg42_bunker_target
+
+$mg42_bunker_2 burstfiresettings 1 3 .2 .75
+$mg42_bunker_2 firedelay .08
+$mg42_bunker_2 tracerfrequency 4
+$mg42_bunker_2 maxyawoffset 30
+$mg42_bunker_2 pitchcaps (0 30 0)
+$mg42_bunker_2 setplayerusable 0
+$mg42_bunker_2 bulletspread 5 7
+$mg42_bunker_2 setaimtarget $mg42_bunker_target
+
+$mg42_bunker_upper maxyawoffset 7
+$mg42_bunker_upper bulletspread 5 7
+$mg42_bunker_upper pitchcaps ( -1 10 0)
+
+//*** setup the two mg42s in the middle
+$mg42_middle1 burstfiresettings 1 3 .2 .75
+$mg42_middle1 firedelay .08
+$mg42_middle1 tracerfrequency 4
+$mg42_middle1 maxyawoffset 30
+$mg42_middle1 pitchcaps (0 30 0)
+$mg42_middle1 setplayerusable 0
+$mg42_middle1 bulletspread 5 7
+$mg42_middle1 setaimtarget $mg42_middle1_target
+
+$mg42_middle2 burstfiresettings 1 3 .2 .75
+$mg42_middle2 firedelay .08
+$mg42_middle2 tracerfrequency 4
+$mg42_middle2 maxyawoffset 30
+$mg42_middle2 pitchcaps (0 30 0)
+$mg42_middle2 setplayerusable 0
+$mg42_middle2 bulletspread 5 7
+$mg42_middle2 setaimtarget $mg42_middle2_target
+
+//*** trigger brushes
+$door_floor_hatch1_lock nottriggerable
+$end_level_trigger nottriggerable
+
+//*** solidifying objects after paths
+$e2_table solid
+$door_bunker_exit solid
+
+end
+
+
+//*********************************
+//*********************************
+//*** setup beach spawners and paths
+setup_beach_spawners:
+
+for (local.i = 1; local.i <= $allied_beach_path.size; local.i ++)
+{
+	local.lookup[$allied_beach_path[local.i].set] = local.i
+}
+
+for (local.i = 1; local.i <= $allied_beach_spawn.size ; local.i ++)
+{
+	$allied_beach_spawn[local.i].path_index = local.lookup[$allied_beach_spawn[local.i].set]
+}
+
+local.lookup = NIL
+
+end
+
+
+//*******************************
+//*******************************
+//*** setup progress triggers
+setup_progress:
+
+for (local.i = 1 ; local.i <= $progress_player.size ; local.i ++)
+{
+	$progress_player[local.i] thread progress_player local.i
+}
+
+end
+
+
+//*******************************
+//*******************************
+//*** setup target eligibility triggers
+setup_beach_target_triggers:
+
+for (local.i = 1 ; local.i <= $allied_beach_target.size ; local.i ++)
+{
+	$allied_beach_target[local.i] thread allied_beach_target local.i
+}
+
+end
+
+
+//*********************************************
+// setting ambient sounds on objects in the level
+//*********************************************
+ambient:
+
+$bunker_radio loopsound m3l1b_radio2
+
+end
+
+
+//*************************************************************
+//*************************************************************
+//
+// GAME OBJECT BACKGROUND THREADS
+//
+//*************************************************************
+//*************************************************************
+
+//*********************************************
+// progress triggers for tracking the player
+//*********************************************
+progress_player local.index:
+
+progress_player_loop:
+local.self waittill trigger
+
+level.progress = local.self.area
+
+//println "PLAYER PROGRESS: player is now in area: " level.progress
+
+if (level.progress == "bunker_lower")
+{
+	//*** change the ambient track
+	forcemusic normal normal
+	
+	//*** change the world fog
+	$world farplane 0
+	$world farplane_color (0 0 0)
+}
+else if (level.progress == "bunker_upper")
+{
+	//*** change the ambient track
+	forcemusic normal normal
+	
+	//*** change the world fog
+	$world farplane 6500
+	$world farplane_color (0.675 0.663 0.651)
+}
+else if (level.progress == "bunker_deck")
+{
+	//*** change the world fog
+	$world farplane 5000
+	
+	/*
+	//*** show the AI running up the beach
+	for (local.i = 1; local.i <= 14 ; local.i ++)
+        {
+		local.guy = $(allied_beach + local.i)
+        	if (local.guy.targetname != NULL || local.guy.targetname != NIL)
+                {
+                        //*** show the AI guy
+                        local.guy show
+                }		
+        }
+	*/
+}
+else if (level.progress == "backfield")
+{
+	//*** change the ambient track
+	forcemusic aux4 aux4
+	
+	//*** change the world fog
+	$world farplane 4500
+}
+
+wait .5
+
+goto progress_player_loop
+
+end
+
+
+//*********************************************
+// beach scene target eligibilty triggers
+//*********************************************
+allied_beach_target local.index:
+
+//*** used for guys in the beach scene to see if they're too far to be shot by the MG42s
+allied_beach_target_loop:
+local.self waittill trigger
+
+local.ai_dude = parm.other
+
+local.ai_dude.select = local.self.select
+
+wait 1
+
+goto allied_beach_target_loop
+
+end
+
+
+//******************************
+//  running the beach scene
+//******************************
+beach_scene_targeting:
+
+beach_scene_targeting_loop:
+//*** pick a guy
+local.choice = (randomint 20 + 1)
+local.guy = $("allied_beach" + local.choice)
+
+//println "BEACH TARGETING: " local.self " has choosen: " local.guy
+
+//*** if the guy choosen is non-existent
+if !(isalive local.guy)
+{
+	//println "BEACH TARGETING: " local.self " picked non-existent target, reselecting" 
+	goto beach_scene_targeting_next
+}
+
+//*** if the guy choosen is not eligble
+if (local.guy.select != 1)
+{
+	//println "BEACH TARGETING: " local.self " picked a non eligble target, select: " local.guy.select " : reselecting"
+	goto beach_scene_targeting_next
+}
+
+//*** keep firing at him till he's dead, the gunner's dead, or the guy is no longer valid
+while ((isalive local.guy) && local.guy.select == 1 && local.self.hasgunner == 1)
+{
+	//println "BEACH TARGETING: " local.self " attacking target: " local.guy
+	local.self.setaimtarget = local.guy
+	wait 1.5
+}
+
+//println "BEACH TARGETING: " local.self " target is no longer valid"
+
+beach_scene_targeting_next:
+
+//println "BEACH TARGETING: " local.self " has this many spawns left: " local.self.spawn_left
+
+//println "FAR BUNKER: " local.self " has a spawn_left of: " local.self.spawn_left
+
+if (local.self.has_gunner == 0)
+{
+	//println "BEACH TARGETING: " local.self " has no more gunners"
+	goto beach_scene_targeting_done
+}
+
+//println "BEACH TARGETING: " local.self " defaulting to default target"
+
+local.self.setaimtarget = $mg42_farbunker_target
+wait 2
+
+goto beach_scene_targeting_loop
+
+beach_scene_targeting_done:
+
+level.far_bunker_done ++
+
+//println "FAR BUNKER: spawn level.far_bunker_done: " level.far_bunker_done
+/*
+//*** TEMP TEMP TEMP  PREMATURE POOPHEAD ENDING
+//*** if all the farbunker gunners are dead, allow the level to end
+if (level.far_bunker_done >= 2)
+{
+	//*** complete the objective 
+	waitthread global/objectives.scr::add_objectives 2 3
+	
+	waitthread global/objectives.scr::add_objectives 3 2 "Exit the bunker." $end_level_trigger.origin
+	waitthread global/objectives.scr::current_objectives 3
+	
+	$end_level_trigger triggerable
+}
+*/
+end
+
+
+//******************************
+//  beach scene mortar calls
+//******************************
+beach_scene_mortar:
+
+//println "BEACH SCENE MORTAR: starting beach mortar1"
+
+local.poop = 1
+
+while (local.poop == 1)
+{
+
+beach_scene_mortar_pickagain:
+	//*** pick the mortar
+	local.choice = (randomint $beach_scene_mortar.size + 1)
+	
+	//println "BEACH SCENE MORTAR: picked mortar: " local.choice
+	
+	//*** check to see if it picked the same one from before, if so, pick again
+	if (local.choice == local.previous_choice)
+        {
+		//println "BEACH SCENE MORTAR: was the previous choice, picking again!"
+        	goto beach_scene_mortar_pickagain
+        }
+	
+	local.previous_choice = local.choice
+	
+	//println "BEACH SCENE MORTAR: playing the sound"
+	$mg42_farbunker_target playsound arty_leadin wait
+	$mg42_farbunker_target waittill sounddone
+	
+	//println "BEACH SCENE MORTAR: firing the mortar: " local.choice
+	
+	//*** fire the mortar
+	$beach_scene_mortar[local.choice] anim start
+	
+	radiusdamage $beach_scene_mortar[local.choice].origin 1000 384
+	
+	wait (randomint 5 + 4)
+}
+
+end
+
+
+//******************************
+//  running the beach scene
+//******************************
+beach_scene:
+
+beach_scene_loop:
+//println "BEACH SCENE: starting"
+local.wait_index = 0
+local.wait_count = (randomint 4 + 4)
+
+//*** set the number of guys based on detail settings
+if (getcvar(g_ddayshingleguys) == "0")  //*** low setting
+{
+	//println "BEACH SCENE: low settings for spawning guys"
+	local.ai_count = 6
+}
+else if (getcvar(g_ddayshingleguys) == "1")  //*** medium setting
+{
+	//println "BEACH SCENE: medium settings for spawning guys"
+	local.ai_count = 12
+}
+else  //*** high setting
+{
+	//println "BEACH SCENE: high settings for spawning guys"
+	local.ai_count = 20
+}
+
+for (local.i = 1; local.i <= local.ai_count ; local.i ++)
+{
+	//println "BEACH SCENE: current guy in loop to spawn: " ("allied_beach" + local.i) " : status:" $("allied_beach" + local.i)  
+	if ($("allied_beach" + local.i) != NULL)
+        {
+        	goto beach_scene_next
+        }
+	
+	//println "BEACH SCENE: top of loop, index: " local.i
+	//*** select the type of allied troop to spawn and his weapon
+	local.choice = randomint 10
+	
+	//println "BEACH SCENE: random troop number: " local.choice
+	
+	switch (local.choice)
+	{
+		case 0:
+		
+		case 1:
+		
+		case 2:
+			local.model = "models/human/dday_ranger_private"
+			local.gun = "m1 garand"
+			//println "BEACH SCENE: selected a private with garand"
+			break
+		
+		case 3:
+		
+		case 4:
+		
+		case 5:
+			local.model = "models/human/dday_ranger_private"
+			local.gun = "bar"
+			//println "BEACH SCENE: selected a private with BAR"
+			break
+			
+		case 6:
+			local.model = "models/human/dday_ranger_lieutenant"
+			local.gun = "thompson"
+			//println "BEACH SCENE: selected a lieutenant with thompson"
+			break
+		
+		case 7:
+		
+		case 8:
+			local.model = "models/human/dday_ranger_sergeant"
+			local.gun = "m1 garand"
+			//println "BEACH SCENE: selected a sergeant with a garand"
+			break
+
+		case 9:
+			local.model = "models/human/dday_ranger_captain"
+			local.gun = "thompson"
+			//println "BEACH SCENE: selected a captain with a thompson"
+			break
+	}
+	
+	local.guy = ("allied_beach" + local.i)
+	
+	//*** spawn him in
+	spawn local.model targetname local.guy gun local.gun
+	local.guy = $("allied_beach" + local.i)
+	
+	//*** set the guy up
+	local.guy waitthread ai_allied_beach_setup
+	
+	//*** position him
+	local.choice = (randomint 14 + 1)
+	local.guy.origin = $allied_beach_spawn[local.choice].origin
+	
+	//println "BEACH SCENE: spawned the guy to location index: " local.choice
+	
+	//*** make him run his path
+	local.guy thread ai_allied_beach_takepath local.choice
+	local.guy forceactivate
+
+	//*** cycle to the next guy after waiting
+	wait (randomfloat .75 + .75)
+	
+	local.wait_index ++
+	
+	//*** every so many troop put a larger wait in to form gaps in the timing
+	if (local.wait_index > local.wait_count)
+        {
+		//println "BEACH SCENE: cycle timing pause"
+        	wait (randomint 3 + 3)
+		local.wait_index = 0
+		local.wait_count = (randomint 4 + 4)
+        }
+	
+beach_scene_next:
+}
+
+wait 7
+goto beach_scene_loop
+
+beach_scene_done:
+//println "BEACH SCENE: exiting"
+
+end
+
+
+//******************************
+//  Dust triggers in the bunker
+//******************************
+bunker_dust_trigger:
+
+bunker_dust_trigger_loop:
+	//println "DUST: checking to see player is in bunker"
+	while (level.progress == "bunker_lower" || level.progress == "bunker_upper"){
+		//println "DUST: player is in bunker, hit with a mortar"
+		exec coop_mod/replace.scr::playsound arty_exp_interior	//chrissstrahl - compatibility
+		thread jitter_small
+		
+		wait .75
+		for (local.i = 1 ; local.i <= $bunker_dust1.size ; local.i ++){
+			$bunker_dust1[local.i] anim start
+			//wait (randomfloat .15 + .1)
+		}
+		wait (randomint 5 + 15)
+	}
+//println "DUST: player is not in bunker, cycle"
+	wait 5
+	goto bunker_dust_trigger_loop
+end
+
+//*************************************************************
+//*************************************************************
+//
+// GAME THREADS
+//
+//*************************************************************
+//*************************************************************
+
+//******************************
+//  TEMP TEMP TEMP POOPHEAD ENDING
+//******************************
+end_level_thread:
+
+//*** fadeout
+fadeout 5 0 0 0 1
+
+//*** give the medal
+setcvar "g_medal5" "1"
+
+waitthread global/objectives.scr::add_objectives 3 3
+waitthread global/objectives.scr::current_objectives 0
+
+//*** end the level
+exec global/missioncomplete.scr m3l2
+
+end
+
+
+//***********************************
+//  check to clear upper bunker objective
+//***********************************
+clear_bunker_objective:
+
+println "CLEAR BUNKER COUNTER: " level.clear_bunker
+
+if (level.clear_bunker >= 6)
+{
+	waitthread global/objectives.scr::add_objectives 1 3
+	
+	//*** check to see if the farbunker gunner objective has been cleared as well, if so, add the exit level objective
+	if (level.clear_farbunker_gunner >= 2)
+        {
+        	//*** open the bunker door and send the guys in
+        	thread seq_bunker_upper_exit
+        	
+        	//*** activate the end level trigger
+        	$end_level_trigger triggerable    	
+        	
+        	//*** complete the objectives
+        	waitthread global/objectives.scr::add_objectives 2 3
+        	
+        	waitthread global/objectives.scr::add_objectives 3 2 "Exit the bunker." $end_level_trigger.origin
+        	waitthread global/objectives.scr::current_objectives 3	
+        }
+	else
+	{
+		waitthread global/objectives.scr::current_objectives 2
+	}
+}
+
+end
+
+
+//***********************************
+//  check to clear farbunker gunners
+//***********************************
+clear_farbunker_gunner_objective:
+
+println "CLEAR FARGUNNER COUNTER: " level.clear_farbunker_gunner
+
+if (level.clear_farbunker_gunner >= 2)
+{
+	waitthread global/objectives.scr::add_objectives 2 3
+
+	//*** check to see if the bunker gunner objective has been cleared as well, if so, add the exit level objective
+	if (level.clear_bunker >= 6)
+        {
+        	//*** open the bunker door and send the guys in
+        	thread seq_bunker_upper_exit
+        	
+        	//*** activate the end level trigger
+        	$end_level_trigger triggerable    	
+        	
+        	//*** complete the objectives
+        	waitthread global/objectives.scr::add_objectives 2 3
+        	
+        	waitthread global/objectives.scr::add_objectives 3 2 "Exit the bunker." $end_level_trigger.origin
+        	waitthread global/objectives.scr::current_objectives 3
+        }
+	else
+	{
+		waitthread global/objectives.scr::current_objectives 1
+	}
+}
+
+end
+
+
+//*********************************************
+// open the lower bunker door
+//*********************************************
+open_door_bunker_entrance_lower:
+
+local.distance = vector_length($weh_sol_bunker_lower_1.origin - $door_bunker_entrance_lower.origin)
+//println "DOOR: local.distance: " local.distance
+
+while ((isalive $weh_sol_bunker_lower_1) && local.distance < 92)
+{
+	if (local.playsound != 1)
+	{
+		local.playsound = 1
+		$door_bunker_entrance_lower playsound door_metal_locked
+	}
+	
+	//println "DOOR: dude is alive"
+	//println "DOOR: local.distance: " local.distance
+	local.distance = vector_length($weh_sol_bunker_lower_1.origin - $door_bunker_entrance_lower.origin)
+	wait .5
+}
+
+$door_bunker_entrance_lower time 1
+$door_bunker_entrance_lower playsound metal_bunker_door_open
+$door_bunker_entrance_lower rotateYup 90
+$door_bunker_entrance_lower waitmove
+
+end
+
+// close the door floor hatch1
+//=========================================================================
+close_door_floor_hatch1:{
+//=========================================================================
+	//chrissstrahl - only do this in sp
+	if(level.gametype == 0){
+		$bunker_middle_ladder remove
+
+		$door_floor_hatch1 time .75
+		$door_floor_hatch1 playsound metal_bunker_hatch_open
+		$door_floor_hatch1 rotateXdown 90
+		$door_floor_hatch1 waitmove
+		$door_floor_hatch1_lock triggerable
+	}
+
+	thread seq_bunker_middle_start
+}end
+
+
+//****************************************
+//*** locked bunker floor hatch1
+//****************************************
+door_metal_lock:
+	local.self playsound door_metal_locked
+	//thread global/message_print.scr::message "This door is locked!!" 0 1
+end
+
+//*************************************************************
+//*************************************************************
+//
+// ECOUNTER THREADS
+//
+//*************************************************************
+//*************************************************************
+
+//*********************************************
+// starting bunker door
+//*********************************************
+seq_bunker_entrance:
+
+$weh_sol_bunker_lower_1 exec global/setdeathanim.scr "death_fall_back"
+$weh_sol_bunker_lower_1 turnto (exec coop_mod/replace.scr::origin $weh_sol_bunker_lower_1) //chrissstrahl - turn towards closets player pos
+$weh_sol_bunker_lower_1 say den_scripted_M3L1_09 //There's no way the Americans could be in the bunker!
+
+$door_bunker_entrance_upper notsolid
+$door_bunker_entrance_upper time 1
+
+$door_bunker_entrance_upper playsound metal_bunker_door_open
+$door_bunker_entrance_upper rotateYdown 90
+$door_bunker_entrance_upper move
+
+$weh_sol_bunker_lower_1 waittill saydone
+
+$weh_sol_bunker_lower_1 exec global/enable_ai.scr
+
+end
+
+
+//*********************************************
+// table turn over thread
+//*********************************************
+seq_flip_table:
+//println "FLIP TABLE: starting"
+level.bunker_lower_alert = 1
+
+//println "FLIP TABLE: dude 2 says some poop"
+$weh_sol_bunker_lower_2 say den_scripted_M3L1_04d  //the perimeter has been breached.....
+
+trigger $weh_sol_bunker_lower_3
+
+//*** relocate the dude closer to the table
+println "FLIP TABLE: dude location before move: " $weh_sol_bunker_lower_2.origin
+
+$weh_sol_bunker_lower_2.origin = (1631 -1665 -79)
+
+println "FLIP TABLE: dude location before move: " $weh_sol_bunker_lower_2.origin
+
+//*** run the dude to the table and kick it over
+//$weh_sol_bunker_lower_2 exec global/runto.scr $weh_sol_bunker_lower_2_path1
+//$weh_sol_bunker_lower_2 waittill movedone
+//println "FLIP TABLE: dude2 ran to table"
+
+$weh_sol_bunker_lower_2 anim grenade_kick_scripted
+//println "FLIP TABLE: dude2 kick the table"
+
+wait .5
+
+$e2_table playsound table_kickover
+
+$e2_table time 0.3
+$e2_table rotateZdown 40
+$e2_table waitmove
+
+$e2_table time 0.1
+$e2_table rotateZdown 30
+$e2_table waitmove
+
+$e2_table time 0.05
+$e2_table rotateZdown 10
+$e2_table waitmove
+
+$e2_table time 0.01
+$e2_table rotateZdown 5
+$e2_table waitmove
+
+//*** modify AI paths now that the table is knocked over
+//$e2_table disconnect_paths
+
+wait .5
+
+
+//$weh_sol_bunker_lower_2 exec global/moveto.scr $weh_sol_bunker_lower_2_path2
+//$weh_sol_bunker_lower_2 waittill movedone
+
+$weh_sol_bunker_lower_2 leash 64
+//$weh_sol_bunker_lower_2 exec global/crouch.scr
+$weh_sol_bunker_lower_2.type_attack = "cover"
+$weh_sol_bunker_lower_2 exec global/enable_ai.scr
+
+end
+
+
+//*********************************************
+// guy opening hatch
+//*********************************************
+seq_open_lower_hatch:
+
+$weh_sol_bunker_middle_1 exec global/crouch.scr
+$weh_sol_bunker_middle_1 say den_scripted_M3L1_10d  //hurry up and open the damned hatch
+$weh_sol_bunker_middle_1 exec global/turnto.scr $weh_sol_bunker_middle_1_lookat.origin
+
+$door_floor_hatch1 time 1.3
+$door_floor_hatch1 playsound metal_bunker_hatch_open
+$door_floor_hatch1 rotateXup 90
+$door_floor_hatch1 move
+
+wait .75
+$weh_sol_bunker_middle_1 exec global/stand.scr
+
+/*
+wait .4
+$weh_sol_bunker_middle_1 anim grenade_kick
+*/
+
+wait 1.5
+
+if (isalive $weh_sol_bunker_middle_1)
+{
+        $weh_sol_bunker_middle_1 exec global/enable_ai.scr
+        $weh_sol_bunker_middle_1.health = 100	
+}
+
+end
+
+// guys talking at radio
+//=========================================================================
+seq_bunker_middle_radio:{
+//=========================================================================
+	$weh_sol_bunker_middle_2 say den_scripted_M3L1_08d  //get word to the captain......
+	wait .5
+	
+	$weh_sol_bunker_middle_2 exec global/runto.scr $weh_sol_bunker_middle_2_path1
+	wait .75
+	
+	//*** enable the officers AI
+	$weh_off_bunker_middle_1 exec global/enable_ai.scr
+	$bunker_radio playsound den_scripted_M3L1_11d wait     //wiederstandnesten 72, we're under heavy...
+	$bunker_radio waittill sounddone
+
+	//*** enable the NCO's AI
+	$weh_sol_bunker_middle_2 exec global/enable_ai.scr
+
+	if ($weh_off_bunker_middle_1.thinkstate == idle){
+		$weh_off_bunker_middle_1 say den_scripted_M3L1_12b  //what are you talking about....
+		$weh_off_bunker_middle_1 waittill saydone
+	}
+	wait 0.1	
+	
+	$bunker_radio playsound den_scripted_M3L1_13d wait    //the machineguns are overheating......
+	$bunker_radio waittill sounddone
+	if ($weh_sol_bunker_middle_2.thinkstate == idle){
+		$weh_sol_bunker_middle_2 say den_scripted_M3L1_14d  //I need to speak to the lieutenant colonel.....
+		$weh_sol_bunker_middle_2 waittill saydone
+	}
+	wait .5
+	
+	local.player = exec player_closestTo $weh_sol_bunker_middle_2	//chrissstrahl - coop mod
+	$weh_sol_bunker_middle_2 exec global/runto.scr local.player		//chrissstrahl - coop mod
+	wait .75
+	local.player = exec player_closestTo $weh_off_bunker_middle_1	//chrissstrahl - coop mod
+	$weh_off_bunker_middle_1 exec global/runto.scr local.player		//chrissstrahl - coop mod
+	if ($weh_off_bunker_middle_1.thinkstate == idle){
+		$weh_off_bunker_middle_1 say den_scripted_M3L1_06b  //don't let them get to the gunnery deck....
+	}
+}end
+
+//  activate the guys on the middle floor
+//=========================================================================
+seq_bunker_middle_start:{
+//=========================================================================
+	$weh_sol_bunker_middle_3 exec global/enable_ai.scr
+	$weh_sol_bunker_middle_4 exec global/enable_ai.scr
+	$weh_sol_bunker_middle_5 exec global/enable_ai.scr
+	trigger $weh_sol_bunker_middle_3
+}end
+
+//  activate the guys on the upper floor
+//=========================================================================
+seq_bunker_upper_start:{
+//=========================================================================
+	//*** autosave the game
+	if(level.gametype == 0){//chrissstrahl - only in sp
+		exec global/autosave.scr 1
+	}
+
+	//*** set the objectives
+	waitthread global/objectives.scr::add_objectives 2 2 "Eliminate the MG42 machine gunners." $mg42_farbunker_2
+
+	//*** activate the mg42s
+	$mg42_bunker_1 startfiring
+	$mg42_bunker_2 startfiring
+
+	$mg42_middle1 startfiring
+	$mg42_middle2 startfiring
+
+	$mg42_farbunker_1.turnspeed = 1000
+	$mg42_farbunker_2.turnspeed = 1000
+	$mg42_farbunker_1 thread global/mg42_active.scr::mg42 10000
+	$mg42_farbunker_2 thread global/mg42_active.scr::mg42 10000
+	$mg42_farbunker_1_gunner thread mg42_farbunker_gunner_death
+	$mg42_farbunker_2_gunner thread mg42_farbunker_gunner_death
+
+	//*** run the beach scene
+	thread beach_scene
+	thread beach_scene_mortar
+
+	wait 1
+	//$mg42_farbunker_1 thread beach_scene_targeting
+	//$mg42_farbunker_2 thread beach_scene_targeting
+
+	spawn script_model targetname "new_target"
+	local.target = $(new_target)
+	local.target model fx/dummy.tik
+
+	local.target.health = 1000000
+	local.target.origin = ( -1197 -3500 128)
+
+	println "MG42 FARBUNKER TARGET: farbunker target origin: " local.target.origin
+	println "MG42 FARBUNKER TARGET: farbunker gun 1 target origin: " $mg42_farbunker_1.origin
+
+	$mg42_farbunker_1.setaimtarget = local.target
+
+	wait .75
+	$mg42_farbunker_2.setaimtarget = local.target
+
+	//*** activate the troops
+	$weh_off_bunker_upper_1 exec global/enable_ai.scr
+	$weh_nco_bunker_upper_1 exec global/enable_ai.scr
+	$weh_sol_bunker_upper_1 exec global/enable_ai.scr
+	$weh_sol_bunker_upper_2 exec global/enable_ai.scr
+
+	//*** have conversation
+	if ($weh_off_bunker_upper_1.thinkstate == idle){
+		$weh_off_bunker_upper_1 say den_scripted_M3L1_01b  //I think they're in the bunker
+		$weh_off_bunker_upper_1 waittill saydone
+	}
+	wait .75
+	if ($weh_nco_bunker_upper_1.thinkstate == idle){
+		$weh_nco_bunker_upper_1 say den_scripted_M3L1_02d  //which floor?
+		$weh_nco_bunker_upper_1 waittill saydone
+	}
+	wait .75
+	if ($weh_off_bunker_upper_1.thinkstate == idle){
+		$weh_off_bunker_upper_1 say den_scripted_M3L1_03b  //I don't know, gather some men.......
+		$weh_off_bunker_upper_1 waittill saydone
+	}
+	$weh_off_bunker_upper_1 exec global/runto.scr $weh_off_bunker_upper_1_path1
+	$weh_nco_bunker_upper_1 exec global/runto.scr $weh_nco_bunker_upper_1_path1
+	wait .5
+	$weh_sol_bunker_upper_1 exec global/runto.scr $weh_sol_bunker_upper_1_path1
+	wait .75
+
+	$weh_sol_bunker_upper_2 exec global/runto.scr $weh_sol_bunker_upper_2_path1
+}end
+
+// guys entering the bunker upon exit
+//=========================================================================
+seq_bunker_upper_exit:{
+//=========================================================================
+	wait 5
+	level.bunker_exit = 1
+
+	$door_bunker_exit_lock remove
+
+	$door_bunker_exit time 1
+	$door_bunker_exit playsound metal_bunker_door_open
+	$door_bunker_exit rotateyup 90
+	$door_bunker_exit waitmove
+
+	//*** disconnect paths
+	$door_bunker_exit disconnect_paths
+
+	wait .5
+	$weh_nco_bunker_exit_1 exec global/enable_ai.scr
+	$weh_sol_bunker_exit_1 exec global/enable_ai.scr
+	$weh_sol_bunker_exit_2 exec global/enable_ai.scr
+
+	$weh_nco_bunker_exit_1.type_idle = "idle"
+	$weh_sol_bunker_exit_1.type_idle = "idle"
+	$weh_sol_bunker_exit_2.type_idle = "idle"
+
+	$weh_nco_bunker_exit_1.enemysharerange = 16
+	$weh_sol_bunker_exit_1.enemysharerange = 16
+	$weh_sol_bunker_exit_2.enemysharerange = 16
+
+	local.player = exec coop_mod/replace.scr::player_closestTo $weh_nco_bunker_exit_1	//chrissstrahl - coop mod
+	$weh_nco_bunker_exit_1 exec global/runto.scr local.player
+	local.player = exec coop_mod/replace.scr::player_closestTo $weh_sol_bunker_exit_1	//chrissstrahl - coop mod
+	$weh_sol_bunker_exit_1 exec global/runto.scr local.player
+	local.player = exec coop_mod/replace.scr::player_closestTo $weh_sol_bunker_exit_2	//chrissstrahl - coop mod
+	$weh_sol_bunker_exit_2 exec global/runto.scr local.player
+
+	//$weh_nco_bunker_exit_1 attackplayer
+	//$weh_sol_bunker_exit_1 attackplayer
+	//$weh_sol_bunker_exit_2 attackplayer
+
+	$weh_nco_bunker_exit_1 forceactivate
+	$weh_sol_bunker_exit_1 forceactivate
+	$weh_sol_bunker_exit_2 forceactivate
+}end
+
+// mg42 fodder spawn - bunker_upper
+//=========================================================================
+mg42_bunker_upper_fodder:{
+//=========================================================================
+	if (level.bunker_exit == 1 && $mg42_bunker_upper.isused != 1){
+	//*** set the variable to denote that this turret has been used once now
+		$mg42_bunker_upper.isused = 1
+
+	//*** spawn the 4 guys
+		spawn "models/human/german_wehrmact_soldier" targetname "mg42_bunker_upper_fodder1" gun "mauser kar 98k"
+		spawn "models/human/german_wehrmact_soldier" targetname "mg42_bunker_upper_fodder2" gun "mauser kar 98k"
+		spawn "models/human/german_wehrmact_soldier" targetname "mg42_bunker_upper_fodder3" gun "mauser kar 98k"
+		spawn "models/human/german_wehrmact_nco" targetname "mg42_bunker_upper_fodder4" gun "mp40"
+		spawn "models/human/german_wehrmact_soldier" targetname "mg42_bunker_upper_fodder5" gun "mauser kar 98k"
+		spawn "models/human/german_wehrmact_nco" targetname "mg42_bunker_upper_fodder6" gun "mp40"
+		
+	//*** disable their AI temporarily for transport
+		$mg42_bunker_upper_fodder1 exec global/disable_ai.scr
+		$mg42_bunker_upper_fodder2 exec global/disable_ai.scr
+		$mg42_bunker_upper_fodder3 exec global/disable_ai.scr
+		$mg42_bunker_upper_fodder4 exec global/disable_ai.scr
+		$mg42_bunker_upper_fodder5 exec global/disable_ai.scr
+		$mg42_bunker_upper_fodder6 exec global/disable_ai.scr
+		
+	//*** start popping the guys in, make them run to player, and activate them
+		$mg42_bunker_upper_fodder1.origin = $mg42_bunker_upper_fodder_spawn1.origin
+		$mg42_bunker_upper_fodder1 exec global/enable_ai.scr
+		local.player = exec player_closestTo $mg42_bunker_upper_fodder1	//chrissstrahl - coop mod
+		$mg42_bunker_upper_fodder1 exec global/runto.scr local.player
+		
+		wait .75
+		$mg42_bunker_upper_fodder2.origin = $mg42_bunker_upper_fodder_spawn2.origin
+		$mg42_bunker_upper_fodder2 exec global/enable_ai.scr
+		local.player = exec player_closestTo $mg42_bunker_upper_fodder2	//chrissstrahl - coop mod
+		$mg42_bunker_upper_fodder2 exec global/runto.scr local.player
+		
+		wait 1
+		$mg42_bunker_upper_fodder3.origin = $mg42_bunker_upper_fodder_spawn1.origin
+		$mg42_bunker_upper_fodder3 exec global/enable_ai.scr
+		local.player = exec player_closestTo $mg42_bunker_upper_fodder3	//chrissstrahl - coop mod
+		$mg42_bunker_upper_fodder3 exec global/runto.scr local.player
+		
+		wait 1
+		$mg42_bunker_upper_fodder4.origin = $mg42_bunker_upper_fodder_spawn2.origin
+		$mg42_bunker_upper_fodder4 exec global/enable_ai.scr
+		local.player = exec player_closestTo $mg42_bunker_upper_fodder4	//chrissstrahl - coop mod
+		$mg42_bunker_upper_fodder4 exec global/runto.scr local.player
+
+		wait 1
+		$mg42_bunker_upper_fodder5.origin = $mg42_bunker_upper_fodder_spawn1.origin
+		$mg42_bunker_upper_fodder5 exec global/enable_ai.scr
+		local.player = exec player_closestTo $mg42_bunker_upper_fodder5	//chrissstrahl - coop mod
+		$mg42_bunker_upper_fodder5 exec global/runto.scr local.player	
+
+		wait 1
+		$mg42_bunker_upper_fodder6.origin = $mg42_bunker_upper_fodder_spawn2.origin
+		$mg42_bunker_upper_fodder6 exec global/enable_ai.scr
+		local.player = exec player_closestTo $mg42_bunker_upper_fodder6	//chrissstrahl - coop mod
+		$mg42_bunker_upper_fodder6 exec global/runto.scr local.player	
+	}
+}end
+
+
+//**************************************************
+// make some guys retreat when looking out from bunker
+//**************************************************
+seq_mg42_retreat:
+
+$mg42_middle1_gunner.type_idle = "idle"
+$mg42_middle1_gunner.type_attack = "cover"
+$mg42_middle1_gunner.type_disguise = "none"
+$mg42_middle1_gunner.type_grenade = "grenade"
+
+$mg42_middle2_gunner.type_idle = "idle"
+$mg42_middle2_gunner.type_attack = "cover"
+$mg42_middle2_gunner.type_disguise = "none"
+$mg42_middle2_gunner.type_grenade = "grenade"
+
+//*** make the guys run away
+$mg42_middle1_gunner thread seq_mg42_retreat_run 
+$mg42_middle2_gunner thread seq_mg42_retreat_run
+
+$weh_nco_retreat_1 thread seq_mg42_retreat_run
+
+wait .75
+$weh_sol_retreat_2 thread seq_mg42_retreat_run
+
+wait .5
+$weh_sol_retreat_3 thread seq_mg42_retreat_run
+
+end
+
+//*********************************************
+// run thread for mg42 retreat sequence
+seq_mg42_retreat_run:
+
+local.self exec global/runto.scr $mg42_middle_retreat
+local.self waittill movedone
+
+wait 2
+local.self remove
+
+end
+
+//*************************************************************
+//*************************************************************
+//
+// AI THREADS
+// naming convenction for AI is
+// e (encounter) # (number of the encounter) x (seperator) # (number of guy in that encounter)
+//
+//*************************************************************
+//*************************************************************
+
+//*********************************************
+// setup the ambient allied beach scene guys
+//*********************************************
+ai_allied_beach_setup:
+
+local.self exec global/disable_ai.scr
+
+//*** set target eligibility
+local.self.istarget = 0
+
+local.self thread ai_allied_beach_death
+
+end
+
+
+//*********************************************
+// ambient allied beach scene guys death thread
+//*********************************************
+ai_allied_beach_death:
+
+//*** waittill death
+local.self waittill death
+
+local.self weapon_internal ""
+
+//*** reset the targetname so another can spawn
+local.self.targetname = NULL
+
+end
+
+
+//*********************************************
+// ambient allied beach scene guys takepath routine
+//*********************************************
+ai_allied_beach_takepath local.index:
+
+local.self exec global/runto.scr $allied_beach_path[$allied_beach_spawn[local.index].path_index]
+local.self waittill movedone
+
+local.self remove
+
+end
+
+
+//*********************************************
+// upper officer alarm thread
+//*********************************************
+weh_off_bunker_upper_1_alarm:
+
+$mg42_bunker_1_gunner.type_idle = "idle"
+$mg42_bunker_1_gunner.type_attack = "cover"
+$mg42_bunker_1_gunner.type_grenade = "grenade"
+$mg42_bunker_1_gunner.type_disguise = "none"
+$mg42_bunker_1_gunner.weapon = "mp40"
+
+$mg42_bunker_2_gunner.type_idle = "idle"
+$mg42_bunker_2_gunner.type_attack = "cover"
+$mg42_bunker_2_gunner.type_grenade = "grenade"
+$mg42_bunker_2_gunner.type_disguise = "none"
+$mg42_bunker_2_gunner.weapon = "mauser kar 98k"
+
+$mg42_bunker_1_gunner unholster
+$mg42_bunker_2_gunner unholster
+
+$mg42_bunker_1_gunner attackplayer
+$mg42_bunker_2_gunner attackplayer
+
+end
+
+
+//*********************************************
+// upper officer pain thread
+//*********************************************
+weh_off_bunker_upper_1_pain:
+
+local.self waittill pain
+
+if (level.progress == "bunker_deck")
+{
+        $mg42_bunker_1_gunner.type_idle = "idle"
+        $mg42_bunker_1_gunner.type_attack = "cover"
+        $mg42_bunker_1_gunner.type_grenade = "grenade"
+        $mg42_bunker_1_gunner.type_disguise = "none"
+	$mg42_bunker_1_gunner.weapon = "mp40"
+        
+        $mg42_bunker_2_gunner.type_idle = "idle"
+        $mg42_bunker_2_gunner.type_attack = "cover"
+        $mg42_bunker_2_gunner.type_grenade = "grenade"
+        $mg42_bunker_2_gunner.type_disguise = "none"
+	$mg42_bunker_2_gunner.weapon = "mauser kar 98k"
+        
+        $mg42_bunker_1_gunner unholster
+        $mg42_bunker_2_gunner unholster
+        
+        $mg42_bunker_1_gunner attackplayer
+        $mg42_bunker_2_gunner attackplayer
+}
+
+end
+
+
+//*********************************************
+// mg42 bunker 1 gunner pain thread
+//*********************************************
+mg42_bunker_1_gunner_pain:
+
+local.self waittill pain
+
+$mg42_bunker_1_gunner.type_idle = "idle"
+$mg42_bunker_1_gunner.type_attack = "cover"
+$mg42_bunker_1_gunner.type_grenade = "grenade"
+$mg42_bunker_1_gunner.type_disguise = "none"
+$mg42_bunker_1_gunner.weapon = "mp40"
+
+$mg42_bunker_2_gunner.type_idle = "idle"
+$mg42_bunker_2_gunner.type_attack = "cover"
+$mg42_bunker_2_gunner.type_grenade = "grenade"
+$mg42_bunker_2_gunner.type_disguise = "none"
+$mg42_bunker_2_gunner.weapon = "mauser kar 98k"
+
+$mg42_bunker_1_gunner unholster
+$mg42_bunker_2_gunner unholster
+
+$mg42_bunker_1_gunner attackplayer
+$mg42_bunker_2_gunner attackplayer
+
+end
+
+
+//*********************************************
+// mg42 bunker 1 gunner death thread
+//*********************************************
+mg42_bunker_1_gunner_death:
+
+local.self waittill death
+
+if !(isalive $mg42_bunker_2_gunner)
+{
+	//*** TEMP TEMP TEMP POOPHEAD ENDING
+	//thread seq_bunker_upper_exit
+}
+
+end
+
+
+//*********************************************
+// mg42 bunker 2 gunner pain thread
+//*********************************************
+mg42_bunker_2_gunner_pain:
+
+local.self waittill pain
+
+$mg42_bunker_1_gunner.type_idle = "idle"
+$mg42_bunker_1_gunner.type_attack = "cover"
+$mg42_bunker_1_gunner.type_grenade = "grenade"
+$mg42_bunker_1_gunner.type_disguise = "none"
+$mg42_bunker_1_gunner.weapon = "mp40"
+
+$mg42_bunker_2_gunner.type_idle = "idle"
+$mg42_bunker_2_gunner.type_attack = "cover"
+$mg42_bunker_2_gunner.type_grenade = "grenade"
+$mg42_bunker_2_gunner.type_disguise = "none"
+$mg42_bunker_2_gunner.weapon = "mauser kar 98k"
+
+$mg42_bunker_1_gunner unholster
+$mg42_bunker_2_gunner unholster
+
+$mg42_bunker_1_gunner attackplayer
+$mg42_bunker_2_gunner attackplayer
+
+end
+
+
+//*********************************************
+// mg42 bunker 2 gunner death thread
+//*********************************************
+mg42_bunker_2_gunner_death:
+
+local.self waittill death
+
+if !(isalive $mg42_bunker_1_gunner)
+{
+	//*** TEMP TEMP TEMP POOPHEAD ENDING
+	//thread seq_bunker_upper_exit
+}
+
+end
+
+
+//*********************************************
+// starting bunker door on lower level guy death
+//*********************************************
+weh_sol_bunker_lower_1_death:
+
+local.self waittill death
+
+wait .75
+if (level.bunker_lower_alert != 1)
+{
+	$weh_sol_bunker_lower_2 say den_scripted_M3L1_01b
+}
+
+end
+
+
+//*********************************************
+// lower level guys death thread
+//*********************************************
+weh_sol_bunker_lower_2_death:
+
+local.self waittill death
+
+//*** wake up the guys in the next room
+
+$weh_sol_bunker_lower_4 exec global/enable_ai.scr
+$weh_sol_bunker_lower_5 exec global/enable_ai.scr
+
+trigger $weh_sol_bunker_lower_4
+trigger $weh_sol_bunker_lower_5
+
+wait 2
+$weh_sol_bunker_lower_4 attackplayer
+$weh_sol_bunker_lower_5 attackplayer
+
+end
+
+
+//*********************************************
+// lower level guys death thread
+//*********************************************
+weh_sol_bunker_lower_3_death:
+
+local.self waittill death
+
+//*** wake up the guys in the next room
+$weh_sol_bunker_lower_4 exec global/enable_ai.scr
+$weh_sol_bunker_lower_5 exec global/enable_ai.scr
+
+trigger $weh_sol_bunker_lower_4
+trigger $weh_sol_bunker_lower_5
+
+wait 2
+$weh_sol_bunker_lower_4 attackplayer
+$weh_sol_bunker_lower_5 attackplayer
+
+end
+
+
+//*********************************************
+// death thread for the upper bunker for objective
+//********************************************
+upper_bunker_death:
+
+local.self waittill death
+
+//*** increment the counter for the objective
+level.clear_bunker ++
+
+//*** run the thread to check for the objective completion
+thread clear_bunker_objective
+
+end
+
+
+//*********************************************
+// death thread for the upper bunker for objective
+//********************************************
+mg42_farbunker_gunner_death:
+
+local.self waittill death
+
+//*** increment the counter for the objective
+level.clear_farbunker_gunner ++
+
+//*** run the thread to check for the objective completion
+thread clear_farbunker_gunner_objective
+
+end
+
+
+//*************************************************************
+//*************************************************************
+//
+// FUNCTION THREADS
+//
+//*************************************************************
+//*************************************************************
+
+// take path, to tell an AI to take a path
+// $targetname takepath <name of path> <movement method|walk - walks, default is run>
+//=========================================================================
+takepath local.path local.movement:{
+//=========================================================================
+	if (local.self.ismoving == 1){
+		println local.self " is already moving, aborting takepath!"
+		end
+	}
+
+	local.self.ismoving = 1
+
+	switch (local.movement)
+	{
+		case "walk":
+			println ( "XXX " + local.self.targetname + " start walking on path " + local.path)
+			local.self exec global/walkto.scr local.path
+			local.self waittill movedone
+			break
+
+		default:
+			println ("XXX " + local.self.targetname + " start running on path " + local.path)
+			local.self exec global/runto.scr local.path
+			local.self waittill movedone
+			break
+	}
+	local.self.ismoving = 0
+}end
+
+
+//*************************************************************
+// move object
+// move_object <distance to move to|vector> <time to take>
+//*************************************************************
+move_object local.distance local.time:
+
+//*** calculate how many moves it will have to make based on once/server frame
+local.index = local.time / .05
+
+//*** calculate the distance per move per axis
+local.move_distance_x = local.distance[0] / local.index
+local.move_distance_y = local.distance[1] / local.index
+local.move_distance_z = local.distance[2] / local.index
+
+//*** move the object every sever frame
+for (local.i = 0 ; local.i <= local.time ; local.i += .05)
+{
+	local.newx = local.self.origin[0] + local.move_distance_x
+	local.newy = local.self.origin[1] + local.move_distance_y
+	local.newz = local.self.origin[2] + local.move_distance_z
+
+	//*** set the new origin
+	local.self.origin = (local.newx local.newy local.newz)
+	
+	waitframe
+}
+
+end
+
+
+//******************************************************************************
+// shooting routine for the AI
+// <$targetname_of_ai> ai_shoot_volley <target to aim at> [optional crouch when done]
+//******************************************************************************
+ai_shoot_volley local.target local.crouch:
+
+//*** if he's dead, quit out
+if !(isalive local.self)
+{
+	goto ai_shoot_volley_end
+}
+
+//*** make the ai stand up
+local.self exec global/stand.scr
+
+//*** set variable to tell that this guy is shooting a volley
+local.shots = ((randomint 3) + 5)
+local.self exec global/aimat.scr local.target
+
+wait .5
+for (local.i = 1 ; local.i <= local.shots ; local.i ++)
+{
+        local.self exec global/shoot.scr
+        wait (randomfloat .3 + .15)
+}
+
+local.self exec global/aimat.scr NULL
+
+if (local.crouch != NIL)
+{
+	local.self exec global/crouch.scr
+}
+
+ai_shoot_volley_end:
+end
+
+
+//*************************************************************
+// killing an AI with gunfire
+// <$targetname_of_ai> ai_mg_death
+//*************************************************************
+ai_mg_death:
+
+if !(isalive local.self)
+{
+	goto ai_mg_death_end
+}
+
+//*** set variable to tell that this guy is shooting a volley
+local.shots = ((randomint 2) + 2)
+
+for (local.i = 1 ; local.i <= local.shots ; local.i ++)
+{
+	local.self thread bhit 20 -1
+	wait (randomfloat .3 + .15)
+}
+
+local.self thread bhit 1000 -1
+
+ai_mg_death_end:
+end
+
+
+//*************************************************************
+// killing an AI with mortar
+// <$targetname_of_ai> ai_mortar_death [water, mine | default dirt]
+//*************************************************************
+ai_mortar_death local.type:
+
+if !(isalive local.self)
+{
+	goto ai_mortar_death_end
+}
+
+//*** set the guys death animation
+local.self exec global/setdeathanim.scr death_mortar
+
+//*** set the type of mortar
+if (local.type == "water")
+{
+	local.spawn_type = "models/animate/fx_mortar_water"
+}
+else if (local.type == "mine")
+{
+	local.spawn_type = "models/animate/fx_explosion_mine"
+}
+else
+{
+	local.spawn_type = "models/animate/fx_mortar_dirt"
+}
+
+//*** set the origin and targetname
+local.spawn_origin = local.self.origin
+local.spawn_origin[2] += 32
+local.spawn_mortar = (local.self.targetname + "_mortar")
+
+//*** spawn the item
+spawn local.spawn_type targetname local.spawn_mortar
+local.spawn_mortar = $(local.self.targetname + "_mortar")
+
+//*** reset the items origin
+local.spawn_mortar.origin = local.spawn_origin
+
+//*** call the mortar
+local.spawn_mortar waitthread mortar_call 1
+
+wait 2
+local.spawn_mortar remove
+
+ai_mortar_death_end:
+end
+
+
+//*****************************************************
+//  mortar call in
+// <mortar> mortar_call [play leadin sound| any value for no]
+//*****************************************************
+//=========================================================================
+mortar_call local.leadin:{
+//=========================================================================
+	if (local.leadin == NIL){
+		//chrissstrahl - little hack to get this working fast - not using player entity
+		exec coop_mod/replace.scr::playsound arty_leadin wait
+		$world playsound arty_leadin wait
+		$world waittill sounddone
+	}
+
+	local.self anim start
+	
+	if(level.gametype == 0){	//chrissstrahl - sp handle
+		//check the distance to the player, if he's close, use the greater jitter
+		local.distance = vector_length (local.self.origin - $player.origin)
+		
+		if (local.distance >= 513) //*** beyond 512, small shake
+		{
+			thread jitter_small
+		}
+		else if (local.distance >= 193) //*** between 193 and 512, medium shake
+		{
+			thread jitter_medium
+		}
+		else if (local.distance >= 97) //*** between 97 and 192, large jitter, hurt the player if he's not in cover
+		{
+			thread jitter_large
+		}
+		else //*** under 97, large jitter, kill the player regardless of cover
+		{
+			thread jitter_large
+		}
+	}else{	//chrissstrahl - coop handle
+		thread jitter_small
+	}
+	radiusdamage local.self.origin 1000 192
+}end
+
+
+//**************************************************************************************************************************************
+//  bullet hit command
+//  <target> bhit [damage| 40 default] [body location| default is chest, -1 is random] [direction| vector] [force to apply| 15 default]
+//**************************************************************************************************************************************
+bhit local.damage local.location local.direction local.force:
+
+if (local.damage == NIL || local.damage == 0)
+{
+	local.damage = 40
+}
+
+if (local.location == NIL)
+{
+	local.location = 3
+}
+else if (local.location == -1)
+{
+	local.temp = (randomint 17 + 1)
+	local.location = local.temp
+}
+
+if (local.direction == NIL || local.direction == 0)
+{
+	local.direction = (0 -1 0)
+}
+
+if (local.force == NIL)
+{
+	local.force = 15
+}
+
+//*** set the characters script_damage variable so the player doesn't lose the level
+local.self.script_damage = 1
+
+//*** damage the target
+local.self exec global/bullethit.scr local.direction local.damage local.force local.location
+
+local.self playsound snd_bh_flesh
+
+local.self.script_damage = 0
+
+end
+
+
+//******************************
+// jitter effect from mgs
+// jitter_mg [delay]
+//******************************
+jitter_mg local.time:
+
+if (local.time)
+{
+	wait local.time
+}
+
+waitexec global/earthquake.scr .5 1 0 0
+
+waitexec global/earthquake.scr .3 1 0 0
+
+end
+
+
+//*********************************
+// jitter effect from mgs in cover
+// jitter_mg_cover [delay]
+//*********************************
+jitter_mg_cover local.time:
+
+if (local.time)
+{
+	wait local.time
+}
+
+waitexec global/earthquake.scr .3 .5 0 0
+
+waitexec global/earthquake.scr .3 .2 0 0
+
+end
+
+
+//*********************************
+// jitter effect from mgs in cover
+// jitter_small [delay]
+//*********************************
+jitter_small local.time:
+
+if (local.time)
+{
+	wait local.time
+}
+
+waitexec global/earthquake.scr .3 1 0 0
+
+waitexec global/earthquake.scr .3 .75 0 0
+
+waitexec global/earthquake.scr 1.25 .3 0 0
+
+end
+
+
+//******************************
+// jitter medium effect
+// jitter_medium [delay]
+//******************************
+jitter_medium local.time:
+
+if (local.time)
+{
+	wait local.time
+}
+
+waitexec global/earthquake.scr .23 2 0 0
+
+waitexec global/earthquake.scr 1 1 0 0
+
+waitexec global/earthquake.scr 1.25 .3 0 1
+
+end
+
+
+//******************************
+// jitter large effect
+// jitter_large [delay]
+//******************************
+jitter_large local.time:
+
+if (local.time)
+{
+	wait local.time
+}
+
+waitexec global/earthquake.scr .25 3 0 0
+
+waitexec global/earthquake.scr .4 1.25 0 0
+
+waitexec global/earthquake.scr 1 .75 0 0
+
+waitexec global/earthquake.scr 1.25 .3 0 1
+
+end
+
+
+//********************************************
+// jitter effect from being next to artillery
+// jitter_artillery [delay]
+//********************************************
+jitter_artillery local.time:
+
+if (local.time)
+{
+	wait local.time
+}
+
+waitexec global/earthquake.scr .23 3 0 0
+
+//waitexec global/earthquake.scr .3 .5 0 0
+
+end
+
+
+//********************************************
+// huddraw refresh thread
+//********************************************
+huddrawrefresh:
+
+println "NEED HUDDRAW REFRESH!!"
+
+end
+

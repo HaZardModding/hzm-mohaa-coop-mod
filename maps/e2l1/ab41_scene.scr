@@ -1,0 +1,684 @@
+//	maps/e2l1/ab41_scene.scr
+// AB41 SCRIPT
+
+//============================================================================
+init: {
+//============================================================================
+	level waittill spawn
+
+	level.did_ab_gag			= 0
+	level.ab_failsafe			= 0
+	level.started_ab			= 0
+	level.ab_start_health		= 1000
+
+	thread doFailsafe
+	thread watertower_fog	
+}end
+
+//============================================================================
+RestoreFog: {
+//============================================================================
+	for (local.i=2100; local.i>level.fogDistanceGround;local.i-=3) {
+		waitthread maps/e2l1/fog.scr::setFog local.i level.fogBiasGround level.fogColorGround
+		waitframe
+	}
+}end
+
+//============================================================================
+watertower_fog: {
+//============================================================================
+	$watertower_fog waittill trigger
+	thread RestoreFog
+}end
+
+//============================================================================
+PushFog: {
+//============================================================================
+	for (local.i=level.fogDistanceGround; local.i <2100; local.i+=3) {
+		waitthread maps/e2l1/fog.scr::setFog local.i level.fogBiasGround level.fogColorGround
+		waitframe
+	}
+}end
+
+//============================================================================
+doFailsafe: {
+//============================================================================
+	$ab_failsafe_trigger waittill trigger
+	thread PushFog
+
+	if (level.started_ab==0 ) {
+		level.ab_failsafe = 1
+		//dprintln "AB41 failsafe in effect!"
+		thread AB41_motion
+		thread maps/e2l1/objectives.scr::DoAB41Objective
+	}
+}end
+
+//============================================================================
+AB41_motion: {
+//============================================================================
+    // iprintlnbold "IN DO AB41 Motion"
+	//iprint "DID THIS WORK ARE YOU IN MY FUNCTION?"
+
+	if ( level.started_ab==1 ) {
+		end
+	}
+
+	level.abdriver = spawn "models/human/sc_ax_ital_inf2.tik" targetname "ABGuyDriver"
+	level.abdriver hide
+	level.abdriver.enableEnemy = 0
+	level.abdriver.threatbias = 5555
+	level.abdriver nodamage
+	level.abdriver notsolid
+	local.o = $AB41.origin
+	local.o[0]	+= 100
+	local.o[2]	+= 75
+	level.abdriver.origin = local.o
+	level.abdriver bind $AB41
+
+	level.started_ab = 1
+	//	level.did_ab_gag = 1
+
+	thread FriendliesAttackAB41
+	thread AB41Targets
+	$hudson takedamage
+	level.lookahead = 256		// how far enemy tanks "look ahead" when driving
+	level.enemytankspeed = 200	// how fast the enemy tanks are
+	level.sightdistance = 2048	// how far the enemy tanks can "see"
+	level.AB41roll = 1          // used as a flag to show that function has been called
+	
+	$AB41 immune bullet
+	$AB41 immune bash
+	$AB41 anim lights_on
+	
+	exec global/spotlight.scr::corona $AB41 "light_backleft" // Turn on headlight coronas
+	exec global/spotlight.scr::corona $AB41 "light_backright"
+	
+	$AB41 rendereffects "-shadow"
+	$AB41 solid
+	$AB41 nodamage
+
+	if($ab41_collide != NULL) {
+		$AB41 setcollisionentity $ab41_collide
+	}
+
+	//get the entities so we can lock them...
+	$AB41.mg42 = $AB41 queryturretslotentity 0
+	$AB41.minigun = $AB41 queryturretslotentity 1
+	$AB41.mg42 lock
+	$AB41.minigun lock
+	
+	//iprintlnbold "SO NOW THIS SHOULD MOVE"
+	$AB41 thread AB_Go
+	$AB41 nodamage
+
+	//$AB41_motion_trigger waittill trigger
+	$AB41 takedamage
+	$aagun4 thread turrethealthcheck
+	$AB41 waittill death
+	level.did_ab_gag = 1
+
+	//dprintln "AB41 is DEAD!"
+
+	$AB41.collisionent disconnect_paths
+	
+	// don't want them shooting at a dead ab41...
+	level.abdriver delete
+	exec global/autosave.scr 3
+	thread WaterTowerKillFriendlies
+
+	//$AB41 AB41_dead
+	//	if($ab41_collide != NULL)
+	//	{
+	//		$AB41 setcollisionentity $ab41_collide
+	//	}
+}End
+
+//============================================================================
+FriendliesAttackAB41: {
+//============================================================================
+	// load up our friendlies with grenades to toss at the ab41...
+	$michaels thread AttackAB41 $michaels_death
+	$mcmartin thread AttackAB41 $mcmartin_death
+	//keep Hudson by the player during the dialog
+	wait 4
+
+	$hudson thread AttackAB41 $leroy_death
+}end
+
+//============================================================================
+AttackAB41 local.dest: {
+//============================================================================
+	if ( !isAlive self ) {
+		end
+	}
+
+	// stop being a friend....
+	self thread global/friendly.scr::friendlystop
+
+	self.ammo_grenade = 4
+	self.nolimp = 1
+
+	if ( local.dest ){
+		self type_attack runandshoot
+		self waitthread global/SafeMoveTo.scr::reach local.dest
+	}
+
+	self turnto $AB41
+	self lookat $AB41
+	self aimat $AB41
+
+	$AB41 waittill death
+
+	self aimat NULL
+
+	//	self thread global/friendly.scr::friendlythink
+}end
+
+//============================================================================
+TargetPlayer: {
+//============================================================================
+	level.playertanktarget = $player
+}end
+
+//============================================================================
+AB41Targets: {
+//============================================================================
+	//wait 4
+
+	if ( level.ab_failsafe==1 ) {
+		// if player hit the failsafe, then we want to target him until the AB41 hits the ab_forward_trigger...
+		thread TargetPlayer
+	}
+
+	// don't target michaels until we hit the "forward" trigger...
+	$ab_forward_trigger waittill trigger
+	
+	level.playertanktarget = $michaels
+	if(isalive $michaels) {
+	   $michaels waittill death
+	}
+
+	level.playertanktarget = $mcmartin
+	if(isalive $mcmartin) {
+	    $mcmartin waittill death
+	}
+
+	level.playertanktarget = $hudson
+	if(isalive $hudson) {
+		$hudson waittill death	
+	}
+
+	level.playertanktarget = $player
+	//	$AB41 thread enemy_tank_think 0 AB41	
+}end
+
+//============================================================================
+AB_Go: {
+//============================================================================
+	
+	self thread enemy_tank_think 0 AB41
+
+	// brady, adjust ab speed here.........|||		this is the speed it will go at when it first enters the scene...
+	self thread drive_path $startab41path1 250
+	$ab_forward_trigger waittill trigger
+
+	// once we get to the "forward" trigger, slow down...  
+	// --------------|||  and here
+	self modifydrive 250 512
+
+	while (isAlive self) {
+		$ab_reverse_trigger waittill trigger
+
+		if ( isAlive self ) {	
+			self modifydrive 16 512
+			wait 3
+
+			if ( isAlive self ) {				//   |||   and here... this is the final speed it will go back and forth at...
+				self modifydrive 250 512
+				self BounceBackwardsVelocity 1
+			}
+		}
+
+		$ab_forward_trigger waittill trigger
+
+		if ( isAlive self ) {
+			self BounceForwardsVelocity
+
+		}
+	}
+	//self damage $world 35000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+}end
+
+//============================================================================
+drive_path local.path local.speed: {
+//============================================================================
+	self.driving = 1
+	self drive local.path local.speed 250 200 level.lookahead
+	self waittill drive
+
+	if (self) {
+		self stop
+		self.driving = 0
+	}
+}end
+
+
+//============================================================================
+AB41_dead: {
+//============================================================================
+	show $aa_gun4charge	
+}End
+
+/*
+   jsl--> not used...
+//-------------------------------------------------------------------
+FinishJumpThread:
+//-------------------------------------------------------------------
+
+	self remove
+
+	wait 0.3
+
+	thread global/throbtext.scr::throbtext_off
+
+	$AB41 stop
+
+	// Explode AB41
+	
+	local.destroyedAB41 = spawn models/vehicles/It_V_AB41des.tik
+	local.destroyedAB41.origin = $AB41.origin
+	local.destroyedAB41.angles = $AB41.angles
+	local.destroyedAB41 nodamage
+	local.destroyedAB41.health = 60000
+	local.destroyedAB41 solid
+	local.destroyedAB41 removeondeath 0
+	local.destroyedAB41 setcollisionentity $ab41_collide
+
+	waitframe
+
+	local.destroyedAB41 anim idle
+
+	// Cause damage to nearby ents
+	radiusdamage $AB41.origin 500 500
+
+	waitframe
+	
+	if($player istouching $AB41.collisionent)
+	{
+		$player normal_damage 100
+	}
+
+	// Show the destroyed, animating AB41
+	local.destroyedAB41 show
+
+	// Hide the AB41 and its turrets
+	level.ab41yawFix = 0 //HACK
+	$AB41.mg42 = $AB41 queryturretslotentity 0
+	$AB41.minigun = $AB41 queryturretslotentity 1
+	$AB41 hide
+	$AB41.mg42 hide
+	$AB41.minigun hide
+
+End
+*/
+
+//============================================================================
+enemy_tank_think local.notattacking local.type: {
+//============================================================================
+	// level waittill spawn	// <-- jsl is this really necessary???
+	self.type = local.type
+	self rendereffects "-shadow"
+
+	// make sure we only set health once...
+	if ( self.health_set==NIL || self.health_set==0 ) {
+		self.health_set = 1
+		self.start_health = level.ab_start_health
+		self.health = self.start_health
+	}
+
+	if (self.death_thread==NULL || self.death_thread==NIL) {
+		self thread TankExplodeOnDeath local.type
+	}
+
+	self removeondeath 0
+	level.tank_stunned_time = 80
+
+	// println "z:          self.target " self.target 
+	if (self.target) {
+		self.collisionent = self.target
+		//self.collisionent hide
+	}
+
+	self.gun = self QueryTurretSlotEntity 0
+	self.gun2 = self QueryTurretSlotEntity 1
+
+	if (self.gun) {
+		self.gun nodamage
+	}
+
+	if (self.gun2) {
+		self.gun2 nodamage
+	}
+
+	if (level.sightdistance == NIL) {
+		level.sightdistance = 16000
+	}
+
+	if (local.notattacking != 1) {
+		while ( (level.playertanktarget == 0) || (level.playertanktarget == NIL) ) {
+			wait 1
+		}
+
+		self.gun setAimTarget level.playertanktarget
+		thread enemy_tank_attack_loop self.gun
+		self.attack_thread = parm.previousthread
+		thread tank_pain self.gun
+		self.pain_thread = parm.previousthread
+	}
+
+	//thread tank_stop_if_close
+}end
+
+//============================================================================
+enemy_tank_attack_loop local.gun: {   //self is the tank
+//============================================================================
+	if ( self.paused==NIL ) {
+		self.paused = 0
+	}
+
+	local.waited = 0
+	if(level.playertanktarget.centroid == NULL) {
+		level.playertanktarget.centroid = $player.origin
+	}
+
+	while (IsAlive self) {
+		// get our gun on target 1st...
+		local.gun waittill ontarget
+		if ( self.paused==0 ) {
+			local.gun waittill ontarget
+			wait 0.25	// center on target for just a little..
+
+			local.trace_offset = local.gun.origin + (0 0 48)
+			if (self.stunned == 1) {
+				//println "z:             " self " is not firing because stunned"
+				wait 1
+				local.waited = 1
+			}
+			else if !(vector_within level.playertanktarget.centroid local.trace_offset level.sightdistance) {		
+				//println "z:             " self " is not firing because range"
+				wait 1
+				local.waited = 1
+			}
+			else if (!(sighttrace level.playertanktarget.centroid local.trace_offset 1)) {
+				//println "z:             " self " is not firing because sight trace"
+				wait 1
+				local.waited = 1
+			}
+			else {
+				//println "z:         " self " on target, firing!"
+				// wait 3
+
+				if ( local.waited==0 ) {
+					wait 2
+					local.waited = 1
+				}
+
+				if (self.stunned != 1) {
+					local.kill = NULL
+
+					if ( level.playertanktarget!=NULL && level.playertanktarget!=$player ) {
+						local.kill = level.playertanktarget
+					}
+
+					local.gun anim fire
+					
+					if ( local.kill!=NULL ) {
+						wait 0.25
+
+						// make sure he dies....
+						if ( isAlive local.kill ) {
+							radiusdamage local.kill.origin 100 45 0
+						}
+					}
+				}
+				wait 5
+			}
+		}
+		else {
+			wait 1
+		}
+	}
+}end
+
+//============================================================================
+tank_pain local.gun local.relock_on_player: {
+//============================================================================
+	local.previoushealth = self.health
+	local.timer = 0
+	self immune bash
+
+	if ( local.relock_on_player==NIL ) {
+		local.relock_on_player	= 1
+	}
+
+	while(isAlive self) {
+		local.gun setAimTarget level.playertanktarget
+		wait .1
+
+		if ( (isAlive self) && (self.health < local.previoushealth) ) {
+			// println "z:         " self " is damaged. self.start_health: " self.start_health
+			// println "z:         current health: " self.health
+			// println "z:         previous health: " local.previoushealth
+			// println "z:         " self " is stunned"
+
+			self playsound damage_tank
+			self.stunned = 1
+			local.gun setAimTarget NULL
+
+			//if (self.driving == 1)
+			//	self modifydrive 55 100 256
+			//if (self.driving_reverse == 1)
+			//	self modifydrive -5 100 256
+
+			//self.smoke = spawn script_model model "models/emitters/linger_smoke.tik"
+
+			if ( self.smoke==NIL ) {
+				self.smoke = spawn "models/emitters/linger_smoke.tik"
+				self.smoke notsolid
+				self.smoke anim start
+				self.smoke.origin = (self.origin + (0 0 80))
+				self.smoke glue self
+			}
+			local.previoushealth = self.health
+			local.timer = 0
+		}
+
+		if (local.timer == level.tank_stunned_time) {
+			if ( local.relock_on_player==1 ) {
+				local.gun setAimTarget level.playertanktarget
+			}
+
+			if (self.driving == 1) {
+				self modifydrive level.enemytankspeed 30 256
+			}
+
+			//if (self.driving_reverse == 1)
+			//	self modifydrive level.enemytankspeed_reverse 30 256
+			self.stunned = 0
+			// println "z:         " self " is no longer stunned"
+		}
+		local.timer++
+	}
+}end
+
+//============================================================================
+TankExplodeOnDeath local.type: {
+//============================================================================
+	self.death_thread	= local
+	self removeondeath 0
+	self.type = local.type
+	self rendereffects "-shadow"
+
+	if ( self.health_set==NIL || self.health_set==0 ) {
+		self.health_set = 1
+		self.start_health = (((randomint 3) + 1) * 400)
+		self.health = self.start_health
+	}
+
+	self removeondeath 0
+	self waittill death
+	// println "z:         " self " is dead. self.start_health: " self.start_health
+	thread tank_killed
+}end
+
+//============================================================================
+tank_killed: {
+//============================================================================
+	self playsound explode_tank
+	self stop
+	self.driving = 0
+
+	local.turretmodel = NIL
+	local.type = self.type
+
+	if (self.attack_thread) {
+		self.attack_thread delete
+	}
+
+	if (self.pain_thread) {
+		self.pain_thread delete
+	}
+
+	local.model = models/vehicles/It_V_AB41des.tik
+	local.name = self
+	local.angles = self.angles
+	local.origin = self.origin
+	local.targetname = self.targetname
+
+	//stop the smoke emitter that came from damage and start a temp emitter for the death model
+	if (self.smoke) {
+		self.smoke anim stop
+		self.smoke = NIL
+	}
+
+	self anim temp_smoke
+	self anim temp_sizzle
+	
+	self.gun = self QueryTurretSlotEntity 0
+	self.gun2 = self QueryTurretSlotEntity 1
+
+	if (self.gun) {
+		local.turretangles = self.gun.angles
+	}
+
+	self thread spawn_fx models/emitters/explosion_tank.tik
+	waitframe
+
+	exec global/earthquake.scr .2 4 0 0
+	//radiusdamage self.origin level.bomb_damage level.bomb_explosion_radius
+	radiusdamage (self.origin + (0 0 200)) 800 400
+	waitframe
+
+	if (self.gun) {
+		self DetachTurretSlot 0
+		self.gun remove
+	}
+
+	if (self.gun2) {
+		self DetachTurretSlot 1
+		self.gun2 remove
+	}
+
+	self remove
+
+	local.damaged = thread spawn_damaged_new local.model local.angles local.origin
+	local.damaged.targetname = local.targetname
+	local.damaged setcollisionentity $ab41_collide
+	local.damaged.smoke	= local.smoke
+
+	//produce temporary smoke and burning sound
+	local.damaged anim temp_smoke
+	local.damaged anim temp_sizzle
+
+	local.soundorigin = spawn script_model model "fx/dummy.tik"
+	local.soundorigin.origin = local.damaged.origin
+	local.soundorigin loopsound fire_med1
+	local.soundorigin notsolid
+}end
+
+//============================================================================
+spawn_fx local.fx: {
+//============================================================================
+	local.temp = spawn script_model model local.fx
+	local.temp notsolid
+	local.temp.origin = self.origin
+	local.temp anim start
+	local.temp notsolid
+	wait 5
+
+	local.temp remove
+}end
+
+//============================================================================
+spawn_damaged_new local.model local.angles local.origin: {
+//============================================================================
+	// Done slightly differently than vehicles_thinkers, spawning as the tiki, not a script model
+	local.damaged = spawn local.model
+	local.damaged.origin = local.origin
+	local.damaged.angles = local.angles
+	local.damaged nodamage
+}end local.damaged
+
+//============================================================================
+WaterTowerKillFriendlies: {
+//============================================================================
+	$watertower_killfriendlies waittill trigger
+
+	if ( isAlive $michaels ) {
+		$michaels thread BeFodder $watertower_killfriendlies_1
+	}
+
+	if ( isAlive $mcmartin ) {
+		$mcmartin thread BeFodder $watertower_killfriendlies_1
+	}
+
+	if ( isAlive $hudson ) {
+		$hudson thread BeFodder $watertower_killfriendlies_1
+	}
+}end
+
+//	make these guys sitting targets
+//============================================================================
+BeFodder local.runto: {
+//============================================================================
+	if ( !isAlive self ) {
+		end
+	}
+
+	self threatbias 99999	// make sure mg42 gunner comes after fodder....
+	self.health = 5
+	self.nolimp = 1
+
+	self waitthread global/friendly.scr::friendlystop
+	self type_attack "runandshoot"
+	self waitthread global/SafeMoveTo.scr::reach local.runto
+
+	// go back to being a friend
+	if ( isAlive self ) {
+		self type_attack cover	// try to use some cover here....
+		self waitthread global/friendly.scr::friendlythink
+	}
+}end
+
+//============================================================================
+turrethealthcheck: {
+//============================================================================
+	while ( self ) {
+		if ( self.health <= 0 ) {
+			//dprintln "~~~~~~~~~~~~~~~~~ REVIVING, self.health is " self.health ", self.turret.health is " self.turret.health
+			self revive 1
+		}
+		waitframe
+	}
+}end

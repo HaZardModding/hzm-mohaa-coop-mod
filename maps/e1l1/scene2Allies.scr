@@ -1,0 +1,475 @@
+//
+// scene2Allies.scr
+//
+//=========================================================================
+alliedGuysCharge:
+//=========================================================================
+{
+	// send in the good guys
+	level.frontLineBattleInProgress = 1
+	wait 0.1  // get out of sync from the axis spawn
+
+	for (local.i = 1; local.i <= level.frontLineFriendlyCount; local.i++) {
+		wait 0.25
+		thread alliedGuyCharge local.i
+	}
+}end
+
+//=========================================================================
+alliedGuysWakeup:
+//=========================================================================
+{
+	$jones thread jonesWakeup
+}end
+
+//=========================================================================
+initAlliedGuys:
+//=========================================================================
+{
+	level.alliedGuyCount   = 0
+	level.frontAlliedRally = exec global/makearray.scr $frontLineAlliedRallyPoint
+	level.frontAlliedRally waitthread initFrontAlliedRally
+}end
+
+//=========================================================================
+initFrontAlliedRally:
+//=========================================================================
+{
+	self.runee = NULL
+}end
+
+//=========================================================================
+jonesInit:
+//=========================================================================
+{
+	self ai_off
+}end
+
+//=========================================================================
+alliedGuyCharge local.guyIndex:
+//=========================================================================
+{
+	local.player = NULL
+	local.generation = 1
+	local.model = models/human/Sc_AL_US_infmask.tik
+
+	while (level.frontLineAlliedGuysSpawn){
+		local.spawnRow = waitthread getAlliedSpawnRow
+
+		if (local.spawnRow == NULL){
+			// player must be too close to the first row
+
+			if (level.frontLineAlliedDebugPrint){
+				println local.guyalliedIndex " waiting for player to get further away"
+			}
+			wait 1
+		}
+		else{
+			local.player = exec coop_mod/replace.scr::player_closestTo local.spawnRow
+			while( local.player == NULL ){
+				wait 1
+				local.player = exec coop_mod/replace.scr::player_closestTo local.spawnRow
+			}
+			// spawn a random guy on this row			
+			if (level.frontLineFriendlyCount < 3) {
+				// spawn from the closest point in this row to the player
+				local.minDistance 	= 999999
+				local.index 		= -1
+
+				for (local.i = 1; local.i <= local.spawnRow.spawnPoint.size; local.i++) {
+					local.d = (vector_length (local.player.origin - local.spawnRow.spawnPoint[local.i].origin))
+
+					if (local.d < local.minDistance) {
+						local.index 		= local.i
+						local.minDistance 	= local.d
+					}
+				}
+			}
+			else{
+				local.index = (randomint local.spawnRow.spawnPoint.size) + 1
+			}
+
+			local.spawnPoint = local.spawnRow.spawnPoint[local.index]
+
+			if (level.frontLineAlliedDebugPrint){
+				println local.guyIndex " spawning in set " local.spawnRow.set " index " local.index
+			}
+
+			if (local.generation != 1 && (local.spawnPoint == NULL || local.spawnPoint == NIL)) {
+				println "alliedGuyWakeup: error, got local.spawnPoint = NULL"
+				wait 2
+			}
+			else{
+				// wait at least two seconds since the last guy spawned here
+				if (local.generation != 1) {
+					local.queueTime = (local.spawnPoint.lastSpawnTime - level.time) + 2
+
+					if (local.queueTime > 0){
+						if (level.frontLineAxisDebugPrint){
+							println local.guyIndex " waiting in queue for " local.queueTime " seconds"
+						}
+						wait local.queueTime
+					}
+				}
+
+				local.guy 				= spawn local.model
+				local.guy.targetname 	= "alliedSpawn_"+local.guyIndex+"_"+local.generation
+				local.guy.alliedIndex 	= local.guyIndex
+
+				if (local.generation == 1) {
+					local.guy.origin = $("frontLineAlliedSpawn_" + local.guyIndex).origin
+				}
+				else{
+					local.guy.origin = local.spawnPoint.origin
+					local.spawnPoint.lastSpawnTime = level.time
+				}
+
+				//chrissstrahl - coop compatible
+				while( local.player == NULL ){
+					wait 1
+					local.player = exec coop_mod/replace.scr::player_closestTo local.spawnRow
+				}
+				
+				local.guy.angles = local.player.angles
+
+				if ((randomint 100) < 50) {
+					local.guy gun "thompson"
+					local.guy useweaponclass mg
+				}
+
+				local.guy type_attack "alarm"
+				local.guy.accuracy = 20 + (local.generation*5)
+
+				if (local.guy.accuracy > 100){
+					local.guy.accuracy = 100
+				}
+
+				// pick a random rally point to run toward
+				local.guy thread alliedGuyThink	local.generation
+
+				if (level.frontLineAxisDebugPrint) {
+					println println local.guyIndex " waiting until deeath "
+				}
+					
+				// waittill death seems to hang sometimes
+				//	local.guy waittill death
+				while (1){
+					if (local.guy == NULL || local.guy == NIL || !(IsAlive local.guy)){
+						break
+					}
+					wait 0.5
+				}
+
+				if (level.frontLineAxisDebugPrint){
+					println println local.guyIndex " ok, I'm dead"
+				}
+				local.generation++
+			}
+		}
+	}
+	//println "allied spawn shutting down"
+}end
+
+//=========================================================================
+alliedGuyThink local.generation:
+//=========================================================================
+{
+	self.health = 100
+	self type_attack "alarm"
+	level.frontLineAlliedGuysAlive++
+
+	thread alliedGuyCheckBattleOver
+	if ((randomint 100) < 90){
+		self dontdropweapons
+	}
+
+	local.charged = 0
+
+	while (self != NULL && self != NIL && (IsAlive self)) {
+		if (local.runto != NULL && local.runto != NIL){
+			local.runto.runee = NULL
+		}
+
+		//if (!local.charged && local.generation == 1 && !level.jonesSaysChargePlease)
+
+		if (0){
+			// first generation, not charged, wait in trench
+			self.enableEnemy = 0
+			self runto $("frontLineAlliedStart_" + self.alliedIndex).origin
+			self waittill movedone
+
+			// if we're first generation, then wait until we kill somebody before charging
+			self.enableEnemy = 1
+			self type_attack "turret"
+
+			// wait until we have an enemy
+			while (self != NULL && self != NIL && (IsAlive self)) {
+				if (self.enemy != NULL && self.enemy != NIL){
+					break
+				}
+				waitframe
+			}
+
+			if (self == NULL || self == NIL || !(IsAlive self)) {
+				break
+			}
+
+			// now that we have an enemy, wait until he is dead					
+			while (self != NULL && self != NIL && (IsAlive self)) {
+				if (self.enemy == NULL || self.enemy == NIL || !(IsAlive self.enemy)){
+					break
+				}
+				waitframe
+			}
+			
+			if (self == NULL || self == NIL || !(IsAlive self)) {
+				break
+			}
+			
+			// our enemy is now dead, CHARGE!
+			local.charged = 1
+		}
+		else {
+			// not first generation
+			while (self != NULL && self != NIL && (IsAlive self)) {
+				// wait until we acquire a target, or the player moves past us
+				self.sight   = 2048
+				self.hearing = 2048
+
+				while (self.enemy == NULL && self != NULL && self != NIL && (IsAlive self)) {
+					
+					//chrissstrahl - make coop compatible
+					local.player = exec coop_mod/replace.scr::player_closestTo $frontLinePlayerRallyPoint
+					while( local.player == NULL ){
+						wait 1
+						local.player = exec coop_mod/replace.scr::player_closestTo $frontLinePlayerRallyPoint
+					}
+				
+					// see if we need to move up the battlefield
+					local.playerDir 	  = local.player.origin //chrissstrahl - make coop compatible
+					local.playerDir 	 -= self.origin
+					local.playerRallyDir  = $frontLinePlayerRallyPoint.origin
+					local.playerRallyDir -= self.origin
+					local.dot = vector_dot local.playerDir local.playerRallyDir
+
+					if (local.dot > 0) {
+						// player has moved on, follow up the battlefied
+						self.enableEnemy = 1
+						self.sight 		 = 350
+						self.hearing 	 = 350
+						local.runto 	 = waitthread getAlliedRallyPoint
+						self runto local.runto
+						self waittill movedone
+						break
+					}
+					wait 1
+				}
+				wait 1
+			}
+		}
+	}
+	level.frontLineAlliedGuysAlive--
+}end
+
+//=========================================================================
+alliedGuyCheckBattleOver:
+//=========================================================================
+{
+	while (self != NULL && self != NIL && (IsAlive self)){
+		if (!level.frontLineBattleInProgress){
+			// it's time for us to depart now
+			thread maps/e1l1/explosion.scr::big self
+			break
+		}
+		wait 15
+	}
+}end
+
+//=========================================================================
+getAlliedRallyPoint:
+//=========================================================================
+{
+	// find the closest rally point to me, that is in FRONT of the player
+	local.minDistance = 99999
+	local.index 	  = -1
+
+	for (local.i = 1; local.i <= level.frontAlliedRally.size; local.i++){
+		local.rallyPoint = level.frontAlliedRally[local.i]
+
+		// make sure nobody else is running to this rally point
+		if (local.rallyPoint.runee == NULL || local.rallyPoint.runee == NIL){
+		
+			//chrissstrahl - make coop compatible
+			local.player = exec coop_mod/replace.scr::player_closestTo $frontLinePlayerRallyPoint
+			while( local.player == NULL ){
+				wait 1
+				local.player = exec coop_mod/replace.scr::player_closestTo $frontLinePlayerRallyPoint
+			}
+		
+			// direction from the rally point to the player
+			local.playerDir  = local.player.origin //chrissstrahl - make coop compatible
+			local.playerDir -= local.rallyPoint.origin
+
+			// direction from the rally point to the player's destination
+			local.playerRallyDir  = $frontLinePlayerRallyPoint.origin
+			local.playerRallyDir -= local.rallyPoint.origin
+
+			// are we in between the player and where they are going
+			local.dot = vector_dot local.playerDir local.playerRallyDir
+
+			if (local.dot < 0) {
+				// direction from here to the rally point
+				local.dir 		 = local.rallyPoint.origin
+				local.dir 		-= self.origin
+				local.distance 	 = vector_length local.dir
+
+				if (local.distance < local.minDistance) {
+					local.minDistance = local.distance
+					local.index = local.i
+				}
+			}
+		}
+	}
+
+	if (local.index == -1){
+		end NULL
+	}
+
+	level.frontAlliedRally[local.index].runee = self
+}end level.frontAlliedRally[local.index]
+
+//=========================================================================
+jonesWakeup:
+//=========================================================================
+{
+	// jones starts squating
+	self nodamage
+	self ai_on
+	self.enableEnemy = 0
+	self gun "thompson"
+	self turnto $frontLinePlayerRallyPoint
+	self thread global/loopanim.scr::LoopAnim mg42_crouch_idle
+	self thread global/loopanim.scr::LoopAnimStop
+	$beginFrontLineBattle waittill trigger
+
+	// then he stands up and fights for a few seconds
+	wait 1
+	self thread global/loopanim.scr::LoopAnimStop
+	self.enableEnemy = 1
+	wait 12
+
+	// then he starts yelling at his comrades to charge
+	wait 1
+	self.enableEnemy = 0
+	self turnto $jeep
+	self thread global/loopanim.scr::LoopAnim 11B102_BritCaptdial
+	self say dfr_E1L1_Lt_1
+	self waittill saydone
+	wait 0.2
+
+	if (!(IsAlive self) || self == NULL || self == NIL){
+		end
+	}
+
+	// tell the guys to start charging
+	level.jonesSaysChargePlease = 1
+	self takedamage
+	self say dfr_E1L1_Lt_2
+	self waittill saydone
+	wait 0.2
+
+	if (!(IsAlive self) || self == NULL || self == NIL){
+		end
+	}
+
+	self say dfr_E1L1_Lt_3
+	self waittill saydone
+	wait 0.2
+
+	if (!(IsAlive self) || self == NULL || self == NIL){
+		end
+	}
+
+	self say dfr_E1L1_Lt_4
+	self waittill saydone
+	wait 0.2
+
+	if (!(IsAlive self) || self == NULL || self == NIL){
+		end
+	}
+
+	self say dfr_E1L1_Lt_5
+	self waittill saydone
+	wait 0.2
+
+	if (!(IsAlive self) || self == NULL || self == NIL){
+		end
+	}
+
+	self say dfr_E1L1_Lt_6
+	self waittill saydone
+	wait 0.2
+
+	if (!(IsAlive self) || self == NULL || self == NIL){
+		end
+	}
+
+	self say dfr_E1L1_Lt_7
+	self waittill saydone
+	wait 0.2
+
+	if (!(IsAlive self) || self == NULL || self == NIL){
+		end
+	}
+
+	self turnto $frontLinePlayerRallyPoint
+	self thread global/loopanim.scr::LoopAnimStop
+	self.enableEnemy = 1
+	self thread alliedGuyThink 2
+}end
+
+//=========================================================================
+getAlliedSpawnRow:
+//=========================================================================
+{
+	// find the row closest to the player that is between the player and
+	//    the player START POINT (ie in *BEHIND* of the player, not in front)
+	local.minDistance 	= 999999
+	local.index 		= -1
+
+	for (local.i = 1; local.i <= level.frontLineSpawnRow.size; local.i++){
+		//chrissstrahl - make coop compatible
+		local.player = exec coop_mod/replace.scr::player_closestTo $frontLinePlayerStartReference
+		while( local.player == NULL ){
+			wait 1
+			local.player = exec coop_mod/replace.scr::player_closestTo $frontLinePlayerStartReference
+		}
+	
+		// direction from here to the player
+		local.playerDir  = local.player.origin //chrissstrahl - make coop compatible
+		local.playerDir -= level.frontLineSpawnRow[local.i].origin
+
+		// direction from here to the player start point
+		local.playerRallyDir  = $frontLinePlayerStartReference.origin
+		local.playerRallyDir -= level.frontLineSpawnRow[local.i].origin
+
+		// are we in between the player and the start reference point
+		local.dot = vector_dot local.playerDir local.playerRallyDir
+
+		if (local.dot < 0) {
+			local.distance = vector_length local.playerDir
+
+			if (local.distance >= level.frontLineAlliedSpawnMinDistance && local.distance < local.minDistance) {
+				local.minDistance = local.distance
+				local.index 	  = local.i
+			}
+		}
+	}
+	
+	if (local.index == -1){
+		end NULL
+	}
+}end level.frontLineSpawnRow[local.index]
+
+//-----------------------------------------------------------------------------
+

@@ -1,0 +1,277 @@
+//=========================================================================
+InitCastle:
+//=========================================================================
+{
+	level.bookBurnersAttacking = 0
+	level.cabinetGagComplete   = 0
+		
+	for (local.i = 1; local.i <= $frontdoor2.size; local.i++ ){
+		$frontdoor2[local.i] lock
+	}
+		
+	$librarybackdoor lock
+	$libraryguy1 ai_off
+	$libraryguy2 ai_off
+	$libraryguy3 ai_off	
+	$libraryguy1 hide
+	$libraryguy2 hide
+	$libraryguy3 hide	
+	$libraryguy1 notsolid
+	$libraryguy2 notsolid
+	$libraryguy3 notsolid	
+	$armoireroomdoor lock
+	$closetally hide
+	$closetally ai_off
+	$closetally notsolid
+	$closetally threatbias ignoreme
+		
+	$castleguy ai_off
+	$castleguy notsolid
+	$castleguy hide
+	$castleguy exec global/disable_ai.scr
+	$castleguy gun "shotgun"
+}end
+
+//=========================================================================
+ObjectiveRegroupInCastle:
+//=========================================================================
+{
+	if (level.hackskipcastle == 1){
+		$player.origin = $radioguyrunback2.origin
+		end
+	}
+
+	local.LowerTunnel = waitthread global/FindTrigger.scr::FindTrigger "secondfloortunnel"
+	local.LowerTunnel waittill trigger
+
+	$castleguy ai_on
+	$castleguy solid
+	$castleguy show
+	$castleguy exec global/disable_ai.scr
+	$castleguy exec global/crouch.scr
+	$castleguy nodamage
+	//$castleguy thread global/LoopAnim.scr::LoopAnim AA_huddle1
+	$castleguy holster
+
+	$castleguytrigger waittill trigger
+	$castleguy turnto $player
+	$castleguy lookat $player
+	$castleguy say A_34_US6_1
+	$castleguy waittill saydone
+
+	$castleguy turnto NULL
+	$castleguy lookat NULL
+
+	$castleguy takedamage
+	$castleguy exec global/stand.scr
+	$castleguy unholster
+	$castleguy exec global/enable_ai.scr
+	$castleguy thread maps/e3l4/Friendly.scr::StartFollow 200
+	exec global/autosave.scr 7 // Into the Castle
+}end
+
+//=========================================================================
+castle2dguys:
+//=========================================================================
+{
+	while (!($castle2d)){
+		waitframe
+	}
+
+	for (local.i=1;local.i<=$castle2d.size; local.i++){
+		$castle2d[local.i] attackplayer
+	}
+}end
+
+//=========================================================================
+chapel2guys:
+//=========================================================================
+{
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "chapel2trigger"
+	local.trigger waittill trigger
+
+	for (local.i=1;local.i<=$chapel2guy.size; local.i++){
+		$chapel2guy[local.i] attackplayer
+	}
+}end
+
+//=========================================================================
+bookBurners:
+//=========================================================================
+{
+	thread CleanupSceneCastle
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "bookburnertrigger"
+	local.trigger waittill trigger
+	waitframe
+
+	for (local.i = 1; local.i <= $bookburner.size; local.i++){
+		$bookburner[local.i].nolongpain = 1
+	}
+
+	$libraryguy1 ai_on
+	$libraryguy2 ai_on
+	$libraryguy3 ai_on	
+	$libraryguy1 solid
+	$libraryguy2 solid
+	$libraryguy3 solid	
+	$libraryguy1 show
+	$libraryguy2 show
+	$libraryguy3 show	
+
+	for (local.i = 1; local.i <= $libraryguy.size; local.i++){
+		$libraryguy[local.i] exec global/enable_ai.scr
+	}
+		
+	level.bookBurnersAttacking = 1
+	wait 1
+	
+	while (level.bookBurnersAttacking == 1){
+		local.guysLeftAlive = 0
+		
+		for (local.i = 1; local.i <= $bookburner.size; local.i++){
+			if ($bookburner[local.i] && isAlive $bookburner[local.i] ){
+				local.guysLeftAlive++
+			}
+		}
+		
+		if (local.guysLeftAlive == 0){
+			level.bookBurnersAttacking = 0
+		}
+		wait 1
+	}
+
+	//guys run to the windows
+	thread runToWindows
+	//	dprintln "BROKE LOOP"
+}end
+
+//=========================================================================
+runToWindows:
+//=========================================================================
+{
+	if ($libraryguy1 && isAlive $libraryguy1){ 
+		$libraryguy1 exec global/disable_ai.scr
+		$libraryguy1 runto $librarywindownode1
+		$libraryguy1 waittill movedone
+		//$libraryguy1 exec global/enable_ai.scr
+	}
+	
+	if ($libraryguy2 && isAlive $libraryguy2){ 
+		$libraryguy2 exec global/disable_ai.scr
+		$libraryguy2 runto $librarywindownode2
+		$libraryguy2 waittill movedone
+		//$libraryguy2 exec global/enable_ai.scr
+	}
+	
+	if ($libraryguy3 && isAlive $libraryguy3){ 
+		$libraryguy3 exec global/disable_ai.scr
+		$libraryguy3 runto $librarywindownode3
+		$libraryguy3 waittill movedone
+		//$libraryguy3 exec global/enable_ai.scr
+	}
+}end
+
+//=========================================================================
+cabinetGag:
+//=========================================================================
+{
+	local.badguytrigger = waitthread global/FindTrigger.scr::FindTrigger "armoireroomtrigger"
+
+	$armoireroomdoortrigger waittill trigger
+	trigger local.badguytrigger
+	$armoireroomdoor unlock
+	$armoireroomdoor open $player
+	wait 2
+	
+	trigger $allycabinettrigger
+
+	$allycabinet.dontfire = 1
+	$closetally ai_on
+	$closetally solid
+	$allycabinet damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	
+	if (local.target){
+		$closetally.creator = local.target
+	}
+
+	$closetally.nosurprise 	= 1
+	$closetally.angles 		= $allycabinet.angles
+	$closetally noticescale 1
+	$closetally mindist  64
+	$closetally maxdist  2048
+	$closetally accuracy 100
+	local.o = $allycabinet gettagposition "tag_origin"
+
+	$closetally.origin = local.o
+	$closetally show
+	$closetally exec global/disable_ai.scr
+	$closetally notsolid
+	$allycabinet playsound cabinetopen
+	$allycabinet anim open
+	$closetally anim_scripted cabinet_hiding_attack
+	$closetally waittill animdone
+	local.angles = vector_toangles ($closetally.origin - $player.origin)
+
+	$closetally.angles = ( 0 (local.angles[1] - 180) 0)
+	$closetally exec global/enable_ai.scr
+	$closetally solid
+	wait 3
+
+	$closetally threatbias 0
+	level.armoireRoomGuysAttacking = 1
+	
+	while (level.armoireRoomGuysAttacking == 1){
+		local.guysLeftAlive = 0
+		
+		for (local.i = 1; local.i <= $armoireroomguy.size; local.i++){
+			if ($armoireroomguy[local.i] && isAlive $armoireroomguy[local.i] ){
+				local.guysLeftAlive++
+			}
+		}
+		
+		if (local.guysLeftAlive == 0){
+			level.armoireRoomGuysAttacking = 0
+		}
+		//else
+		//	dprintln ( "DEBUG: number of guys left = " + local.guysLeftAlive )
+		wait 1
+	}
+
+	$closetally waitthread maps/e3l4/friendly.scr::StartFollow 200
+	level.cabinetGagComplete = 1
+}end
+
+//=========================================================================
+triggeredChapelBong:
+//=========================================================================
+{
+	// called by setthread
+	//dprintln "Bong!"
+	$player playsound bell_impact		// String soundName, [ Integer channel ], [ Float volume ], [ Float min_distance ], [ Float pitch ]
+}end
+
+//=========================================================================
+CleanupSceneCastle:
+//=========================================================================
+{
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "mainhall1"
+	local.trigger waittill trigger
+	
+	thread global/EntityCleanup.scr::EntityCleanup "castle1"  600
+	thread global/EntityCleanup.scr::EntityCleanup "castle1b" 600
+	thread global/EntityCleanup.scr::EntityCleanup "castle1c" 600
+	thread global/EntityCleanup.scr::EntityCleanup "castle2"  600
+	thread global/EntityCleanup.scr::EntityCleanup "castle2b" 600
+	thread global/EntityCleanup.scr::EntityCleanup "castle2c" 600
+	thread global/EntityCleanup.scr::EntityCleanup "castle2d" 600
+	$snipetrigger waittill trigger
+
+	thread global/EntityCleanup.scr::EntityCleanup "bookburner" 	50	
+	thread global/EntityCleanup.scr::EntityCleanup "mainhallguy" 	50	
+	thread global/EntityCleanup.scr::EntityCleanup "armoireroomguy" 50
+	thread global/EntityCleanup.scr::EntityCleanup "chapel1guy"  50
+	thread global/EntityCleanup.scr::EntityCleanup "chapel2guy"  50
+	thread global/EntityCleanup.scr::EntityCleanup "libraryguy1" 50
+	thread global/EntityCleanup.scr::EntityCleanup "libraryguy2" 50
+	thread global/EntityCleanup.scr::EntityCleanup "libraryguy3" 50
+}end

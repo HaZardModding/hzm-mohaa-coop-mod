@@ -1,0 +1,159 @@
+// InitSection
+//=========================================================================
+InitSection: {
+//=========================================================================
+	waitthread global/ManSpawnNamed.scr::Init "sniper4"
+	$tank5 thread InitTank
+	thread DoSection
+}end
+
+// DoSection
+//=========================================================================
+DoSection: {
+//=========================================================================
+	// wait until the section is triggered
+	$tank5Trigger waittill trigger
+
+	waitthread global/ManSpawnNamed.scr::Spawn "sniper4"
+	waitthread global/ai.scr::spawnset 800 spawn800
+	$spawn800 thread BadGuyThink
+	thread waitTillDeath
+
+	// cleanup
+	exec global/EntityRemoveOnTrigger.scr $FinalSectionTrigger "sniper2" "mgGuy2" "sniper3" "sniper4"
+
+	// modello
+	while (level.killedCannon2 != 1){
+		wait 0.5
+	}
+
+	if ($HomeStretchCompTarg2) {
+		waitthread global/ObjMgr.scr::SetObjCompassTarg "findPOWs" $HomeStretchCompTarg2
+	}
+}end
+
+// BadGuyThink
+//=========================================================================
+BadGuyThink: {
+//=========================================================================
+	self favoriteenemy $player
+}end
+
+// InitTank
+//=========================================================================
+InitTank: {
+//=========================================================================
+	spawn trigger_relay targetname "tank5FireTrigger"
+	self.tankFireTrigger = $tank5FireTrigger
+	self hide
+
+	local.gun = self QueryTurretSlotEntity 0
+	local.gun hide
+
+	self.health = 300
+	self.health_set = 1
+	self.tankType = panzer_desert
+	self.tankSpeed = 8
+	self.tankAccel = 20
+	self.tankLookAhead = 200
+	self.tankPath = $tank5Path
+	self.tankPathLoop = 0
+	self.tankDriveDelay = 0
+	self.tankEngageDelay = 0
+	self.tankStunTime = 3
+	self.tankGuysJumpOut = 0
+	self.tankReloadTime = 4
+	level.tankDebugPrint = 0
+
+	$tank5Trigger waittill trigger
+	self show
+	local.gun show
+
+	thread SparkyNumberOne
+	self thread TankAttack
+	self thread maps/e3l2/thinkTank.scr::tankGo 
+	//	wait 5
+
+	self setcollisionentity $player_t34
+	self waittill drive
+}end
+
+// insures that the throbbing box on cannon1 remains hidden
+// until the tank is destroyed
+//=========================================================================
+waitTillDeath: {
+//=========================================================================
+	if ($tank5 && (isalive $tank5)) {
+		$tank5 waittill death
+	}
+
+	// while (isAlive $tank5) { waitframe }
+	$Cannon2_Throb show
+	$Cannon2.noexplode = 0
+	waitthread global/ObjMgr.scr::SetCurrObj "killModellos"
+}end
+
+// TankAttack
+//=========================================================================
+TankAttack: {
+//=========================================================================
+	$tank5AttackTrigger waittill trigger
+	self.tankTarget = player
+	// $prisoner thread HideFromTank
+}end
+
+////////////////////////////////////////////////////////////////////////////////
+// HideFromTank
+////////////////////////////////////////////////////////////////////////////////
+
+//HideFromTank:
+//
+//	println "running to hide from tank"
+//
+//	self threatbias ignoreme
+//
+//	self waitthread global/friendly.scr::friendlystop
+//	self exec global/disable_ai.scr
+//	self thread maps/e3l2.scr::doRunTo $PrisonerTankCoverNode
+//	self waittill movedone
+//	self lookat $tank5
+//	self exec global/crouch.scr
+//	
+//	while (isAlive $tank5) { waitframe }
+//
+//	//self exec global/disable_ai.scr
+//	//self exec global/stand.scr
+//	//self exec global/enable_ai.scr
+//	//self lookat NULL
+//	//self.friendtype	= 1
+//	//self.distance = 250
+//	//self thread global/friendly.scr::friendlythink
+//
+//	//while (!level.killedCannon1) { waitframe }
+//
+////	// update objectives, successfully protected the radioman
+////	waitthread maps/e3l2/objectives.scr::Transition "ProtectedRadioman"
+//
+//	// make radioman run to waypoint
+//
+//	self exec global/disable_ai.scr
+//	self exec global/stand.scr	
+//	self thread maps/e3l2.scr::doRunTo $radio_guy_give_node 64
+//	self waittill movedone
+//	self lookat $player
+//	self exec global/crouch.scr
+//
+//end
+
+//=========================================================================
+SparkyNumberOne: {
+//=========================================================================
+	if (!$spark1) {
+		end
+	}
+
+	while ($spark1) {
+		wait (1 + (randomfloat 3))
+		$spark1 playsound e3l2_spark
+	}
+}end

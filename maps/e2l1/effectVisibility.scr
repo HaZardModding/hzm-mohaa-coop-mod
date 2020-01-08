@@ -1,0 +1,62 @@
+// effectVisibility.scr
+
+//============================================================================
+Init: {
+//============================================================================
+	$jeepfire3 thread manageVisibility 2500 0.1 "idle" "stop"		// various jeeps
+	$campfire1 thread manageVisibility 2500 0.1 "idle" "stop"		// campfire by second gun (near double MG42 nest)
+	$campfire4 thread manageVisibility 2500 0.1 "idle" "stop"		// campfire by fourth gun (near AB41)
+	$campfire5 thread manageVisibility 2500 0.1 "idle" "stop"		// campfire by fifth gun (end of tracks, base of final hill)
+	$plane thread manageVisibility 2500 0.1 "fire_on" "fire_off"	// crashed plane at end of tracks
+}end
+
+//============================================================================
+manageVisibility local.distance local.sampleTime local.animon local.animoff: {
+//============================================================================
+	//	dprintln "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ manageVisibility running on " self.targetname " (" self.entnum ")"
+	if ( local.distance == NIL ) {
+		local.distance = 2500
+	}
+
+	if ( local.sampleTime == NIL ) {
+		local.sampleTime = 0.5
+	}
+
+	if ( local.sampleTime < 0.05 ) {
+		local.sampleTime = 0.05
+	}
+
+	if ( self.viewradius != NIL ) {
+		local.distance = self.viewradius
+	}
+
+	while ( 1 ) {
+		self anim local.animoff
+		waitframe
+
+		while (!(vector_within $player.origin self.origin local.distance)) {
+			wait local.sampleTime
+		}
+
+		//dprintln "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ showing " self.entnum
+		self anim local.animon
+		waitframe
+
+		while (vector_within $player.origin self.origin local.distance) {
+			wait local.sampleTime
+		}
+		//dprintln "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ hiding " self.entnum
+	}
+}end	
+
+//============================================================================
+truck: {
+//============================================================================
+	self thread manageVisibility 2500 0.1 "smoke" "smoke_off"
+}end
+
+//============================================================================
+aagun: {
+//============================================================================
+	self thread manageVisibility 2500 0.1 "fire_on" "fire_off"
+}end

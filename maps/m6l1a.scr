@@ -1,0 +1,164 @@
+// SNOWY FOREST
+// ARCHITECTURE: BENSON/NED
+// SCRIPTING: NED
+//============================================================================
+main:{
+//============================================================================
+	level.coopNextMap = "m6l1b"					//Pasted by Criminal for coop comp. - set next map (for mom voteing)
+	level.coopPrevMap = "briefing/briefing6"	//Pasted by Criminal for coop comp. - set previouse map (for mom voteing)
+	level.coop_aaMap = 1						//Pasted by Criminal for coop comp. - let global scripts know this is a AA level
+	level.coop_debugSpawn = 1 					//Pasted by Criminal for coop comp. - enable spawnpoint debug (make visible)
+	thread coop_mod/main.scr::main         		//Pasted by Criminal for coop comp. - start coop mod extensions
+	
+	level.rain_speed = "32"
+	level.rain_speed_vary = "16"
+	//level.rain_length = "2" //chrissstrahl
+	level.rain_length = "1" //chrissstrahl
+	level.rain_width = "1"
+	//level.rain_density = ".2" //chrissstrahl
+	level.rain_density = ".5" //chrissstrahl
+	level.rain_slant = "250"//chrissstrahl
+	level.rain_min_dist = "1800"//chrissstrahl
+	level.rain_numshaders = 12
+	//level.rain_shader = "textures/snow0" //chrissstrahl
+	level.rain_shader = "textures/snow" //chrissstrahl - this way it works in BT
+
+	exec global/loadout.scr maps/m6l1a.scr
+	exec global/ai.scr
+
+	level waittill prespawn
+	exec global/ambient.scr m6l1a
+
+	//level waittill spawn //chrissstrahl
+	waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl - coop wait for player to spawn for icons to show up ?
+	
+	waitthread global/items.scr::add_item "explosives" nomessage
+	exec coop_mod/spawnlocations.scr::m6l1a
+
+	$sb2_mg42 thread global/mg42_active.scr::mg42 1230
+	$sb3_mg42 thread global/mg42_active.scr::mg42 1230
+	$sb4_mg42 thread global/mg42_active.scr::mg42 1230
+	$sb5_mg42 thread global/mg42_active.scr::mg42 1230
+	$sb6_mg42 thread global/mg42_active.scr::mg42 1230
+
+	//// objectives
+	waitthread global/objectives.scr::add_objectives 1 2 "Find and destroy the 20mm Flaks.         [2 remaining]" $obj1.origin
+	waitthread global/objectives.scr::add_objectives 2 2 "Keep tracking towards the rally point." $obj3.origin
+
+	wait 2
+	waitthread global/objectives.scr::current_objectives 1
+	
+	//$player stufftext "tmstop"											// Criminal.
+	exec coop_mod/replace.scr::tmstop										// Criminal- coop compabitility.
+	//$player stufftext "tmstart sound/music/mus_02b_suspense.mp3"			// Criminal.
+	exec coop_mod/replace.scr::tmstart "sound/music/mus_02b_suspense.mp3"	// Criminal- coop compabitility.
+}end
+
+//============================================================================
+level_end_trigger:{
+//============================================================================
+	iprintlnbold "You have not completed your objectives."	
+}end
+
+// flakk 30-1 objective, destroy with explosives
+//============================================================================
+20mm_weapon1_set_explosive:{
+//============================================================================
+	$20mm_weapon1_explosive thread explode_controller $20mm_weapon1
+	wait 5
+
+	wait 1
+	if(level.gametype==0){//Criminal.
+		exec global/autosave.scr 1
+	}
+ 	$20mm_weapon1_explosive remove
+	
+	level.flak1_destroyed = 1
+	if( level.flak2_destroyed == 1){	
+		waitthread global/objectives.scr::add_objectives 1 3 "Find and destroy the 20mm Flaks.         [0 remaining]"
+		waitthread global/objectives.scr::current_objectives 2
+		$level_end_script_obj remove
+		$level_end_trigger remove
+	}else{
+		waitthread global/objectives.scr::add_objectives 1 2 "Find and destroy the 20mm Flaks.         [1 remaining]" $obj2.origin
+		waitthread global/objectives.scr::current_objectives 1
+	}
+}end
+
+// flakk 30-2 objective, destroy with explosives
+//============================================================================
+20mm_weapon2_set_explosive:{
+//============================================================================
+	$20mm_weapon2_explosive thread explode_controller $20mm_weapon2
+	wait 5
+	wait 2
+
+	level.flak2_destroyed = 1
+	if( level.flak1_destroyed == 1){	
+		waitthread global/objectives.scr::add_objectives 1 3 "Find and destroy the 20mm Flaks.         [0 remaining]"
+		waitthread global/objectives.scr::current_objectives 2
+		$level_end_script_obj remove
+		$level_end_trigger remove
+	}else{
+		waitthread global/objectives.scr::add_objectives 1 2 "Find and destroy the 20mm Flaks.         [1 remaining]" $obj1.origin
+		waitthread global/objectives.scr::current_objectives 
+	}
+}end
+
+//============================================================================
+explode_controller local.target:{
+//============================================================================ 	
+	self model items/explosive.tik
+	self playsound plantbomb
+	self loopsound bombtick
+
+	//$player stopwatch 5				// Criminal
+	exec coop_mod/replace.scr::stopwatch 5	// Criminal - coop compabitility.
+	wait 5
+
+	self stoploopsound
+ 
+	///// shake the players view
+	thread jitter_large 0
+
+	local.temp = spawn script_model
+	local.temp.origin = self.origin
+	local.temp model "fx/fx_flak88_explosion.tik"
+	local.temp anim start
+	local.temp playsound explode_aagun
+ 
+	local.target model models/statweapons/20mmflak_d.tik
+	radiusdamage self.origin 200 600
+	self hide
+
+	local.target exec global/loopsound.scr fire_med
+	wait 10
+
+	local.temp remove 
+}end
+
+//============================================================================
+jitter_large local.time:{
+//============================================================================
+	if (local.time){
+		wait local.time
+	}
+
+	waitexec global/earthquake.scr .35 10 0 0
+	waitexec global/earthquake.scr .23 6 0 0
+	waitexec global/earthquake.scr 1 1 0 0
+	waitexec global/earthquake.scr 1.25 .3 0 1
+}end
+
+//============================================================================
+end_of_level:{
+//============================================================================
+}end
+
+//============================================================================
+levelbluh:{
+//============================================================================
+	waitthread global/objectives.scr::add_objectives 2 3
+	exec global/missioncomplete.scr m6l1b 1
+}end
+

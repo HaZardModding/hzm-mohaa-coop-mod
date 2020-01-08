@@ -1,0 +1,148 @@
+//chrissstrahl - completed coopification on 2019.09.18
+
+//
+// Objectives
+//
+
+start_init:
+
+/* List of objectives:
+	- Successfully cross the canal by boat
+	- Free the british forces believed to be imprisoned inside
+	- Overrun and secure the fortress
+	- Rendezvous with Klaus Knefler
+	- Protect Klaus as he picks lock
+	- Escape the city with Klaus
+*/
+
+	waitthread global/ObjMgr.scr::Init
+//	waitthread global/ObjMgr.scr::InitObj		"getBriefed"		"Get briefed by the Captain"
+	waitthread global/ObjMgr.scr::InitObj		"crossCanal"		"Successfully Cross the Canal"
+	waitthread global/ObjMgr.scr::InitObj		"freeBrits"			"Free the British Prisoners"
+	waitthread global/ObjMgr.scr::InitObj		"takeFort"			"Secure the Fortress"
+	
+	waitthread global/ObjMgr.scr::InitObj		"meetKlaus"			"Locate Klaus Knefler"
+	waitthread global/ObjMgr.scr::InitObj		"protectKlaus"		"Follow Klaus"
+//	waitthread global/ObjMgr.scr::InitObj		"escapeCity"		"Acquire a German truck and exit the city through the north gate"
+
+	println "objectives initialized"
+end
+
+
+finish_init:
+
+//	waitthread global/ObjMgr.scr::SetObjCompassTarg 	"getBriefed"			$cappy
+	waitthread global/ObjMgr.scr::SetObjCompassTarg 	"crossCanal"			$playerspot_boat
+	waitthread global/ObjMgr.scr::SetObjCompassTarg 	"freeBrits"				$JailWallThrobber
+	waitthread global/ObjMgr.scr::SetObjCompassTarg 	"takeFort"				$FortOutsidePoint
+	waitthread global/ObjMgr.scr::SetObjCompassTarg 	"meetKlaus"				$Claus
+	waitthread global/ObjMgr.scr::SetObjCompassTarg 	"protectKlaus"			$getawayTruck
+//	waitthread global/ObjMgr.scr::SetObjCompassTarg 	"escapeCity"			$getawayTruck
+
+	waitthread global/ObjMgr.scr::SetCurrObjStrategy	"inOrder"
+
+end
+
+
+transition local.key:
+
+	// handle any objective state changes
+
+	println ("Objective transition = " + local.key)
+
+	switch (local.key)
+	{
+//		case "needToFindCappy":
+//			waitthread global/ObjMgr.scr::RevealObj "getBriefed"
+//			break
+
+		case "gotBriefing":
+//			waitthread global/ObjMgr.scr::CompleteObj "getBriefed"
+			waitthread global/ObjMgr.scr::RevealObj "crossCanal"
+			waitthread global/ObjMgr.scr::RevealObj "freeBrits"
+//			waitthread global/ObjMgr.scr::RevealObj "takeFort"
+//			waitthread global/ObjMgr.scr::RevealObj "meetKlaus"
+			break
+
+		case "crossedCanal":
+			waitthread global/ObjMgr.scr::CompleteObj "crossCanal"
+			break
+
+		case "freedBrits":
+			waitthread global/ObjMgr.scr::CompleteObj "freeBrits"
+			waitthread global/ObjMgr.scr::RevealObj "takeFort"
+			break
+
+		case "tookFort":
+			waitthread global/ObjMgr.scr::RevealObj "meetKlaus"
+			waitthread global/ObjMgr.scr::CompleteObj "takeFort"
+			break
+
+		case "metKlaus":
+			waitthread global/ObjMgr.scr::CompleteObj "meetKlaus"
+			waitthread global/ObjMgr.scr::RevealObj "protectKlaus"
+			break
+
+//		case "klausStartedPickingLock":
+//			waitthread global/ObjMgr.scr::RevealObj "protectKlaus"
+//			break
+//
+//		case "klausPickedLock":
+//			waitthread global/ObjMgr.scr::CompleteObj "protectKlaus"
+//			break
+
+		case "escaped":
+			waitthread global/ObjMgr.scr::CompleteObj "protectKlaus"
+//			waitthread global/ObjMgr.scr::CompleteObj "escapeCity"
+			break
+	}
+
+end
+
+
+catchup local.key:		// catch up to the event specified (used for section warping)
+
+	println ("Objective catchup = " + local.key)
+
+	switch (local.key)
+	{
+		case "needToFindCappy":
+			waitthread global/ObjMgr.scr::RevealObj "getBriefed"
+			break
+
+		case "gotBriefing":
+			thread global/ObjMgr.scr::CatchUpObjs "getBriefed" "crossCanal" "freeBrits" "takeFort" "meetKlaus"
+			break
+
+		case "crossedCanal":
+			thread global/ObjMgr.scr::CatchUpObjs "crossCanal" "freeBrits" "takeFort" "meetKlaus"
+			break
+
+		case "freedBrits":
+			thread global/ObjMgr.scr::CatchUpObjs "freeBrits" "takeFort" "meetKlaus"
+			break
+
+		case "tookFort":
+			thread global/ObjMgr.scr::CatchUpObjs "takeFort" "meetKlaus"
+			break
+
+		case "metKlaus":
+			thread global/ObjMgr.scr::CatchUpObjs "meetKlaus"		// "escapeCity"
+			break
+
+		case "klausStartedPickingLock":
+			thread global/ObjMgr.scr::CatchUpObjs "meetKlaus" "protectKlaus"		// "escapeCity"
+			break
+
+		case "klausPickedLock":
+			thread global/ObjMgr.scr::CatchUpObjs "protectKlaus"		// "escapeCity"
+			break
+
+		case "escaped":
+			//thread global/ObjMgr.scr::CatchUpObjs "escapeCity"
+			break
+	}
+
+end
+
+

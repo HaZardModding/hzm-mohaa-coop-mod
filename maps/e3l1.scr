@@ -1,0 +1,218 @@
+//=========================================================================
+main: {
+//=========================================================================
+	level.farDist = 2200
+	level.fogBias = 1000
+	level.fogColor = ( .25 .26 .28 )
+
+	exec global/auto.scr e3l1
+	exec global/ambience.scr e3l1
+	exec global/fogtrigger.scr
+
+	level waittill prespawn
+	level.nodrophealth = 1
+	level.nodropweapons = 1
+
+	thread maps/e3l1/Planes.scr::InitPlanes // this is just a stub thread
+	thread maps/e3l1/Intro.scr::InitIntro
+ 	thread maps/e3l1/BritHQ.scr::InitBritHQ
+	thread maps/e3l1/JeepRidePart1.scr::InitJeepRidePart1
+	thread maps/e3l1/JeepStuck.scr::InitJeepStuck
+	thread maps/e3l1/JeepRidePart3.scr::InitJeepRidePart3
+	thread maps/e3l1/Courtyard.scr::InitCourtyard
+	thread maps/e3l1/AfterSnipers.scr::InitAfterSnipers
+
+	exec global/door_locked.scr
+	exec global/cabinet.scr
+
+	thread startMusic_e3l1_main
+	waitthread InitLevel
+
+	// this is used for player health scaling
+	level.playerHealthScale = 1.0
+	level waittill spawn
+
+	waitexec maps/e3l1/hacks.scr
+	
+	//intro and find hq
+	waitthread global/objectives.scr::add_objectives level.objBritHQ 2
+	waitthread global/objectives.scr::current_objectives level.objBritHQ
+	waitthread maps/e3l1/Intro.scr::DoIntro
+	waitthread maps/e3l1/BritHQ.scr::DoObjectiveFindBritHQ	
+	waitthread global/objectives.scr::add_objectives level.objBritHQ 3
+
+	//get on the jeep
+	waitthread global/objectives.scr::add_objectives level.objEscortMedic 2
+	waitthread global/objectives.scr::current_objectives level.objEscortMedic
+	waitthread maps/e3l1/BritHQ.scr::DoObjectiveGetOnJeep
+
+	//do the ride
+	waitthread global/objectives.scr::add_objectives level.objEscortMedic 2 level.escortstring $pinnedbrit01
+	waitthread global/objectives.scr::current_objectives level.objEscortMedic
+	waitthread maps/e3l1/BritHQ.scr::CleanupIntro
+	// waitthread maps/e3l1/BritHQ.scr::CleanupBritHQ
+	waitthread maps/e3l1/JeepRidePart1.scr::DoMedicRide
+	waitthread maps/e3l1/JeepRidePart1.scr::CleanupJeepRidePart1
+	// waitthread maps/e3l1/JeepStuck.scr::CleanupJeepStuck
+	waitthread maps/e3l1/Courtyard.scr::DoObjectiveMedicReachGoal
+	waitthread global/objectives.scr::add_objectives level.objEscortMedic 3
+	waitthread global/objectives.scr::add_objectives level.objSnipers 2
+	waitthread global/objectives.scr::current_objectives level.objSnipers
+	
+	if(level.skipobjSnipers != 1) {
+		waitthread maps/e3l1/Courtyard.scr::DoObjectiveSnipers
+	}
+	else {
+		$player.origin = $medicworkrunto.origin - (0 20 0)
+	}
+
+	local.objectiveString = "Eliminate Snipers"
+	waitthread global/objectives.scr::add_objectives level.objPIAT 2
+	waitthread global/objectives.scr::current_objectives level.objPIAT	
+	waitthread global/objectives.scr::add_objectives level.objSnipers 2 local.objectiveString $pinnedbrit04.origin
+	waitthread global/objectives.scr::add_objectives level.objSnipers 3
+	waitthread maps/e3l1/AfterSnipers.scr::DoObjectiveReturn
+
+	//get the munitions	
+	if(level.skipobjGetPIAT != 1) {
+		waitthread maps/e3l1/AfterSnipers.scr::DoObjectiveGetPIAT
+	}
+
+	waitthread global/objectives.scr::add_objectives level.objPIAT 3
+	
+	//begin the escort
+	waitthread global/objectives.scr::add_objectives level.objCity 2
+	waitthread global/objectives.scr::current_objectives level.objCity	
+	
+	//no longer an objective, but still full of crunchy goodness	
+	if(level.skipobjDestroyTank != 1) {
+		waitthread maps/e3l1/AfterSnipers.scr::DoObjectiveDestroyTank
+	}
+
+	if(level.skipobjGoToCity != 1) {
+		waitthread maps/e3l1/AfterSnipers.scr::DoObjectiveGoToCity
+	}
+	
+	//update objectives
+	waitthread global/objectives.scr::add_objectives level.objCity 3
+	waitthread maps/e3l1/JeepRidePart1.scr::CleanupJeepRidePart3
+	waitthread maps/e3l1/Courtyard.scr::CleanupCourtyard
+	waitthread maps/e3l1/AfterSnipers.scr::CleanupAfterSnipers
+	wait 1.5
+
+	$nextleveltrigger waittill trigger
+
+	//end level
+	exec global/missioncomplete.scr e3l2 1
+}end
+
+//=========================================================================
+Fadein: {
+//=========================================================================
+	$player physics_off
+	exec global/fadein.scr
+	waitframe
+
+	waitthread global/fadein.scr::DoFadeIn e3l1_1 e3l1_2 e3l1_3 NIL 1
+	$player.viewangles = "0 3 0"  //undo any mousemovment during the hud stuff
+}end
+
+//=========================================================================
+Briefing: {
+//=========================================================================
+	/*
+	$player playsound dfr_E3L3_MOR01 wait
+	$player waittill sounddone
+	$player playsound dfr_E3L3_MOR02 wait
+	$player waittill sounddone
+	*/
+	$player physics_on
+}end
+
+//=========================================================================
+InitLevel: {
+//=========================================================================
+	level.script = "maps/e3l1.scr"
+	//level.music  = ""
+	waitthread InitPlayer
+	// waitthread InitLights
+	setcvar g_mission 3
+
+	level.autosave = 1
+	exec global/autosave.scr level.autosave	//"Starting"
+	level.autosave++
+}end
+
+//=========================================================================
+InitPlayer: {
+//=========================================================================
+	$player heal 1
+	waitthread ArmPlayer
+	waitthread Fadein
+	waitthread Briefing
+	waitthread GiveObjectives
+}end
+
+//=========================================================================
+ArmPlayer: {
+//=========================================================================
+	waitexec global/loadout.scr
+	waitthread global/items.scr::blank_items 
+}end
+
+// This adjusts the players health to tweak difficulty during jeep ride
+//=========================================================================
+SetPlayerHealthScale local.scale: {
+//=========================================================================
+	//	iprintln "setting player health scale to " local.scale
+	//	iprintln "   old health: " $player.health ", old maxhealth: " $player.max_health
+
+	$player healthonly ($player.health / level.playerHealthScale)
+	$player.max_health = ($player.max_health / level.playerHealthScale)
+
+	$player.max_health = $player.max_health * local.scale
+	$player healthonly ($player.health * local.scale)
+		
+	//	iprintln "   new health: " $player.health ", new max_health: " $player.max_health
+	level.playerHealthScale = local.scale
+}end
+
+//=========================================================================
+InitLights: {
+//=========================================================================
+	waitexec maps/e3l1/light_e3l1.scr
+}end
+
+//=========================================================================
+GiveObjectives: {
+//=========================================================================
+	level.hqstring = "Report to the British Field HQ"
+	level.escortstring = "Escort the Medic to the British Wounded"
+	level.sniperstring = "Eliminate Snipers [3 Remaining]"
+	level.piatstring = "Retrieve Munitions from the Supply House"
+	level.citystring = "Escort the Wounded Out of the Area"
+	
+	level.objBritHQ = 1
+	level.objEscortMedic = 2
+	level.objSnipers = 3
+	level.objPIAT = 4
+	level.objCity = 5
+
+	waitthread global/objectives.scr::add_objectives level.objBritHQ 1 level.hqstring $commander.origin
+	waitthread global/objectives.scr::add_objectives level.objEscortMedic 1 level.escortstring $medic
+	waitthread global/objectives.scr::add_objectives level.objSnipers 1 level.sniperstring $sniper1.origin
+	waitthread global/objectives.scr::add_objectives level.objPIAT 1 level.piatstring $pinnedbrit04.origin
+	waitthread global/objectives.scr::add_objectives level.objCity 1 level.citystring $nextleveltrigger.origin
+}end
+
+//=========================================================================
+DoubleParadeDone: {
+//=========================================================================
+}end
+
+//=========================================================================
+startMusic_e3l1_main: {
+//=========================================================================
+	$player stufftext "tmstop; tmstartloop sound/music/E2L2_Road_to_Tobruk.mp3; tmvolume 2"
+	//	$player stufftext "tmvolume 2"
+}end

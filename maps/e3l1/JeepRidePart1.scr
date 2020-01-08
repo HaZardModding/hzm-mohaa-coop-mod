@@ -1,0 +1,603 @@
+//=========================================================================
+InitJeepRidePart1: {
+//=========================================================================
+	level.rideDone = 0
+	level.firstParadeDuration = 25
+
+	$jeep nodamage
+	$jeep lock
+	$jeep setcollisionentity $jeepcollide
+	$medic nodamage
+
+	$bridgetank.speed					= 200
+	$bridgetank.accel					= 50
+	// $bridgetank.visiblebeforedrive				= 1
+	// $bridgetank.takedamage					= 0
+	// $bridgetank.target = $bridgetankpath
+	$bridgetank waitthread global/autotank.scr::init_autotanks
+	// $bridgetank rendereffects "+growradius"
+	$bridgetank_turret0 svflags "+broadcast"
+	// $bridgetank_turret0 rendereffects "+growradius"
+	
+	level.bridgeparadetrigger = waitthread global/FindTrigger.scr::FindTrigger "bridgeparadetrigger"
+}end
+
+//=========================================================================
+CleanUpIntro: {
+//=========================================================================
+	if($jeeptrigger) {
+		$jeeptrigger waittill trigger
+	}
+
+	//iprintln "CLEANUPINTRO"
+
+	if($deleteguy[1]) {
+		thread global/EntityCleanup.scr::EntityCleanup $deleteguy[1].targetname 1500
+	}
+
+	if($tunneltruckguys[1]) {
+		thread global/EntityCleanup.scr::EntityCleanup $tunneltruckguys[1].targetname 1500
+	}
+
+	if($ambushinvestigators[1]) {
+		thread global/EntityCleanup.scr::EntityCleanup $ambushinvestigators[1].targetname 1500
+	}
+
+	if($ambushgunners[1]) {
+		thread global/EntityCleanup.scr::EntityCleanup $ambushgunners[1].targetname 1500
+	}
+
+	if($ambushgunner[1]) {
+		thread global/EntityCleanup.scr::EntityCleanup $ambushgunner[1].targetname 1500
+	}
+	
+	wait 5.0
+	//	iprintln "AFTERCLEANUPPART 1"
+
+	if($aagun) {
+		thread global/EntityCleanup.scr::EntityCleanup $aagun[1].targetname 1500
+	}
+
+	if($commander[1]) {
+		thread global/EntityCleanup.scr::EntityCleanup $commander[1].targetname 1500
+	}
+
+	if($friendly[1]) {
+		thread global/EntityCleanup.scr::EntityCleanup $friendly[1].targetname 1500
+	}
+
+	if($campguy2nd[1]) {
+		thread global/EntityCleanup.scr::EntityCleanup $campguy2nd[1].targetname 1500
+	}
+
+	if($alliedcampparade2ndorigin) {
+		$alliedcampparade2ndorigin waitthread global/parade.scr::DeleteParade 100
+	}
+}end
+
+//=========================================================================
+CleanupIntro2: {
+//=========================================================================
+	if($introemitter) {
+		$introemitter delete
+	}
+
+	if($campemitter) {
+		for(local.i = 1; local.i <= $campemitter.size; local.i++) {
+			$campemitter[local.i] delete
+		}
+	}
+	
+	if($deleteguy) {
+		for(local.i = 1; local.i <= $deleteguy.size; local.i++) {
+			$deleteguy[local.i] delete
+		}
+	}
+
+	if($tunneltruckguys) {
+		for(local.i = 1; local.i <= $tunneltruckguys.size; local.i++) {
+			$tunneltruckguys[local.i] delete
+		}
+	}
+
+	if($ambushinvestigators) {
+		for(local.i = 1; local.i <= $ambushinvestigators.size; local.i++) {
+			$ambushinvestigators[local.i] delete
+		}
+	}
+	
+	if($ambushgunners) {
+		for(local.i = 1; local.i <= $ambushgunners.size; local.i++) {
+			$ambushgunners[local.i] delete
+		}
+	}
+
+	if($ambushgunner) {
+		for(local.i = 1; local.i <= $ambushgunner.size; local.i++) {
+			$ambushgunner[local.i] delete
+		}
+	}
+
+	if($commander) {
+		$commander delete
+	}
+
+	if($campguy2nd) {
+		for(local.i = 1; local.i <= $campguy2nd.size; local.i++) {
+			$campguy2nd[local.i] delete
+		}
+	}
+
+	if($friendly) {
+		for(local.i = 1; local.i <= $friendly.size; local.i++) {
+			$friendly[local.i] delete
+		}
+	}
+}end
+
+//=========================================================================
+DoMedicRide: {
+//=========================================================================
+	if (level.skipobjMedicReachGoal == 1) {
+		end
+	}
+
+	/*
+	$medic.position = crouch
+	$medic setanim A_22_driving_idle 1
+	$medic setmotionanim A_22_driving_idle
+	$medic setactionanim A_22_driving_idle -60 60
+	*/
+	
+	$bridgetank waitthread global/autotank.scr::StartAutoTank
+	$jeep nodamage
+
+	// Set the players health scale based upon difficulty level
+	switch ( level.skill ) {
+		case 0:
+			local.healthScale = 3.0
+			break
+		case 1:
+			local.healthScale = 2.0
+			break
+		case 2:
+			local.healthScale = 1.4
+			break
+		default:
+			local.healthScale = 2.0
+	}
+
+	waitthread maps/e3l1.scr::SetPlayerHealthScale local.healthScale
+	$player immune vehicle
+	wait 1.5
+	
+	thread driverTurnStraight
+	$jeep driveNoWait $jeeppath 200 100 200 156
+	//wait 3
+	wait 8
+
+	local.bridgeplanetrigger = waitthread global/FindTrigger.scr::FindTrigger "bridgeplanetrigger"
+	trigger local.bridgeplanetrigger
+	$player nodamage
+	wait 3.5
+	
+	$bridgetank fullstop
+	$bridgetank waitthread global/autotank.scr::KillMe
+	$player takedamage
+	trigger level.bridgeparadetrigger
+
+	//	$bridgetank remove
+	$medic waitthread global/loopanim.scr::LoopAnimStop
+
+	// TEMP VO
+	//iprintln "(DFRUS_E3L1_PW2312) Holy smokes! There goes our escort, look like we'll have to take the long way around."
+
+	$medic.direction = 5  // : Talking
+	//	$medic thread global/loopanim.scr::LoopAnim A_22_driver_idle
+
+	$medic upperanim A_31_MedTalk_04
+	$medic waittill upperanimdone
+	$medic.direction = 3
+	$medic anim A_22_driver_idle
+	$medic.direction = 3 // : stopped
+
+	thread driverStopped
+	wait 3
+
+	thread CleanUpIntro
+	$jeep driveNoWait $jeepturnone  80 40 200 156
+	thread CleanupIntro2
+	thread driverTurnLeft $jeep
+	wait 4 // 6
+
+	$medic anim A_22_driver_idle
+	$medic.direction = 3 // : stopped
+	$jeep driveNoWait $jeepturntwo -60 20 20 20
+	thread driverTurnRight $jeep
+	wait 4 // 6
+	
+	$jeep driveNoWait $roadpath 300 350 200 156
+	wait 3.0
+
+	thread driverTurnLeft $jeep
+	// ADD BACK IN WHEN ANIMATION IS FIXED BY JAMAAL
+	// $jeep anim A_22_willys_gearshift
+	$medic anim A_22_Gearshift
+	$medic waittill animdone
+	thread driverTurnStraight $jeep
+	wait 5.0
+
+	thread CleanupJeepRidePart1
+	//	$medic thread global/loopanim.scr::LoopAnim 
+	$medic anim A_22_driver_idle
+	$medic.direction = 3 // : stopped
+	thread driverStopped
+	wait 1.5 // NOT THE WAY TO DO THIS, SHOULD HAVE TRIGGER
+
+	$medic thread global/loopanim.scr::LoopAnimStop
+	// $jeep waittill drive
+	wait 3.5 // Done instead of the animation to fill time
+	
+	// -----------------------------------------------------------------
+	// Temp VO
+	//	iprintln "(VO) I'm going to move into position so you can give these boys some assistance."
+	//	$medic upperanim A_31_MedTalk_05
+	//	$medic waittill upperanimdone
+	// $medic thread global/loopanim.scr::LoopAnimStop
+	// -----------------------------------------------------------------
+	
+	waitthread firstParade
+	thread driverTurnStraight $jeep
+
+	$jeep driveNoWait $citypath 200 50 200 156
+	thread CleanUpandStartWoundedGuy
+	thread AutoSaveBeforeWoundedGuy
+	$jeep waittill drive
+
+	// thread maps/e3l1/BritHQ.scr::medicIdleAnim
+	waitthread maps/e3l1/jeepstuck.scr::main
+
+	// JUST TOOK OUT 8/1/03
+	// thread maps/e3l1/BritHQ.scr::medicDriveAnim
+	$jeep drive $jeepcontinue 200 50 200 256
+	while (level.rideDone == 0)	{ waitframe }
+
+	//Let the medic handle his business
+	$medic thread maps/e3l1/JeepRidePart3.scr::GetOutAndHide
+	thread maps/e3l1/JeepRidePart3.scr::WaitToGetOutOfJeep
+}end
+
+// This was implemented so that the autosave would not happen at the same time as dialogue
+//=========================================================================
+AutoSaveBeforeWoundedGuy: {
+//=========================================================================
+	level.pillar1 triggerable
+	level.pillar2 triggerable
+
+	level.jeepstucktrigger triggerable
+	level.jeepstuck2trigger triggerable
+
+	level.pillar1 takedamage
+	level.pillar2 takedamage
+
+	level.jeepstucktrigger takedamage
+	level.jeepstuck2trigger takedamage
+
+	level.pillar1 thread maps/e3l1/JeepStuck.scr::triggerwatch2
+	level.pillar2 thread maps/e3l1/JeepStuck.scr::triggerwatch2
+
+	level.jeepstucktrigger thread maps/e3l1/JeepStuck.scr::triggerwatch2
+	level.jeepstuck2trigger thread maps/e3l1/JeepStuck.scr::triggerwatch2
+
+	$jeeponmildcurve3 waittill trigger
+	exec global/autosave.scr level.autosave	//Wounded soldier
+	level.autosave++
+
+	thread maps/e3l1/JeepStuck.scr::WarningShot
+}end
+
+//=========================================================================
+CleanUpandStartWoundedGuy: {
+//=========================================================================
+	if($deletenow) {
+		$deletenow waittill trigger
+	}
+
+	thread maps/e3l1/JeepStuck.scr::handleWoundedWonder
+}end
+
+//=========================================================================
+firstParade:{
+//=========================================================================
+	//waitthread medicTakeCover
+	$medic.direction = 3 // stopped
+	$medic thread global/loopanim.scr::LoopAnimStop
+	$medic anim A_22_driver_cover
+	$medic waittill animdone 
+	$medic thread global/loopanim.scr::LoopAnim A_22_driver_coveridle
+
+	waitthread BarrierDestroyed
+	// wait level.firstParadeDuration
+
+	$medic thread global/loopanim.scr::LoopAnimStop
+	$medic anim A_22_driver_coverdone
+	$medic waittill animdone 
+	$medic.direction = 2 // stopped
+	//waitthread medicStopCover
+}end
+
+//=========================================================================
+BarrierDestroyed: {
+//=========================================================================
+	if(!$ObjectiveAimatBarricade) {
+		spawn script_object targetname "ObjectiveAimatBarricade"
+		$ObjectiveAimatBarricade.origin = (4398 1531 177)
+	}
+	else {
+		$ObjectiveAimatBarricade.origin = (4398 1531 177)
+	}
+		
+	waitthread global/objectives.scr::add_objectives level.objEscortMedic 2 level.escortstring $ObjectiveAimatBarricade
+	waitthread global/objectives.scr::current_objectives level.objEscortMedic
+	thread IfYouDontKillItWeWill // this thread will wait then spawn a guy to destroy the barricade
+
+	while($crate_barrier) {
+		waitframe
+	}
+
+	waitthread global/objectives.scr::add_objectives level.objEscortMedic 2 level.escortstring $pinnedbrit04
+	waitthread global/objectives.scr::current_objectives level.objEscortMedic
+	$ObjectiveAimatBarricade remove
+}end
+
+//=========================================================================
+IfYouDontKillItWeWill: {
+//=========================================================================
+	wait 60.0 // 120 for rest of time
+
+	if(!$crate_barrier) {
+		end
+	}
+
+	local.i = 0
+
+NaziBarrierDestroyer:
+	if(!$BarricadeBazookaGuyStart) {
+		spawn script_origin targetname "BarricadeBazookaGuyStart"
+		$BarricadeBazookaGuyStart.origin = (2195 2574 116)
+	}
+	
+	if(!$BarricadeBazookaGuyShootLoc) {
+		spawn script_origin targetname "BarricadeBazookaGuyShootLoc"
+		$BarricadeBazookaGuyShootLoc.origin = (3258 1986 114)
+	}
+	
+	local.guy = spawn "models/human/german_waffenss_shutze" targetname "BarricadeBazookaGuy" origin $BarricadeBazookaGuyStart.origin
+	local.guy gun "panzerschrek"
+	local.guy.accuracy = 100
+	local.guy exec global/disable_ai.scr
+	local.guy runto $BarricadeBazookaGuyShootLoc.origin
+	local.guy waittill movedone
+
+	while(local.guy && isalive local.guy && $crate_barrier[1]) {
+			local.guy exec global/aimat.scr $crate_barrier[1]
+			local.guy setaimtarget $crate_barrier[1]
+			wait 0.5
+
+			local.guy waitthread global/improvedshootatloop.scr::start $crate_barrier[1] NIL 1
+	}
+	
+	if($crate_barrier) {
+		local.i++
+		goto NaziBarrierDestroyer
+	}
+
+	local.guy exec global/enable_ai.scr
+}end
+
+
+//----------------------------------------------------------------------
+//animations for Medic the Anti-Healer 
+//	Going to Switch to single number comparisons for direction
+//  0: left
+//  1: right
+//  2: straight
+//  3: stopped
+//  4: Go out
+//  5: Talking
+//----------------------------------------------------------------------
+
+//=========================================================================
+driverTurnLeft local.triggerer: {
+//=========================================================================
+	if($medic.direction == 5) {
+		end
+	}
+
+	// $medic thread global/loopanim.scr::LoopAnimStop
+	$medic anim A_22_driver_turnleft
+	$medic waittill animdone
+	// $medic anim A_22_driver_turnleft_idle
+	$medic.direction = 0
+
+	while($medic.direction == 0 && level.medicGo != 1) {
+		$medic anim A_22_driver_turnleft_idle
+		$medic waittill animdone
+	}
+
+	//	$medic thread global/loopanim.scr::LoopAnim A_22_driver_turnleft_idle
+	//	thread WaitToGoStraight
+
+	if(self) {
+		self remove
+	}
+}end
+
+//=========================================================================
+driverStopped: {
+//=========================================================================
+	if($medic.direction == 5) {
+		end
+	}
+
+	/*
+	if(level.woundedInJeep == 1)
+		{
+			if(self.classname == "trigger")
+				self remove
+			END	
+		}
+	*/
+
+	$medic thread global/loopanim.scr::LoopAnimStop
+	
+	switch($medic.direction){
+		case 0:
+			$medic anim A_22_driver_turnstraight_fromleft
+			break
+		case 1:
+			$medic anim A_22_driver_turnstraight_fromright
+			break
+		default:
+			//	iprintln "DEFAULT"
+			$medic anim A_22_driving_idle
+			break		
+	}
+
+	$medic.direction = 3
+	$medic waittill animdone
+	//	$medic anim A_22_driving_idle
+
+	while($medic.direction == 3 && level.medicGo != 1) {
+		$medic anim A_22_driving_idle
+		$medic waittill animdone
+	}
+
+	if(self) {
+		self remove
+	}
+}end
+
+//=========================================================================
+driverTurnRight local.triggerer: {
+//=========================================================================
+	if($medic.direction == 5) {
+		end
+	}
+
+	//if(local.triggerer.targetname != "jeep")
+	//	End
+
+	$medic thread global/loopanim.scr::LoopAnimStop
+	$medic anim A_22_driver_turnright
+    $medic waittill animdone
+    $medic.direction = 1
+	//	$medic anim A_22_driver_turnright_idle
+
+	while($medic.direction == 1 && level.medicGo != 1) {
+		$medic anim A_22_driver_turnright_idle
+		$medic waittill animdone
+	}
+
+	//	$medic thread global/loopanim.scr::LoopAnim A_22_driver_turnright_idle
+	//	thread WaitToGoStraight
+
+	if(self) {
+		self remove
+	}
+}end
+
+//=========================================================================
+WaitToGoStraight: {
+//=========================================================================
+	// iprintln $medic.position
+	local.direction = $medic.direction
+	wait 3.0
+
+	if($medic.direction != 2 && local.direction != $medic.direction){
+		waitthread driverDriveStraight $jeep	
+	}
+}end
+
+//=========================================================================
+driverTurnStraight local.triggerer: {
+//=========================================================================
+	if($medic.direction == 5) {
+		end
+	}
+
+	//if(local.triggerer.targetname != "jeep")
+	//	End
+	//iprintln $medic.position
+
+	if(level.woundedInJeep == 1) {
+		if(self.classname == "trigger") {
+			self remove
+		}
+		end	
+	}
+
+	$medic thread global/loopanim.scr::LoopAnimStop
+	
+	switch($medic.direction){
+		case 0:
+			$medic anim A_22_driver_turnstraight_fromleft
+			break
+		case 1:
+			$medic anim A_22_driver_turnstraight_fromright
+			break
+		default:
+			//	iprintln "DEFAULT"
+			$medic anim A_22_driving_idle
+			break		
+	}
+
+	$medic.direction = 2
+	$medic waittill animdone
+	//	$medic anim A_22_driving_idle
+
+	while($medic.direction == 2 && level.medicGo != 1){
+		$medic anim A_22_driving_idle
+		$medic waittill animdone
+	}
+
+	if(self) {
+		self remove
+	}
+}end
+
+//=========================================================================
+driverStopDriving: {
+//=========================================================================
+	$medic thread global.loopanim.scr::LoopAnimStop
+}end
+
+//=========================================================================
+CleanupJeepRidePart1: {
+//=========================================================================
+	if($jeeppassengertarget) {
+		$jeeppassengertarget connect_paths
+		$jeeppassengertarget remove
+	}
+
+	if($jeepcrashcollide) {
+		$jeepcrashcollide connect_paths
+		$jeepcrashcollide remove
+	}
+
+	if($bridgetank_turret0) {
+		$bridgetank_turret0 connect_paths
+		$bridgetank_turret0 remove
+	}
+
+	if($bridgetank_damaged_turret) {
+		$bridgetank_damaged_turret connect_paths
+		$bridgetank_damaged_turret remove
+	}
+	wait 1.0
+
+	if($bridgetank) {
+		$bridgetank connect_paths
+		$bridgetank remove
+	}
+}end

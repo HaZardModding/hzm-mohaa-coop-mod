@@ -1,0 +1,527 @@
+//============================================================================
+init: {
+//============================================================================
+	//The bikes will take off when these triggers go off
+	$Bike1Go_Trigger thread GoBike1
+	$Bike2Go_Trigger thread GoBike2
+	$Bike3Go_Trigger thread GoBike3	
+
+	$bike_crash thread BikeCrash
+
+	//Main trigger for all bike animations
+	$bike_anim thread DoBikeAnim
+
+	$bike10 hide
+	$bike10.doRadiusDmg = 1
+}end
+
+//============================================================================
+GoBike1: {
+//============================================================================
+	$bike1 hide
+	
+	self waittill trigger		
+
+	$bike1.removeMe = 1
+	$bike1 thread GoBike $bike1path "wheelie"	
+}end
+
+//============================================================================
+GoBike2: {
+//============================================================================
+	$bike2 hide
+
+	self waittill trigger
+	
+	$bike2.removeMe = 1
+	$bike2 thread GoBike $bike2path "fish_tail"
+}end
+
+//============================================================================
+GoBike3: {
+//============================================================================
+	$bike3 hide
+	
+	self waittill trigger
+	
+	$bike3.removeMe = 1
+	$bike3 thread GoBike $bike3path "wheelie"
+}end
+
+//============================================================================
+GoBike10: {
+//============================================================================
+	$bike10.removeMe = 0
+	$bike10 thread GoBike $bike10_path
+}end
+
+//============================================================================
+BikeCrash: {
+//============================================================================
+	self waittill trigger	
+	
+	if( parm.other == $bike1 || parm.other == $bike2 || parm.other == $bike3 || parm.other == $bike10 ) {		
+		local.bike = parm.other		
+		local.bike damage $world 99999 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	}
+	else {
+		self thread BikeCrash
+	}
+}end
+
+//============================================================================
+bikedeath: {
+//============================================================================
+	while( self != NULL && self.health > 0 ) {
+		wait 0.1
+	}
+
+	if( self != NULL && self.health <= 0 ) {	
+		self thread bikeExplode	
+	}
+}end
+
+//============================================================================
+doBikeRider local.bike: {
+//============================================================================
+	self turnto NULL
+	self lookat NULL
+	self rendereffects "-shadow"
+	self gun "beretta"
+	self physics_off
+	self exec global/disable_ai.scr
+	self angles ( 0 0 0 )		
+	self attach local.bike driver 1
+	wait 2.0
+}end
+
+//============================================================================
+GoBike local.path local.start_anim: {
+//============================================================================
+	if( local.start_anim == NULL || local.start_anim == NIL ) {
+		local.start_anim = "lean_forward"
+	}
+	
+	//Setup bike 1
+	self.toss = 1	
+	self.rider = spawn "models/human/Sc_AX_Ital_Inf.tik"
+	self.rider thread doBikeRider self	
+	self show
+	self solid
+	self takedamage
+	self health 3000
+	self touchtriggers	
+
+	//Wait till the bike dies
+	self thread bikedeath	
+	
+	//Start the bike along it's path
+	self followpath local.path //200 200 256		
+	self loopsound bmwbike_snd_run	
+	self move
+	self thread PlayAnim local.start_anim					
+	self waitmove	
+	
+	//remove myself
+	if( self != NIL && self != NULL && self.removeMe == 1 ) {			
+		self.rider remove
+		self remove
+	}
+}end
+
+//============================================================================
+DoBikeAnim: {
+//============================================================================
+	self waittill trigger
+
+	if( parm.other == $bike1 || parm.other == $bike2 || parm.other == $bike3 ) {		
+		local.bike = parm.other
+		local.bike thread PlayAnim self.animname		
+	}
+	else {
+		self thread DoBikeAnim
+	}
+}end
+
+//============================================================================
+PlayAnim local.animname: {
+//============================================================================
+	switch( local.animname ) {
+		case "lean_forward":
+			self anim bmwbike_lean_forward				
+			self.rider anim bmwbike_lean_forward
+			self.rider waittill animdone			
+			self.rider anim bmwbike_idle
+			break
+
+		case "lean_back":
+			self anim bmwbike_lean_back
+			self.rider anim bmwbike_lean_back
+			self.rider waittill animdone
+			self.rider anim bmwbike_idle
+			break  
+
+		case "skid_left":
+			self anim bmwbike_skid_left
+			self.rider anim bmwbike_skid_left				
+			self.rider waittill animdone
+			self.rider anim bmwbike_idle
+			break
+
+		case "skid_right":
+			self anim bmwbike_skid_right
+			self.rider anim bmwbike_skid_right							
+			self.rider waittill animdone
+			self.rider anim bmwbike_idle
+			break
+			
+		case "fish_tail":
+			self anim bmwbike_skid_right
+			self.rider anim bmwbike_skid_right
+			self.rider waittill animdone
+			self anim bmwbike_skid_left
+			self.rider anim bmwbike_skid_left
+			self.rider waittill animdone
+			self.rider anim bmwbike_idle
+			break
+
+		case "roughpatch":
+			self anim bmwbike_roughpatch
+			self.rider anim bmwbike_roughpatch
+			self.rider waittill animdone
+			self.rider anim bmwbike_idle
+			break
+
+		case "wheelie":			
+			self anim bmwbike_wheelie
+			self.rider anim bmwbike_wheelie			
+			self.rider waittill animdone
+			self.rider anim bmwbike_idle
+			break
+
+		case "shallow_right":
+			self anim bmwbike_shallow_right
+			self.rider anim bmwbike_shallow_right
+			self.rider waittill animdone
+			self.rider anim bmwbike_idle
+			break
+
+		case "shallow_left":
+			self anim bmwbike_shallow_right
+			self.rider anim bmwbike_shallow_right
+			self.rider waittill animdone
+			self.rider anim bmwbike_idle
+			break		
+
+		case "aim_0":
+			self.rider anim bmwbike_draw_0
+			self.rider waittill animdone
+			self.rider anim bmwbike_aim_0
+			self thread FireShots $player 
+			break
+
+		case "holster_0":
+			self.rider anim bmwbike_holster_0
+			self.rider waittill animdone
+			break
+
+		case "aim_n90":			
+			self.rider anim bmwbike_draw_n90
+			self.rider waittill animdone
+			self.rider anim bmwbike_aim_n90
+			self thread FireShots $player 
+			break
+
+		case "holster_n90":
+			self.rider anim bmwbike_holster_n90
+			break
+
+		case "aim_p90":
+			self.rider anim bmwbike_draw_p90	
+			self.rider waittill animdone
+			self.rider anim bmwbike_aim_p90					
+			self thread FireShots $player 
+			break
+
+		case "holster_p90":
+			self.rider anim bmwbike_holster_p90
+			self.rider waittill animdone
+			break
+
+		case "aim_p45":
+			self.rider anim bmwbike_draw_p45
+			self.rider waittill animdone
+			self.rider anim bmwbike_aim_p45
+			self thread FireShots $player 
+			break
+
+		case "holster_p45":
+			self.rider anim bmwbike_holster_p45
+			self.rider waittill animdone
+			break
+
+		case "aim_n45":
+			self.rider anim bmwbike_draw_n45	
+			self.rider waittill animdone
+			self.rider anim bmwbike_aim_n45
+			self thread FireShots $player 
+			break
+		
+		case "holster_n45":
+			self.rider anim bmwbike_holster_n45
+			self.rider waittill animdone
+			break
+		
+		case "aim_p90_to_p45":
+			self.rider anim bmwbike_aim_p90_to_p45
+			self thread FireShots $player 
+			break
+
+		case "aim_p45_to_0":
+			self.rider anim bmwbike_aim_p45_to_0
+			self thread FireShots $player 
+			break
+
+		case "aim_0_to_n45":
+			self.rider anim bmwbike_aim_0_to_n45
+			self thread FireShots $player 
+			break
+
+		case "aim_n45_to_n90":
+			self.rider anim bmwbike_aim_n45_to_n90
+			self thread FireShots $player 
+			break
+
+		case "aim_n90_to_n45":
+			self.rider anim bmwbike_aim_n90_to_n45
+			self thread FireShots $player 
+			break
+
+		case "aim_n45_to_0":
+			self.rider anim bmwbike_aim_n45_to_0
+			self thread FireShots $player 
+			break
+
+		case "aim_0_to_p45":
+			self.rider anim bmwbike_aim_0_to_p45
+			self thread FireShots $player 
+			break
+
+		case "aim_p45_to_p90":
+			self.rider anim bmwbike_aim_p45_to_p90
+			self thread FireShots $player 
+			break
+	}
+}end
+
+//============================================================================
+FireShots local.target local.numShots: {
+//============================================================================
+	if( self != NULL && !isAlive self.rider ) {
+		end
+	}
+		
+	if( local.numShots == NULL || local.numShots == NIL ) {
+		local.numShots = 8
+	}
+	
+	for( local.i = 0; local.i < local.numShots; local.i++ ) {		
+		if( self != NULL && !isAlive self.rider ) {
+			end
+		}
+		
+		local.rand = randomfloat .35
+		local.rand += 0.2			 
+		wait local.rand		
+
+		if( self != NULL && isAlive self.rider ) {
+			self nodamage		
+			self.rider fire
+			waitframe
+			self takedamage
+		}
+	}
+}end
+
+//============================================================================
+LoopAnimNoClip local.anim: {
+//============================================================================
+	self.loop_anim_thread = local
+
+	while (1) {
+		self anim_noclip local.anim
+		self waittill animdone
+	}
+}end
+
+//============================================================================
+bikeExplode: {
+//============================================================================
+	self notsolid
+	local.vel = self.velocity
+
+	self stoploopsound
+	self anim stop_wheels
+	self thread global/loopanim.scr::LoopAnimStop
+
+	//	if (self.toss)
+	//		thread tossPassengers local.vel
+	//	else
+	//		thread PassengersDie
+
+	self.rider detach
+	self playsound explode_truck
+	exec global/earthquake.scr .2 4 0 0
+
+	local.explosion1 = spawn script_model model models/fx/fx_truck_explosion.tik
+	local.explosion1.origin = self.origin // gettagposition "engine1"
+	local.explosion1.angles = self.origin // gettagangles "engine1"
+	local.explosion1 anim start
+	local.explosion1 notsolid
+	//	wait .4
+
+	self playsound explode_truck
+	exec global/earthquake.scr .2 4 0 0	
+	local.explosion2 = spawn script_model model models/fx/fx_truck_explosion.tik
+	local.explosion2.origin = self.origin // gettagposition "engine2"
+	local.explosion2.angles = self.origin // gettagangles "engine2"
+	local.explosion2 anim start
+	local.explosion2 notsolid
+
+	if( self.doRadiusDmg == 1 ) {
+		radiusdamage self.origin 1000 256
+	}
+
+	if (self.collisionent != NULL && self.collisionent != NIL )  {
+		if($player istouching self.collisionent) {
+			$player normal_damage 100
+		}
+		self.collisionent disconnect_paths
+	}
+
+	local.name = self
+	local.angles = self.angles
+	local.origin = self.origin
+	self hide
+	self notsolid
+
+	self.damaged = spawn script_model model models/human/animation/scripted/bmwbike.tik
+	self.damaged.origin = local.origin
+	self.damaged.angles = local.angles
+	self.rider.origin = local.origin
+	self.rider.angles = local.angles
+
+	if (self.toss == 1)  {
+		self.damaged notsolid
+		self.damaged thread toss local.vel 1 self.tossRefObj
+		self.rider thread tossPassenger local.vel
+	}
+
+	wait 2	
+	self.rider remove
+	self remove		
+
+	wait 8
+	local.explosion1 remove
+	local.explosion2 remove	
+}end
+
+//============================================================================
+toss local.baseVel local.besolid local.tossRefObj: {
+//============================================================================
+	local.v = local.baseVel
+	local.v = (vector_scale local.v 0.1)
+
+	if (local.tossRefObj != NULL && local.tossRefObj != NIL)  {
+		if ((isalive local.tossRefObj))  {
+			//iprintlnbold "tossing away from " local.tossRefObj.targetname
+			local.dir = (vector_normalize local.baseVel)
+			local.toRef = local.tossRefObj.origin
+			local.toRef -= self.origin
+			local.toRef = (vector_normalize local.toRef)
+			local.dot = (vector_dot local.dir local.toRef)
+			//iprintlnbold "dir = " local.dir ", toRef = " local.toRef ", dot = " local.dot
+
+			if (local.dot < -0.707) {
+				// toss to the side
+				local.v0 = ( local.v[0] local.v[1] 0 )
+				local.v1 = ( 0 0 1)
+				local.u = (vector_cross local.v0 local.v1)
+				local.u = (vector_normalize local.u)
+				//iprintlnbold "tossing to the side, u = " local.u
+
+				if ((randomint 100) < 50){
+					local.u = (vector_scale local.u 100)
+				}
+				else{
+					local.u = (vector_scale local.u -100)
+				}
+				local.v += local.u
+			}
+		}
+		else  {
+			//iprintlnbold "not tossing to the side"
+		}
+	}
+
+	local.v += ( 0 0 250 )
+	local.a = ( 0 0 -150 )
+	local.startTime = level.time
+
+	if ((randomint 100) < 50) {
+		local.av = ( 50 0 25 )
+	}
+	else {
+		local.av = ( 50 0 -25 )
+	}
+
+	local.lastTime = level.time - 0.1
+	while (level.time - local.startTime < 1.7) {
+		local.slice = level.time - local.lastTime
+		local.slice = local.slice*2.0
+		local.lastTime = level.time
+		local.dp = (vector_scale local.v local.slice)
+		self.origin += local.dp
+		local.dv = (vector_scale local.a local.slice)
+		local.v += local.dv
+		local.v[0] = local.v[0]*0.98
+		local.v[1] = local.v[1]*0.98
+
+		local.da = (vector_scale local.av local.slice)
+		self.angles += local.da
+		waitframe
+	}		
+
+	if (self.isGuy == 1)  {
+		local.a = self.angles
+		local.a[0] = 0
+		local.a[2] = 0
+		self.angles = local.a
+	}
+
+	if (local.besolid)  {
+		self physics_on
+		self solid
+	}
+}end
+
+//============================================================================
+tossPassenger local.truckVel: {
+//============================================================================
+	local.x = (randomint 4000) - 2000
+	local.y = (randomint 4000) - 2000
+	local.z = (randomint 100) + 50
+	local.v = local.truckVel
+	local.v += ( local.x local.y local.z )
+	//iprintlnbold "tossing guy " local.i ", " (isalive local.ent) ", " local.v
+
+	self ai_on
+	self takedamage
+	self exec global/bullethit.scr (0 0 20) 5000 0 1
+	self notsolid
+	self nodamage
+	self.isGuy = 1
+	self physics_off
+	waitframe
+	self thread toss local.v 0
+}end

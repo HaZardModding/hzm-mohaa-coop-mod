@@ -1,0 +1,524 @@
+//
+// scene2Axis.scr
+//
+//=========================================================================
+initAxisGuys:
+//=========================================================================
+{
+	level.frontAxisRally = exec global/makearray.scr $frontLineEnemyRallyPoint
+	thread battlefieldBackside
+}end
+
+//=========================================================================
+axisGuysCharge:
+//=========================================================================
+{
+	//chrissstrahl - make sure we don't get that error message
+	if(level.frontLineInitialEnemyCount == NIL){
+		level.frontLineInitialEnemyCount = 0
+	}
+
+	// send in the bad guys
+	for (local.i = 0; local.i < level.frontLineInitialEnemyCount; local.i++) {
+		wait 0.25
+		thread axisGuyLive local.i
+	}
+
+	if (level.frontLineTotalEnemyWait > 0){
+		wait level.frontLineTotalEnemyWait
+	}
+
+	for (; local.i < level.frontLineTotalEnemyCount; local.i++) {
+		wait 0.25
+		thread axisGuyLive local.i
+	}
+}end
+
+//=========================================================================
+initFrontLineAxisSpawn:
+//=========================================================================
+{
+	self hide
+	self notsolid
+	self.lastSpawnTime = 0
+}end
+
+//=========================================================================
+getAxisSpawnRow local.set:
+//=========================================================================
+{
+	if (local.set != NULL && local.set != NIL) {
+		for (local.i = 1; local.i <= level.frontLineSpawnRow.size; local.i++) {
+			if (level.frontLineSpawnRow[local.i].set == local.set){
+				end level.frontLineSpawnRow[local.i]
+			}
+		}
+	}
+
+	// find the row closest to the player that is between the player and
+	//    the player rally point (ie in *front* of the player, not behind)
+	local.minDistance 	= 999999
+	local.index 		= -1
+
+	for (local.i = 1; local.i <= level.frontLineSpawnRow.size; local.i++){
+		// direction from here to the player
+		
+		//chrissstrahl - sp
+		local.player = NULL
+		local.playerDir  = ( 0 0 0 )
+		if( level.gametype == 0 ){
+			local.player = $player
+		}
+		//chrissstrahl - coop compatible
+		else{
+			local.player = exec coop_mod/replace.scr::player_closestTo $frontLinePlayerRallyPoint
+			while( local.player == NULL ){//make sure we wait for valid player
+				wait 2
+				local.player = exec coop_mod/replace.scr::player_closestTo $frontLinePlayerRallyPoint
+			}
+		}
+		
+		local.playerDir  = local.player.origin
+		local.playerDir -= level.frontLineSpawnRow[local.i].origin
+
+		// direction from here to the player rally point
+		local.playerRallyDir  = $frontLinePlayerRallyPoint.origin
+		local.playerRallyDir -= level.frontLineSpawnRow[local.i].origin
+
+		// are we in between the player and where they are going
+		local.dot = vector_dot local.playerDir local.playerRallyDir
+
+		if (local.dot < 0){
+			local.distance = vector_length local.playerDir
+
+			if (local.distance >= level.frontLineSpawnMinDistance && local.distance < local.minDistance) {
+				local.minDistance = local.distance
+				local.index 	  = local.i
+			}
+		}
+	}
+
+	if (local.index == -1){
+		end NULL
+	}
+}end level.frontLineSpawnRow[local.index]
+
+//=========================================================================
+axisGuyLive local.guyIndex:
+//=========================================================================
+{
+	local.generation 		= 1
+	local.nextSpawnRowSet 	= -1
+
+	while (level.frontLineAxisGuysSpawn){
+		// find a suitable spawn point
+		if (local.spawnRow == NULL) {
+			// player must have passed the last row
+			wait 2
+		}
+		else{
+			// spawn a random guy on this row			
+			local.spawnRow = waitthread getAxisSpawnRow
+			local.spawnRow.axisSpawnCount++
+			local.index = 1+((local.spawnRow.axisSpawnCount)%local.spawnRow.spawnPoint.size)
+
+			//println "set = " local.spawnRow.set ", spawn count = " local.spawnRow.axisSpawnCount ", index = " local.index
+			local.spawnPoint = local.spawnRow.spawnPoint[local.index]
+
+			if (level.frontLineAxisDebugPrint){
+				println local.guyIndex " spawning in set " local.spawnRow.set " index " local.index
+			}
+
+			if (local.spawnPoint == NULL || local.spawnPoint == NIL) {
+				println "axisGuyLive: error, got local.spawnPoint = NULL"
+				wait 2
+			}
+			else{
+				// wait at least two seconds since the last guy spawned here
+				local.queueTime = (local.spawnPoint.lastSpawnTime - level.time) + 2
+
+				if (local.queueTime > 0){
+					if (level.frontLineAxisDebugPrint) {
+						println local.guyIndex " waiting in queue for " local.queueTime " seconds"
+					}
+					wait local.queueTime
+				}
+
+				local.guy = spawn models/human/german_afrika_private_headwrap.tik
+				local.guy.origin = local.spawnPoint.origin
+				local.guy.angles = local.spawnPoint.angles
+
+				switch (level.scene2Skill) {
+					case 0:
+						local.guy.health   = 45
+						local.guy.accuracy = 25
+						break
+					case 1:
+						local.guy.health   = 55
+						local.guy.accuracy = 75 - (local.generation*5)
+						break
+					case 2:
+						local.guy.health   = 65
+						local.guy.accuracy = 100 - (local.generation*5)
+						break
+				}
+
+				if (local.guy.accuracy < 20){
+					local.guy.accuracy = 20
+				}
+
+				local.guy.runto = waitthread getNearestAxisRallyPoint local.guy.origin
+				local.guy thread axisGuyThink local.generation
+				local.spawnPoint.lastSpawnTime = level.time
+
+				if (level.frontLineAxisDebugPrint){
+					println local.guyIndex " waiting until deeath "
+				}
+
+				// waittill death seems to hang sometimes
+				//	local.guy waittill death
+				while (1) {
+					if (local.guy == NULL || local.guy == NIL || !(IsAlive local.guy)){
+						break
+					}
+					wait 0.5
+				}
+
+				if (local.guy == NULL || local.guy == NIL){
+					local.guy remove
+				}
+
+				if (level.frontLineAxisDebugPrint) {
+					println local.guyIndex " ok, I'm dead"
+				}
+				local.generation++
+			}
+		}
+	}
+}end
+
+//=========================================================================
+axisGuyThink local.generation:
+//=========================================================================
+{
+	if ((randomint 100) < 90){
+		self dontdropweapons
+	}
+
+	if (local.generation == 1) {
+		self gun "mauser kar 98k"
+		self useweaponclass rifle
+	}
+	else {
+		if ((randomint 100) < 10) {
+			self gun "mg42"
+			self useweaponclass mg
+		}
+		else {
+			self gun "mauser kar 98k"
+			self useweaponclass rifle
+		}
+	}
+
+	self type_attack "runandshoot"
+
+	if ((randomint 100) <= 30){
+		self.ammo_grenade = 4
+	}
+
+	self.maxdist = 2000
+	self.mindist = 10
+	self.sight   = 2000
+	self.sight   = self.hearing
+
+	if (self.runto != NULL && self.runto != NIL) {
+		self.reachedRallypoint = 0
+		thread frontLineAxisCheckDestDistance
+
+		while (isAlive self && self.reachedRallypoint == 0) {
+			//self.enableEnemy = 0
+			self runto self.runto
+			//wait (0.5 + (randomint 20)*0.1)
+			//self.enableEnemy = 1
+			//wait (0.5 + (randomint 40)*0.1)
+			wait 1
+		}
+	}
+	else{
+		self attackplayer
+	}
+}end
+
+//=========================================================================
+frontLineAxisCheckDestDistance:
+//=========================================================================
+{
+	while ((isAlive self) && self != NIL && self != NULL) {
+		// see if we are too far away from the player
+		
+		//chrissstrahl - keep sp, make compatible for coop
+		local.playerDir  = (0 0 0)
+		local.player = NULL
+		if( level.gametype == 0){
+			local.player = $player
+		}
+		else{
+			local.player = exec coop_mod/replace.scr::player_closestTo self
+			if(local.player == NULL){
+				wait 1
+				continue
+			}
+		}
+		local.playerDir  = local.player.origin //chrissstrahl - made coop compatible
+		local.playerDir -= self.origin
+
+		// direction from here to the player rally point
+		local.playerRallyDir  = $frontLinePlayerRallyPoint.origin
+		local.playerRallyDir -= self.origin
+
+		// are we in between the player and where they are going
+		local.dot = vector_dot local.playerDir local.playerRallyDir
+
+		if (local.dot > 0){
+			// we are behind the player.  by how far though ?
+			local.distance = vector_length local.playerDir
+
+			if (local.distance >= level.frontLineSpawnMinDistance) {
+				// far enough to die
+				self bedead
+				waitframe
+
+				if (self != NULL && self != NIL){
+					self remove
+				}
+				break
+			}
+		}
+
+		// see if we are too close to our rally point
+		local.dir  = self.origin
+		local.dir -= self.runto.origin
+		local.dist = vector_length local.dir
+
+		if (local.dist < 500) {
+			// see if player is in front or behind our rally point
+			self.reachedRallypoint = 1
+			local.playerToHisRally = $frontLinePlayerRallyPoint.origin - local.player.origin //chrissstrahl - coop compatible
+			local.playerToMyRally  = self.runto.origin - local.player.origin //chrissstrahl - coop compatible
+
+			if ((vector_dot local.playerToHisRally local.playerToMyRally) < 0){
+				// he is in front of my rally point, I die a horrible death here
+				thread maps/e1l1/explosion.scr::big self 0 1
+				break
+			}
+
+			//else {
+			//	// the cowardly scum is hiding at the back of the battlefield
+			//	self aimat $player
+			//	self.favoriteenemy = $player
+			//}
+		}
+
+		wait 0.5
+	}
+}end
+
+//=========================================================================
+getNearestAxisRallyPoint local.origin:
+//=========================================================================
+{
+	local.minDistance 	= 99999
+	local.index 		= -1
+
+	for (local.i = 1; local.i <= level.frontAxisRally.size; local.i++) {
+		local.dir  = level.frontAxisRally[local.i].origin
+		local.dir -= local.origin
+		local.distance = vector_length local.dir
+
+		if (local.distance < local.minDistance) {
+			local.minDistance = local.distance
+			local.index = local.i
+		}
+	}
+}end level.frontAxisRally[local.index]
+
+//=========================================================================
+battlefieldBackside:
+//=========================================================================
+{
+	thread handleTracers
+	thread leftTrench
+	thread rightTrench
+	thread backGuys
+	thread backTrench_1
+	thread backTrench_2
+}end
+
+//=========================================================================
+leftTrench:
+//=========================================================================
+{
+	$scene2Trench2 waittill trigger
+	
+	//chrissstrahl - coop mod respawn area
+	if(level.gametype != 0){
+		//chrissstrahl - create spawnpoints for coop
+		waitthread coop_mod/spawnlocations.scr::e1l1_update1
+	}
+	
+	$scene1TracerFire_1 thread global/fakeGunfire.scr::gunStop
+	$scene1TracerFire_2 thread global/fakeGunfire.scr::gunStop
+
+	waitthread global/ai.scr::spawnset 4700 leftTrenchGuys
+	$leftTrenchGuys thread trenchLogic
+}end
+
+//=========================================================================
+rightTrench:
+//=========================================================================
+{
+	$scene2Trench1 waittill trigger
+	$scene1TracerFire_1 thread global/fakeGunfire.scr::gunStop
+	$scene1TracerFire_2 thread global/fakeGunfire.scr::gunStop
+
+	waitthread global/ai.scr::spawnset 4600 rightTrenchGuys
+	$rightTrenchGuys thread trenchLogic
+}end
+
+//=========================================================================
+backGuys:
+//=========================================================================
+{
+	$scene2MainExitTrigger waittill trigger
+	waitthread global/ai.scr::spawnset 4800 backGuys
+	$backGuys thread chargeLogic
+}end
+
+//=========================================================================
+backTrench_1:
+//=========================================================================
+{
+	$scene2BackTrenchTrigger_1 waittill trigger
+	waitthread global/ai.scr::spawnset 4900
+	$backTrenchGuys_1 thread trenchLogic
+}end
+
+//=========================================================================
+backTrench_2:
+//=========================================================================
+{
+	level.backTrenchGuysAllDead = 0
+	level.backTrenchGuyCount 	= 0
+
+	$scene2BackTrenchTrigger_2 waittill trigger
+	waitthread global/ai.scr::spawnset 4950 backTrenchGuys_2
+
+	$backTrenchGuys_2 thread trenchLogic
+	$backTrenchGuys_2 thread backTrenchGuyTrack
+	// TODO, when these guys are all dead, allow player to talk to commander
+}end
+
+//=========================================================================
+backTrenchGuyTrack:
+//=========================================================================
+{
+	level.backTrenchGuyCount++
+	self waittill death
+	level.backTrenchGuyCount--
+
+	if (level.backTrenchGuyCount == 0){
+		level.backTrenchGuysAllDead = 1
+	}
+}end
+
+//=========================================================================
+handleTracers:
+//=========================================================================
+{
+	$scene2MainFirstTrenchTrigger waittill trigger
+	$scene1TracerFire_3 thread global/fakeGunfire.scr::gunShootPlayer 0.1 0.5 0.1 0.5 1 25
+	$scene2MainExitTrigger waittill trigger
+	$scene1TracerFire_3 thread global/fakeGunfire.scr::gunStop
+	$scene1TracerFire_4 thread global/fakeGunfire.scr::gunShootPlayer 0.1 0.5 0.1 0.5 1 25
+	$scene2BackTrenchTrigger_2 waittill trigger
+	$scene1TracerFire_4 thread global/fakeGunfire.scr::gunStop
+}end
+
+//=========================================================================
+backGuySetup:
+//=========================================================================
+{
+	switch (level.scene2Skill){
+		case 0:
+			local.guy.health 	= 45
+			local.guy.accuracy 	= 20
+			break
+		case 1:
+			local.guy.health 	= 55
+			local.guy.accuracy 	= 40
+			break
+		case 2:
+			local.guy.health 	= 65
+			local.guy.accuracy 	= 60
+			break
+	}
+
+	self exec coop_mod/replace.scr::turnto //chrissstrahl - coop compatible
+
+	// jsl--> added #keepweapon to allow designer to specify the weapon.
+	if ( self.keepweapon==NIL || self.keepweapon==0 ){
+		if ((randomint 100) < 30) {
+			self gun "mauser kar 98k"
+			self useweaponclass rifle
+		}
+		else{
+			self gun "mg42"
+			self useweaponclass mg
+		}
+	}
+
+	if ((randomint 100) <= 30){
+		self.ammo_grenade = 1
+	}
+}end
+
+//=========================================================================
+trenchLogic:
+//=========================================================================
+{
+	self thread backGuySetup
+	self.hearing 	 = 1300
+	self.sight 		 = 1300
+	self.maxdist 	 = 5000
+	self.type_attack = turret
+
+	self exec coop_mod/replace.scr::turnto //chrissstrahl - coop compatible
+	self thread global/loopanim.scr::LoopAnim mg42_crouch_idle
+
+	while ((isalive self) && (self.enemy == NULL || self.enemy == NIL)){
+		wait 0.2
+	}
+
+	self thread global/loopanim.scr::LoopAnimStop
+}end
+
+//=========================================================================
+chargeLogic:
+//=========================================================================
+{
+	self thread backGuySetup
+	self.type_attack = alarm
+	
+	//chrissstrahl - coop compatible
+	local.player = exec coop_mod/replace.scr::player_closestTo self
+	while(local.player == NULL){
+		wait 2
+		local.player = exec coop_mod/replace.scr::player_closestTo self
+	}
+	self turnto local.player //chrissstrahl - coop compatible
+		
+	self.hearing = 350 + (randomint 150)
+	self.sight   = self.hearing
+	self runto local.player //chrissstrahl - coop compatible
+}end
+

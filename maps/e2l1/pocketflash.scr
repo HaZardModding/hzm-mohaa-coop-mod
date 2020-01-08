@@ -1,0 +1,247 @@
+// pocketflash.scr
+//	- do pocket flashes...
+
+//============================================================================
+init: {
+//============================================================================
+	level.pocketflashes = 0
+	level.flakshow = 1
+}end
+
+
+//	Start up all the pocket flashes that are in the level...
+//	set the following as your trigger's setthread:
+//				gags/T1L1_Falling.Scr::DoPocketFlashes
+//	Note: Name all your pocket flashes: pocketflash
+//============================================================================
+StartPocketFlashes: {
+//============================================================================
+	level.pocketflashes = 1
+	$pocketflash thread DoPocketFlash
+}End
+
+//	Call this to stop/delete all pocket flashes...
+//============================================================================
+StopPocketFlashes: {
+//============================================================================
+	level.pocketflashes = 0
+}End
+
+//============================================================================
+DoPocketFlash: {
+//============================================================================
+	local.delay = 1
+
+	while (level.pocketflashes==1) {
+		local.wait = randomint(3) + local.delay
+		wait local.wait
+
+		if ( level.pocketflashes==1 ) {
+			self thread pocketflash_fx models/fx/fx_pocketflash.tik
+		}
+	}
+}End
+
+//============================================================================
+StartPocketFlashesFar: {
+//============================================================================
+	level.pocketflashes = 1
+	$pocketflash_far thread DoPocketFlash
+}end
+
+//============================================================================
+StopPocketFlashesFar: {
+//============================================================================
+	level.pocketflashes = 0
+}end
+
+//============================================================================
+pocketflash_fx local.fx: {
+//============================================================================
+	local.x = 128 - randomint(256)
+	local.y = 128 - randomint(256)
+	local.z = randomint(128)
+
+	local.temp = spawn script_model model local.fx
+	local.temp notsolid
+	//local.temp.origin = self.origin
+	local.temp.origin = ( self.origin + (local.x local.y local.z)) 
+	local.temp anim start
+	local.temp notsolid
+	wait .1
+
+	local.temp remove
+}end
+
+//DoGliderFlak local.script_object local.count:
+//============================================================================
+DoGliderFlak: {
+//============================================================================
+	/*
+	level.flakshow = 1
+	for ( local.i=1;local.i<=local.count;local.i++ )
+	{
+		thread DoPlayerFlak 1 4 300 600
+		//thread DoFlakFar local.script_object 1 3
+	}
+	*/
+
+	wait 38.5
+	$flak_origin_1 thread DoSingleFlak 
+	wait 1
+	$flak_origin_2 thread DoSingleFlak 
+	wait 1
+	$flak_origin_3 thread DoSingleFlak 
+	wait 1
+	$flak_origin_4 thread DoSingleFlak 
+	wait 1
+	$flak_origin_5 thread DoSingleFlak 
+	wait 1
+	$flak_origin_6 thread DoSingleFlak 
+	wait 1
+	$flak_origin_7 thread DoSingleFlak 
+	wait 1
+	//	$flak_origin_8 thread DoSingleFlak 
+	//	wait 1
+	//	$flak_origin_9 thread DoSingleFlak 
+	//	wait 1
+	//	$flak_origin_10 thread DoSingleFlak 
+	//	wait 1
+	//	$flak_origin_11 thread DoSingleFlak 
+	//	wait 1
+}end
+
+//============================================================================
+StopGliderFlak: {
+//============================================================================
+	level.flakshow = 0
+}end
+
+// To use:
+//	- Place a box that is a "script_object" in the level.
+//	- Give the box a $targetname of something.
+//	- Spawn a thread for the box, similar to the following:
+//		"thread gags/box_effects.scr::DoFlakFar $bob 1 10"
+//	- To end, call the stopflak thread.
+//============================================================================
+DoFlakFar local.box local.mindelay local.maxdelay: {
+//============================================================================
+	//	local.fx		= "models/fx/exp_flak_far.tik"
+	local.fx		= "models/fx/exp_flak_near_moving.tik"
+	//	local.fx		= "models/fx/exp_flak_near03.tik"
+	//	local.fx		= "models/fx/exp_flak_near_v2.tik"
+	//	local.fx		= "models/fx/exp_flak_near_v3.tik"
+
+	local.origin = local.box.origin
+	local.mins = local.box.getmins
+	local.maxs = local.box.getmaxs
+	local.bounds = local.maxs - local.mins
+	local.delay = local.maxdelay - local.mindelay
+
+	while (level.flakshow == 1) {
+		local.temp = spawn script_model model local.fx
+
+		local.x = randomint(local.bounds[0]) - (local.bounds[0] / 2)
+		local.y = randomint(local.bounds[1]) - (local.bounds[1] / 2)
+		local.z = randomint(local.bounds[2]) - (local.bounds[2] / 2)
+
+		local.temp.origin = local.origin + (local.x local.y local.z)
+		local.temp notsolid
+		local.temp anim start
+
+		local.waittime = local.mindelay + randomfloat(local.delay)
+		wait local.waittime
+		local.temp remove
+	}
+}end
+
+// To use the player effect:
+//			- Call as follows:
+//					"thread DoPlayerFlak 1  4	300	 600"
+//============================================================================
+DoPlayerFlak local.mindelay local.maxdelay local.mindist local.maxdist: {
+//============================================================================
+	//local.fx	= "models/fx/exp_flak_near.tik"
+	local.fx	= "models/fx/exp_flak_near_moving.tik"
+
+	local.delay = local.maxdelay - local.mindelay
+
+	while (level.flakshow == 1) {
+		local.temp = spawn script_model model local.fx
+		local.temp.angle = 90
+
+		//local.origin = $player.origin
+		local.origin = $gliderCamera.origin
+
+		local.x	= randomfloat(2) - 1.0
+		local.y	= randomfloat(2) - 1.0
+		local.z	= randomfloat(2) - 1.0
+
+		local.magsq = local.x * local.x + local.y * local.y + local.z * local.z
+		if (local.magsq < 0.05) {
+			local.x = 0.0
+			local.y = 0.0
+			local.z = 1.0
+		}
+
+		local.vDir		= ( local.x local.y local.z )
+		local.vDir		= vector_normalize local.vDir
+		local.mag		= randomfloat(local.maxdist - local.mindist )
+		local.mag		+= local.mindist
+
+		local.temp.origin = vector_scale local.vDir local.mag
+		local.temp.origin += local.origin
+
+		//dprintln "player origin:" local.origin[0] "," local.origin[1] "," local.origin[2]
+		//dprintln "explosion origin:" local.temp.origin[0] "," local.temp.origin[1] "," local.temp.origin[2]
+
+		local.temp notsolid
+		local.temp anim start
+		local.waittime = local.mindelay + randomfloat(local.delay)
+		wait local.waittime
+		local.temp remove
+	}
+}end
+
+//============================================================================
+restartflak: {
+//============================================================================
+	level.flakshow = 1
+}end
+
+//============================================================================
+stopflak: {
+//============================================================================
+	level.flakshow = 0
+}end
+
+//thread DoSingleFlak models/fx/exp_flak_near.tik $flakspot 2
+//============================================================================
+DoSingleFlak: {
+//============================================================================
+	if ( !self ) {
+		//dprintln "NULL script origin passed to DoSingleFlak"
+		end
+	}
+
+	local.fx	= "models/fx/exp_flak_near_moving.tik"
+	local.temp = spawn script_model model local.fx
+	local.temp.angle = 90
+	local.temp.origin = self.origin
+	local.temp notsolid
+	local.temp anim start
+	//local.waittime = local.mindelay + randomfloat(local.delay)
+	wait 4
+	local.temp remove
+}end
+
+//============================================================================
+Flash: {
+//============================================================================
+	fadein 0.3 1 1 1 .75
+	wait .1
+	fadein 0.1 .48 .22 .03 .75
+	wait .2
+	fadein 0.2 0 0 0 0
+	//fadein 0.2 1 1 1 0
+}End

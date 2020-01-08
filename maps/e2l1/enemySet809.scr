@@ -1,0 +1,225 @@
+// enemySet809.scr
+// (water tower parader)
+
+//============================================================================
+init: {
+//============================================================================
+	level.bazooka_wait_time = 13
+	local.paradeConcurrentMax = 4
+	local.paradeDuration = 15
+	local.spawnerCount = $parade809origin.size
+	level.nodrophealth = 1
+
+	for ( local.i = 0; local.i < local.spawnerCount; local.i++) {
+		local.j = local.i + 1
+		local.spawner[local.i] = $parade809origin[local.j]
+		local.spawner[local.i] hide
+		local.spawner[local.i] notsolid
+	}
+
+	level.watertoweractivated = 0
+	$watertowerparadetrigger waittill trigger
+	level.watertoweractivated = 1
+	$towerexplodertrigger thread CheckForTowerExplosion
+	thread SpawnBazookaGuys
+	wait 1
+
+	level.endParade = 0
+	local.spawnedCount = 0
+	level.aliveCount = 0
+	local.startTime = level.time
+	level.paradeOver = 0
+	level.paradeInProgress = 1
+
+	while (level.time - local.startTime < local.paradeDuration) {
+		//local.dTime = level.time - local.startTime
+		//iprintlnbold local.dTime " elapsed"
+
+		while (level.aliveCount >= local.paradeConcurrentMax) {
+			wait 0.25
+		}
+
+		if (level.endParade != 0) {
+			break
+		}
+
+		// time to spawn another dude
+		local.touching = $player istouching $water_tower_trigger
+		if ( local.touching ) {
+			local.spawnerIndex = local.spawnedCount % local.spawnerCount
+			local.currentSpawner = local.spawner[local.spawnerIndex]
+
+			local.i = local.spawnedCount
+			local.parader_name[local.i] = "water_tower_parade_soldier" + local.i
+
+			spawn local.currentSpawner.model "targetname" (local.parader_name[local.i]) "health" "45"
+			//dprintln "spawned another"
+
+			$(local.parader_name[local.i]) thread paradeCount
+			local.rallyPoint = $(local.currentSpawner.target)
+			$(local.parader_name[local.i]) thread paradeRun local.rallyPoint
+			$(local.parader_name[local.i]).origin = local.currentSpawner.origin
+			$(local.parader_name[local.i]).angles = local.currentSpawner.angles
+			$(local.parader_name[local.i]).mindist = 128
+			$(local.parader_name[local.i]).maxdist = 1024
+			$(local.parader_name[local.i]).leash = 4096
+			$(local.parader_name[local.i]).fixedleash = 0
+			$(local.parader_name[local.i]).sight = 2048
+			$(local.parader_name[local.i]).noticescale = 25
+			$(local.parader_name[local.i]).hearing = 2048
+			$(local.parader_name[local.i]).enemysharerange = 2048
+			$(local.parader_name[local.i]).sound_awareness = 100
+			$(local.parader_name[local.i]).interval = 128
+			$(local.parader_name[local.i]).aipronechance = 0
+			$(local.parader_name[local.i]).aicrouchchance = 0
+			$(local.parader_name[local.i]) dontdropweapons
+			$(local.parader_name[local.i]) type_attack "runandshoot"
+
+			local.random = randomint 100
+			if (local.random <= 35) {
+				$(local.parader_name[local.i]) gun "Moschetto"
+			}
+
+			if (local.random <= 1) {
+				$(local.parader_name[local.i]).ammo_grenade = 4
+			}
+
+			local.spawnedCount++
+			wait 0.2							// this is the wait between "drops"
+		}
+		else {
+			waitframe
+		}
+	}	
+	level.paradeInProgress = 0
+	level.paradeOver = 1
+}end
+
+//============================================================================
+paradeRun local.rallyPoint: {
+//============================================================================
+	if ( (local.rallyPoint == NIL) || (local.rallyPoint == NULL) ) {
+		// dprintln "no rally point - quitting thread"
+		self.enableEnemy = 1
+		end
+	}
+
+	self forceactivate
+	wait 1
+
+	//dprintln "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ (" self.entnum ") trying to run to " local.rallyPoint
+	self runto local.rallyPoint
+
+	//local.random = randomint 100
+	local.random = 0
+	if (local.random < 50) {
+		// run all the way to the end
+		self waittill movedone
+	}
+	else {
+		// just run for a couple seconds
+		local.random = randomint 4
+		local.random += 2
+		wait local.random
+	}
+
+	self favoriteenemy $player
+	self aimat $player
+}end
+
+//============================================================================
+paradeCount: {
+//============================================================================
+	level.aliveCount++
+	self waittill death
+	level.aliveCount--
+}end
+
+//============================================================================
+SpawnBazookaGuys: {
+//============================================================================
+	wait level.bazooka_wait_time 
+	waitthread global/ai.scr::spawnset 401 bazookaguy1 0
+	$bazookaguy1 thread GoBazookaGuy
+}end
+
+//============================================================================
+GoBazookaGuy: {
+//============================================================================
+	self dontdropweapons
+	self.vHome = self.origin
+	self exec global/disable_ai.scr
+	self waittill movedone
+
+	wait 0.5
+	if ( isAlive self ) {
+		self exec global/crouch.scr
+	}
+
+	wait 1
+	if ( isAlive self ) {
+		self exec global/aimat.scr $watertower_target
+	}
+
+	wait 1
+	if ( isAlive self ) {
+		self exec global/shoot.scr
+	}
+
+	wait 1
+	if ( isAlive self ) {
+		self exec global/enable_ai.scr
+		self attackplayer
+
+		// switch to a pistol....
+		self gun "beretta"
+		//self waitthread global/SafeMoveTo.scr::reach self.vHome
+		//if ( isAlive self )
+			//self delete
+	}
+}end
+
+//============================================================================
+CheckForTowerExplosion: {
+//============================================================================
+	if ( self.set!=227 ) {
+		end
+	}
+
+	while (1) {
+		self waittill trigger
+
+		if ( $mg42_guy_350_c ) {
+			$mg42_guy_350_c delete
+		}
+
+		if ( $mg42_guy_350_a ) {
+			$mg42_guy_350_a delete
+		}
+
+		// only do this if an NPC caused the trigger to trip
+		if ( parm.owner != $player ) {
+			// do the exploder stuff
+			thread global/exploder.scr::explode 227
+
+			// and remove the func_ladder
+			$towerladder remove
+
+			if ( $player.turret!=NULL ) {
+				//dprintln "PLAYER ON TURRET, GET HIM OFF IT!"
+				$player usestuff
+				waitframe
+
+				$player safeholster 1
+			}
+
+			// do a little shaky shaky if player was in the tower...
+			thread maps/e2l1/gliderride.scr::doEarthquake 1.5 4 1 0
+			wait 5
+
+			$player safeholster 0
+			end
+		}
+		waitframe
+	}
+}end

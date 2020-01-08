@@ -1,0 +1,411 @@
+//*********************************************************
+//                    Entity list                        
+//*********************************************************
+// $startjeep
+// $jeepdriver
+// $jeeppassenger
+// $ambushgunners
+//----------------------------------------------------------
+//                       paths
+//----------------------------------------------------------
+// $jeeppath            -- path used by the trucks
+//----------------------------------------------------------
+//**********************************************************
+
+//=========================================================================
+InitIntro: {
+//=========================================================================
+	level.introDone = 0
+	drawhud 0 // take away hud
+	
+	if($introtruck) {
+		$introtruck nodamage
+		$introtruck anim idlenolights
+		$introtruck anim stop_wheels
+		$introtruck setcollisionentity $opeltruckcollide
+	}
+	
+	$player threatbias 500
+	thread handleDriver
+	thread handlePassenger  
+
+	// The target for the gunners to aim at
+	$jeeppassengertarget.origin = ( -917 -5546 34 )
+	$startjeep nodamage
+	$startjeep SoundSet "alt_jeep_"
+
+	// Setup Axis forces
+	// Setup two gunners
+	for (local.i=1;local.i<=$ambushgunners.size;local.i++) {
+		$ambushgunners[local.i] exec global/disable_ai.scr
+		$ambushgunners[local.i] gun "mp40"
+		$ambushgunners[local.i].originalAccuracy = $ambushgunners[local.i].accuracy
+		$ambushgunners[local.i].accuracy = 100
+		//iprintln "juked up gunner accuracy for gunner" local.i
+		$ambushgunners[local.i] nodamage
+	}
+
+	$plane1tree1 nodamage
+	$plane1tree1 immune rocket
+	$plane1tree1 immune Explosion
+	$plane1tree2 nodamage
+	$plane1tree2 immune rocket
+	$plane1tree2 immune Explosion
+
+	local.origin = $jeep.origin
+	$jeep.origin = (0 0 0)
+	$jeep connect_paths
+	waitframe
+
+	$jeep.origin = local.origin
+	//	$ambushinvestigators[1] thread InvestigatorsAmbient
+	//	$ambushinvestigators[2] thread InvestigatorsAmbient
+	//	$ambushgunners[1] thread InvestigatorsAmbient
+}end
+
+//=========================================================================
+DoIntro: {
+//=========================================================================
+	if (level.skipintro == 1) {
+		$player.origin = ( -1323 -5699 7 )
+		waitthread AmbushGuysAttack
+		end
+	}
+
+	drawhud 0
+	$jeeppassenger gun "thompson"
+	$jeeppassenger unholster
+
+	// Setup player for first rail ride
+	$player nodamage
+
+	//unlock the jeep and turret
+	$startjeep.turret = $startjeep queryturretslotentity 0
+	$startjeep unlock
+	$startjeep.turret unlock
+
+	// Put the player in the jeep
+	$player.origin = $startjeep.turret.origin
+	$startjeep doUse $player
+	$startjeep lock
+	$startjeep.turret lock
+
+	// Tell the jeep to drive
+	$startjeep drive $startjeeppath 300 200 200 256
+
+	//iprintln "(VO) The British H.Q. should be up ahead here.  From the looks of things, it sounds like they've got some company, too.  You fellas just make sure you're ready for anything.  Whatever those Krauts are up to, it can't be any good."
+	$jeeppassenger anim A_31_Talk_01  //british hq is up ahead
+	$jeeppassenger waittill animdone
+	$jeeppassenger anim A_31_Talk_01_idle // idle so he does no gun swinging
+	$jeeppassenger waittill animdone
+	
+	// Wait till the crash has happened
+	while ( level.introDone == 0 ) {
+		waitframe
+	}
+
+	drawhud 1 // take away hud
+}end
+
+//=========================================================================
+JeepCrash: {
+//=========================================================================
+	self remove
+
+	// testing a flyby for the plane gag
+	thread maps/e3l1/planes.scr::DoPlaneBombGag 
+	wait 1.8
+
+	$plane1tree1 anim death
+	wait 0.7
+
+	// Remove the people from the jeep
+	$startjeep detachpassengerslot 0 $jeeppassenger.origin
+	$startjeep DetachDriverSlot 0 $jeepdriver.origin
+
+	// Eject the player from the jeep
+	$startjeep.turret = $startjeep queryturretslotentity 0
+	$startjeep unlock
+	$startjeep.turret unlock
+	$startjeep doUse $player
+	$player.viewangles = ( 0 20 0 )
+	waitframe
+	
+	$player.origin = $player.origin + (0 0 400)
+
+	// Shake the camera
+	exec global/earthquake.scr 3 5 0 0
+
+	// Let the player take damage from now on
+	$player takedamage
+
+	// Hide the old jeep and spawn the new one
+	level.jeepcrash = spawn script_model model models/human/animation/scripted/jeepcrash.tik "origin" $bazookaTarget.origin
+	//	level.jeepcrash.origin = $bazookaTarget.origin
+
+	$startjeep.turret = $startjeep queryturretslotentity 0
+	$startjeep.turret remove
+	$startjeep remove
+
+	waitthread JeepCrashAnim
+	waitthread PlayerRotateAngles
+	level.jeepcrash notsolid
+
+	// Start crash animation
+	thread AmbushGuysAttack
+	thread InvestigatorsGo
+
+	//	waitthread maps/e3l1.scr::ArmPlayer
+	$plane1tree2 anim death
+	wait 2
+
+	$player useweaponclass smg
+	drawhud 1
+	//	$player safeholster 1
+}end
+
+//=========================================================================
+PlayerRotateAngles: {
+//=========================================================================
+	local.angles = 20
+	local.otheraccess = 20  // joke get it.
+	local.otherotheraccess = 20
+	local.playerelevator = 10
+	//	$player velocity (0 0 200)
+
+	while(local.angles <= 360) {
+		$player.viewangles = (0 local.otheraccess local.angles)
+		local.angles += 15
+		local.otheraccess += 15
+		local.otherotheraccess += 15
+		waitframe
+
+		$player.origin -= (0 0 local.playerelevator)
+	}
+	$player.viewangles = (0 0 0)
+}end
+
+//=========================================================================
+JeepCrashAnim: {
+//=========================================================================
+	level.jeepcrash.origin = ( -1088.8 -5724.5 -5 )
+	level.jeepcrash.angles = ( 0 270 0 )
+	level.jeepcrash anim crash
+	level.jeepcrash playsound e3l1_jeep_explo
+
+	$jeepdriver takedamage
+	$jeepdriver physics_off
+	$jeepdriver notsolid
+	$jeepdriver.origin = level.jeepcrash.origin
+	$jeepdriver.angles = ( 0 270 0 )
+	$jeepdriver exec global/bullethit.scr (0 0 250) 5000 0 1
+
+	$jeeppassenger takedamage
+	$jeeppassenger takeall
+	$jeeppassenger physics_off
+	$jeeppassenger notsolid
+	$jeeppassenger.origin = level.jeepcrash.origin + (0 20 0)
+	$jeeppassenger.angles = ( 0 270 0 )
+	$jeeppassenger exec global/bullethit.scr (0 0 250) 5000 0 1
+
+	spawn weapons/thompsonsmg.tik origin (level.jeepcrash.origin + (0 20 7)) "targetname" "CoolGun"
+	$CoolGun.angles = $CoolGun.angles + (0 0 90)
+ 	$CoolGun setthread CoolGunPickup
+
+	level.introDone = 1	
+}end
+
+//=========================================================================
+CoolGunPickup: {
+//=========================================================================
+	$player item weapons/thompsonsmg.tik
+	self remove
+}end
+
+//=========================================================================
+InvestigatorsAmbient: {
+//=========================================================================
+	self turnto $jeep
+	self setaimtarget $jeep 1
+
+	while (level.introDone == 0 && self) {
+		local.endtime = level.time + randomint(4) + 1
+
+		while (self && local.endtime > level.time && isalive self ) {
+			self exec global/shoot.scr
+			waitframe
+		}
+		wait (1 + randomint(3))
+	}
+
+	self turnto NULL
+	self setaimtarget NULL 1
+}end
+
+//=========================================================================
+InvestigatorsGo: {
+//=========================================================================
+	wait 0.5
+	
+	//$ambushinvestigators[1] exec global/moveto.scr anim/crouch_run.scr $jeeppassengertarget.origin
+	//wait 5
+
+	//	$ambushinvestigators[1] exec global/disable_ai.scr
+	//	$ambushinvestigators[2] exec global/disable_ai.scr
+	//	$ambushinvestigators[1] mindist 1
+	//	$ambushinvestigators[2] mindist 1
+	$ambushinvestigators[1] mumble 1
+	$ambushinvestigators[2] mumble 1
+	$ambushinvestigators[1].attack_type = "runandshoot"
+	$ambushinvestigators[2].attack_type = "runandshoot"
+	$ambushinvestigators[2] runto ($jeeppassengertarget.origin)
+	wait 2.0
+
+	$ambushinvestigators[1] runto ($jeeppassengertarget.origin + (0 50 5))
+	$ambushinvestigators[2] thread WatchBuddy $ambushinvestigators[1]
+	$ambushinvestigators[1] thread WatchBuddy $ambushinvestigators[2]
+	$ambushinvestigators[2] waittill movedone
+	$ambushinvestigators[2] anim chatter04
+	$ambushinvestigators[1] waittill movedone
+	$ambushinvestigators[2] anim rifle_stand_curious
+
+	if($ambushinvestigators[1]) {
+		$ambushinvestigators[1] exec global/stand.scr
+		wait 1
+
+		$ambushinvestigators[1] turnto $ambushinvestigators[2]
+		$ambushinvestigators[1] waittill turndone
+		$ambushinvestigators[1] turnto NULL
+		wait 1
+
+		$ambushinvestigators[2] turnto $ambushinvestigators[1]
+
+		if($ambushinvestigatorslookat) {
+			$ambushinvestigators[1] turnto $ambushinvestigatorslookat
+			$ambushinvestigators[1] waittill turndone
+		}
+		else {
+			println "DONT HAVE ambushinvestigatorslookat in this Map"
+		}
+
+		$ambushinvestigators[1] anim wall_indicateright
+		$ambushinvestigators[1] waittill animdone
+		$ambushinvestigators[1] exec global/enable_ai.scr
+		//$ambushinvestigators[1] exec global/crouch.scr
+		$ambushinvestigators[1] exec global/moveto.scr anim/crouch_run.scr $player.origin
+		
+	}
+
+	if($ambushinvestigators[2]) {
+		$ambushinvestigators[2] exec global/enable_ai.scr
+		$ambushinvestigators[2] exec global/moveto.scr anim/crouch_run.scr $player.origin
+	}
+}end
+
+//=========================================================================
+WatchBuddy local.guy: {
+//=========================================================================
+	local.guy waittill death
+
+	if !(self) {
+		end
+	}
+
+	self attackplayer
+	self.attack_type = "runandshoot"
+	self runto $player.origin
+}end
+
+//=========================================================================
+AmbushGuysAttack: {
+//=========================================================================
+	wait 5.5
+	local.howlong = level.time + 2.5
+
+//	spawn "models/human/dday_29th_private" targetname "dummy" origin $jeeppassengertarget.origin
+//	$dummy hide
+/*
+	for (local.i=1;local.i<=$ambushgunners.size;local.i++)
+	{
+		$ambushgunners[local.i] turnto $crashjeep.origin
+//		$ambushgunners[local.i] setaimtarget $dummy 1
+	}
+	while ( local.howlong > level.time )
+	{
+
+		for (local.i=1;local.i<=$ambushgunners.size;local.i++)
+		{
+			$ambushgunners[local.i] exec global/shoot.scr
+		}
+		waitframe
+	}
+*/
+//	$dummy remove
+
+	for (local.i=1;local.i<=$ambushgunners.size;local.i++) {
+		$ambushgunners[local.i] aimat NULL
+		$ambushgunners[local.i] takedamage
+		$ambushgunners[local.i].accuracy = $ambushgunners[local.i].originalAccuracy
+		//iprintln "reset gunner accuraccy for gunner" local.i
+		$ambushgunners[local.i] exec global/enable_ai.scr		
+	}
+}end
+
+//=========================================================================
+handleDriver: {
+//=========================================================================
+	local.angles = $startjeep.angles
+	$jeepdriver physics_off
+	$jeepdriver notsolid
+	$jeepdriver nodamage
+	$jeepdriver angles local.angles
+	$jeepdriver attach $startjeep driver 1 ( 0 2 0 ) 
+	$jeepdriver anim jeep_idle_drive //00A004_driversitstill
+	$jeepdriver gun "none"	
+	$jeepdriver exec global/setdeathanim.scr "jeep_crash_driver"	
+}end
+
+//=========================================================================
+handlePassenger: {
+//=========================================================================
+	local.angles = $startjeep.angles
+	$jeeppassenger exec global/disable_ai.scr
+	$jeeppassenger nodamage
+	$jeeppassenger notsolid
+	$jeeppassenger physics_off
+	$jeeppassenger angles local.angles
+	$jeeppassenger attach $startjeep passenger0 1 ( 0 2 0 )
+	$jeeppassenger thread global/LoopAnim.scr::LoopAnim AV_jeep_passenger_idle
+	$jeeppassenger gun "none"
+	$jeeppassenger exec global/setdeathanim.scr "jeep_crash_passenger"
+}end
+
+//=========================================================================
+CleanupIntro: {
+//=========================================================================
+	for (local.i=1;local.i<=$ambushgunners.size;local.i++) {
+		$ambushgunners[local.i] remove
+	}
+
+	for (local.i=1;local.i<=$tunneltruckguys.size;local.i++) {
+		$tunneltruckguys[local.i] remove
+	}
+
+	for (local.i=1;local.i<=$ambushinvestigators.size;local.i++) {
+		$ambushinvestigators[local.i] remove
+	}
+}end
+
+//=========================================================================
+CleanupIntro2: {
+//=========================================================================
+	for (local.i=1;local.i<=$deleteguy.size;local.i++) {
+		$deleteguy[local.i] remove
+	}
+
+	$commander remove
+
+	if($CoolGun) {
+		$CoolGun remove
+	}
+}end

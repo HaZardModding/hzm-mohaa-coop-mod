@@ -1,0 +1,520 @@
+//chrissstrahl - modified for coop again in version 2.00 added NULL and NIL check for cloneing
+
+//
+// Reanimator.scr
+//
+// By ccaron   5/23/2003
+//
+// spawn replacement guys when guys die
+// 
+// works like parades only a script_origin
+// targets guys that it repopulates.
+// the script origin has a trigger that starts
+// it. Trigger(s) that stop it.  and fields
+// that determine max number of guys to 
+// spawn and delay between spawns
+//
+// Just as the control origin can target multiple
+// guys to reanimate, the activation trigger can target
+// multiple reanimator origins.
+//
+// HOW TO USE:
+//
+// Provide:
+//   A trigger to activate the reanimator
+//   - $targetname reanimator_trigger
+//   - $target a script_origin control point
+//
+//   A Set of guys to reanimate
+//   - $targetname the same for each guy
+//
+//   A script_origin as a control point for guys you want to reanimate
+//   - $targetname (anything)
+//   - $target     (targetname of guys to reanimate)
+//
+// Optional fields for controller script_origin(s)
+//
+//   - #max		    default 20, max num of guys to spawn
+//
+//   - #delay       default 0, delay in seconds between spawns
+//
+//   - #control_ai  default 0, when true (1) disables ai of targeted guys
+//                             until triggered (ala enemyspawner except for convertion to script_o)
+//
+//   - $spawnpoints default NULL, optional array of spawnpoints.  If this field present then spawning
+//                                will occur at the spawnpt that is not visible by the player.  A
+//                                $spawnpoints[n] is visible if $player cansee $spawnpoints[n] 90 1000.
+//								  If this field not present then the controller origin is the spawn point.
+//
+// Special Fields for reanimated guys
+//   - $mg          default NULL (machine gun to man)
+//   
+//   Trigger(s) to Abort The Reanimator (optional)
+//   - $targetname $reanimator_abort_trigger
+//   - $target the script_origin control point
+//
+// Usage: automatic
+//
+// -----------------------------------------------------
+
+
+main:
+//println "Initializing Reanimator" //chrissstrahl
+
+	if ($reanimator_trigger){
+		//println "found the reanimator trigger!"
+		for (local.i = 1; local.i <= $reanimator_trigger.size; local.i++){
+			$reanimator_trigger[local.i] thread TriggerThread
+		}
+	}
+
+	if ($reanimator_abort_trigger){
+//println "REANIMATOR >>> found the reanimator abort trigger!" //chrissstrahl
+		for (local.i = 1; local.i <= $reanimator_abort_trigger.size; local.i++){
+
+			$reanimator_abort_trigger[local.i] thread AbortTriggerThread
+		}
+	}
+
+end
+
+FindTrigger local.find_name:
+
+    if ($reanimator_trigger){
+		for (local.i=1; local.i<=$reanimator_trigger.size; local.i++){
+			if ($reanimator_trigger[local.i].find_name == local.find_name)
+			    end $reanimator_trigger[local.i]
+		}
+	}
+
+    if ($reanimator_abort_trigger){
+		for (local.i=1; local.i<=$reanimator_abort_trigger.size; local.i++){
+			if ($reanimator_abort_trigger[local.i].find_name == local.find_name)
+			    end $reanimator_abort_trigger[local.i]
+		}
+	}
+
+end NIL
+
+// -----------------------------------------------------
+// wait for a reanimator trigger to be hit
+// -----------------------------------------------------
+TriggerThread:
+
+	if (!self.target){
+		println "ERROR: reanimate_trigger does not have a target"
+		end
+	}
+
+	// if ai controller active then scroll through
+	// all the guys turn off their ai until the trigger hit
+
+	local.array = exec global/makearray.scr $(self.target)
+
+//println "REANIMATOR >>> Trigger targeting " local.array.size " script_origins"  //chrissstrahl
+
+	for (local.i=1; local.i<=local.array.size; local.i++)
+		local.array[local.i] thread AIControl self
+
+	self waittill trigger
+	waitframe 
+
+	println "REANIMATOR >>> starting to reanimate "
+
+	//for (local.i = 1; local.i <= $(self.target).size; local.i++)
+	//{
+	$(self.target) thread ControllerOriginThread
+	//}
+
+end
+
+AIControl local.trigger:
+
+//println "REANIMATOR >>> In script origin " self  //chrissstrahl
+
+	if (!self.target)
+		end
+
+	if (self.control_ai != 1)
+        end
+	
+    local.array = exec global/makearray.scr $(self.target)
+
+//println "REANIMATOR >>> " self " disableling " local.array.size " guys" //chrissstrahl
+
+    for (local.i=1; local.i<=local.array.size; local.i++){
+	    local.array[local.i] ai_off
+	    local.array[local.i] hide
+    }
+	
+    local.trigger waittill trigger
+	
+	println "REANIMATOR >>> " self " enabling " local.array.size " guys"  //chrissstrahl
+
+    for (local.i=1; local.i<=local.array.size; local.i++)
+    {
+		println "REANIMATOR >>> Activating " local.array[local.i]
+		local.array[local.i] show
+		local.array[local.i] ai_on
+		if (local.array[local.i].mg)
+		{
+			println "REANIMATOR >>> Ai_control guy has a mg, enabling ..." local.array[local.i].mg	
+			$(local.array[local.i].mg) thread global/mg42init.scr::AttachGuyToMG42 local.array[local.i] 
+		}
+		if ((self.dontdropweapons == 1) || (local.array[local.i].dontdropweapons == 1))
+		{
+			local.array[local.i].dontdropweapons = 1
+			local.array[local.i] dontdropweapons
+		}
+		if ((self.dontdrophealth == 1) || (local.array[local.i].dontdrophealth == 1))
+		{
+			local.array[local.i].dontdrophealth = 1
+			local.array[local.i] thread DontDropHealth
+		}
+		if (!local.array[local.i].model1)
+			local.array[local.i].model1 = self.model1
+		if (!local.array[local.i].model2)
+			local.array[local.i].model2 = self.model2
+		if (!local.array[local.i].model3)
+			local.array[local.i].model3 = self.model3
+	}
+
+end
+
+Activate:
+
+	println "REANIMATOR >>> Activating " self
+	self show
+	self ai_on
+	if (self.mg)
+	{
+		println "REANIMATOR >>> Ai_control guy has a mg, enabling ..." self.mg	
+		$(self.mg) thread global/mg42init.scr::AttachGuyToMG42 self 
+	}
+	if (self.dontdropweapons == 1)
+	{
+		self dontdropweapons
+	}
+	if (self.dontdrophealth == 1)
+	{
+		self thread DontDropHealth
+	}
+
+end
+
+
+DontDropHealth:
+	self waittill death
+	self takeall                      // IMPORTANT PART
+End
+
+
+// -----------------------------------------------------
+// Thread to wait for an abort trigegr to be used
+// -----------------------------------------------------
+AbortTriggerThread:
+
+	if (!self.target)
+	{
+		println "ERROR: $reanimator_abort_trigger does not have a target!"
+		end
+	}
+
+	println "REANIMATOR >>> Abort Trigger Active " self.target
+
+	self waittill trigger
+
+	println "REANIMATOR >>> aborting reanimator"
+
+	for (local.i = 1; local.i <= $(self.target).size; local.i++)
+		$(self.target)[local.i].working = 0
+
+end
+
+// -----------------------------------------------------
+// This is the origin where reanimators spawn from
+// -----------------------------------------------------
+ControllerOriginThread: 
+
+	if (!self.target)
+	{
+		println "ERROR: Reanimator control has no target(s)!"
+		end
+	}
+
+	if (self.max == NULL || self.max == NIL)
+	{
+		self.max = 20
+	}
+
+	self.count = 0
+
+	local.trigger = spawn trigger_relay
+
+	//for (local.i = 1; local.i <= $(self.target).size; local.i++)
+	//{
+	$(self.target) thread WaitForDeath local.trigger
+	//}
+
+	self.working = 1
+	while (self && self.working == 1 && self.count < self.max)
+	{
+		local.trigger waittill trigger
+
+		wait (1 + (randomfloat 4))
+
+		if (self.working != 1)
+			break
+
+		self.count ++
+
+        // look for alternative spawn points
+		if (self.spawnpoints)
+		{
+			local.array = exec global/makearray.scr $(self.spawnpoints)
+			
+			if (!local.array || local.array.size < 1)
+			{
+				println "REANIMATOR >>> Error: spawnpoints field points to invalid array!, quitting"
+				end
+			}
+
+            //while (1)
+            //{
+			
+			//chrissstrahl - keep for sp
+			if(level.gametype == 0){
+				local.start = $player.origin + (0 0 48) // compute position of player's head
+
+				// look for a spawn point that passes the sighttrace 
+				for (local.i=1; local.i<= local.array.size; local.i++)
+				{
+					local.end = local.array[local.i].origin + (0 0 48)
+					if ((sighttrace local.start local.end 1) == 0)
+					{
+						// found one
+						local.origin = local.array[local.i].origin
+						goto searchSuccess
+					}
+				}
+			}
+			//chrissstrahl - Multiplayer
+			else{
+				// look for a spawn point that passes the sighttrace 
+				for (local.i=1; local.i<= local.array.size; local.i++){
+					local.spawnFound = 1
+					local.end = local.array[local.i].origin + (0 0 48)
+					
+					//check for every player
+					for (local.i = 1;local.i <= $player.size;local.i++){
+						local.player = $player[local.i]
+						if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 ){
+							local.start = local.player.origin + (0 0 48) // compute position of player's head					
+							if ((sighttrace local.start local.end 1) != 0){  //!= 0 -> can see
+								local.origin = local.array[local.i].origin
+								local.spawnFound = 0
+							}
+						}
+						//found valid spot
+						if(local.spawnFound){
+							goto searchSuccess
+						}
+					}
+				}
+			}
+
+            println "REANIMATOR >>> failed to find a spot"
+            goto searchFail
+        }
+        else // just use the script_origin as the spawn point
+        {
+            local.origin = self.origin
+            local.i = "script_origin"
+        }
+
+searchSuccess:
+println "reanimator.scr -> Spawning guy at " local.i " : "  local.origin
+
+		local.ent = waitthread Clone local.trigger.type local.origin
+		local.ent thread WaitForDeath local.trigger
+		local.trigger.type = NIL
+
+searchFail:
+	}
+
+	local.trigger remove
+	
+	println "REANIMATOR >>> Reanimator terminated"
+
+end
+
+
+// -----------------------------------------------------
+// -----------------------------------------------------
+WaitForDeath local.trigger:
+
+	self waittill death
+	if (local.trigger)
+	{
+		local.trigger.type = self
+		trigger local.trigger
+	}
+
+end
+
+
+RandInt local.i:
+
+	if (local.i <= 1)
+		end 1
+
+end (1 + (randomint local.i))
+
+
+// -----------------------------------------------------
+// -----------------------------------------------------
+Clone local.dude local.origin:
+
+	println "REANIMATOR >>> Cloning " local.dude
+	
+	//chrissstrahl - don't clone NULL or NIL
+	if( local.dude == NULL || local.dude == NIL ){ end NULL }
+
+	local.num_models = 0
+	if (local.dude.model1 != NIL)
+	{
+		local.num_models++
+		local.model_list[local.num_models] = local.dude.model1
+	}
+	if (local.dude.model2 != NIL)
+	{
+		local.num_models++
+		local.model_list[local.num_models] = local.dude.model2
+	}
+	if (local.dude.model3 != NIL)
+	{
+		local.num_models++
+		local.model_list[local.num_models] = local.dude.model3
+	}
+
+	if (local.num_models == 0)
+	{
+		local.model = local.dude.model
+	}
+	else
+	{
+		local.model_index = waitthread RandInt local.num_models
+		local.model = local.model_list[local.model_index]
+	}
+
+	local.ent = spawn local.model "targetname" local.dude.targetname
+
+	local.ent.model1				= local.dude.model1
+	local.ent.model2				= local.dude.model2
+	local.ent.model3				= local.dude.model3
+	//local.ent.origin				= local.dude.origin
+	local.ent.type_idle				= local.dude.type_idle
+	//local.ent.type_attack			= local.dude.my_type_attack
+	local.ent.type_disguise			= local.dude.type_disguise
+	local.ent.type_grenade			= local.dude.type_grenade
+	local.ent.hearing				= local.dude.hearing
+	local.ent.sight					= local.dude.sight
+	local.ent.fov					= local.dude.fov
+	local.ent.leash					= local.dude.leash
+	local.ent.mindist				= local.dude.mindist
+	local.ent.maxdist				= local.dude.maxdist
+	local.ent.health				= local.dude.max_health
+	local.ent.sound_awareness		= local.dude.sound_awareness
+	local.ent.noticescale			= local.dude.noticescale
+	local.ent.fixedleash			= local.dude.fixedleash
+	local.ent.enemysharerange		= local.dude.enemysharerange
+	local.ent.voicetype				= local.dude.voicetype
+	local.ent.accuracy				= local.dude.accuracy
+	local.ent.ammo_grenade			= local.dude.ammo_grenade
+	local.ent.gren_awareness		= local.dude.gren_awareness
+	local.ent.nosurprise			= local.dude.nosurprise
+	local.ent.disguise_range		= local.dude.disguise_range
+	local.ent.disguise_period		= local.dude.disguise_period
+	local.ent.disguise_accept_thread = local.dude.disguise_accept_thread
+	local.ent.disguise_level		= local.dude.disguise_level
+	local.ent.patrolpath			= local.dude.patrolpath
+	local.ent.waittrigger			= local.dude.waittrigger
+	local.ent.turret				= local.dude.turret
+	local.ent.alarmnode				= local.dude.alarmnode
+	local.ent.alarmthread			= local.dude.alarmthread
+	local.ent.spawn_target			= local.dude.target
+	local.ent.spawn_angle			= local.dude.angle
+	local.ent.spawn_weapon			= local.dude.weapon
+	local.ent.set					= local.dude.set
+	local.ent.group					= local.dude.group
+	local.ent.healthchance			= local.dude.healthchance
+	local.ent.area					= local.dude.area
+	local.ent.enemyname				= local.dude.enemyname
+	local.ent.playerseek			= local.dude.playerseek
+	local.ent.fnum					= local.dude.fnum
+	local.ent.turndoneerror			= local.dude.turndoneerror
+	local.ent.threatbias			= local.dude.threatbias
+	local.ent.radnum				= local.dude.radnum
+	local.ent.balconyheight			= local.dude.balconyheight
+	local.ent.pause					= local.dude.pause
+	local.ent.origin				= local.origin
+    local.ent.mg                    = local.dude.mg
+	local.ent.dontdropweapons		= local.dude.dontdropweapons
+	local.ent.dontdrophealth		= local.dude.dontdrophealth
+
+	if (local.ent.dontdropweapons == 1)
+	{
+		local.ent dontdropweapons
+	}
+	if (local.ent.dontdrophealth == 1)
+	{
+		local.ent thread DontDropHealth
+	}
+
+    println "REANIMATOR >>> dude mg = " local.dude.mg
+
+	if (local.ent.mg)
+		local.ent thread Go local.ent.mg
+	else
+		local.ent thread Go local.dude
+
+end local.ent
+
+// ------------------------------------------------
+// Start the Spawned guy 
+// ------------------------------------------------
+Go local.place:
+
+	self forceactivate
+	self exec global/enable_ai.scr
+	self.enableEnemy = 0
+	// I am not sure if this would be good for everyone instead I just wanted to make sure this worked for the mg42 guys, JP 81203
+	if(self.mg)
+	{	
+		if(self.team == "german")
+		{
+			// I think this is never ever used
+			if(self.nationality == "it")
+				self gun "moschetto"
+			else
+				self gun "mp40"	
+		}
+		else if(self.team == "american")
+			self gun "thompson"
+		self pophelmet
+		self.movedoneradius = 100
+	}
+	// The bug was that guys were looking confused because they could not get close enough, instead I just made close enough farther
+	// -----------------------------------------------------------------------------------------------------------------
+	self runto	local.place
+	self waittill movedone
+    if (self && (isalive self) && self.mg)// && (vector_length (self.origin - self.mg.origin) < 100))
+    {
+        println "REANIMATOR >>> Spawned guy " self " has a machine gun, enabling ...."
+        $(self.mg) thread global/mg42init.scr::AttachGuyToMG42 self
+    }
+	self.enableEnemy = 1
+
+end
+
+

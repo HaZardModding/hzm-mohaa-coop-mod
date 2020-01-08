@@ -1,0 +1,1581 @@
+//==========================================================================================================//
+// LEVEL: 				M4L3																				//
+// CAMPAIGN: 			Behind Enemy Lines																	//
+// TITLE:				"The Paper Chase"	AKA the level that almost wasn't								//
+// GEOMETRY/DESIGN: 	Steve Fukuda, Benson Russell														//
+// SCRIPTING:			Benson Russell, Steve Fukuda, Mackey McCandlish										//
+// Initially modified for coop purposes by Criminal															//
+//==========================================================================================================//
+
+// INIT SECTION
+//=========================================================================
+main:{
+//=========================================================================
+	level.coopNextMap = "briefing/briefing5"	//Pasted by Criminal for coop comp. - set next map (for mom voteing)
+	level.coopPrevMap = "maps/m4l3"				//Pasted by Criminal for coop comp. - set previouse map (for mom voteing)
+	level.coop_aaMap = 1						//Pasted by Criminal for coop comp. - let global scripts know this is a AA level
+	level.coop_forcePrimary		= "weapons/ThompsonSMG.tik"		//chrissstrahl - force weapon on spawn
+	level.coop_forceSecondary	= "weapons/silencedpistol.tik"	//chrissstrahl - force weapon on spawn	
+	thread coop_mod/main.scr::main         	//Pasted by Criminal for coop comp. - start coop mod extensions
+	
+	soundtrack music/m4l3.mus
+	exec global/alarmer.scr //ERR: Criminal //chrissstrahl - i think it is fixed now, reactivated it
+	
+	thread coop_upatePlayerSpawn //chrissstrahl - update spawns based on progress
+
+	exec global/loadout.scr maps/m4l3.scr
+	exec global/spotlight.scr
+	exec global/ai.scr
+	exec global/cardgame.scr
+
+	$endgate_left notsolid
+	$endgate_right notsolid
+	$truckgate notsolid
+	level waittill prespawn
+
+	$world farplane 1500
+	$world farplane_color (.1 .1 .14)
+
+	fadeout .1 0 0 0 1
+
+	thread level_prep
+	thread ai_prep
+	thread variable_prep
+	
+	//thread global/barrel.scr::explosive_barrel
+	for (local.i=1;local.i<$explosive_barrel_launch.size+1;local.i++){
+		$explosive_barrel_launch[local.i] thread deleteself
+	}
+
+	for (local.i=1;local.i<$explosive_barrel_launch_dummy.size+1;local.i++){
+		$explosive_barrel_launch_dummy[local.i] thread deleteself
+	}
+
+	for (local.i=1;local.i<$explosive_barrel.size+1;local.i++){
+		$explosive_barrel[local.i] thread deleteself
+	}
+
+	thread global/door_locked.scr::lock
+	exec global/ambient.scr m4l3
+
+	//level waittill spawn - Criminal
+	waitthread coop_mod/replace.scr::waitForPlayer // Criminal - coop comapbitility.
+
+	$tank1 notsolid
+	$tank2 notsolid
+	$tank1_turret notsolid
+	$tank2_turret notsolid
+
+	$truckblock hide
+
+	$manon.health = 50000
+	$manon.avoidplayer = 0
+	$manon leash 0
+	$manon.mindist = 0
+	$manon.maxdist = 2000
+	$endgate_left solid
+	$endgate_right solid
+	$truckgate solid
+	$endgate_left disconnect_paths
+	$endgate_right disconnect_paths
+	$truckgate disconnect_paths
+
+	//$player.alarmoff = level.time + 1 //chrissstrahl
+	level.alarmer_alarmoff = level.time + 1 //chrissstrahl - make coop compatible ($player array issue)
+	level.spawneddogs = 0
+	level.totalbaddies = 0
+	level.flags[ending] = 0
+
+	waitthread global/objectives.scr::add_objectives 1 2 "Infiltrate the perimeter." $objective1.origin
+	waitthread global/objectives.scr::current_objectives 1
+	wait 1
+
+	thread intro_truck
+	thread truckgate_mechanic
+
+	//*** end level trigger warning not all objectives are complete
+	thread endgate_warning
+
+	//*** give the player some binoculars
+	//thread global/items.scr::add_item "binoculars"
+	
+	//*** play the music track
+	//$player stufftext "tmstartloop sound/music/mus_15a_mystery.mp3" // Criminal.
+	exec coop_mod/replace.scr::tmstartloop "sound/music/mus_15a_mystery.mp3" //Criminal - coop comapbitility.
+
+	//	thread cheatend
+
+	for (local.i=1;local.i<$enemy.size+1;local.i++){
+		if ($enemy[local.i].type != NIL){
+			if (($enemy[local.i].deleteable != NIL) && (randomint(100) > 78)){
+				$enemy[local.i] thread killthyself
+			}else if ($enemy[local.i].type == -1){
+				$enemy[local.i] thread killthyself
+			}else if ($enemy[local.i].type == 1){
+				$enemy[local.i] ammo_grenade (randomint(4) + 1)
+				$enemy[local.i] noticescale 95
+				$enemy[local.i] accuracy 30
+				$enemy[local.i] gun "MP40"
+				$enemy[local.i] fov 90
+				$enemy[local.i] sight 1400
+				$enemy[local.i] hearing 1200
+				$enemy[local.i] mindist 100
+				$enemy[local.i] maxdist 500
+				$enemy[local.i] leash 600
+				$enemy[local.i] type_attack "cover"
+
+			}else if ($enemy[local.i].type == 2){
+				$enemy[local.i] ammo_grenade (randomint(4) + 1)
+				$enemy[local.i] noticescale 85
+				$enemy[local.i] accuracy 30
+				$enemy[local.i] fov 90
+				$enemy[local.i] sight 1400
+				$enemy[local.i] hearing 1200
+				$enemy[local.i] mindist 300
+				$enemy[local.i] maxdist 800
+				$enemy[local.i] leash 600
+				$enemy[local.i] type_attack "cover"
+
+			}else if ($enemy[local.i].type == 3){
+				$enemy[local.i] ammo_grenade (randomint(4) + 1)
+				$enemy[local.i] noticescale 75
+				$enemy[local.i] accuracy 35
+				$enemy[local.i] fov 90
+				$enemy[local.i] sight 1400
+				$enemy[local.i] hearing 1200
+				$enemy[local.i] mindist 0
+				$enemy[local.i] maxdist 700
+				$enemy[local.i] leash 600
+				$enemy[local.i] type_attack "cover"
+
+			}else if ($enemy[local.i].type == 4){
+				$enemy[local.i] noticescale 65
+				$enemy[local.i] accuracy 40
+				$enemy[local.i] fov 90
+				$enemy[local.i] sight 1400
+				$enemy[local.i] hearing 1200
+				$enemy[local.i] mindist 100
+				$enemy[local.i] maxdist 700
+				$enemy[local.i] leash 600
+				$enemy[local.i] type_attack "cover"
+			}else if ($enemy[local.i].type == 5){
+				$enemy[local.i] noticescale 35
+				$enemy[local.i] accuracy 60
+				$enemy[local.i] fov 90
+				$enemy[local.i] sight 1400
+				$enemy[local.i] hearing 1200
+				$enemy[local.i] mindist 100
+				$enemy[local.i] maxdist 800
+				$enemy[local.i] leash 600
+				$enemy[local.i] type_attack "cover"
+			}
+		}
+
+		if ($enemy[local.i].phone != NIL){
+			$enemy[local.i] hearing 0
+		}
+		//$enemy[local.i] thread enemythink
+	}
+	
+	//chrissstrahl - spawn trigger moving player back on to map
+	//TrapperKiller found a spot where players can fall off the map (rare)
+	spawn "trigger_multiple" "targetname" "coop_returnToMap" "setthread" "coop_returnMe" "origin" "-3691 -4142 -380"
+	waitframe
+	$coop_returnToMap setsize ( -50 -50 -300 ) ( 50 50 0 )
+}end
+
+//=========================================================================
+kill_baby_step local.set:{
+//=========================================================================
+	for (local.i=1;local.i<$baby_step.size+1;local.i++){
+		if ($baby_step[local.i].set == local.set){
+			$baby_step[local.i] thread dead_baby
+		}
+	}
+}end
+
+//=========================================================================
+deleteself:{
+//=========================================================================
+	wait 2
+	self delete
+}end
+
+//=========================================================================
+dead_baby:
+//=========================================================================
+{
+	wait 1
+	self.target delete
+	self delete
+}end
+
+//=========================================================================
+baby_step local.set:{
+//=========================================================================
+	end // No baby steps for you!
+
+	for (local.i=1;local.i<$baby_step.size+1;local.i++)
+	{
+		if (($baby_step[local.i].set == local.set) && ($baby_step[local.i].group == 1))
+		{
+			$baby_step[local.i] thread baby_stepper
+		}
+	}
+}end
+
+//=========================================================================
+baby_stepper:{
+//=========================================================================
+	if (self.already_started == NIL){
+		self.already_started = 1
+		set_objective_pos self.origin
+		self waittill trigger
+		set_objective_pos self.target.origin
+
+		local.break = 0
+		local.ent = self
+		while (local.break == 0)
+		{
+			local.newent = -1
+
+			for (local.i=1;local.i<$baby_step.size+1;local.i++)
+			{
+				if (($baby_step[local.i].set == local.ent.set) && ($baby_step[local.i].group == local.ent.group + 1))
+				{
+					local.newent = $baby_step[local.i]
+				}
+			}
+
+			if (local.newent != -1)
+			{
+				local.ent delete
+				local.ent = local.newent
+				local.ent waittill trigger
+				set_objective_pos local.ent.target.origin
+			}
+			else
+			{
+				local.break = 1
+			}
+		}
+	}
+}end
+
+//=========================================================================
+killthyself:{
+//=========================================================================
+	wait 4
+	//self damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	self delete
+}end
+
+//=========================================================================
+phone:{
+//=========================================================================
+	for (local.i=1;local.i<$enemy.size+1;local.i++){
+		if ($enemy[local.i].phone != NIL){
+			$enemy[local.i] thread phoneman
+		}
+	}
+}end
+
+//=========================================================================
+phoneman:{
+//=========================================================================
+	self hearing 1000
+	if (self.thinkstate != "idle"){
+		self exec global/disable_ai.scr
+		//self runto $player // Criminal.
+		self exec coop_mod/replace.scr::runtoClosest //Criminal - coop comapbitility.
+		wait 0.5
+		self exec global/enable_ai.scr
+	}
+
+	while (isalive self){
+		//self runto $player // Criminal.
+		self exec coop_mod/replace.scr::runtoClosest //Criminal - coop comapbitility.
+		self waittill movedone
+		waitframe
+	}
+}end
+
+//=========================================================================
+alarmer:{
+//=========================================================================
+	/* empty, here for reference */
+}end
+
+//=========================================================================
+dogsno:{
+//=========================================================================
+	end
+	if (level.dogs == 1){
+		level.dogs = -1
+		for (local.i=1;local.i<$spawned_dog.size+1;local.i++){
+			if (isalive $spawned_dog[local.i]){
+				$spawned_dog[local.i] exec global/disable_ai.scr
+				if (randomint(100) > 50){
+					$spawned_dog[local.i] runto $dogsleft
+				}else{
+					$spawned_dog[local.i] runto $dogsright
+				}
+
+			}
+
+		}
+	}
+}end
+
+//=========================================================================
+dogsyes:{
+//=========================================================================
+	end
+	if (level.dogs == -1){
+		level.dogs = 1
+		for (local.i=1;local.i<$spawned_dog.size+1;local.i++){
+			if (isalive $spawned_dog[local.i]){
+				$spawned_dog[local.i] exec global/enable_ai.scr
+			}
+		}
+	}
+}end
+
+//=========================================================================
+ending_spawner1:{
+//=========================================================================
+	if (self.timecheck == NIL){
+		self.timecheck = level.time - 5
+	}
+
+	if (level.time > self.timecheck){
+		if (level.flags[ending] == 0){
+			self.timecheck = level.time + randomfloat(3)
+			if (level.totalbaddies < 2){
+				thread global/ai.scr::spawn 100
+			}
+		}
+	}	
+}end
+
+//=========================================================================
+ending_spawner2:{
+//=========================================================================
+	if (self.timecheck == NIL){
+		self.timecheck = level.time - 5
+		thread global/ai.scr::spawndog (randomint(2) + 1)
+	}
+
+	if (level.time > self.timecheck){
+		if (level.flags[ending] == 0){
+			self.timecheck = level.time + randomfloat(5) + 2
+	
+			if (level.totalbaddies < 3){
+				thread global/ai.scr::spawn 100
+			}
+		}
+	}	
+}end
+
+//=========================================================================
+ending_spawner3:{
+//=========================================================================
+	if (self.timecheck == NIL){
+		self.timecheck = level.time - 5
+	}
+
+	if (level.time > self.timecheck){
+		if (level.flags[ending] == 0){
+			self.timecheck = level.time + randomfloat(3) + 1
+
+			if (level.spawneddogs < 1){
+				thread global/ai.scr::spawndog (randomint(2) + 1)
+			}
+			if (level.totalbaddies < 1){
+				thread global/ai.scr::spawn 100
+			}
+		}
+	}		
+}end
+
+//=========================================================================
+ending_spawner4:{
+//=========================================================================
+	if (self.timecheck == NIL){
+		self.timecheck = level.time - 5
+	}
+
+	if (level.time > self.timecheck){
+		if (level.flags[ending] == 0){
+			self.timecheck = level.time + randomfloat(3) + 1
+			if (level.spawneddogs < 1){
+				thread global/ai.scr::spawndog 3 200
+			}
+		}
+	}		
+}end
+
+//=========================================================================
+dogthink:{
+//=========================================================================
+	self mindist 500
+	self noticescale 1
+	self.nosurprise = 1
+
+	level.totalbaddies++
+	thread dogdie
+	while (isalive self){
+		//self runto $player // Criminal.
+		self exec coop_mod/replace.scr::runtoClosest //Criminal - coop comapbitility.
+		self waittill movedone
+		wait 1
+	}
+}end
+
+//=========================================================================
+dogdie:{
+//=========================================================================
+	self waittill death
+	level.totalbaddies--
+}end
+
+//=========================================================================
+alarm_player_reset:{
+//=========================================================================
+	thread global/alarmer.scr::alarm_player_reset
+}end
+
+
+// INIT THREADS
+// init variables
+//=========================================================================
+variable_prep:{
+//=========================================================================
+	println "XXX Prepping the variables"
+
+	//*** set the script file
+	level.script = "maps/m4l3.scr"
+
+	//*** truck gate variables
+	$truckgate.isinuse = 0
+	$truckgate.isopen = 0
+
+	//*** objectives
+	level.objective_infiltrate_perimeter = 0
+	level.objective_false_communique = 0
+	level.objective_steal_manifest = 0
+	level.objective_steal_battleplans = 0
+	level.objective_get_tigerii_info = 0
+
+	//*** exit the level
+	level.must_exit = 0
+
+	//*** secret objective variables
+	level.tank1_bomb_planted = 0
+	level.tank2_bomb_planted = 0
+	level.tank1_patrol_iswatching = 0
+	level.tank2_patrol_iswatching = 0
+}end
+
+
+
+// prep the level, set initial time values,
+// move objects to starting positions
+//=========================================================================
+level_prep:{
+//=========================================================================
+	println "XXX Prepping the level"
+
+	//*** make stuff non-solid
+	$faketruck_model notsolid
+	$faketruck_collision notsolid
+
+	//*** flak 30 stuff
+	$20mm_weapon1 anim 30degrees
+	$20mm_weapon2 anim 60degrees
+
+	//***********************
+	//*** opel trucks setup
+
+	//*** attack the spotlights
+	// exec global/spotlight.scr::corona $opeltruck_start_exit "light left"
+	// exec global/spotlight.scr::corona $opeltruck_start_exit "light right"
+
+	$faketruck_model anim idlelights
+
+	//*** binding the fake opel starting truck together
+	$faketruck_playerspot bind $faketruck_model
+
+	//*** binding the end opel truck
+	$opeltruck_end_playerspot bind $opeltruck_end
+	$opeltruck_end notsolid
+
+	//*** turn off the secret objective stuff
+	$tank1_bomb_trigger nottriggerable
+	$tank2_bomb_trigger nottriggerable
+	$tank1_bomb hide
+	$tank2_bomb hide
+}end
+
+
+
+// prep the ai
+//=========================================================================
+ai_prep:{
+//=========================================================================
+	println "XXX Prepping the AI"
+
+	//*** opel truck driver
+	$realtruck_driver exec global/disable_ai.scr
+	$realtruck_driver anim opel_driver
+	$realtruck_driver nodamage
+	$realtruck_driver notsolid
+	$realtruck_driver.weapon = "none"
+
+	//*** activate the mg42 turrets
+	$mg42_truckgate thread global/mg42_active.scr::mg42
+	$mg42_ending thread global/mg42_active.scr::mg42 2000
+
+	//*** endlevel mg42 turret disable
+	// $mg42_endlevel_gunner exec global/disable_ai.scr
+	// $mg42_endlevel_spotter exec global/disable_ai.scr
+	
+	//*** prep manon
+	$manon nodamage
+}end
+
+
+// prep the player
+//=========================================================================
+player_prep:{
+//=========================================================================
+	//*** Allied weapons
+	//$player item weapons/colt45.tik
+	//$player item weapons/silencedpistol.tik 						// Criminal - Player got this originaly.
+	exec coop_mod/replace.scr::item weapons/silencedpistol.tik 		//	Criminal - coop comapbitility.
+	//$player item weapons/m1_garand.tik
+	//$player item weapons/Springfield.tik
+	//$player item weapons/ThompsonSMG.tik 							// Criminal - Enabled to time of weapons fix.
+	//exec coop_mod/replace.scr::item weapons/ThompsonSMG.tik 		// Criminal - coop comapbitility.
+	//$player item weapons/BAR.tik
+	//$player item weapons/M2frag_grenade_sp.tik
+	//$player item weapons/bazooka.tik
+	//$player item weapons/shotgun.tik 								// Criminal - Player got this originaly - Disabled.
+
+	//*** German weapons
+	//$player item weapons/P38.tik    								
+	//$player item weapons/KAR98.tik
+	//$player item weapons/KAR98sniper 								// Criminal - Player got this originaly - Disabled.
+	//$player item weapons/mp40.tik 								// Criminal - Player got this originaly - Disabled.
+	//$player item weapons/mp44.tik
+	//$player item weapons/steilhandgranate.tik 				 	// Criminal - Player got this originaly.
+	exec coop_mod/replace.scr::item weapons/steilhandgranate.tik 	// Criminal - coop comapbitility.
+	//$player item weapons/panzerschreck.tik
+	
+	//*** give ammo
+	//$player ammo pistol 80 									// Criminal - Player got this ammo originaly
+	exec coop_mod/replace.scr::ammo pistol 80 					// Criminal - coop comapbitility.
+	//$player ammo rifle 200 									// Criminal - Player got this originaly - Disabled.
+	//$player ammo smg 200 										// Criminal - Player got this ammo originaly
+	exec coop_mod/replace.scr::ammo smg 200 					// Criminal - coop comapbitility.
+	//$player ammo mg 400
+	//$player ammo grenade 6  									// Criminal - Player got this ammo originaly
+	exec coop_mod/replace.scr::ammo grenade 6 					// Criminal - coop comapbitility.
+	//$player ammo shotgun 92									// Criminal - Player got this ammo originaly - Disabled.
+	//$player ammo heavy 92										// Criminal - Player got this ammo originaly - Disabled.
+
+	//*** which gun the player will ready at the start
+	//$player useweaponclass pistol
+	//$player useweaponclass rifle
+	//$player useweaponclass smg
+	//$player useweaponclass mg
+	//$player useweaponclass grenade
+	//$player useweaponclass heavy 								// Criminal - Player used this class originaly - Disabled.
+	//$player useweaponclass heavy
+}end
+
+
+
+// GAME OBJECT BACKGROUND THREADS
+// warning trigger for end of level
+//=========================================================================
+endgate_warning:{
+//=========================================================================
+	while(1){
+		$trigger_endgate_warning waittill trigger
+
+		iprintlnbold "You have not completed all of the objectives."
+		wait 6
+	}
+}end
+
+
+// autosave for the end of the level
+//=========================================================================
+end_autosave:{
+//=========================================================================
+	if(level.gametype != 0){ end } //chrissstrahl - fuck off in coop
+	//*** autosave the game
+	exec global/autosave.scr 3
+}end
+
+// GAME THREADS
+//  intro truck ride into the compound
+//=========================================================================
+intro_truck:{
+//=========================================================================
+	//*** temporarily set the disguise so the AI won't shoot at him
+	if(level.gametype == 0){ //chrissstrahl - sp
+		$player.has_disguise = 1
+	}else{ //chrissstrahl - mp/coop
+		exec coop_mod/replace.scr::threatbias ignoreme	//Criminal
+	}
+	
+	/*
+	// Crim - Takeall is enough.
+	//*** German weapons
+	$player take weapons/P38.tik    
+	$player take weapons/KAR98.tik
+	$player take weapons/KAR98sniper.tik
+	$player take weapons/mp40.tik
+	$player take weapons/mp44.tik
+	$player take weapons/steilhandgranate.tik
+	$player take weapons/panzerschreck.tik
+	*/
+
+	//*** put the player into the truck
+	//$player glue $faketruck_playerspot 0 					// Criminal.
+	exec coop_mod/replace.scr::glue $faketruck_playerspot 0	// Criminal - coop compabitility.
+	//$player physics_off 									// Criminal - coop glue handles that.
+
+	//*** jitter routine for the player
+	level.intruck = 1
+	thread intro_truck_jitter
+
+	//*** lock the players view
+	level.lockview = 1
+	thread intro_truck_lockview
+
+	//*** thread to open the gate
+	thread intro_truck_opengate
+
+	//*** play the sound for the ride
+	$faketruck_model playsound m4l3_truck1
+
+	//*** fade the view in
+	fadein 2 0 0 0 1
+
+	//*** get the truck moving on its path
+	$faketruck_model followpath $faketruck_entrypath
+	$faketruck_model waitmove
+
+	//*** play the sound for idling
+	$faketruck_model loopsound m4l2_truckidle
+
+	//*** re-activate the player and give him his weapons back
+	$faketruck_collision solid
+	//$player physics_on 									// Criminal - coop unglue handles that.
+	//$player unglue 										// Criminal - coop unglue handles that.
+	exec coop_mod/replace.scr::unglue 						// Criminal - coop compabitility.
+	exec coop_mod/replace.scr::show							// Criminal - added to prevent weapon disapearing issues.
+	exec coop_mod/replace.scr::threatbias 10				// Criminal - coop compabitility.
+
+	level.intruck = 0
+	//thread player_prep
+
+	//*** autosave the game
+	exec global/autosave.scr 1
+	wait .5
+
+	//$player playsound dfr_m4l3_add06  //go, now, quickly 	// Criminal.
+	exec coop_mod/replace.scr::playsound dfr_m4l3_add06		// Criminal - coop compabitility.
+}end
+
+
+
+//  open the startgates
+//=========================================================================
+intro_truck_opengate:{
+//=========================================================================
+	$startgate_left time 5
+	$startgate_right time 5
+
+	wait 1.75
+	thread intro_truck_leftgate
+
+	wait 1
+	thread intro_truck_rightgate
+
+}end
+
+
+
+//  dude opening left gate
+//=========================================================================
+intro_truck_leftgate:{
+//=========================================================================
+	$startgate_left rotateyup 100
+	$startgate_left move
+
+	//*** play the gate open sound
+	$startgate_left playsound m4l3_gateopen
+	wait 2
+
+	//*** make the guy walk his path
+	$startgate_left_dude exec global/walkto.scr $startgate_left_path_open
+	$startgate_left_dude waittill movedone
+	wait .75
+
+	$startgate_left_dude exec global/turnto.scr $faketruck_model
+	$startgate_left_dude lookat $faketruck_model
+	wait 5
+
+	$startgate_left_dude exec global/turnto.scr NULL
+}end
+
+
+
+//  dude opening right gate
+//=========================================================================
+intro_truck_rightgate:{
+//=========================================================================
+	$startgate_right rotateydown 100
+	$startgate_right move
+
+	//*** play the gate open sound
+	$startgate_right playsound m4l3_gateopen
+	wait 2
+
+	//*** make the guy walk his path
+	$startgate_right_dude exec global/walkto.scr $startgate_right_path_open
+	$startgate_right_dude waittill movedone
+	wait .75
+
+	$startgate_right_dude exec global/turnto.scr $faketruck_model
+	$startgate_right_dude lookat $faketruck_model
+	wait 5
+
+	$startgate_right_dude exec global/turnto.scr NULL
+}end
+
+//  shaking the players view while riding the truck
+//=========================================================================
+intro_truck_jitter:{
+//=========================================================================
+	while (level.intruck == 1){
+	        if (level.intruck == 1){
+				waitexec global/earthquake.scr .3 .1 0 0
+	        }
+ 	        if (level.intruck == 1){
+				waitexec global/earthquake.scr 3 .05 0 0
+	        }
+	        if (level.intruck == 1){
+				waitexec global/earthquake.scr .5 .15 0 0
+	        }
+ 	        if (level.intruck == 1){
+				waitexec global/earthquake.scr 1.5 .05 0 0
+	        }
+	        if (level.intruck == 1){
+				waitexec global/earthquake.scr .2 .2 0 0
+	        }
+	        if (level.intruck == 1){
+				waitexec global/earthquake.scr 3 .05 0 0
+	        }
+	}
+}end
+
+//  lock the players view once beyond the gate
+//=========================================================================
+intro_truck_lockview:{
+//=========================================================================
+	$player.viewangles = (0 90 0)
+	end
+
+	while (level.lockview == 1){
+		if ($player.viewangles[1] < 20){
+			local.x_angles = $player.viewangles[0]
+			local.y_angles = 20
+			local.z_angles = $player.viewangles[2]
+        	$player.viewangles = (local.x_angles local.y_angles local.z_angles)
+	    }
+		else if ($player.viewangles[1] > 160){
+			local.x_angles = $player.viewangles[0]
+			local.y_angles = 160
+			local.z_angles = $player.viewangles[2]
+        	$player.viewangles = (local.x_angles local.y_angles local.z_angles)        
+        }
+		waitframe
+	}
+}end
+
+
+
+//  unlock the players view once beyond the gate, and push the fog
+//=========================================================================
+intro_truck_unlockview:{
+//=========================================================================
+	//*** activate mg42 guys
+	$mg42_startfield thread global/mg42_active.scr::mg42 2048
+
+	//*** unlock the players view
+	level.lockview = 0
+
+	$startgate_right_dude lookat NULL
+	$startgate_left_dude lookat NULL
+
+	thread intro_truck_pushfog
+
+	//*** close the gate
+	wait 2
+	$startgate_left_dude exec global/walkto.scr $startgate_left_path_close
+	$startgate_left rotateydown 100
+	$startgate_left move
+
+	wait .5
+	$startgate_right_dude exec global/walkto.scr $startgate_right_path_close
+	$startgate_right rotateyup 100
+	$startgate_right move
+
+	$startgate_left_dude waittill movedone
+
+	//*** left gate dude and officer have conversation
+	wait .5
+	$startgate_left_dude exec global/walkto.scr $startgate_left_dude_path
+	$startgate_left_dude waittill movedone
+
+	wait .75
+	//*** start the driver talking to powell
+	thread intro_truck_dialog
+}end
+
+//  the driver talks to Powell
+//=========================================================================
+intro_truck_dialog:{
+//=========================================================================
+	wait 2
+	//$player playsound dfr_m4l3_add03 wait 					// Criminal.
+	waitexec coop_mod/replace.scr::playsound dfr_m4l3_add03		// Criminal - coop comapbitility.
+	
+	 if(level.gametype==0){ // Criminal - do in SP.
+		$player waittill sounddone
+ 	}else{ // Criminal - do in MP.
+ 		for (local.i = 1; local.i <= $player.size; local.i++) {
+ 			local.player = $player[local.i];
+ 			if(local.player != NULL && local.player.dmteam != "spectator" && local.player.healt > 0){
+ 				local.player waittill sounddone
+ 			}
+ 		}
+ 	}	
+
+	//	wait .3
+	//	$player playsound dfr_m4l3_add04 wait  					//find a set of officers identifications.....
+	//	$player waittill sounddone
+
+	wait .3
+	// $player playsound dfr_m4l3_add05 wait					// Criminal.
+	waitexec coop_mod/replace.scr::playsound dfr_m4l3_add05		// Criminal - coop compabitility.
+ 	
+ 	if(level.gametype==0){ // Criminal - do in SP.
+		$player waittill sounddone
+ 	}else{ // Criminal - do in MP.
+ 		for (local.i = 1; local.i <= $player.size; local.i++) {
+ 			local.player = $player[local.i];
+ 			if(local.player != NULL && local.player.dmteam != "spectator" && local.player.healt > 0){
+ 				local.player waittill sounddone
+ 			}
+ 		}
+ 	}	
+}end
+
+//  push back the fog
+//=========================================================================
+intro_truck_pushfog:{
+//=========================================================================
+	for (local.i = 1500 ; local.i <= 2700 ; local.i += 50 ){
+		$world farplane local.i
+		wait .2
+	}
+}end
+
+
+
+//  player jumping off of truck
+//=========================================================================
+faketruck_playerexit:{
+//=========================================================================
+	local.firstOne = parm.other //chrissstrahl
+	
+	thread realtruck_drive
+
+	//$player.has_disguise = 1
+	//println "PLAYER JUMPED OFF OF TRUCK!!!"
+	$faketruck_model stoploopsound
+
+	if (level.gametype==0) { //Criminal - do in SP
+		$player.has_disguise = 0
+	}else{ // Criminal - do in MP.
+		exec coop_mod/replace.scr::has_disguise 0
+		
+		//chrissstrahl - let us try to resolve some issues
+		//first player out will be fine, the others will be kicked out, sort of
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+			if(local.firstOne == local.player){
+				continue
+			}
+
+			if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" ){
+				exec coop_mod/main.scr::playerPlaceAtSpawn local.i
+			}
+		}
+	}
+
+	local.new_origin = $faketruck_model.origin
+	$faketruck_collision remove
+	$faketruck_model remove
+	
+	$realtruck immune bullet
+	$realtruck immune rocket
+	$realtruck immune explosion
+	$realtruck immune shotgun
+	$realtruck immune bash
+	$realtruck immune crush
+	$realtruck immune falling
+	$realtruck immune vehicle
+
+	$realtruck.origin = local.new_origin
+
+	// opel truck setup
+	exec global/spotlight.scr::corona $realtruck "light left"
+	exec global/spotlight.scr::corona $realtruck "light right"
+
+	$realtruck vehicleanim idlelights
+	$realtruck.corona = 1
+
+	$realtruck setcollisionentity $opeltruck_start_exit_collisionmask
+	$realtruck AttachDriverSlot 0 $realtruck_driver
+
+	//*** Start the startfield_inspectors approach and at the end of the scene, send the truck on its way.
+	thread startfield_truck_cutscene
+}end
+
+//  have the intro truck drive off to the gate and disappear
+//=========================================================================
+realtruck_drive:{
+//=========================================================================
+	//*** syntax
+	// <vehicle> drive <path> <speed> <accel> <200> <256>
+	// recommended speed for truck 100 - 400
+	// recommended accel for truck 40 - 100
+
+	$realtruck drive $realtruck_path 300 30 200 256
+	$realtruck waittill drive
+
+	$realtruck stop
+	$realtruck DetachDriverSlot 0 $realtruck_driver
+
+	$realtruck_driver remove
+	$realtruck remove
+
+}end
+
+//  trigger use for truck gate openning and closing
+//=========================================================================
+truckgate_mechanic:{
+//=========================================================================
+	println "TRUCKGATE: used the switch trigger"
+	//*** if the gate is in motion, wait
+	if ($truckgate.isinuse == 1){
+		println "TRUCKGATE: is in use already, aborting!"
+        goto truckgate_mechanic_skip
+    }
+	
+	$truckgate.isinuse = 1
+	
+	println "TRUCKGATE: isopen value: " $truckgate.isopen
+	
+	if ($truckgate.isopen == 1){
+		println "TRUCKGATE: the gate was open, closing!"
+		//*** animate the switch on
+		$truckgate_switch anim switch_turnon
+       	$truckgate_switch waittill animdone
+       	$truckgate_switch anim switch_on
+		
+		//*** move the gate
+       	$truckgate time 4
+       	$truckgate movewest 360
+       	$truckgate waitmove
+		$truckgate disconnect_paths
+		
+		//*** set the gate variable to open
+		$truckgate.isopen = 0        	
+    }else{
+		println "TRUCKGATE: the gate was closed, opening!"
+		//*** animate the switch
+        $truckgate_switch anim switch_off
+		
+		//*** move the gate	
+        $truckgate time 4
+        $truckgate moveeast 360
+        $truckgate waitmove
+		$truckgate connect_paths
+		
+		//*** set the gate variable to closed
+		$truckgate.isopen = 1
+	}
+	
+	$truckgate.isinuse = 0
+	truckgate_mechanic_skip:
+}end
+
+
+
+//  Accomplished the first objective infiltrate the perimeter
+//=========================================================================
+objective1_complete:{
+//=========================================================================
+	set_objective_pos $objective2.origin
+	waitthread global/objectives.scr::add_objectives 1 3
+
+	waitthread global/objectives.scr::add_objectives 2 2 "Send the false comminique." $objective2.origin
+	waitthread global/objectives.scr::add_objectives 3 2 "Steal the troop manifest." $troop_manifest.origin
+	waitthread global/objectives.scr::add_objectives 4 2 "Steal the battle plans." $battleplans2.origin
+
+	waitthread global/objectives.scr::current_objectives 2
+	thread baby_step 3
+	$mg42_front thread global/mg42_active.scr::mg42
+
+}end
+
+
+// send false communique
+//=========================================================================
+objective2_complete:{
+//=========================================================================
+	//*** only complete the objective if the dude is not alive
+	if !(isalive $radio_objective2){
+		$objective2 playsound m4l3_radiosend
+		
+		$objective2_complete_trigger remove
+		$objective2 model animate/military_radio.tik
+
+		waitthread global/objectives.scr::add_objectives 2 3
+		level.objective_false_communique = 1
+
+		thread check_current_objective
+		exec global/autosave.scr 4
+	}
+}end
+
+
+//*** troop manifest
+//=========================================================================
+objective3_complete:{
+//=========================================================================
+	$troop_manifest remove
+
+	waitthread global/items.scr::add_item "clipboard"
+	waitthread global/objectives.scr::add_objectives 3 3
+	
+	level.objective_steal_manifest = 1
+
+	thread check_current_objective
+	exec global/autosave.scr 5
+}end
+
+
+//*** battleplans
+//=========================================================================
+objective4_complete:{
+//=========================================================================
+	$battleplans1 remove
+	$battleplans2 remove
+	$battleplans3 remove
+
+	waitthread global/items.scr::add_item "battleplans"
+	waitthread global/objectives.scr::add_objectives 4 3
+	
+	level.objective_steal_battleplans = 1
+	thread check_current_objective
+	exec global/autosave.scr 6
+}end
+
+
+//*** tigerfible for Kingtiger
+//=========================================================================
+objective5_complete:{
+//=========================================================================
+	$tigerii_manual remove
+
+	waitthread global/items.scr::add_item "tigerii_manual"
+	waitthread global/objectives.scr::add_objectives 5 3
+
+	level.objective_get_tigerii_info = 1
+	thread check_current_objective
+	exec global/autosave.scr 7
+
+}end
+
+
+// check what objective to set as current
+//=========================================================================
+check_current_objective:{
+//=========================================================================
+	//*** check through the objectives and set the current one
+	if (level.objective_false_communique != 1){
+		waitthread global/objectives.scr::current_objectives 2
+		thread baby_step 3
+	}else if (level.objective_steal_manifest != 1){
+		waitthread global/objectives.scr::current_objectives 3
+		thread baby_step 4
+	}else if (level.objective_steal_battleplans != 1){
+		waitthread global/objectives.scr::current_objectives 4
+		thread baby_step 1
+	}else if (level.objective_get_tigerii_info != 1){
+		waitthread global/objectives.scr::current_objectives 5
+		thread baby_step 2
+	}
+
+	//*** check to see if all the objectives are completed, lead player to exit
+	if (level.objective_false_communique == 1 && level.objective_steal_manifest == 1 && level.objective_steal_battleplans == 1 && level.objective_get_tigerii_info == 1){
+		waitthread global/objectives.scr::add_objectives 6 2 "Escape and meet up with Manon." $meet_manon.origin
+		waitthread global/objectives.scr::current_objectives 6
+		
+		level.must_exit = 1
+		$trigger_endgate_warning remove
+		
+		//*** open the endgate
+		$endgate_left time 1
+		$endgate_right time 1
+
+		$endgate_right rotateyup 80
+		$endgate_right move
+		$endgate_left rotateydown 100
+		$endgate_left waitmove
+		$endgate_left connect_paths
+		$endgate_right connect_paths
+		$endgate_left disconnect_paths
+		$endgate_right disconnect_paths
+	}
+}end
+
+//=========================================================================
+cheatend:{
+//=========================================================================
+	waitthread global/objectives.scr::add_objectives 6 2 "Escape and meet up with Manon." $meet_manon.origin
+	waitthread global/objectives.scr::current_objectives 6
+
+	level.must_exit = 1
+	$trigger_endgate_warning remove
+
+	$endgate_left time 1
+	$endgate_right time 1
+	$endgate_right rotateyup 80
+	$endgate_right move
+	$endgate_left rotateydown 100
+	$endgate_left waitmove
+	$endgate_left connect_paths
+	$endgate_right connect_paths
+	$endgate_left disconnect_paths
+	$endgate_right disconnect_paths
+}end
+
+
+//  Add the objective to gather info on the Tiger II
+//=========================================================================
+objective5_add:{
+//=========================================================================
+	//*** remove the triggers
+	if ($objective5_trigger1) {$objective5_trigger1 remove}
+	if ($objective5_trigger2) {$objective5_trigger2 remove}
+	if ($objective5_trigger3) {$objective5_trigger3 remove}
+
+	//*** add the tank objective
+	waitthread global/objectives.scr::add_objectives 5 2 "Gather any intelligence on the new Tiger tank." $tigerii_manual.origin
+}end
+
+//  Manon calling to the player at the end of the level
+//=========================================================================
+manon_shout:{
+//=========================================================================
+	//*** have manon shout out to the player to get in the truck
+	$manon playsound dfr_M4L1_417
+	$opeltruck_end loopsound m4l2_truckidle
+}end
+
+
+
+//  end truck sequence
+//=========================================================================
+end_truck:{
+//=========================================================================
+	//*** put the player into the truck
+	level.flags[ending] = 1
+
+	//$player glue $opeltruck_end_playerspot 0 						// Criminal.
+	exec coop_mod/replace.scr::glue $opeltruck_end_playerspot 0		// Criminal - coop compabitility.
+
+	//	$player physics_off
+	//	$player.viewangles = (0 180 0)
+	
+	if(level.gametype == 0){ // Criminal - Do in SP.
+		$player nodamage
+		$player notsolid
+	}else{	// Criminal - Do in MP.
+		for (local.i = 1; local.i <= $player.size; local.i++) { 
+			local.player = $player[local.i];
+			if (local.player != NULL && local.player.dmteam != "spectator" && local.player.healt > 0) {
+				local.player nodamage
+				local.player notsolid
+			}
+		}
+	}
+
+	//*** roll the fog in
+	thread end_fog_pull
+
+	waitthread global/objectives.scr::add_objectives 6 3 "Escape and meet up with Manon." $meet_manon.origin
+
+	//*** manon shouts backto the player
+	$manon remove
+	$opeltruck_end playsound opeltruck_snd_dooropen
+	//$player playsound dfr_M4L1_418  					// Criminal.
+	exec coop_mod/replace.scr::playsound dfr_M4L1_418	// Criminal - coop compabitility.
+
+	wait 2
+	$opeltruck_end playsound opeltruck_snd_doorclose
+
+	//play the sound for the ride
+	$opeltruck_end stoploopsound
+	$opeltruck_end playsound m4l3_truck2
+
+	//start the jittering
+	level.intruck = 1
+	thread intro_truck_jitter
+
+	//start the truck moving
+	//$opeltruck_end_collision bind $opeltruck_end
+	$opeltruck_end_collision delete
+	$truckblock bind $opeltruck_end
+	$opeltruck_end followpath $opeltruck_end_path
+	$opeltruck_end waitmove
+}end
+
+
+//  end level thread
+//=========================================================================
+end_level:{
+//=========================================================================
+	//*** end the level
+	if ((level.tank1_bomb_planted == 1) && (level.tank2_bomb_planted == 1)){
+		setcvar g_medal3 "1"
+	}else{
+		println ("tanks " + level.tank1_bomb_planted + " " + level.tank2_bomb_planted)
+	}
+
+	setcvar "g_m5l1" "1"
+	exec global/missioncomplete.scr briefing/briefing5
+}end
+
+
+//  pull in the fog as the truck goes away
+//=========================================================================
+end_fog_pull:{
+//=========================================================================
+	for (local.i = 2700 ; local.i <= 700 ; local.i -= 30 ){
+		$world farplane local.i
+		wait .2
+	}
+}end
+
+//  acquiring the tank1 radio bomb for secret objective
+//=========================================================================
+tank_bomb_pickup:{
+//=========================================================================
+	$tank1_bomb_pickup remove
+	$tank2_bomb_pickup remove
+
+	thread global/items.scr::add_item "explosives"
+
+	$tank1_bomb_trigger triggerable
+	$tank2_bomb_trigger triggerable
+	$tank1_bomb show
+	$tank2_bomb show
+}end
+
+//  planting the bomb on tank1
+//=========================================================================
+tank1_bomb_plant:{
+//=========================================================================
+	if (level.tank1_bomb_planted == 0){
+		level.tank1_bomb_planted = 1
+		
+		$tank1_bomb model animate/explosive.tik
+		//$tank1_bomb playsound radiobomb
+		$tank1_bomb playsound plantbomb
+		$tank1_bomb loopsound bombtick
+
+		thread global/ai.scr::spawn 101
+		//$player stopwatch 5 					// Criminal.
+		exec coop_mod/replace.scr::stopwatch 5 	// Criminal - coop compabitility.
+		wait 5
+
+		radiusdamage $tank1_bomb.origin 9000 450 
+		exec global/model.scr $tank1_bomb.origin "models/emitters/mortar_higgins.tik"
+
+		$tank1 playsound explode_tank
+		$tank1_bomb remove
+		$tank1 model "vehicles/kingtank_all_d.tik"
+		$tank1 notsolid
+		$tank1_turret delete // model "vehicles/kingcannon_d.tik"
+	}
+}end
+
+
+//  planting the bomb on tank2
+//=========================================================================
+tank2_bomb_plant:{
+//=========================================================================
+	if (level.tank2_bomb_planted == 0){
+		level.tank2_bomb_planted = 1
+
+		$tank2_bomb model animate/explosive.tik
+		//$tank2_bomb playsound radiobomb
+		$tank2_bomb playsound plantbomb
+		$tank2_bomb loopsound bombtick
+
+		thread global/ai.scr::spawn 102
+		//$player stopwatch 5 					// Criminal.
+		exec coop_mod/replace.scr::stopwatch 5 	// Criminal - coop compabitility.
+		wait 5
+
+		radiusdamage $tank2_bomb.origin 9000 450 
+		exec global/model.scr $tank2_bomb.origin "models/emitters/mortar_higgins.tik"
+
+		$tank1 playsound explode_tank
+		$tank2_bomb remove
+		$tank2 model "vehicles/kingtank_all_d.tik"
+		$tank2 notsolid
+		$tank2_turret delete // model "vehicles/kingcannon_d.tik"
+	}
+}end
+
+//*************************************************************
+//
+// AI THREADS
+// naming convention for AI is
+// $location_role# e.g. $bathroom_planningofficer2
+//
+//*************************************************************																				
+//										STARTFIELD SUPPORT THREADS																				
+//==============================================================================================================================================//
+
+//=========================================================================
+startfield_truck_cutscene:{
+//=========================================================================
+	//*** Called from faketruck_playerexit
+
+	//*** Start the inspectors on their patrol path and they will auto pause near the truck
+
+	//	$startfield_inspector1 thread global/patrol_path.scr::patrol $startfield_inspector1_node
+	//	$startfield_inspector2 thread global/patrol_path.scr::patrol $startfield_inspector2_node
+	//	$startfield_inspector1
+}end
+
+//============================================================//
+
+//=========================================================================
+startfield_inspector_truckpass:{
+//=========================================================================
+	//*** Called from one of the startfield_inspectors hitting a patrol node
+	//*** Pretend to be inspected for 5 seconds, then drive away
+
+	wait 5
+	
+	thread realtruck_drive
+}end
+
+
+//==============================================================================================================================================//
+//																																				//
+//											UTILITIES																							//
+//																																				//
+//==============================================================================================================================================//
+
+
+// move object
+// move_object <distance to move to|vector> <time to take>
+//=========================================================================
+move_object local.distance local.time:{
+//=========================================================================
+	//*** calculate how many moves it will have to make based on once/server frame
+	local.index = local.time / .05
+
+	//*** calculate the distance per move per axis
+	local.move_distance_x = local.distance[0] / local.index
+	local.move_distance_y = local.distance[1] / local.index
+	local.move_distance_z = local.distance[2] / local.index
+
+	//*** move the object every sever frame
+	for (local.i = 0 ; local.i <= local.time ; local.i += .05){
+		local.newx = local.self.origin[0] + local.move_distance_x
+		local.newy = local.self.origin[1] + local.move_distance_y
+		local.newz = local.self.origin[2] + local.move_distance_z
+
+		//*** set the new origin
+		local.self.origin = (local.newx local.newy local.newz)
+		
+		waitframe
+	}
+}end
+
+
+
+// jitter effect from mgs
+// jitter_mg [delay]
+//=========================================================================
+jitter_mg local.time:{
+//=========================================================================
+	if (local.time){
+		wait local.time
+	}
+
+	waitexec global/earthquake.scr .5 1 0 0
+	waitexec global/earthquake.scr .3 1 0 0
+}end
+
+
+
+// jitter effect from mgs in cover
+// jitter_mg_cover [delay]
+//=========================================================================
+jitter_mg_cover local.time:{
+//=========================================================================
+	if (local.time){
+		wait local.time
+	}
+
+	waitexec global/earthquake.scr .3 .5 0 0
+	waitexec global/earthquake.scr .3 .2 0 0
+}end
+
+
+// jitter effect from mgs in cover
+// jitter_small [delay]
+//=========================================================================
+jitter_small local.time:{
+//=========================================================================
+	if (local.time){
+		wait local.time
+	}
+
+	waitexec global/earthquake.scr .3 1 0 0
+	waitexec global/earthquake.scr .3 .75 0 0
+	waitexec global/earthquake.scr 1.25 .3 0 0
+}end
+
+
+// jitter medium effect
+// jitter_medium [delay]
+//=========================================================================
+jitter_medium local.time:{
+//=========================================================================
+	if (local.time){
+		wait local.time
+	}
+
+	waitexec global/earthquake.scr .23 2 0 0
+	waitexec global/earthquake.scr 1 1 0 0
+	waitexec global/earthquake.scr 1.25 .3 0 1
+}end
+
+
+// jitter large effect
+// jitter_large [delay]
+//=========================================================================
+jitter_large local.time:{
+//=========================================================================
+	if (local.time){
+		wait local.time
+	}
+
+	waitexec global/earthquake.scr .25 3 0 0
+	waitexec global/earthquake.scr .4 1.25 0 0
+	waitexec global/earthquake.scr 1 .75 0 0
+	waitexec global/earthquake.scr 1.25 .3 0 1
+}end
+
+
+// jitter effect from being next to artillery
+// jitter_artillery [delay]
+//=========================================================================
+jitter_artillery local.time:{
+//=========================================================================
+	if (local.time)
+	{
+		wait local.time
+	}
+
+	waitexec global/earthquake.scr .23 3 0 0
+	//waitexec global/earthquake.scr .3 .5 0 0
+}end
+
+//chrissstrahl - used to bring back the player to the map
+//=========================================================================
+coop_returnMe:{
+//=========================================================================
+	if( parm.other != NULL &&  parm.other.targetname == "player"){
+		thread coop_mod/main.scr::playerPlaceAtSpawn ( waitexec coop_mod/main.scr::getPlayerId parm.other )
+		exec coop_mod/main.scr::resetSpawn parm.other
+	}
+}
+
+//chrissstrahl - equip player especially for this level
+//=========================================================================
+coop_playerJustSpawned:{
+//=========================================================================
+	wait 1
+	if(self == NULL || self.health <= 0){ end }
+	
+	self ammo pistol 80
+	self ammo grenade 6
+}end
+
+coop_playerJustSpawned1: { $player[1] thread coop_playerJustSpawned } end
+coop_playerJustSpawned2: { $player[2] thread coop_playerJustSpawned } end
+coop_playerJustSpawned3: { $player[3] thread coop_playerJustSpawned } end
+coop_playerJustSpawned4: { $player[4] thread coop_playerJustSpawned } end
+coop_playerJustSpawned5: { $player[5] thread coop_playerJustSpawned } end
+coop_playerJustSpawned6: { $player[6] thread coop_playerJustSpawned } end
+coop_playerJustSpawned7: { $player[7] thread coop_playerJustSpawned } end
+coop_playerJustSpawned8: { $player[8] thread coop_playerJustSpawned } end
+
+
+//chrissstrahl - update spawnpoints based upon player adcancement
+//this function only exists because there are no triggers at the places
+//where we want the script to update the spawn locations
+//this is why we check if a player is near a specific location
+//============================================================================
+coop_upatePlayerSpawn:{
+//============================================================================
+//-4898 -700 -113 -> -3555 -870 200 --> y-- R:500 A:-174
+//-5182 1035 -6 -> -5986 1086 -9 --> x++ R:300
+
+	while( 1 ){
+		if( level.coop_upatePlayerSpawn_stage == NIL ){
+			if( exec coop_mod/replace.scr::withinDistance ( -4898 -700 -113 ) 500 ){
+				level.coop_upatePlayerSpawn_stage = 1
+				exec coop_mod/spawnlocations.scr::m4l3_update2
+			}
+		}
+		else{//below end bridge
+			if( exec coop_mod/replace.scr::withinDistance ( -5182 1035 -6 ) 4200){
+				level.coop_upatePlayerSpawn_stage = 2
+				exec coop_mod/spawnlocations.scr::m4l3_update3
+				end
+			}
+		}
+		wait 0.5
+	}
+}
+

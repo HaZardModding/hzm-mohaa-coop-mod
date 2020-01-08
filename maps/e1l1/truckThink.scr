@@ -1,0 +1,441 @@
+//
+// truckThink.scr
+//
+//=========================================================================
+init local.hp local.passengers local.model:
+//=========================================================================
+{
+	if (local.hp == NIL){
+		self.health = 4000
+	}
+	else {
+		self.health = local.hp
+	}
+
+	println "truck health: " self.health
+	//	thread global/vehicles_thinkers.scr::truck_INIT
+	thread truck_INIT
+
+	if ( (local.passengers != NIL) && (local.passengers != 0) ) {
+		//waitthread MyTruckLoad self local.passengers "models/human/german_panzer_grenadier"
+		//waitthread load self local.passengers "models/human/german_wehrmact_soldier"
+		waitthread load self local.passengers local.model
+	}
+
+	thread global/spotlight.scr::deadcorona self "light left" 
+	thread global/spotlight.scr::deadcorona self "light right"
+
+	self waittill death
+	self stop
+
+	if (self.collisionent != NULL){
+		self.collisionent disconnect_paths
+	}
+
+	thread truckExplode
+}end
+
+//=========================================================================
+truck_INIT:
+//=========================================================================
+{
+	self rendereffects "-shadow"
+	self takedamage
+	self solid
+	self removeondeath 0
+
+	if (self.nolights == 1){
+		self vehicleanim idlenolights
+	}
+	else{
+		self vehicleanim idlelights
+	}
+
+	if (self.target){
+		self.collisionent = self.target
+		//self.collisionent hide
+	}
+}end
+
+//=========================================================================
+load local.truck local.passengers local.guy_type:
+//=========================================================================
+{
+	self waitthread loadDriver local.guy_type local.truck
+
+	switch ( local.passengers ){
+		case 6:
+			self waitthread loadPassenger 4 local.guy_type local.truck
+		case 5:
+			self waitthread loadPassenger 1 local.guy_type local.truck
+		case 4:
+			self waitthread loadPassenger 5 local.guy_type local.truck
+		case 3:
+			self waitthread loadPassenger 2 local.guy_type local.truck
+		case 2:
+			self waitthread loadPassenger 6 local.guy_type local.truck
+		case 1:
+			self waitthread loadPassenger 3 local.guy_type local.truck
+		default:
+	}
+}end
+
+//=========================================================================
+loadDriver local.guy_type local.truck:
+//=========================================================================
+{
+	local.guy_type = "models/human/german_afrika_officer.tik"
+	local.driver = spawn local.guy_type "gun" "none"
+	local.driver.truck = local.truck
+	local.driver.origin = self.origin
+	local.driver rendereffects "-shadow"
+
+	self AttachDriverSlot 0 local.driver
+	local.driver exec global/disable_ai.scr
+	local.driver anim 00A004_driversitstill
+
+	self.driver = local.driver
+	self.driver.driving = 1
+	self.driver.done_unloading = 0
+	local.driver exec global/setdeathanim.scr "opel_driver_death"
+}end
+
+//=========================================================================
+loadPassenger local.slot local.guy_type local.truck:
+//=========================================================================
+{
+	if (local.guy_type == NIL){
+		local.guy_type = "models/human/german_afrika_private"
+	}
+
+	if ((randomint 100) < 750){
+		local.gun = "Bazooka"
+		local.accuracy = 100
+	}
+	else{
+		local.gun = "mg42"
+		local.guy.accuracy = 70 + (randomint 30)
+	}
+
+	local.guy 		 = spawn local.guy_type "gun" local.gun
+	local.guy.truck  = local.truck
+	local.guy.origin = self.origin
+	local.guy rendereffects "-shadow"
+	local.guy.done_unloading = 0
+	local.guy dontdropweapons              
+
+	local.guy.sight 	= 4096
+	local.guy.hearing 	= 4096
+	local.guy.accuracy 	= local.accuracy
+
+	// don't prone while on vehicle!
+	local.guy.ainoprone  = 1
+	local.guy.ainocrouch = 1
+
+	self.passenger[local.slot]	= local.guy
+	if ( local.passenger_name!=NIL ){
+		local.guy.targetname = local.passenger_name
+	}
+
+	if (level.dontdropweapons == 1){
+		local.guy dontdropweapons
+	}
+
+	self AttachPassengerSlot local.slot local.guy
+	local.guy type_attack "cover"
+	local.guy leash 0
+	local.guy fixedleash 1
+	local.guy physics_off
+	local.guy hearing 1024
+	local.guy sight   1536
+		
+	switch (local.slot){
+		case 1:
+			local.guy exec global/setdeathanim.scr "death_headpistol"
+			break
+		case 2:
+			local.guy exec global/setdeathanim.scr "death_crotch"
+			break
+		case 3:
+			local.guy exec global/setdeathanim.scr "death_left"
+			break
+		case 4:
+			local.guy exec global/setdeathanim.scr "death_run"
+			break
+		case 5:
+			local.guy exec global/setdeathanim.scr "death_shoot"
+			break
+		case 6:
+			local.guy exec global/setdeathanim.scr "death_right"
+			break
+		default:
+			local.guy exec global/setdeathanim.scr "death_collapse"
+			break
+	}
+
+	local.guy thread stopTruckOnPain
+	local.guy thread stopTruckOnDeath
+	local.guy thread stopTruckOnEnemy
+}end
+
+//=========================================================================
+truckStop:
+//=========================================================================
+{
+	// drive for at least three seconds
+	local.timeLeft = 3-(level.time-self.driveStartTime)
+	if (local.timeLeft > 0){
+		wait local.timeLeft
+	}
+	self stop
+}end
+
+//=========================================================================
+stopTruckOnEnemy:
+//=========================================================================
+{
+	while (self != NIL && self != NULL && (self.enemy == NIL || self.enemy == NULL)){
+		wait 0.5
+	}
+
+	if (self != NIL && self != NULL && self.enemy != NIL && self.enemy != NULL){
+		self.truck waitthread truckStop
+	}
+}end
+
+//=========================================================================
+stopTruckOnPain:
+//=========================================================================
+{
+	self waittill pain
+	self.truck waitthread truckStop
+}end
+
+//=========================================================================
+stopTruckOnDeath:
+//=========================================================================
+{
+	self waittill death
+	self.truck waitthread truckStop
+}end
+
+//=========================================================================
+truckExplode:
+//=========================================================================
+{
+	thread PassengersDie
+	local.type = "green"
+	self show
+
+	if ( self.driver!=NIL && self.driver.driving==1 ){
+		self.driver exec global/bullethit.scr (0 0 250) 500 0 1
+	}
+
+	self playsound explode_truck
+	exec global/earthquake.scr .2 4 0 0	
+	local.explosion1 = spawn script_model model models/fx/fx_truck_explosion.tik
+	local.explosion1.origin = self gettagposition "engine1"
+	local.explosion1.angles = self gettagangles "engine1"
+	local.explosion1 anim start
+	local.explosion1 notsolid
+	wait .4
+
+	self playsound explode_truck
+	exec global/earthquake.scr .2 4 0 0	
+	local.explosion2 = spawn script_model model models/fx/fx_truck_explosion.tik
+	local.explosion2.origin = self gettagposition "engine2"
+	local.explosion2.angles = self gettagangles "engine2"
+	local.explosion2 anim start
+	local.explosion2 notsolid
+
+	//chrissstrahl - make coop compatible
+	if(level.gametype == 0){
+		if($player istouching self.collisionent){
+			$player normal_damage 100
+		}	
+	}
+	else{
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player =  $player[local.i]
+			if( local.player != NULL && local.player istouching self.collisionent){
+				if( local.player.dmteam != "spectator" && local.player.health > 0 ){
+					local.player normal_damage 10000
+				}
+			}
+		}
+	}
+
+	if ( (level.script == "maps/t2l2") && (isAlive $t2l2_cab_diver) ){
+		$t2l2_cab_diver removeimmune "explosion"
+		$t2l2_cab_diver waitexec global/setdeathanim.scr "22A222_DeathTruck"
+		$t2l2_cab_diver damage $world 10000 $world (0 0 0) (0 0 0) (0 0 0) 0 0 9 0
+	}
+
+	//radiusdamage self.origin level.bomb_damage level.bomb_explosion_radius
+	radiusdamage self.origin 200 200
+	self.collisionent disconnect_paths
+
+	local.name 	 = self
+	local.angles = self.angles
+	local.origin = self.origin
+	self hide
+	self notsolid
+
+	if (local.type == "green"){
+		self.damaged = thread spawn_damaged_new models/vehicles/opeltruckgreen_d.tik local.angles local.origin
+	}
+	else{
+		self.damaged = thread spawn_damaged_new models/vehicles/opeltruck_d.tik local.angles local.origin	
+	}
+
+	if (self.collisionent){
+		if (self.damaged){
+			// if we have a collision entity make our destroyed truck not solid
+			self.damaged notsolid
+		}
+	}
+	
+	if (level.script == "maps/m1l3b.scr"){
+		println "z:   in m1l3b. making truck not solid"
+		self.collisionent remove
+		self.damaged notsolid
+		self notsolid
+
+		while (self.done_unloading != 1){
+			wait 1
+		}
+
+		self.origin = (1952 376 80)
+	}
+	wait 10
+	local.explosion1 remove
+	local.explosion2 remove
+}end
+
+//=========================================================================
+spawn_damaged_new local.model local.angles local.origin:
+//=========================================================================
+{
+	local.damaged = spawn script_model model local.model
+	local.damaged.origin = local.origin
+	local.damaged.angles = local.angles
+}end local.damaged
+
+//=========================================================================
+PassengersDie:
+//=========================================================================
+{
+	local.i = 0
+	local.ent = NULL
+
+	for ( local.i = 1; local.i <= 6; local.i++ ){
+		local.ent = self QueryPassengerSlotEntity local.i
+
+		if ( local.ent != NULL){
+			local.ent exec global/bullethit.scr (0 0 20) 5000 0 1
+		}
+	}
+}end
+
+//=========================================================================
+drive local.path:
+//=========================================================================
+{
+	local.speed 	= 200
+	local.accel 	= 50
+	local.lookahead = 256
+
+	println "truck  \"" self.targetname "\"  starting to drive on path \"" local.path.targetname "\""
+	self.driveStartTime = level.time
+	self drive local.path local.speed local.accel 200 local.lookahead
+	self waitTill drive
+	self.drive_done = 1
+	self.collisionent disconnect_paths
+	println "truck done with waittill drive"
+	self stop
+
+	//wait 3
+	println "truck starting to unload"
+	thread truck_unload
+}end
+
+//=========================================================================
+truck_unload:
+//=========================================================================
+{
+	self waitthread UnloadPassengers
+	local.driver = self.driver
+
+	if ( isAlive local.driver && self.driver.driving != 0){
+		//wait 3
+		self fullstop
+		//self vehicleanim dooropen
+		self moveanim dooropen
+		self DetachDriverSlot 0 local.driver.origin
+
+		local.driver notsolid
+		local.driver physics_on
+		local.driver gun "walter p38"
+		local.driver nodamage
+		local.driver anim_noclip 00A003_driverexit
+		local.driver waittill animdone
+		local.driver takedamage
+		local.driver solid
+		local.driver exec global/enable_ai.scr
+		local.driver exec global/setdeathanim.scr NIL
+
+		self.corona = 0
+		self.driver.driving = 0
+		self.driver.done_unloading = 1
+	}
+	self.done_unloading = 1
+}end
+
+//=========================================================================
+UnloadPassengers:
+//=========================================================================
+{
+	for (local.slot = 0; local.slot <= 6; local.slot++){
+		self thread truck_passenger_unload local.slot
+	}
+}end
+
+//=========================================================================
+truck_passenger_unload local.slot:
+//=========================================================================
+{
+	local.ent = self QueryPassengerSlotEntity local.slot
+
+	if !(isAlive local.ent){
+		end
+	}
+
+	if (local.ent == NULL){
+		end
+	}
+
+	local.ent exec global/disable_ai.scr
+	self DetachPassengerSlot local.slot local.ent.origin
+	local.tag = ("passenger" + local.slot)
+	println "z:      local.tag: " local.tag
+
+	local.ent.origin = self gettagposition local.tag
+	local.ent.angles = self gettagangles local.tag
+	
+	local.ent notsolid
+	local.ent physics_on
+	local.ent anim_noclip ("opel_passenger" + local.slot)
+	local.ent waittill animdone
+	local.ent solid
+	local.ent rendereffects "+shadow"
+	local.ent leash 10000
+	local.ent exec global/enable_ai.scr
+	local.ent exec global/setdeathanim.scr NIL
+	local.ent.done_unloading = 1
+	local.ent.accuracy = 100
+
+	// allow proning and crouching now...
+	local.ent.ainoprone  = 0
+	local.ent.ainocrouch = 0
+}end
+

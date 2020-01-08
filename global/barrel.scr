@@ -1,0 +1,604 @@
+////////////////////////////////////////////////////////////////////////////////////////
+//
+//  MoH: Allied Assault Script File  
+//  Global function: Exploding and launching barrels
+//  Script Written By: Benson 'elmagoo' Russell
+//
+////////////////////////////////////////////////////////////////////////////////////////
+
+//**************************************************************************
+//*** will setup all specified barrels in the editor for explosive barrels
+//*** syntax --------------------------------
+//*** explosive_barrel
+//**************************************************************************
+explosive_barrel:
+
+level.damage_delay = .3
+
+//*** setup normal explosive barrels
+if ($explosive_barrel == NULL)
+{
+	dprintln "^~^~^ No explosive barrels in the level!!"
+	goto explosive_barrel_launch_setup
+}
+
+for (local.i = 1; local.i <= $explosive_barrel.size ; local.i ++)
+{
+       	$explosive_barrel[local.i] thread explosive_barrel_spawn local.i
+}
+
+explosive_barrel_launch_setup:
+//*** setup explosive launching barrels
+if ($explosive_barrel_launch == NULL)
+{
+	dprintln "^~^~^ No explosive launch barrels in the level!!"
+	goto explosive_barrel_end
+}
+
+for (local.i = 1; local.i <= $explosive_barrel_launch_dummy.size; local.i ++)
+{
+	local.lookup[$explosive_barrel_launch_dummy[local.i].set] = local.i
+}
+
+for (local.i = 1; local.i <= $explosive_barrel_launch.size ; local.i ++)
+{
+	$explosive_barrel_launch[local.i].dummy_index = local.lookup[$explosive_barrel_launch[local.i].set]
+	$explosive_barrel_launch[local.i] thread explosive_barrel_launch_spawn local.i
+}
+
+local.lookup = NIL
+
+explosive_barrel_end:
+end
+
+
+//**************************************************************************
+//*** thread for the explosive barrel
+//*** syntax --------------------------------
+//*** <crate> explosive_barrel_spawn <array index>
+//**************************************************************************
+explosive_barrel_spawn local.index:
+
+//*** set temp variables
+local.spawn_origin = local.self.origin
+local.spawn_origin[2] += 32
+local.spawn_targetname = (local.self.targetname + "_explosive_" + local.index)
+
+if (local.self.dmg != NIL)
+{
+	local.dmg = local.self.dmg
+}
+else
+{
+	local.dmg = 250
+}
+
+if (local.self.radius != NIL)
+{
+	local.radius = local.self.radius
+}
+else
+{
+	local.radius = 256
+}
+
+if (self.script_health != NIL)
+{
+	self.health = self.script_health
+}
+else
+{
+	self.health = 1
+	//println "z:       barrel: " self " health: " self.health
+}
+
+//*** wait till the barrel is destroyed
+local.self waittill death
+
+
+	//*** if a thread is set, run it and wait for it's completion
+	if (self.run_thread != NIL)
+        {
+        	self thread level.script::self.run_thread
+        }
+
+//*** spawn the explosion
+spawn "models/fx/barrel_gas_destroyed" targetname local.spawn_targetname angle "-1"
+local.spawn_targetname = $(local.self.targetname + "_explosive_" + local.index)
+
+//*** reset the explosions origin
+local.spawn_targetname.origin = local.spawn_origin
+
+local.spawn_targetname anim idle
+
+//*** get the distance to the player
+//local.distance = vector_length (local.self.origin - $player.origin)
+local.distance = vector_length (local.self.origin - (waitexec coop_mod/replace.scr::origin self)) //chrissstrahl - coop
+local.check_distance = (local.radius * 1.5)
+local.outter_distance = (local.radius * 2.5)
+
+//*** shake his view
+if (local.distance <= local.check_distance)  //*** inner distance check
+{
+	if (local.dmg <= 150)
+        {
+        	thread jitter_small
+        }
+	else
+	{
+		thread jitter_normal
+	}
+}
+else if (local.distance <= local.outter_distance)  //*** outter distance check
+{
+	if (local.dmg <= 150)
+        {
+        	thread jitter_tiny
+        }
+	else
+	{
+		thread jitter_small
+	}
+}
+
+wait level.damage_delay // wait a bit so barrels stagger
+
+//*** damage the player  <origin> <damage> <radius> [consitent]
+radiusdamage local.spawn_targetname.origin local.dmg local.radius
+
+wait (randomint 3 + 4)
+
+//*** delete the effect out of the world now that it's done
+local.spawn_targetname remove
+
+end
+
+
+//**************************************************************************
+//*** thread for the explosive launching barrels
+//*** syntax --------------------------------
+//*** <crate> explosive_barrel_launch_spawn <array index>
+//**************************************************************************
+explosive_barrel_launch_spawn local.index:
+
+//*** get the dummy targetname
+//println "EXPLOSIVE LAUNCH: current barrel: " local.index
+//println "EXPLOSIVE LAUNCH: current barrel dummy index: " local.self.dummy_index
+local.dummy = $explosive_barrel_launch_dummy[local.self.dummy_index]
+
+//*** check to see if a dummy barrel exists for this launcher, if not, turn it into a normal exploder
+if (local.dummy == NULL)
+{
+	dprintln "^~^~^ No dummy barrel for launcher barrel with set number: "  local.self.set "  - converting to normal exploder!!"
+	local.self thread explosive_barrel_spawn local.i
+	goto explosive_barrel_launch_spawn_end
+}
+
+//*** make the dummy invisible and not solid and place it
+local.dummy notsolid
+local.dummy hide
+local.dummy.origin = local.self.origin
+
+//*** set temp variables
+local.spawn_origin = local.self.origin
+local.spawn_origin[2] += 32
+local.spawn_targetname = (local.self.targetname + "_explosive_" + local.index)
+local.spawn_smoke_targetname = (local.self.targetname + "_smoke_" + local.index)
+
+if (local.self.dmg != NIL)
+{
+	local.dmg = local.self.dmg
+}
+else
+{
+	local.dmg = 250
+}
+
+if (local.self.radius != NIL)
+{
+	local.radius = local.self.radius
+}
+else
+{
+	local.radius = 256
+}
+
+if (self.script_health != NIL)
+{
+	self.health = self.script_health
+}
+else
+{
+	self.health = 1
+}
+
+//*** wait till the barrel is destroyed
+local.self waittill death
+
+	//*** if a thread is set, run it and wait for it's completion
+	if (self.run_thread != NIL)
+        {
+        	self thread level.script::self.run_thread
+        }
+
+//*** spawn the explosion and smoke for the dummy
+spawn "models/fx/barrel_gas_destroyed" targetname local.spawn_targetname
+local.spawn_targetname = $(local.self.targetname + "_explosive_" + local.index)
+
+spawn "models/emitters/firesmoke" targetname local.spawn_smoke_targetname angle "-2"
+local.spawn_smoke_targetname = $(local.self.targetname + "_smoke_" + local.index)
+
+//println "BARREL LAUNCH: targetname: " local.spawn_smoke_targetname
+
+//*** reset the explosions origin
+local.spawn_targetname.origin = local.spawn_origin
+local.spawn_smoke_targetname.origin = local.dummy.origin
+
+//println "BARREL LAUNCH: dummy smoke origin: " local.spawn_smoke_targetname.origin
+//println "BARREL LAUNCH: dummy origin: " local.dummy.origin
+//println "BARREL LAUNCH: barrel origin[2] +32: " local.spawn_origin
+
+//*** bind the dummy smoke to the dummy
+local.spawn_smoke_targetname bind local.dummy
+
+//*** show the dummy and execute the thread to launch it into the air
+local.dummy show
+local.dummy thread explosive_barrel_launch_dummy_fly
+
+local.spawn_targetname anim idle
+
+
+//*** get the distance to the player
+//local.distance = vector_length (local.self.origin - $player.origin) //chrissstrahl
+local.distance = vector_length (local.self.origin - (waitexec coop_mod/replace.scr::origin self)) //chrissstrahl - coop
+local.check_distance = (local.radius * 1.5)
+local.outter_distance = (local.radius * 2.5)
+
+//*** shake his view
+if (local.distance <= local.check_distance)  //*** inner distance check
+{
+	if (local.dmg <= 150)
+        {
+        	thread jitter_small
+        }
+	else
+	{
+		thread jitter_normal
+	}
+}
+else if (local.distance <= local.outter_distance)  //*** outter distance check
+{
+	if (local.dmg <= 150)
+        {
+        	thread jitter_tiny
+        }
+	else
+	{
+		thread jitter_small
+	}
+}
+
+
+wait level.damage_delay  // wait a bit so barrels stagger
+
+//*** damage the player  <origin> <damage> <radius> [consitent]
+radiusdamage local.spawn_targetname.origin local.dmg local.radius
+
+wait (randomint 3 + 4)
+
+//*** delete the effect out of the world now that it's done
+local.spawn_targetname remove
+
+//added by Z. dont emit smoke forever
+wait 10
+local.spawn_smoke_targetname remove
+
+explosive_barrel_launch_spawn_end:
+end
+
+
+//**************************************************************************
+//*** thread for making the exploding luncher dummy barrels fly fly fly.....
+//*** syntax --------------------------------
+//*** <dummy barrel> explosive_barrel_launch_dummy_fly
+//**************************************************************************
+explosive_barrel_launch_dummy_fly:
+
+//*** grab it's starting position
+local.start = local.self.origin
+
+//*** see if the scripter wants a different min height than default
+if (local.self.min_height != NIL)
+{
+	local.fly_min_height = local.self.min_height
+}
+else
+{
+	local.fly_min_height = 500
+} 
+
+//println "BARREL LAUNCH FLY: fly min height: " local.fly_min_height
+
+//*** see if the scripter wants a different max height than default
+if (local.self.max_height != NIL)
+{
+	local.fly_max_height = local.self.max_height - local.fly_min_height
+	local.fly_max_height ++
+	if (local.fly_max_height < 0)
+        {
+        	dprintln "^~^~^ Maximum desired height is lower than minimum desired height!!!  Setting to 0"
+		local.fly_max_height = 1
+        }
+}
+else
+{
+	local.fly_max_height = 151
+}
+
+//println "BARREL LAUNCH FLY: fly max height: " local.fly_max_height
+
+//*** calculate the target vector for it to fly on
+local.fly_vector = (0 0 0)
+local.fly_vector[0] = ((randomint 96) - 48)
+local.fly_vector[1] = ((randomint 96) - 48)
+local.fly_vector[2] = (randomint local.fly_max_height + local.fly_min_height)
+
+//println "BARREL LAUNCH FLY: dummy fly vector heigth: " local.fly_vector[2]
+
+//*** rotate barrel to orient to the fly vector
+//println "BARREL LAUNCH FLY: dummy start angles: " local.self.angles
+
+local.start_angles = vector_toangles local.fly_vector
+local.self.angles = (0 local.start_angles[1] 0)
+
+//println "BARREL LAUNCH FLY: dummy adjusted angles: " local.self.angles
+//println "BARREL LAUNCH FLY: dummy origin: " local.self.origin
+
+//*** launch the barrel
+local.self physics_velocity (local.fly_vector)
+wait .2
+local.self physics_on 1
+local.self physics_velocity (local.fly_vector)
+
+//*** make it solid and set the motion flag for rotation
+local.self solid
+local.inmotion = 1
+
+//*** calculate the initial spin by first getting the top down distance moved from it's start point
+local.check_start = (local.start[0] local.start[1] 0)
+//println "BARREL LAUNCH FLY: check starting position, reset Z: " local.check_start
+local.check_end = ((local.start[0] + local.fly_vector[0]) (local.start[1] + local.fly_vector[1]) 0)
+//println "BARREL LAUNCH FLY: check fly position, reset Z: " local.check_end
+
+local.spin_length = vector_length(local.check_start - local.check_end)
+//println "BARREL LAUNCH FLY: initial spin length calculation: " local.spin_length
+
+//*** scale the spin value up to a noticable value
+local.spin_length = local.spin_length * 1.5
+
+//*** start spinning the barrel
+local.self rotatex local.spin_length
+
+//*** check for major direction changes to adjust rotation accordingly
+local.pos_prev = local.self.origin
+
+waitframe
+
+//*** loop to check for sharp changes in direction
+while (local.inmotion == 1)
+{
+	//println "BARREL CHECK: pos_prev: " local.pos_prev
+	//println "BARREL CHECK: pos_current: " local.self.origin 
+	local.vel = local.self.origin - local.pos_prev
+	//println "BARREL CHECK: velocity from past to current: " local.vel
+	//println "BARREL CHECK: current angles facing: " local.self.angles
+	//*** old value local.pos_next = local.self.origin + local.vel + (0 0 -1.28)
+	local.pos_next = local.self.origin + local.vel + (0 0 -2)
+	//println "BARREL CHECK: pos_next: " local.pos_next
+	local.pos_prev = local.self.origin
+
+	waitframe
+	local.pos_diff = vector_length (local.self.origin - local.pos_next)
+	//println "BARREL CHECK: pos_current after predition: " local.self.origin
+	//println "BARREL CHECK: difference in prediction and actual: " local.pos_diff
+	//println "BARREL CHECK: local.self.velocity: " local.self.velocity
+	if (local.pos_diff > 0 && local.self.velocity != (0 0 0))
+        {
+        	//println "BARREL COLLISION DETECTED"
+		local.vel_new = local.self.origin - local.pos_prev
+		//println "BARREL COLLISION: original vel: " local.vel
+		//println "BARREL COLLISION: new vel: " local.vel_new
+		local.vel_diff_x = local.vel_new[0] - local.vel[0]
+		//println "BARREL COLLISION: x difference: " local.vel_diff_x  
+		local.vel_diff_y = local.vel_new[1] - local.vel[1]
+		//println "BARREL COLLISION: y difference: " local.vel_diff_y
+		local.vel_diff_z = local.vel_new[2] - local.vel[2]
+		//println "BARREL COLLISION: z difference: " local.vel_diff_z
+		
+		//*** check for a difference on the horizontal plane
+		if ((local.vel_diff_x + local.vel_diff_y) > local.vel_diff_z)
+                {
+                	//println "BARREL COLLISION CHECK: horizontal change detected"
+                }
+		
+		//*** check for a difference on the vertical plane
+		if (local.vel_diff_z != 0)
+                {
+                	//println "BARREL COLLISION CHECK: vertical change detected"
+			local.spin_z = local.vel_diff_z * 5
+			//*** check which direction to spin
+			if ((local.self.angles[0] >= 0 && local.self.angles[0] <= 90) || (local.self.angles[0] >= 180 && local.self.angles[0] <= 270))
+                        {
+                        	local.self rotatex local.spin_z
+                        }
+			else
+			{
+				local.spin_z = local.spin_z * -1
+				local.self rotatex local.spin_z
+			}
+                }
+        }
+	else if (local.self.velocity == (0 0 0))
+	{
+		//println "BARREL CHECK: the barrel has stopped moving, exiting"
+		local.inmotion = 0
+	}
+}
+
+//*** align the barrel with the ground
+if (local.self.angles[0] >= 0 && local.self.angles[0] <= 10)
+{
+	local.self time .75
+	local.self rotatexdownto 0
+	local.self move
+}
+else if (local.self.angles[0] >= 350 && local.self.angles[0] < 0)
+{
+	local.self time .75
+	local.self rotatexupto 0
+	local.self move
+}
+else if (local.self.angles[0] >= 170 && local.self.angles[0] <= 180)
+{
+	local.self time .75
+	local.self rotatexupto 180
+	local.self move
+}
+else if (local.self.angles[0] >= 181 && local.self.angles[0] <= 190)
+{
+	local.self time .75
+	local.self rotatexdownto 180
+	local.self move
+}
+else if (local.self.angles[0] >= 11 && local.self.angles[0] <= 90)
+{
+	//println "BARREL ALIGN: quadrant 1 move"
+	local.self physics_off
+	
+	//println "BARREL ALIGN: start accel"
+	local.distance = 90 - local.self.angles[0]
+	local.distance = local.distance / 4
+	//*** accelerate the final movement
+	for (local.accel = .25 ; local.accel >= .1 ; local.accel = local.accel - .05)
+	{
+		//println "BARREL ALIGN: rotating, local.accel: " local.accel
+		local.self time local.accel
+		local.self rotatexup local.distance
+		local.self movedown 3
+		local.self waitmove
+	}
+}
+else if (local.self.angles[0] >= 91 && local.self.angles[0] <= 169)
+{
+	//println "BARREL ALIGN: quadrant 2 move"
+	local.self physics_off
+		
+	//println "BARREL ALIGN: start accel"
+	local.distance = local.self.angles[0] - 90
+	local.distance = local.distance / 4
+	//*** accelerate the final movement
+	for (local.accel = .25 ; local.accel >= .1 ; local.accel = local.accel - .05)
+	{
+		//println "BARREL ALIGN: rotating, local.accel: " local.accel
+		local.self time local.accel
+		local.self rotatexdown local.distance
+		local.self movedown 3
+		local.self waitmove
+	}
+} 
+else if (local.self.angles[0] >= 191 && local.self.angles[0] <= 269)
+{
+	//println "BARREL ALIGN: quadrant 3 move"
+	local.self physics_off
+	
+	//println "BARREL ALIGN: start accel"
+	local.distance = 270 - local.self.angles[0]
+	local.distance = local.distance / 4
+	//*** accelerate the final movement
+	for (local.accel = .25 ; local.accel >= .1 ; local.accel = local.accel - .05)
+	{
+		//println "BARREL ALIGN: rotating, local.accel: " local.accel
+		local.self time local.accel
+		local.self rotatexup local.distance
+		local.self movedown 3
+		local.self waitmove
+	}
+} 
+else if (local.self.angles[0] >= 270 && local.self.angles[0] <= 349)
+{
+	//println "BARREL ALIGN: quadrant 4 move"
+	local.self physics_off
+		
+	//println "BARREL ALIGN: start accel"
+	local.distance = local.self.angles[0] - 270
+	local.distance = local.distance / 4
+	//*** accelerate the final movement
+	for (local.accel = .25 ; local.accel >= .1 ; local.accel = local.accel - .05)
+	{
+		//println "BARREL ALIGN: rotating, local.accel: " local.accel
+		local.self time local.accel
+		local.self rotatexdown local.distance
+		local.self movedown 3
+		local.self waitmove
+	}
+} 
+
+end
+
+
+//*******************************
+// random positive / negative choice
+//*******************************
+random_sign:
+
+local.choice = (randomint 3 - 1)
+
+if (local.choice == 0)
+{
+	goto random_sign
+}
+
+end local.choice
+
+
+//******************************
+// jitter effect
+// jitter_normal
+//******************************
+jitter_normal:
+
+waitexec global/earthquake.scr .4 3 0 0
+
+waitexec global/earthquake.scr .5 1 0 0
+
+//waitexec global/earthquake.scr .5 1 0 0
+
+end
+
+
+//*********************************
+// jitter effect
+// jitter_small
+//*********************************
+jitter_small:
+
+waitexec global/earthquake.scr .3 1.5 0 0
+
+waitexec global/earthquake.scr .35 .75 0 0
+
+//waitexec global/earthquake.scr .5 1 0 0
+
+end
+
+
+//*********************************
+// jitter effect
+// jitter_tiny
+//*********************************
+jitter_tiny:
+
+waitexec global/earthquake.scr 1 .3 0 0
+
+//waitexec global/earthquake.scr .5 1 0 0
+
+end

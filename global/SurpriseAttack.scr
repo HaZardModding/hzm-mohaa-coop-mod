@@ -1,0 +1,141 @@
+//-------------------------------------------------------------------------------------------------------//
+// SurpriseAttack.scr by 1337Smithy
+//
+// Makes an ai show then seek and shoot player for a specified duration.
+//
+// Provides more aggressive behaviour as no delay occurs before  
+// shooting which can happen with the built-in 'attackplayer' function.
+//
+// You can specify a delay before shooting as a number of seconds if you wish.
+//
+// Great if you want AI to pop out from corners and catch the player by surprise.
+//
+// It works best if you give the AI a target in Radiant and he will run there
+// before shooting. The target should be an info_waypoint as they provide the best AI movement. 
+//
+// <actor> SurpriseAttack [volley duration] [delay] [accuracy of actor]
+//-------------------------------------------------------------------------------------------------------//
+main local.time local.delay local.accuracy:
+
+	thread SurpriseAttack local.time local.delay local.accuracy
+	
+end
+
+SurpriseAttack local.time local.delay local.accuracy:
+
+	group.waypoint = self.target
+	group.thread[SurpriseAttack] = local
+
+	//self thread Debug group // *!* create the debug thread outside of group scope (only for testing)
+
+	thread DeathHandler	
+
+	if !(local.time) { local.time = 3.0 } else { local.time = float local.time }
+	if !(local.accuracy) local.accuracy = 80
+	self exec global/TransformActor.scr show::solid::disable::takedamage
+	self nosurprise 1
+	self nolongpain 1
+	self.no_idle = 1
+	local.originalaim = self.accuracy
+	
+	println self " IS STARTING A SURPRISE ATTACK"
+	
+	if (group.waypoint) 
+	{		
+		self runto group.waypoint
+		self waittill movedone
+		self turnto $player
+		self lookat $player
+		self.accuracy = local.accuracy
+	}
+	else
+		self runto $player
+	
+	if (local.delay && local.delay > 0) wait local.delay
+			
+	while !(self cansee $player) waitframe
+			
+	if !(group.waypoint) 
+	{
+		self exec global/stand.scr	
+		wait .2
+		self turnto $player
+		self lookat $player
+	}
+
+	waitthread GetTimings	// *!* get the gun timings (stored in group object)
+			
+	println self " STARTING TO SHOOT WITH GUN " self.gun
+	
+	local.decrement = float (group.aim_time + group.interbullet_time)
+	while (local.time > 0 && self cansee $player)
+	{
+		self aimat $player
+		wait group.aim_time
+		self exec global/shoot.scr
+		wait group.interbullet_time
+		local.time -= local.decrement
+	}
+	
+	self.accuracy = local.originalaim
+	self turnto NULL
+	self aimat NULL
+	self.no_idle = 0
+	self exec global/TransformActor.scr enable
+	self attackplayer
+
+	println self " FINISHED SURPRISE ATTACK"
+end
+
+// *!* kill the thread if the guy dies.
+// *!* this method shares the group  
+// *!* object with SurpriseAttack.
+DeathHandler:
+	while (isAlive self && group.thread[SurpriseAttack])
+		waitframe
+
+	if (group.thread[SurpriseAttack])
+	{
+		println self " DIED WHILE PERFORMING SURPRISE ATTACK"
+		group.thread[SurpriseAttack] delete
+	}
+
+	if (group.waypoint)
+		group.waypoint remove 	// *!* delete his waypoint to release from entity list
+end
+
+// *!* define appropriate gun timings.
+// *!* this method shares the group  
+// *!* object with SurpriseAttack.
+GetTimings:
+	switch (self.gun)
+	{
+		case "mp40":
+			group.aim_time = .1
+			group.interbullet_time = .3
+			break
+		case "stg44":
+			group.aim_time = .1
+			group.interbullet_time = .5
+			break
+		case "walter p38":
+			group.aim_time = .1
+			group.interbullet_time = .3
+			break
+		default:
+			group.aim_time = .35
+			group.interbullet_time = 1.4
+	}
+	// *!* make sure they are floats 
+	//group.aim_time = float group.aim_time
+	//group.interbullet_time = float group.interbullet_time
+end
+
+// *!* check if all threads have finished.
+// *!* this method DOES NOT share the group object. 
+Debug local.threadgroup:
+	while (local.threadgroup)
+		waitframe
+
+	println "threads have finished!"
+end

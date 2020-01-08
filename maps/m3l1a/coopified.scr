@@ -1,0 +1,457 @@
+//chrissstrahl - handles stuff for coop of m3l1a
+//chrissstrahl - m3l1a is already fat, this might be a american thing..?
+
+//sequence_12_playerclip1
+//sequence_12_playerclip2
+//progress: shelf_bunker
+//progress: shelf
+
+//mortar_puzzle_trigger local.index:{
+
+//spawnrangelinked
+//spawnrangelinked
+//spawnrangelinked
+//spawnrangelinked
+
+//chrissstrahl - fixme temporary - testing
+//chrissstrahl - fixme - temporary - disabled
+
+//chrissstrahl - middle mgs killing player if not in cover - coop version
+//=========================================================================
+mg42AttackBeach:{
+//=========================================================================
+	level.coop_mg42Fiering = 1
+	while(level.coop_mg42Fiering){
+		local.alivePlayers=0	//chrissstrahl - keep track of players being alive
+		local.explosedPlayers=0	//chrissstrahl - keep track of players not in cover
+		
+		for(local.pNum = 1;local.pNum<=$player.size;local.pNum++){
+			local.player = $player[local.pNum]
+			local.playerNotIncover = 1
+			
+			//chrissstrahl - skip if player is missing or dead or spec
+			if(local.player == NULL || local.player.health <= 0 || ocal.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1){
+				continue
+			}
+			//-832.00 3648.00 -344.00
+			local.pos = local.player.origin
+			if(local.pos[1] > 4000 ){//everything above 4000 make it a little to hard tro reach the captain
+				continue
+			}
+			
+			local.alivePlayers++	//chrissstrahl - keep track of players being alive
+			//iprintlnbold_noloc("mg42AttackBeach warning: " + local.pNum)
+			
+			// bullet run-up warning
+			for (local.i = 4 ; local.i >= 1 ; local.i --){
+				local.temp_origin = local.player.origin
+				local.temp_origin[1] += (128 * local.i)
+				local.temp_origin[2] += level.target_offset
+
+				$player_target.origin = local.temp_origin
+				$mg42_middle1 setaimtarget $player_target
+				$mg42_middle2 setaimtarget $player_target
+				
+				wait 0.3 // was 0.2 might needs better adjustment for coop
+			}
+		
+			//chrissstrahl - fire at cover or player
+			//chrissstrahl - make it a bit harder for the player if playing alone
+			//chrissstrahl - otherwise it will be to easy, because the damage is multiplied by players
+			//iprintlnbold_noloc("mg42AttackBeach fire: " + local.pNum)
+			for (local.j = 1 ; local.j <= 8 ; local.j ++){
+				//chrissstrahl - stop if player disconnected or dead
+				if(local.player == NULL || local.player.health <= 0 ){
+					break
+				}
+			
+				// set the aim target to be a the player while hitting
+				local.temp_origin = local.player.origin
+				local.temp_origin[2] += level.target_offset
+
+				$player_target.origin = local.temp_origin
+				
+				//chrissstrahl - not in cover
+				if!(waitthread isInCover local.player){
+					thread mg42_damage_player local.player
+					local.explosedPlayers++;
+				}			
+				else{//chrissstrahl - in cover
+					local.playerNotIncover = 0
+					thread mg42_incover_player local.player.flags["coop_coverTrigger"]
+				}
+			}
+			//play get down/take cover/put your head down... dialogs
+			if(local.player != NULL && local.playerNotIncover ){
+				local.player playsound warn_player_cover
+			}
+			
+		}
+		
+		
+		//chrissstrahl - keep timing of singleplayer in mp if there is just 1 player
+		if(local.alivePlayers < 2){
+			wait (randomfloat(0.6) + 0.3)
+		}else{
+			waitframe
+		}
+		
+		//chrissstrahl - fire on other targets if there are no players to fire at
+		if( local.explosedPlayers == 0){
+			//iprintlnbold_noloc("mg42AttackBeach fire: normal targets")
+			// set the MG42 turrets to fire at normal targets
+			local.index = (randomint 3 + 1)
+			$mg42_middle1 setaimtarget $mg42_target_left[local.index]
+			$mg42_middle2 setaimtarget $mg42_target_right[local.index]
+			wait 4 //was 3
+		}
+	}
+}end
+
+
+//chrissstrahl - check if this player is behind cover
+//=========================================================================
+isInCover local.player:{
+//=========================================================================
+	local.player.flags["coop_coverTrigger"] = NULL
+	for(local.cpp=1;local.cpp<=$cover_trigger.size;local.cpp++){
+		local.coverTrigger = $cover_trigger[local.cpp]
+		if(local.player istouching local.coverTrigger){
+			if (local.coverTrigger.stand == 0){
+				if(local.player getposition == "crouching"){
+					local.player.flags["coop_coverTrigger"] = local.coverTrigger
+					end 1
+				}
+			}else{
+				local.player.flags["coop_coverTrigger"] = local.coverTrigger
+				end 1
+			}
+		}
+	}
+}end 0
+
+
+//chrissstrahl - handles respawns for players
+//makes sure they don't have all to start at the beginning again
+//saves every 30 sec the player location if the player is in cover
+//save also if player made it to the bunker entrance
+//=========================================================================
+manageRespawns:{
+//=========================================================================
+	while(1){
+		for(local.pNum = 1;local.pNum<=$player.size;local.pNum++){
+			local.player = $player[local.pNum]
+			if(	local.player != NULL &&
+				local.player.health > 0 &&
+				local.player.dmteam != "spectator" &&
+				local.player.flags["coop_isActive"] == 1 &&
+				local.player.flags["congratsYouMadeit"] == NIL	)
+			{
+				local.origin = local.player.origin
+				// 4832 -432
+				if(local.origin[0] > 1540 && local.origin[1] > 4744){//1674 4821 -422
+					level.flags["coop_spawn"+local.pNum+"origin"] = (1656 4784 -504)
+					level.flags["coop_spawn"+local.pNum+"angles"] = (0 0 0)
+					local.player.flags["congratsYouMadeit"] = 1 //this player will not be updated anymore
+					//iprintlnbold_noloc("no more spawn updates for you")
+				}
+				else if((local.player.flags["coverRespawnManageTime"] + 20) < level.time){
+					for(local.cpp=1;local.cpp<=$cover_trigger.size;local.cpp++){
+						local.coverTrigger = $cover_trigger[local.cpp]
+						if(local.player istouching local.coverTrigger){
+							if (local.coverTrigger.stand == 0){
+								if(local.player getposition == "crouching"){
+									level.flags["coop_spawn"+local.pNum+"origin"] = local.player.origin
+									local.vec = (0 0 0)
+									local.vec[1] = local.player.viewangles[1]
+									level.flags["coop_spawn"+local.pNum+"angles"] = local.vec
+									local.player.flags["coverRespawnManageTime"] = level.time
+								}
+							}else{
+								level.flags["coop_spawn"+local.pNum+"origin"] = local.player.origin
+								local.vec = (0 0 0)
+								local.vec[1] = local.player.viewangles[1]
+								level.flags["coop_spawn"+local.pNum+"angles"] = local.vec
+								local.player.flags["coverRespawnManageTime"] = level.time
+							}
+						}
+					}
+				}
+			 }
+		}
+		wait 0.2
+	}
+}end
+
+//=========================================================================
+craters_cover local.player:{
+//=========================================================================
+	iprintlnbold_noloc("krater koffer")
+}end
+
+//=========================================================================
+jitter_mg local.player:{
+//=========================================================================
+	
+}end
+
+//=========================================================================
+jitter_mg_cover local.trig:{
+//=========================================================================
+	
+}end
+
+// mg42 damage player routine
+//chrissstrahl - coop mod variant
+//=========================================================================
+mg42_damage_player local.player:{
+//=========================================================================
+	//chrissstrahl - handle for sp
+	local.playerCount = $player.size
+	if(local.playerCount == NIL){
+		end
+	}
+	
+	local.damage = 5
+	
+	local.player normal_damage local.damage (0 -1 0)
+	local.player playsound snd_bh_flesh
+	thread jitter_mg local.player
+}end
+
+// mg42 player is in cover routine
+//=========================================================================
+mg42_incover_player local.trig:{
+//=========================================================================
+	if( local.trig == NULL || local.trig == NIL ){ end }
+
+	thread jitter_mg_cover local.trig
+
+	if ( local.trig.cover_type == "hedgehog"){
+	//	println "trigger set: " $cover_trigger[level.cover_index].set
+	//	println "trigger sound index: " $cover_trigger[level.cover_index].sound_index
+	//	println "sound set: " $cover_sound[$cover_trigger[level.cover_index].sound_index].set
+	//	println "OOOOO, just come out from that hedgehog, it won't hurt.......FOR LONG!!!"
+		$cover_sound[ local.trig.sound_index] playsound hedgehog_supression
+	}
+	else if ( local.trig.cover_type == "ramp"){
+		$cover_sound[ local.trig.sound_index] playsound ramp_supression
+	}
+	else if ( local.trig.cover_type == "crater"){
+		$cover_sound[local.trig.sound_index] playsound crater_supression
+	}
+}end
+
+//chrissstrahl - kills player with lots of damage when he comes to close to the level edge
+//=========================================================================
+warningTriggers local.damage:{
+//=========================================================================
+	//make sure we fix what was not done right
+	if(self == NULL || self.flags["warningTriggers"] != NIL){
+		
+		iprintlnbold_noloc("DEV: warningTriggers multiple calls prevented!!!")
+		end
+	}
+	self.flags["warningTriggers"] = 1
+	
+	while(1){
+		//wait for the trigger to activate (by player)
+		self waittill trigger
+		wait 1.5
+		//now handle each player
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player =  $player[local.i]
+			//if existing, touching the trigger and alive
+			if( local.player != NULL && local.player istouching self && local.player.health > 0){
+			
+				//extra check for coop only (skip if player invalid)
+				//skip spectators or players in respawn 
+				if( level.gametype != 0 ){
+					if( local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1 ){
+						continue
+					}
+					//make sure player will not respawn inside killzone
+					exec coop_mod/main.scr::resetSpawn local.player
+				}
+				
+				//hurt player
+				local.player exec maps/m3l1a.scr::bhit local.damage
+			}
+		}
+	}
+}end
+
+//chrissstrahl - 
+//=========================================================================
+mg42_attack_closest:{
+//=========================================================================
+	while(level.mg42_attack_closest){
+		local.player = exec coop_mod/replace.scr::player_closestTo $mg42_middle2
+		$mg42_middle1.setaimtarget = local.player
+		$mg42_middle2.setaimtarget = local.player
+		wait 3
+	}
+}end
+
+//=========================================================================
+sequence_5_medic local.medic local.patient:{
+//=========================================================================
+	local.inAnim = 0
+	while(1){
+		wait 1
+		local.player = thread medic_closest local.medic
+		if( local.player != NULL ){
+			local.medic lookat local.player
+			local.medic turnto local.player
+			local.medic waittill turndone
+			wait 1
+			
+			if(level.m3l1a_sequence == 11){
+				break
+			}
+			
+			if (randomint(100) > 50){ local.medic say medic_heal1 }
+			else{ local.medic say medic_heal2 }
+			
+			local.inAnim = 1
+			local.medic upperanim pass_canteen_start
+			local.medic waittill upperanimdone
+			
+			while (1){
+				wait 0.1
+				if(level.m3l1a_sequence == 11){
+					break
+				}
+				if(local.player == NULL || local.player.health <= 0 || vector_length (local.player.origin - local.medic.origin) < 110){
+					break
+				}
+			}
+			
+			if(local.player != NULL || local.player.health > 0){
+				local.player heal 1
+			}
+			
+			local.medic upperanim pass_canteen_end
+			local.inAnim = 0
+			wait 2
+			
+			if(level.m3l1a_sequence == 11){
+				break
+			}
+
+			local.medic lookat NULL
+			local.medic turnto local.patient
+			local.medic.turndoneerror = 10
+			local.medic waittill turndone
+			wait 1
+			
+			if(level.m3l1a_sequence == 11){
+				break
+			}			
+			local.medic turnto NULL
+		}
+	}
+	if(local.inAnim){
+		local.medic upperanim pass_canteen_end
+	}
+}end
+
+//=========================================================================
+shingle_medic local.medic:{
+//=========================================================================
+	local.inAnim = 0
+	while(level.m3l1a_sequence != 11){
+		wait 1
+		local.player = thread medic_closest local.medic
+		if(local.player != NULL){
+			local.medic lookat local.player
+			local.medic turnto local.player
+			local.medic waittill turndone
+			wait 1
+			
+			if(level.m3l1a_sequence == 11){
+				break
+			}
+			
+			if (randomint(100) > 50){ local.medic say medic_heal1 }
+			else{ local.medic say medic_heal2 }
+			
+			local.inAnim = 1
+			local.medic upperanim pass_canteen_start
+			local.medic waittill upperanimdone
+			
+			while (1){
+				wait 0.1
+				if(level.m3l1a_sequence == 11){
+					break
+				}
+				if(local.player == NULL || local.player.health <= 0 || vector_length (local.player.origin - local.medic.origin) < 110){
+					break
+				}
+			}
+			
+			if(local.player != NULL || local.player.health > 0){
+				local.player heal 1
+			}
+			
+			local.medic upperanim pass_canteen_end
+			local.inAnim = 0
+			wait 2
+			
+			if(level.m3l1a_sequence == 11){
+				break
+			}
+
+			// reset his turnto
+			local.medic lookat NULL
+			local.medic.turndoneerror = 10
+			local.medic turnto $mg42_middle1
+			local.medic waittill turndone
+			wait 0.5
+			
+			if(level.m3l1a_sequence == 11){
+				break
+			}
+			
+			local.medic turnto NULL
+			local.medic exec global/prone.scr
+		}
+	}
+	if(local.inAnim){
+		local.medic upperanim pass_canteen_end
+	}
+}end
+
+//=========================================================================
+medic_closest local.object:{
+//=========================================================================
+	local.objectOrigin = ( 0 0 0 )
+	local.player = NULL
+	local.playerReturn = NULL
+	local.playerOrigin = (0 0 0)
+	local.closestDistance = 999999
+	
+	//make array for 8 players
+	
+	if( local.object == NULL ){
+		end NULL
+	}else{
+		local.objectOrigin = local.object.origin
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player = $player[local.i]
+		if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 && (local.player.health / local.player.max_health) < 1 ){
+			if( vector_length( local.player.origin - local.objectOrigin ) < local.closestDistance ){
+				local.playerReturn		= local.player
+				local.closestDistance	= vector_length( local.player.origin - local.objectOrigin )
+			}
+		}
+	}
+	
+	//to far away from medic
+	if( local.closestDistance > 512){
+		end NULL
+	}
+}end local.playerReturn
+

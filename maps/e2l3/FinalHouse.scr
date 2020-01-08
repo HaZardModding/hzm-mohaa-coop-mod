@@ -1,0 +1,598 @@
+// FinalHouse
+
+//============================================================================
+Init: {
+//============================================================================
+	//set up starting health on tanks
+	$tank1_South.health = 300
+	$tank2_South.health = 300
+	$tank3_South.health = 300
+	$tank4_South.health = 300
+	$tank5_South.health = 300
+	$tank1_West.health = 300
+	$tank1_West.health = 300
+	$tank3_West.health = 300
+	$tank4_West.health = 300
+	
+	$tank1_South.isActive = 0
+	$tank2_South.isActive = 0
+	$tank3_South.isActive = 0
+	$tank4_South.isActive = 0
+	$tank5_South.isActive = 0
+	$tank1_West.isActive = 0
+	$tank2_West.isActive = 0
+	$tank3_West.isActive = 0
+	$tank4_West.isActive = 0
+	
+	$tank1_South.myenemy = NULL
+	$tank2_South.myenemy = NULL
+	$tank3_South.myenemy = NULL
+	$tank4_South.myenemy = NULL
+	$tank5_South.myenemy = NULL
+	$tank1_West.myenemy = NULL
+	$tank2_West.myenemy = NULL
+	$tank3_West.myenemy = NULL
+	$tank4_West.myenemy = NULL
+	
+	$mortarWest notsolid
+	$mortarSouth notsolid
+	$mortarWest.origin = $mortarWest.origin + ( -13 0 0 )
+	
+	level.tankDebugPrint = 0
+	level.tanksDefeated = 0
+
+	//needed for music control
+	level.tanksMoving = 0
+
+	//setup a trigger to know when the tanks are all repelled
+	spawn trigger_relay targetname "tanksRepelled"
+	
+	// work thread
+	thread DoWork
+}end
+
+//============================================================================
+DoWork: {
+//============================================================================
+	$bushNS thread BushWatch
+	$bushEW thread BushWatch
+	wait .2
+	
+	// wait for the player to get to the top floor
+	$FH_OnTopFloorTrigger waittill trigger
+	
+	//autosave
+	waitthread maps/e2l3/saves.scr::DoAutoSave "finale"
+	thread AdjustFogPlane
+
+	waitthread summonJohnson
+	wait 5
+	
+	thread handleObjectives
+	thread doTankBattle    //for the whiz-bang finale
+
+	// complete objectives and finish mission
+	$tanksRepelled waittill trigger
+	$ParatrooperLeader.congradulatePlayer = 1
+
+	while ($ParatrooperLeader.congradulatePlayer == 1) {
+		wait 0.1
+	}
+
+	waitthread maps/e2l3.scr::GiveMedal
+	exec global/missioncomplete.scr  briefing/briefinge3
+}end
+
+//============================================================================
+handleObjectives: {
+//============================================================================
+	waitthread global/ObjMgr.scr::CompleteObj "clearTown"
+	waitthread global/ObjMgr.scr::RevealObj "repelTanks"
+	$tanksRepelled waittill trigger
+		
+	waitthread global/ObjMgr.scr::CompleteObj "repelTanks"
+}end
+
+//============================================================================
+doTankBattle: {
+//============================================================================
+	level.totalTanks = 9
+
+	thread playSounds
+	thread compassHandler   	//compass points to nearest active tank
+	thread missionFailThread  	//in case the tanks cross the line
+	thread runTanks				//go tanks go
+	
+	while (level.totalTanks > 0) {
+		waitframe
+	}
+
+	level.tanksDefeated = 1
+	trigger $tanksRepelled  //when battle is done
+}end
+
+//============================================================================
+summonJohnson: {
+//============================================================================
+	// If johnson is nowhere to be found, teleport him to the downstairs
+	if ($ParatrooperLeader == NIL || $ParatrooperLeader == NULL) {
+		local.model = spawn models/human/Sc_Al_US_InfWPack.tik
+		local.model.targetname = "ParatrooperLeader"
+		local.model ai_on
+		local.model physics_on
+		local.model thread maps/e2l3/JohnsonThinker.scr::Think
+	}
+
+	local.dist = vector_length ( $ParatrooperLeader.origin - $player.origin )
+	$ParatrooperLeader.metWithPlayer = 1
+
+	if (local.dist > 1000) {
+		$ParatrooperLeader.jumpToFinalHouse = 1
+		wait 1.0
+	}
+
+	thread clearUpstairs
+	$ParatrooperLeader.doTanksAreComing = 1
+	wait 2.0
+}end
+
+//============================================================================
+clearUpstairs: {
+//============================================================================
+	local.dummy = spawn script_model model "fx/dummy.tik"
+	local.dummy.origin = ( 6439 -2663 -410 )
+
+	local.allies = waitthread maps/e2l3/Town.scr::allocateTankEnemies
+	for (local.i = 1; local.i <= local.allies.size; local.i++) {
+		local.allies[local.i] thread runAndDie local.dummy
+	}
+}end
+
+//============================================================================
+runAndDie local.location: {
+//============================================================================
+	self health 5
+	self thread global/friendly.scr::friendlystop
+	self exec global/disable_ai.scr
+	self thread global/standrunto.scr::start local.location
+
+	while (self) {
+		local.dist = vector_length ( local.location.origin - self.origin )
+
+		if (local.dist < 60) {
+			self exec global/crouch.scr
+			//self ai_off
+		}
+		wait 0.1
+	}
+}end
+
+//============================================================================
+playSounds: {
+//============================================================================
+	$player playsound birds_Rustlebush
+	wait 1.0
+
+	$ParatrooperLeader.doTanksWarning = 1
+	thread havePlayerUseMortars
+
+	//local.s1 = thread sound $mortarWest tank_snd_run
+	//local.s2 = thread sound $mortarSouth tank_snd_run
+	//$tanksRepelled waittill trigger
+	//local.s1 stoploopsound
+	//local.s2 stoploopsound
+}end
+
+//============================================================================
+havePlayerUseMortars: {
+//============================================================================
+	// Don't tell the player to use the mortar if they are already using it
+	if ($player.vehicle == NULL) {
+		local.usekey = getboundkey1 "+use"
+		local.msg = ( loc_convert_string ( "Press " + local.usekey + " to use the mortar." ) )
+		thread global/throbtext.scr::throbtext local.msg 0
+
+		while ($player.health > 0 && $player.vehicle == NULL) {
+			waitframe
+		}
+		thread global/throbtext.scr::throbtext "" 0
+	}
+
+	while (1) {
+		if ($mortarSouth_turret0_camera) {
+			$mortarSouth_turret0_camera showquakes
+		}
+
+		if ($mortarWest_turret0_camera) {
+			$mortarWest_turret0_camera showquakes
+		}
+		wait 0.1
+	}
+}end
+
+//============================================================================
+sound local.origin local.sound: {
+//============================================================================
+	local.soundorigin = spawn script_model model "fx/dummy.tik"
+	local.soundorigin.origin = local.origin
+	local.soundorigin loopsound local.sound
+	local.soundorigin notsolid
+}end local.soundorigin
+
+//============================================================================
+missionFailThread: {
+//============================================================================
+	$missionFailedTrigger waittill trigger
+	local.msg = (loc_convert_string "You failed to repel the tank assault.")
+	iprintlnbold local.msg
+
+	//wait 1
+	missionfailed
+}end
+
+//============================================================================
+runTanks: {
+//============================================================================
+	local.speed = 12
+	if (level.skill == "0") {
+		local.speed = 11
+	}
+	else if (level.skill == "2") {
+		local.speed = 13
+	}
+
+	local.firstTank = waitthread activateTank "tank1_South" local.speed
+	local.firstTank projectilevulnerable 2
+	wait 2
+
+	level.tanksMoving = 1
+	wait 1
+
+	local.secondTank = waitthread activateTank "tank4_South" local.speed
+	local.secondTank projectilevulnerable 2
+	wait 2
+	
+	while (local.firstTank.health > 0 || local.secondTank.health > 0) {
+		waitframe
+	}
+
+	level.tanksMoving = 0
+	wait 5
+
+	local.firstTank = waitthread activateTank "tank1_West" local.speed
+	local.firstTank projectilevulnerable 2
+	wait 2
+
+	level.tanksMoving = 1
+	local.secondTank = waitthread activateTank "tank3_West" local.speed
+	local.secondTank projectilevulnerable 2
+	wait 3
+
+	local.thirdTank = waitthread activateTank "tank3_South" local.speed
+	local.thirdTank projectilevulnerable 2
+	wait 2
+	
+	while (	local.firstTank.health > 0 || local.secondTank.health > 0 || local.thirdTank.health > 0 ) {
+		waitframe
+	}
+	
+	level.tanksMoving = 0
+	local.firstTank = waitthread activateTank "tank2_South" local.speed
+	local.firstTank projectilevulnerable 2
+	wait 2
+
+	level.tanksMoving = 1
+	local.secondTank = waitthread activateTank "tank2_West" local.speed
+	local.secondTank projectilevulnerable 2
+	wait 3
+
+	local.thirdTank = waitthread activateTank "tank5_South" local.speed
+	local.thirdTank projectilevulnerable 2
+	wait 3
+
+	local.fourthTank = waitthread activateTank "tank4_West" local.speed
+	local.fourthTank projectilevulnerable 2
+}end
+
+//============================================================================
+activateTank local.findName local.speed: {
+//============================================================================
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger local.findName
+	local.tank = local.trigger.target
+	trigger local.trigger
+	waitframe
+
+	local.tank.speed = local.speed
+	local.tank.health = 400
+	local.tank thread targetAcquisition
+	local.tank thread countdownTanksLeft
+}end local.tank
+
+//============================================================================
+countdownTanksLeft: {
+//============================================================================
+	self.isActive = 1
+
+	while (self.health > 0) {
+		waitframe
+	}
+
+	level.totalTanks--
+	self.isActive = 0
+}end
+
+// tank targetting stuff
+//hitChance is the array of chances to hit various targets. 
+//	[0] - a complete miss
+//	[1] - hitting the house
+//	[2] - hitting the player
+//local.findName = find name on the autotanktrigger for the tank
+//============================================================================
+targetAcquisition: {
+//============================================================================
+	while (self && isAlive self) {
+		local.targetGroup = self waitthread findTargetByRange
+		local.target = self waitthread chooseTarget local.targetGroup
+		//self waitthread global/autotank.scr::AimAt local.target
+	
+		if (local.target == $player) {
+			local.dummy = spawn script_origin
+			local.dummy.origin = $player.origin + ( 0 0 70 )
+			local.target = local.dummy
+		}
+		self.gun setAimTarget local.target
+		self.gun waittill ontarget
+		//wait 3
+		
+		if (self) {
+			self.gun anim fire
+			
+			if (local.targetGroup == 1) {
+				earthquake .2 2 1 0
+				local.target playsound explode_building_small
+			}
+		}
+
+		if (local.dummy) {
+			local.dummy delete
+		}
+		wait 2
+	}
+}end
+
+//============================================================================
+chooseTarget local.targetGroup: {
+//============================================================================
+	if (local.targetGroup == 0) {
+		if (self.approach == "west") {
+			local.random = (randomint $MissTarget_West.size) + 1
+			local.target = $MissTarget_West[local.random]
+		}
+		else if (self.approach == "south") {
+			local.random = (randomint $MissTarget_South.size) + 1
+			local.target = $MissTarget_South[local.random]
+		}
+	}
+	else if (local.targetGroup == 1) {
+		if (self.approach == "west") {
+			local.random = (randomint $FHTarget_West.size) + 1
+			local.target = $FHTarget_West[local.random]
+		}
+		else if (self.approach == "south" ) {
+			local.random = (randomint $FHTarget_South.size) + 1
+			local.target = $FHTarget_South[local.random]
+		}
+	}
+	else if (local.targetGroup == 2) {
+		local.target = $player
+	}
+}end local.target
+
+//============================================================================
+findTargetByRange: {
+//============================================================================
+	self.distance = vector_length ($self.origin - $FH_OnTopFloorTrigger.origin)
+
+	if (self.distance > 5000) {
+		local.hitChance = ( 100 -1 -1 )			//extreme range
+	}
+	else if (self.distance > 4000) {
+		local.hitChance = ( 50 100 -1 )			//long range
+	}
+	else if (self.distance > 2500) {
+		local.hitChance = ( -1 55 100 )			//medium range
+	}
+	else {
+		local.hitChance = ( -1 40 100 )			//short range
+	}
+		
+	/*	
+	if (self.distance > 4500)
+		local.hitChance = ( 100 -1 -1 )			//extreme range
+	else if (self.distance > 3500)
+		local.hitChance = ( 50 100 -1 )			//long range
+	else if (self.distance > 1800)
+		local.hitChance = ( 10 65 100 )			//medium range
+	else
+		local.hitChance = ( -1 40 100 )			//short range
+	*/	
+
+	local.random = (randomint 100) + 1	
+	for (local.i = 0; local.i < 3; local.i++) {
+		if (local.random <= local.hitChance[local.i]) {
+			local.targetGroup = local.i
+			break	
+		}
+	}
+}end local.targetGroup
+
+//============================================================================
+compassHandler: {
+//============================================================================
+	local.tanks[1] = $tank1_South
+	local.tanks[2] = $tank2_South
+	local.tanks[3] = $tank3_South
+	local.tanks[4] = $tank4_South
+	local.tanks[5] = $tank5_South
+	local.tanks[6] = $tank1_West
+	local.tanks[7] = $tank2_West
+	local.tanks[8] = $tank3_West
+	local.tanks[9] = $tank4_West
+	
+	while (level.tanksDefeated == 0) {
+		local.ref = -1
+		local.shortestDistance = 10000
+		
+		for (local.i = 1; local.i < 10; local.i++) {
+			if (local.tanks[local.i] && local.tanks[local.i].isActive == 1) {
+				if (local.tanks[local.i].distance < local.shortestDistance) {
+					local.shortestDistance = local.tanks[local.i].distance
+					local.ref = local.i
+				}
+			}
+		}
+	
+		if (local.ref != -1) {
+			waitthread global/ObjMgr.scr::SetObjCompassTarg "repelTanks" local.tanks[local.ref]
+		}
+		waitframe
+	}
+}end
+
+//============================================================================
+tankFenceTrigger local.tank: {
+//============================================================================
+	//radiusdamage self.origin 200 200
+	//local.temp = spawn script_model model models/fx/fx_truck_explosion.tik
+
+	// Compute length of tank
+	local.lenVec = local.tank.getmaxs
+	local.lenVec[2] = 0
+	local.lenVec[1] = 0
+	local.len = vector_length local.lenVec
+
+	// Find offset to start of this tank
+	local.forward = angles_toforward local.tank.angles
+	local.offset = vector_scale local.forward local.len
+
+	local.temp = spawn script_model model models/emitters/tehao_tankCrashWall.tik
+	local.temp notsolid
+	local.temp.origin = local.tank.origin + local.offset
+	local.temp playsound explode_building_large
+	local.temp anim start
+	local.temp notsolid
+
+	exec global/earthquake.scr .4 4 0 0
+	wait 5
+
+	local.temp remove
+}end
+
+//============================================================================
+BushWatch: {
+//============================================================================
+	local.nslen = self.getmaxs[0] - self.getmins[0]
+	local.ewlen = self.getmaxs[1] - self.getmins[1]
+
+	if (local.nslen > local.ewlen) {
+	   local.ns = 1
+	}
+	else{
+	   local.ns = 0
+	}
+
+	local.base = self.origin + ( 0 0 100 )
+	local.base = trace local.base ( self.origin + ( 0 0 -100 ) ) 1
+
+	if (local.ns) {
+		local.forward = angles_toforward ( self.angles + ( 0 -90 0 ) )
+	}
+	else {
+		local.forward = angles_toforward self.angles
+	}
+
+	local.forward = vector_normalize local.forward
+	local.forward = vector_scale local.forward 50
+	local.origin = local.base + local.forward
+	local.origin[2] += 100
+
+	local.bottom = local.origin
+	local.bottom[2] -= 900
+
+	local.end = trace local.origin local.bottom 1
+	local.towards = local.end - local.base
+	local.xup = atan local.towards[0] local.towards[2]
+
+	if (local.ns) {
+		local.forward = angles_toforward ( self.angles + ( 0 0 0 ) )
+	}
+	else {
+		local.forward = angles_toforward ( self.angles + ( 0 90 0 ) )
+	}
+
+	local.forward = vector_normalize local.forward
+	local.forward = vector_scale local.forward 50
+	local.origin = local.base + local.forward
+	local.origin[2] += 100
+
+	local.bottom = local.origin
+	local.bottom[2] -= 900
+
+	local.end = trace local.origin local.bottom 1
+	local.towards = local.end - local.base
+
+	local.zup = atan local.towards[1] local.towards[2]
+	local.zup = 90 - local.zup
+
+	local.trigger = spawn trigger_vehicle
+	local.trigger.origin = self.origin
+	local.trigger setsize self.getmins self.getmaxs
+	local.trigger triggerable
+
+	local.trigger waittill trigger
+	local.trigger remove
+
+	self thread spawn_fx models/fx/explosionFoliage.tik
+	self time 1
+	self rotatexup local.xup
+	self rotatezup local.zup
+	self waitmove
+}end
+
+//============================================================================
+spawn_fx local.fx: {
+//============================================================================
+	local.temp = spawn script_model model local.fx scale 10
+	local.temp notsolid
+	local.temp.origin = self.origin + ( 0 0 90 )
+	local.temp anim start
+	local.temp notsolid
+	wait 5
+
+	local.temp remove
+}end
+
+//============================================================================
+AdjustFogPlane: {
+//============================================================================
+	local.startfogdist = 2500
+	local.destfogdist = 8000
+	local.fadetime = 10
+
+	level.starttime = level.time
+	while (level.time - level.starttime < local.fadetime) {
+		local.newfogdist = local.startfogdist + ((local.destfogdist - local.startfogdist) * (level.time - level.starttime) / local.fadetime)
+		waitthread setFog local.newfogdist -256
+		waitframe
+	}
+
+	waitthread setFog local.destfogdist -256
+}End
+
+//============================================================================
+setFog local.distance local.bias: {
+//============================================================================
+	$world farclipoverride local.distance
+	$world farplane local.distance
+	$world farplane_bias local.bias
+}end

@@ -1,0 +1,771 @@
+//=========================================================================
+InitBunker2:
+//=========================================================================
+{
+	$bunker2falltree nodamage
+
+	$bunker2mgguy1 ai_off
+	$bunker2mgguy2 ai_off
+
+	$bunker2mgguy1 notsolid
+	$bunker2mgguy2 notsolid
+
+	$bunker2mgguy1 hide
+	$bunker2mgguy2 hide
+
+	$bunker2mgguy1 nodamage
+	$bunker2mgguy2 nodamage
+
+	$bunker2reinforcement ai_off
+	$bunker2reinforcement hide
+	$bunker2reinforcement nodamage
+	$bunker2reinforcement notsolid
+
+	$bridgemg1 thread maps/e3l4/Bunker1.scr::SetupMG
+	$bridgemgguy1 ai_off
+	$bridgemgguy1 notsolid
+	$bridgemgguy1 hide
+
+	$bridgemg2 thread maps/e3l4/Bunker1.scr::SetupMG
+	$bridgemgguy2 ai_off
+	$bridgemgguy2 notsolid
+	$bridgemgguy2 hide
+
+	$bunker2mg1 thread maps/e3l4/Bunker1.scr::SetupMGBadass
+	$bunker2mg2 thread maps/e3l4/Bunker1.scr::SetupMGBadass
+	$bunker2mg3 thread maps/e3l4/Bunker1.scr::SetupMGBadass
+}end
+
+//=========================================================================
+BattleOnDriveUp:
+//=========================================================================
+{
+	thread maps/e3l4/Bunker1.scr::CleanupSceneBunker1
+	thread CleanupSceneBunker1to2
+
+	for(local.i = 1; local.i <= $1b2alliedguys.size; local.i++){
+		 $1b2alliedguys[local.i] ai_on
+		 $1b2alliedguys[local.i] show 
+		 $1b2alliedguys[local.i] solid 
+	}
+	
+	$pgenB1B2 turnon
+	$pgenBridge01 turnon
+	$pgenBridge02 turnon
+	
+	$bridgemgguy1 ai_on
+	$bridgemgguy1 solid
+	$bridgemgguy1 show
+	$bridgemg1 thread global/mg42init.scr::AttachGuyToMG42 $bridgemgguy1 NIL 1
+	
+	$bridgemgguy2 ai_on
+	$bridgemgguy2 solid
+	$bridgemgguy2 show
+	$bridgemg2 thread global/mg42init.scr::AttachGuyToMG42 $bridgemgguy2 NIL 1
+	
+	// watch for gags
+	thread gagBlastBridge
+	thread gagStrafeRoad	// 1B2 cleanup occurs here, once road's closed
+	thread gagPlaneSound
+}end
+
+//=========================================================================
+gagPlaneSound:
+//=========================================================================
+{
+	$triggerdistantplanesound waittill trigger
+	$player playsound plane_by5
+}end
+
+//=========================================================================
+gagBlastBridge:
+//=========================================================================
+{
+	//dprintln "Thread launched: bunker2.scr::gagBlastBridge"
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "bridgeplanetrigger"			
+	local.trigger waittill trigger
+	
+	// set plane params 
+	local.bridgeplane = $bridgeplane
+	local.bridgeplane notsolid
+	local.bridgeplane.shooting 	= 0
+	local.bridgeplane.speed 	= 1200
+	local.bridgeplane.accel 	= 8000
+
+	$triggerBlastBridge waittill trigger
+	//dprintln "Triggered: triggerBlastBridge"
+	
+	thread global/exploder.scr::explode 202
+	
+	// jeep driver panics for a few moments
+	$startjeep playsound jeep_bounce2
+	$startjeep modifydrive 500 200 256	// Float desired_speed, Float acceleration, Float look_ahead 
+	wait 3
+
+	$startjeep modifydrive 300 100 256	// Float desired_speed, Float acceleration, Float look_ahead 	
+}end
+
+//=========================================================================
+gagStrafeRoad:
+//=========================================================================
+{
+	// wait for road strafing plane
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "bunker2planetrigger"			
+	local.trigger waittill trigger
+	
+	// set plane params 
+	local.b2plane = $bunker2plane
+	local.b2plane notsolid
+	local.b2plane.shooting 	= 1
+	local.b2plane.speed 	= 1000
+	local.b2plane.accel 	= 8000
+	wait 3 // changed from 4	
+
+	$bunker2falltree anim death
+	$bunker2falltree playsound tree_fall_end1
+	local.b2plane.shooting = 0
+}end
+
+//=========================================================================
+ShowBunker2Guys:
+//=========================================================================
+{
+	$turnonbunker2 waittill trigger
+
+	$bunker2mgguy1 ai_on
+	$bunker2mgguy2 ai_on
+	
+	$bunker2mgguy1 solid
+	$bunker2mgguy2 solid
+	
+	$bunker2mgguy1 show
+	$bunker2mgguy2 show
+
+	$bunker2mg1 thread global/mg42init.scr::AttachGuyToMG42 $bunker2mgguy1 NIL 1
+	$bunker2mg2 thread global/mg42init.scr::AttachGuyToMG42 $bunker2mgguy2 NIL 1
+
+	$bunker2mgguy1 thread MG42Clip
+	$bunker2mgguy2 thread MG42Clip
+
+	//$bunker2mgguy1 thread CreateMrInvisible
+	//$bunker2mgguy2 thread CreateMrInvisible
+
+	//$bunker2mgguy1 thread UpstairsMGThink $bunker2mg1
+	//thread Bunker2MGEnemy
+
+}end
+
+/*
+CreateMrInvisible:
+	local.guy = spawn models/human/allied_airborne_soldier.tik
+	local.forward = angles_toforward self.angles
+	local.forward = local.forward * 20
+	local.guy.origin = self.origin + local.forward
+	local.guy bind self
+//	local.guy attach self origin 1 (50 0 0)
+//	local.guy hide
+	local.guy threatbias ignoreme
+	local.guy nodamage
+	local.guy physics_off
+	local.guy ai_off
+//	local.guy notsolid
+	local.guy exec global/disable_ai.scr
+
+	self waittill death
+
+	local.guy delete
+
+end
+*/
+
+//=========================================================================
+ObjectiveGoToBunker2:
+//=========================================================================
+{
+	if(level.hackskipbunker2 == 1){
+		$player.origin = $bunker3.origin		
+		end
+	}
+		
+	thread BattleOnDriveUp
+	thread ShowBunker2Guys
+	thread JeepSteering3
+
+    $startjeep drive $drivetobunker2path 300 100 200 256	// Vector position, Float speed, Float acceleration, Float reach_distance, Float look_ahead, [ Vector alternate_position ]
+	$startjeep waittill drive
+	$startjeep fullstop
+	
+	thread Bunker2CrateDeliver
+
+	$jeepdriver say A_34_JeepDrive_Talk_05 //Here we are, Sarge!  Take these supplies to the gunners downstairs.  I'm headin' to the next bunker!"
+	$jeepdriver waittill saydone
+	$jeepdriver thread global/LoopAnim.scr::LoopAnim A_22_driver_idle
+	
+	waitthread maps/e3l4/Bunker1.scr::PlayerGetOffJeepTurret
+	exec global/autosave.scr 3 // Baker Bunker
+
+	$bunker2leavetrigger thread LeaveMissionFailure
+		
+	thread maps/e3l4/Bunker3.scr::JeepDriveAwayToBunker3
+	wait 1.0
+
+	$bunker2deliverytrigger waittill trigger
+
+	// Dumb the gunners back down
+	$bunker2mg1 thread maps/e3l4/Bunker1.scr::SetupMG
+	$bunker2mg2 thread maps/e3l4/Bunker1.scr::SetupMG
+	$bunker2mg3 thread maps/e3l4/Bunker1.scr::SetupMG
+	waitthread CleanupSceneBunker2RunUpGuys
+
+	$bunker2mgguy2 physics_on
+	$bunker2mgguy2 exec global/disable_ai.scr
+	$bunker2mgguy2 say A_34_gunnertalk_01 //thanks for the ammo, you're a life saver
+	$bunker2mgguy2 waittill saydone
+	$bunker2mgguy2 takedamage
+	$bunker2mgguy2 exec global/enable_ai.scr
+	$bunker2mgguy2 physics_off
+	$bunker2mgguy1 takedamage
+}end
+
+//=========================================================================
+JeepSteering3:
+//=========================================================================
+{
+	// First right from starting position
+	$jeepdriver anim A_22_driver_turnright
+	$jeepdriver waittill animdone
+	$jeepdriver thread global/LoopAnim.scr::LoopAnim A_22_driver_turnright_idle
+	wait 1
+
+	$jeepdriver thread global/LoopAnim.scr::LoopAnimStop
+	$jeepdriver anim A_22_driver_turnstraight_fromright
+	$jeepdriver waittill animdone
+
+	// Shift
+	$jeepdriver anim A_22_Gearshift
+	$jeepdriver waittill animdone
+
+	// Straightaway
+	$jeepdriver thread global/LoopAnim.scr::LoopAnim A_22_driving_idle
+	wait 8
+
+	$jeepdriver thread global/LoopAnim.scr::LoopAnimStop
+
+	// Right-left-Right
+	// (Right)
+
+	$jeepdriver anim A_22_driver_turnright
+	$jeepdriver waittill animdone
+	$jeepdriver anim A_22_driver_turnstraight_fromright
+	$jeepdriver waittill animdone
+
+	// (Left)
+	$jeepdriver anim A_22_driver_turnleft
+	$jeepdriver waittill animdone
+	$jeepdriver anim A_22_driver_turnstraight_fromleft
+	$jeepdriver waittill animdone
+
+	// (Right)
+	$jeepdriver anim A_22_driver_turnright
+	$jeepdriver waittill animdone
+	$jeepdriver anim A_22_driver_turnstraight_fromright
+	$jeepdriver waittill animdone
+
+	// Over bridge
+	$jeepdriver thread global/LoopAnim.scr::LoopAnim A_22_driving_idle
+	wait 1
+	$jeepdriver thread global/LoopAnim.scr::LoopAnimStop
+
+	// Bomb
+	$jeepdriver anim A_22_driver_cover
+	$jeepdriver waittill animdone
+	$jeepdriver thread global/LoopAnim.scr::LoopAnim A_22_driver_coveridle
+	wait 3
+
+	$jeepdriver thread global/LoopAnim.scr::LoopAnimStop
+	$jeepdriver anim A_22_driver_coverdone
+	$jeepdriver waittill animdone
+
+	// Shift
+	$jeepdriver anim A_22_Gearshift
+	$jeepdriver waittill animdone
+
+	// Straight
+	$jeepdriver thread global/LoopAnim.scr::LoopAnim A_22_driving_idle
+	wait 1
+	$jeepdriver thread global/LoopAnim.scr::LoopAnimStop
+
+	// Left under trees
+	$jeepdriver anim A_22_driver_turnleft
+	$jeepdriver waittill animdone
+
+	$jeepdriver thread global/LoopAnim.scr::LoopAnim A_22_driver_turnleft_idle
+	wait 2
+
+	$jeepdriver thread global/LoopAnim.scr::LoopAnimStop
+	$jeepdriver anim A_22_driver_turnstraight_fromleft
+	$jeepdriver waittill animdone
+
+	// Straight
+	$jeepdriver thread global/LoopAnim.scr::LoopAnim A_22_driving_idle
+	wait 1
+	$jeepdriver thread global/LoopAnim.scr::LoopAnimStop
+
+	// Strafing cover
+	$jeepdriver anim A_22_driver_cover
+	$jeepdriver waittill animdone
+	$jeepdriver thread global/LoopAnim.scr::LoopAnim A_22_driver_coveridle
+	wait 2
+
+	$jeepdriver thread global/LoopAnim.scr::LoopAnimStop
+	$jeepdriver anim A_22_driver_coverdone
+	$jeepdriver waittill animdone
+
+	// Under trees
+	$jeepdriver thread global/LoopAnim.scr::LoopAnim A_22_driving_idle
+}end
+
+//=========================================================================
+Bunker2CrateDeliver:
+//=========================================================================
+{
+	$jeeppassenger thread global/LoopAnim.scr::LoopUpperAnimStop
+	wait 1
+
+	// Get out of the jeep
+	waitthread global/jeepanim.scr::PassengerGetOutJeep $startjeep $jeeppassenger
+
+	// Deliver the crate
+	$jeeppassenger waitthread maps/e3l4/Bunker1.scr::crateDeliver $bunker2cratepath $bunker2finalcratenode 0 "passenger_enter0 1"
+	$bunker1supplies[1].origin = $jeeppassenger.origin + (50 0 0)
+	$bunker1supplies[1] show
+
+	// Now get on the gun
+	$jeeppassenger runto $bunker2mg3node
+
+	while (vector_length($jeeppassenger.origin - $bunker2mg3node.origin) > 50){
+		waitframe
+	}
+
+	$bunker2mg3 thread global/mg42init.scr::AttachGuyToMG42 $jeeppassenger NIL 1
+	$jeeppassenger thread MG42Clip
+
+	//	$jeeppassenger thread CreateMrInvisible
+	$jeeppassenger exec global/enable_ai.scr
+
+	//	$jeeppassenger thread UpstairsMGThink $bunker2mg3
+	$jeeppassenger takedamage
+}end
+
+//=========================================================================
+gatelocktrigger:
+//=========================================================================
+{
+	// called by setthread.  self==calling trigger
+	//dprintln "triggered: gateLockTrigger"
+	self playsound picket_fence_locked
+}end
+
+//=========================================================================
+ObjectiveDefendBunker2:
+//=========================================================================
+{
+	if(level.hackskipbunker2 == 1){		
+		end
+	}
+
+	$jeepgate2 lock
+	waitthread Bunker2BattleManager
+	
+	//dprintln "Opening Bunker 2 Gate"
+	thread OpenGate
+
+	// wait till our friend tells us to go to b3
+	while (level.b2neworders == 0){
+		waitframe
+	}
+}end
+
+// THis is here so it won't push the player or the reinforcement into the ground when it opens
+//=========================================================================
+OpenGate:
+//=========================================================================
+{
+	while ((vector_length($player.origin - $jeepgate2[1].origin) < 150) && (vector_length($bunker2reinforcement.origin - $jeepgate2[1].origin) < 150)){
+		waitframe
+	}
+
+	$clipB2Gate remove	// remove player clip on gate
+	$jeepgate2 wait -1	// stop gate from closing automatically
+	$jeepgate2 unlock
+	trigger $triggerVehB2Gate	// open it
+}end
+
+//=========================================================================
+WakeUpReinforcement:
+//=========================================================================
+{
+	level.b2neworders = 0
+
+	// spawn the reinforcment out of sight of the player
+	while ($player cansee $bunker2reinforcement.origin 30){
+		waitframe
+	}
+	
+	// Set up the reinforcement dude who tells us to run away
+	$bunker2reinforcement ai_on
+	$bunker2reinforcement solid
+	$bunker2reinforcement show
+	$bunker2reinforcement exec global/disable_ai.scr
+
+	$bunker2reinforcement runto NULL
+	$bunker2reinforcement exec global/enable_ai.scr
+	$bunker2reinforcement waitthread maps/e3l4/friendly.scr::StartFollow 150
+}end
+
+//=========================================================================
+ReinforcementGiveOrders:
+//=========================================================================
+{
+	$bunker2reinforcement waitthread maps/e3l4/friendly.scr::StopFollow
+	$bunker2reinforcement exec global/disable_ai.scr
+
+	// Make the reinforcement run to the player
+	$bunker2reinforcement runto $player
+	while (vector_length($bunker2reinforcement.origin - $player.origin) > 150){
+		waitframe
+	}
+
+	// pop the player off the turret if necessary
+	if ($player.turret != NIL && $player.turret != NULL){
+		$player usestuff $player.turret
+	}
+
+	// the dude gives you instructions
+	$bunker2reinforcement turnto $player
+	$bunker2reinforcement lookat $player
+	$bunker2reinforcement say A_34_Soldier5Talk_01
+	$bunker2reinforcement waittill saydone
+	$bunker2reinforcement turnto NULL
+	$bunker2reinforcement lookat NULL
+	$bunker2reinforcement runto NULL
+
+	thread ReinforcementGoToGun
+	level.b2neworders = 1
+}end
+
+//=========================================================================
+ReinforcementGoToGun:
+//=========================================================================
+{
+	// send him to the gun and attach
+	$bunker2reinforcement.movedoneradius = 40	// reduce his tolerance - he really needs to get there
+	$bunker2reinforcement runto $bunker2mg4node
+	
+	while (vector_length($bunker2reinforcement.origin - $bunker2mg4node.origin) > 50){
+		waitframe
+	}
+		
+	$bunker2mg4 thread global/mg42init.scr::AttachGuyToMG42 $bunker2reinforcement NIL 1
+	$bunker2reinforcement takedamage
+}end
+
+//=========================================================================
+gagB2ReinforcmentRunToPlayer:
+//=========================================================================
+{
+	//dprintln "thread launched: Bunker2::gagB2ReinforcmentRunToPlayer"
+	// send him to the player and wait until he gets there
+	$bunker2reinforcement runto $bunker2reinforcepath
+	$bunker2reinforcement waittill movedone
+	
+	// if running is still set, we haven't yet encountered player 
+	if (self.running){	
+		// if we got to the end of the defined path without encountering the player, hunt freely
+		$bunker2reinforcement runto $player
+	}
+}end
+
+//=========================================================================
+gagB2ReinforcementWatchForPlayer:
+//=========================================================================
+{
+	//dprintln "thread launched: Bunker2::gagB2ReinforcementWatchForPlayer"
+	
+	while (self.running) {
+		if (vector_length($player.origin - self.origin) < 150){	// if we encounter player before path end...
+			self runto NULL										// ...stop running
+			self thread gagB2ReinforcementInstructPlayer		// ...give instructions
+			self.running = 0									// ...flag that we stopped
+			break
+		} 
+		else{
+			waitframe											// if not, keep watching
+		}
+	}
+}end
+
+//=========================================================================
+gagB2ReinforcementInstructPlayer:
+//=========================================================================
+{
+	//dprintln "thread launched: Bunker2::gagB2ReinforcementInstructPlayer"
+
+	level.thunder = 0
+	self runto NULL		// stop running
+	self turnto $player	// face the player
+	self lookat $player
+	wait 1	
+	
+	// pop the player off the turret if necessary
+	if ($player.turret != NIL && $player.turret != NULL){
+		$player usestuff $player.turret
+	}
+
+	$bunker2reinforcement say A_34_Soldier5Talk_01
+	$bunker2reinforcement waittill saydone
+	
+	self turnto NULL	// stop facing player
+	self lookat NULL
+	
+	thread gagPutReinforcementOnGun		// run this on its own thread so we don't hold up the objective
+}end
+
+//=========================================================================
+gagPutReinforcementOnGun:
+//=========================================================================
+{
+	//dprintln "thread launched: Bunker2::gagPutReinforcementOnGun"
+	
+	$bunker2reinforcement.enableenemy =1	// let him get in a fight if he wants to
+	
+	// wait for player to get away from the gun
+	while (vector_length($player.origin - $bunker2mg4node.origin) < 128){
+		waitframe
+	}
+	
+	// send him to the gun and attach
+	$bunker2reinforcement.movedoneradius = 40	// reduce his tolerance - he really needs to get there
+	$bunker2reinforcement runto $bunker2mg4node
+	
+	while (vector_length($bunker2reinforcement.origin - $bunker2mg4node.origin) > 50){
+		waitframe
+	}
+		
+	$bunker2mg4 thread global/mg42init.scr::AttachGuyToMG42 $bunker2reinforcement NIL 1
+}end
+
+//=========================================================================
+LeaveMissionFailure:
+//=========================================================================
+{
+	self waittill trigger
+
+	if (level.currentobjective == level.ObjDefendBunker2){
+		iprintlnbold "You failed to defend Baker Bunker."
+		wait 2
+		missionfailed
+	}
+}end
+
+//=========================================================================
+MG42Clip:
+//=========================================================================
+{
+	local.collision 		= spawn script_object model $mgguycollision.brushmodel targetname "mgguyclip"
+	local.collision.origin  = self.origin
+	local.collision.angles  = self.angles
+
+	while (isalive self){
+		local.collision time 0.1
+		local.collision moveto self.origin
+		local.collision waitmove
+	}
+
+	local.collision delete
+}end
+
+//=========================================================================
+Bunker2BattleManager:
+//=========================================================================
+{
+	local.wave1 = 10
+	local.wave2 = 10
+	local.wave3 = 15
+
+	$bunker2parade.totalguys = local.wave1 + local.wave2 + wave3 + 5
+	$bunker2parade thread global/parade.scr::RunParade
+	thread InvadeBunkerAttempts
+
+	// 5 active guys, 10 total
+	$bunker2parade.activeguys = 5
+	while ($bunker2parade.spawncount < local.wave1){
+		waitframe
+	}
+
+	// 8 second cleanup time
+	$bunker2parade.activeguys = 0
+	wait 8
+
+	// 7 active guys 10 total
+	$bunker2parade.activeguys = 7
+	while ($bunker2parade.spawncount < local.wave1 + local.wave2){
+		waitframe
+	}
+
+	// 8 second cleanup time
+	$bunker2parade.activeguys = 0
+	wait 8
+
+	// 10 active guys 15 total
+	$bunker2parade.activeguys = 10
+	while ($bunker2parade.spawncount < local.wave1 + local.wave2 + local.wave3){
+		waitframe
+	}
+
+	// Bring in the reinforcment
+	thread WakeUpReinforcement
+
+	// Wait till they're all dead
+	while ($bunker2parade.spawndead < local.wave1 + local.wave2 + local.wave3){
+		waitframe
+	}
+
+	// Any remaining guys run away
+	$bunker2parade_paradeguy thread maps/e3l4/Bunker3.scr::Retreat $bunker2retreatnode
+
+	// Tell the invaders to stop
+	level.bunker3runaway = 1
+
+	// Stop the parade!
+	$bunker2parade thread global/parade.scr::DeleteParade
+	wait 6
+	thread ReinforcementGiveOrders
+}end
+
+// Bunker 2 invasion guys
+//=========================================================================
+InvadeBunkerAttempts:
+//=========================================================================
+{
+	local.pathnum 		 = 1
+	level.bunker2runaway = 0
+
+	while(level.bunker2runaway == 0){
+		if (local.pathnum == 1){
+			local.path 	  = $bunker2invadepath1
+			local.pathend = $bunker2invadepath1end
+			local.pathnum = 2
+		}
+		else{
+			local.path 	  = $bunker2invadepath2
+			local.pathend = $bunker2invadepath2end
+			local.pathnum = 1
+		}
+
+		local.invader = waitthread ChooseRandomParadeGuy local.path
+
+		if (local.invader){
+
+			local.invader thread InvadeBunker local.path local.pathend
+			wait 3
+		}
+		wait 1
+	}
+}end
+
+//=========================================================================
+ChooseRandomParadeGuy local.path:
+//=========================================================================
+{
+	if (!$bunker2parade_paradeguy){
+		end
+	}
+
+	local.closestguy  = NULL
+	local.closestdist = 10000
+
+	for (local.i=1;local.i<=$bunker2parade_paradeguy.size;local.i++){
+		if ($bunker2parade_paradeguy[local.i] && isalive $bunker2parade_paradeguy[local.i] && $bunker2parade_paradeguy[local.i].invading != 1){
+			local.dist = vector_length($bunker2parade_paradeguy[local.i].origin - local.path.origin)
+
+			if (local.dist < local.closestdist){
+				local.closestdist = local.dist
+				local.closestguy  = $bunker2parade_paradeguy[local.i]
+			}
+		}
+	}
+}end local.closestguy
+
+//=========================================================================
+InvadeBunker local.path local.pathend:
+//=========================================================================
+{
+	self.type_attack = "runandshoot"
+	self.invading = 1
+
+	//	dprintln ("going " + local.path)
+	//=========================================================================
+	RunIn:
+	//=========================================================================
+	{
+		self runto local.path
+		self waittill movedone
+	}
+	//	dprintln ("done " + local.path)
+
+	if (self && isalive self && vector_length(self.origin - local.pathend.origin) > 30){
+		goto RunIn
+	}
+
+	//	dprintln ("madeit " + local.path)
+
+	// if  we are dead, get out of here
+	if (!self || !(isalive self)){
+		end
+	}
+}end
+
+//=========================================================================
+CleanupSceneBunker2:
+//=========================================================================
+{
+	thread global/EntityCleanup.scr::EntityCleanup $bunker2mgguy1 3000
+	thread global/EntityCleanup.scr::EntityCleanup $bunker2mgguy2 3000
+	thread global/EntityCleanup.scr::EntityCleanup $bunker2reinforcement 3000
+	thread global/EntityCleanup.scr::EntityCleanup $jeeppassenger 3000
+}end
+
+//=========================================================================
+CleanupSceneBunker1to2:
+//=========================================================================
+{
+	// wait for the second group of guys to trigger
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "1b2guys2trigger"			
+	local.trigger waittill trigger
+
+	thread global/EntityCleanup.scr::EntityCleanup "1b2guys1" 2000
+	$triggerBlastBridge waittill trigger
+	thread global/EntityCleanup.scr::EntityCleanup "1b2guys2" 1000
+
+	// wait for road strafing plane
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "bunker2planetrigger"			
+	local.trigger waittill trigger
+
+	thread global/EntityCleanup.scr::EntityCleanup "1b2guys3" 	 1000
+	thread global/EntityCleanup.scr::EntityCleanup "1b2guys4" 	 1000
+	thread global/EntityCleanup.scr::EntityCleanup $bridgemgguy1 1000
+	thread global/EntityCleanup.scr::EntityCleanup $bridgemgguy2 1000
+
+	$pgenB1B2 	  turnoff
+	$pgenBridge01 turnoff
+	$pgenBridge02 turnoff
+}end
+
+//=========================================================================
+CleanupSceneBunker2RunUpGuys:
+//=========================================================================
+{
+	thread global/EntityCleanup.scr::EntityCleanup "1b2guys5" 1000
+}end
+

@@ -1,0 +1,345 @@
+/* example initialization, with:
+
+	level.bohlerDelay	the time between shots with the gun if it is crewed and the crew is in position
+	$bohler:  		the gun
+	$bohler_turret0: 	the turret
+	$bohlerguy1:		the default crew member
+	$bohlerguy2:		the backup crew member
+	$bohlerCrewPosition	the spot for the crew member to stand to operate the gun
+	$bohlerGuysGo		trigger to make the crew member man the gun and start shooting at the player
+	$bohlerGuysStop:	trigger to make the crew dismount the gun and attack the player
+
+
+//--------------------------------------
+initBohlers:
+//--------------------------------------
+	level.bohlerDelay = 2
+	
+	$bohlerGuysGo waittill trigger
+	waitframe
+	$bohler thread initGun $bohlerGuysStop $bohler_turret0 $bohlerguy1 $bohlerguy2 $bohlerCrewPosition $bohlerCrewPosition
+end
+
+*/
+
+//=========================================================================
+initGun local.stopTrigger local.turret local.crew1 local.crew2 local.crewPosition:
+//=========================================================================
+{
+	if (local.crew1 == NULL || local.crew1 == NIL){
+		//iprintln "ERROR!  CREW MEMBER NOT SPAWNED!"
+		end
+	}
+	else{
+		//iprintln ("crew1.targetname = " + local.crew1.targetname )
+	}
+
+	local.crew1 exec global/disable_ai.scr
+	local.crew2 exec global/disable_ai.scr
+	local.crew1 gun "none"
+	local.crew2 gun "none"
+	
+	self.view 		  	 = local.crewPosition.origin + (0 0 150)
+	self.hasFiredOnce 	 = 0
+	self.crew 		  	 = local.crew1
+	self.crew.inPosition = 0
+	self.wantsToShoot 	 = 1
+	self.turret 		 = local.turret
+	self.firePosition 	 = local.crewPosition
+	self thread bohlerCrap local.stopTrigger local.crew1 local.crew2
+}end
+
+//=========================================================================
+bohlerCrap local.stopTrigger local.crew1 local.crew2:	
+//=========================================================================
+{
+	local.crew1 thread crewThink
+	local.crew2 thread crewThink
+
+	self thread bohlerThink local.crew1 local.crew2
+	self thread stopOnProximity local.stopTrigger local.crew1 local.crew2
+	//$bohlerguy2 exec global/enable_ai.scr
+}end
+
+//=========================================================================
+stopOnProximity local.trigger local.crew1 local.crew2:
+//=========================================================================
+{
+	//chrissstrahl - debug bohler shitt - wait only if we are not debugging
+	if(level.coop_debugLevel == NIL){
+		local.trigger waittill trigger
+	}
+	self thread playerUseBohlerThread
+	
+	//iprintln "DEBUG: PROXIMITY"
+	self.wantsToShoot = 0
+	local.crew1 thread crewAttack
+	local.crew2 thread crewAttack
+}end
+
+//=========================================================================
+crewThink local.gun:
+//=========================================================================
+{
+	self takedamage
+	self waittill pain
+	//iprintln "DEBUG: OW!!!!!!!!"
+	self thread crewAttack
+}end
+
+//=========================================================================
+crewAttack:
+//=========================================================================
+{
+	self exec global/enable_ai.scr
+	self gun "Mauser KAR 98K"
+	self attackplayer
+}end
+
+//=========================================================================
+bohlerThink local.crew1 local.crew2:
+//=========================================================================
+{
+	//	iprintln "DEBUG: thinking"
+	while (self.wantsToShoot == 1 && (isAlive local.crew1 || isAlive local.crew2)){
+		if (self.crew && isAlive self.crew){
+
+			if (self.crew.inPosition == 1){
+				self waitthread fireBohler
+				wait level.bohlerDelay
+			}
+			else{
+				self.crew waitthread getInPosition self
+			}
+		}	
+		else{
+			self.crew.inPosition = 0
+			local.crew2 exec global/disable_ai.scr
+			self.crew = local.crew2
+		}
+		waitframe
+	}
+}end
+
+//=========================================================================
+getInPosition local.gun:
+//=========================================================================
+{
+	//	iprintln "DEBUG: getting in position"
+	self runto local.gun.firePosition
+	self waittill movedone
+	//chrissstrahl - coop compatible
+	level.playerBohlerTarget = exec coop_mod/replace.scr::player_closestTo self
+	self turnto level.playerBohlerTarget
+	
+	self waittill turndone
+	self.inPosition = 1
+}end
+
+//=========================================================================
+fireBohler:
+//=========================================================================
+{
+	//	iprintln "DEBUG: firing bohler"
+	local.target 	 = level.playerBohlerTarget.origin //chrissstrahl - coop compatible
+	local.tankTop 	 = $tank2.origin + (0 0 150)
+	local.canSeeTank = sighttrace local.tankTop self.view
+
+	if (self.hasFiredOnce == 0){
+		if (local.canSeeTank == 1){
+			local.target = $tank2.origin
+		}
+			 
+		self.hasFiredOnce 	= 1
+		self.hackTarget 	= spawn script_origin 
+		self.hackTarget.origin = local.target
+		self.turret setaimtarget self.hackTarget
+	}
+	
+	self.turret waittill ontarget
+	self.crew thread bohlerCrewFire
+
+	while (level.fireWeapon == 0){
+		waitframe
+	}
+
+	self.turret shoot
+	self.turret anim fakefire
+	level.fireWeapon = 0
+
+	
+	self.hackTarget delete
+	self.hackTarget = spawn script_origin 
+
+	if (local.canSeeTank == 1){
+		local.target = $tank2.origin
+	}
+			
+	self.hackTarget.origin = local.target
+	self.turret setaimtarget self.hackTarget
+}end
+
+//=========================================================================		
+bohlerCrewFire:
+//=========================================================================
+{
+	self thread global/loopanim.scr::LoopAnimStop
+	self anim A_12_bohler_fire
+	self waittill animdone
+	level.fireWeapon = 1
+	self thread global/loopanim.scr::LoopAnim A_13_bohler_idle	
+}end
+
+//=========================================================================
+playerUseBohlerThread:
+//=========================================================================
+{
+	//chrissstrahl - handle it for coop in seperate func
+	if(level.gametype != 0){
+		self thread coop_playerUseBohlerThread
+		end
+	}
+	
+	self lock
+	local.backward  = -1 * angles_toforward self.angles 
+	while (self) {
+		local.playerClose = 0
+		
+		while (1){
+			while (local.playerClose == 0){
+				if (vector_length ($player.origin - self.origin) < 200){
+					local.playerClose = 1
+				}
+				waitframe
+			}
+			
+			while (local.playerClose == 1){
+				if (vector_length (self.origin - $player.origin) > 200){
+					local.playerClose = 0
+					//iprintlnbold_noloc("i was close now no more") //chrissstrahl
+				}
+				else if ($player.useheld){
+					//iprintlnbold_noloc("local.dot: useheld")  //chrissstrahl
+					local.vObjDir = vector_subtract $player.origin self.origin
+					local.vObjDir = vector_normalize local.vObjDir
+					local.dot 	  = vector_dot local.vObjDir local.backward
+					
+					if (local.dot > .707){
+						//iprintlnbold_noloc("local.dot: > .707")
+						break
+					}else{
+						//iprintlnbold_noloc("local.dot: "+local.dot)
+					}
+				}
+				waitframe
+			}
+			if (local.playerClose == 1){
+				//iprintlnbold_noloc("close break")  //chrissstrahl
+				break
+			}
+		}		
+		//iprintlnbold_noloc("viewangles 1")  //chrissstrahl
+		
+		local.playerAngles = $player.viewangles
+		self unlock
+		self doUse $player
+		self lock
+		wait .25
+		
+		while (!($player.useheld)){
+			waitframe
+		}
+		//iprintlnbold_noloc("viewangles use held")  //chrissstrahl
+		
+		self unlock
+		self doUse $player
+		self lock
+
+		$player.viewangles = local.playerAngles
+		wait .25
+	}
+}end
+
+//chrissstrahl - this manages the bohler stuff for coop
+//=========================================================================
+coop_playerUseBohlerThread:{
+//=========================================================================
+	self lock
+	local.backward  = -1 * angles_toforward self.angles
+	iprintlnbold_noloc("DEV: coop_playerUseBohlerThread")
+	//loop
+	while (self) {
+	//check each player if they validate
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player =  $player[local.i]
+			if(	local.player == NULL ||
+				local.player.health <= 0 ||
+				local.player.dmteam == "spectator" ||
+				local.player.flags["coop_isActive"] != 1 ||
+				vector_length (local.player.origin - self.origin) > 200){
+				continue
+			}
+	//valid player
+			if(local.player.useheld){
+	//valid player pressing use key
+				iprintlnbold_noloc("DEV: valid player pressing use key")
+	//valid player check if player is within reach range/angle
+				local.vObjDir = vector_subtract local.player.origin self.origin
+				local.vObjDir = vector_normalize local.vObjDir
+				local.dot 	  = vector_dot local.vObjDir local.backward
+				if (local.dot > .707){
+					iprintlnbold_noloc("DEV: > .707")
+	//valid player using, wait until player (gets) interrupt(ed)
+					self waitthread coop_playerUseBohlerThread_player local.player
+	//abort the for loop and start over fresh again
+					break
+				}
+			}
+		}
+		waitframe
+	}
+}end
+
+//chrissstrahl - this manages the player using the bohler
+//=========================================================================
+coop_playerUseBohlerThread_player local.player:{
+//=========================================================================
+	iprintlnbold_noloc("DEV: coop_playerUseBohlerThread")
+	local.playerAngles = local.player.viewangles
+	self unlock
+	self doUse local.player
+	self lock
+	
+	while(1){//run forest run!
+//player left server - player dead - player changed team
+		if( local.player == NULL || local.player.health <= 0 || local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1){
+			iprintlnbold_noloc("DEV: left, team or dead")
+			self waitthread coop_playerUseBohlerThread_playerExit NULL
+			break
+		}
+//player out of reach(for what ever reason) - player pressing use (wants to exit)
+		else if(vector_length (local.player.origin - self.origin) > 200 || local.player.useheld){
+			iprintlnbold_noloc("DEV: out of range or pressed use")
+			self waitthread coop_playerUseBohlerThread_playerExit local.player local.playerAngles
+			break
+		}
+		waitframe
+	}
+	wait .25
+}end
+
+//chrissstrahl - this manages the player exiting the bohler
+//=========================================================================
+coop_playerUseBohlerThread_playerExit local.player local.viewangle:{
+//=========================================================================
+	self unlock
+	//unlock player from turret only if we really need to, or we can get a player stuck in a loop untill they kill them self
+	if(local.player != NIL && local.player != NULL){
+		self doUse local.player
+		local.player face local.viewangle
+		waitframe
+	}
+	self lock
+}end
+
+

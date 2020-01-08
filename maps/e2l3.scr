@@ -1,0 +1,157 @@
+//============================================================================
+main: {
+//============================================================================
+	fadeout .001 0 0 0 1
+	wait 0.5
+	drawhud 0
+
+	println "-----------------------------------------------"
+	println "-----------------------------------------------"
+	println "-----------------------------------------------"
+	println "E2L3"
+	println "-----------------------------------------------"
+
+	exec global/auto.scr e2l3
+	setcvar g_mission 2
+	exec global/exploder.scr
+	exec global/ambience.scr e2l3
+	waitexec maps/e2l3/hacks.scr
+	exec maps/e2l3/aicleanup.scr
+	
+	thread InitLevel
+
+	//	waitthread maps/e2l3/TankCrash.scr::InitTankCrash
+	//	level waittill spawn
+
+	thread startMusic_e2l3_main
+
+	level waittill prespawn
+
+	// AI Values
+	level.aicrouchchance = 55
+	level.aipronechance = 45
+
+	// create objectives
+	waitthread global/ObjMgr.scr::Init
+	waitthread global/ObjMgr.scr::InitObj	"meet82nd"		"Rendezvous with 82nd Airborne"
+	waitthread global/ObjMgr.scr::InitObj	"assist82nd"		"Assist 82nd Airborne"
+	waitthread global/ObjMgr.scr::InitObj	"clearTown"		"Secure the Village"
+	waitthread global/ObjMgr.scr::InitObj	"repelTanks"		"Repel Tank Assault"
+
+	level waittill spawn
+
+	// init sections
+	waitthread maps/e2l3/IntroHouse.scr::Init
+	waitthread maps/e2l3/building1.scr::Init
+	waitthread maps/e2l3/Glider.scr::Init
+	waitthread maps/e2l3/BattleHouse.scr::Init
+	waitthread maps/e2l3/AirDrop.scr::Init
+	waitthread maps/e2l3/Vineyard.scr::Init
+	waitthread maps/e2l3/Town.scr::Init
+	waitthread maps/e2l3/FinalHouse.scr::Init
+
+	// finish objectives init (set up compass targs, possibly reveal first objectives, possibly set current obj)
+	waitthread global/ObjMgr.scr::RevealObj	"meet82nd"
+	waitthread global/ObjMgr.scr::SetObjCompassTarg "meet82nd" $battleAirborne_Commander
+	waitthread global/ObjMgr.scr::SetCurrObjStrategy		"inOrder"
+
+	if (level.nofog == 1) {
+		end // MPS because Mercieca told me to...
+		$world farclipoverride 10000
+		$world farplane 10000
+		$world farplane_bias 10000
+	}		
+}end
+
+//============================================================================
+InitLevel: {
+//============================================================================
+	level.script = "maps/e2l3.scr"
+	level.bomb_damage = 800
+	level.bomb_explosion_radius = 400
+
+	level.skip_fadein = 1
+	if (level.skip_fadein == 0) {	
+		waitthread Fadein 
+	}
+
+	level waittill prespawn
+
+	$player heal 1
+	level.commander_kill = 0
+	waitexec global/loadout.scr
+
+	level waittill spawn
+
+	$player waitthread global/squad.scr::create_squad
+	//level.autosave = 1
+	//exec global/autosave.scr level.autosave	//"Starting"
+	//level.autosave++	
+}end
+
+//============================================================================
+Fadein: {
+//============================================================================
+	level.startangles = $player.viewangles
+	$player physics_off
+	exec global/fadein.scr
+	waitframe
+
+	waitthread global/fadein.scr::DoFadeIn e2l3_1 e2l3_2 e2l3_3 NIL 1
+	$player.viewangles = level.startangles  //undo any mousemovment during the hud stuff
+	$player physics_on
+}end
+
+//============================================================================
+startMusic_e2l3_main: {
+//============================================================================
+	level waittill prespawn
+
+	if (level.skiptown != 1) {
+		// start looping at intro
+		$player stufftext "tmstop; tmstartloop sound/music/mus_11a_surprise.mp3"
+
+		while (level.startTankDead != 1) {
+			wait 0.1
+		}
+	
+		// start looping after destroying the first tank
+		// (at opening of level)
+		waitthread global/music.scr::StopSong 1.5
+		$player stufftext "tmstartloop sound/music/E2L1_Streets_of_Paris.mp3"
+	}
+
+	if (level.skipairdrop != 1) {
+		while (level.met82nd != 1) {
+			wait 0.1
+		}
+
+		waitthread global/music.scr::StopSong 1.5
+		$player stufftext "tmstartloop sound/music/mus_14a_action.mp3"
+	}
+
+	$FH_OnTopFloorTrigger waittill trigger
+	waitthread global/music.scr::StopSong 3
+	
+	while (level.tanksMoving != 1) {
+		waitframe
+	}
+	
+	$player stufftext "tmstartloop sound/music/medicdance.mp3"
+
+	while (level.tanksDefeated == 0) { 
+		waitframe
+	}
+
+	waitthread global/music.scr::StopSong 1.5
+}end
+
+//mus_14a_action.mp3                 start playing after encountering the the 82nd Airborne outside the village                         
+//medicdance.mp3                     start looping after tanks appear at end
+
+//============================================================================
+GiveMedal: {
+//============================================================================
+	//E2 Specific Medal, the Air Medal
+	setcvar "g_medal4" "1"
+}end

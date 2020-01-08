@@ -1,0 +1,230 @@
+main:
+	
+	level.flags[white_room_transformed] = 1
+		
+	$shottytrig nottriggerable
+	
+	thread RampDownFog
+		
+	$shotty bind $gunstand
+	$shotty.angles = (357 233 84)
+	
+	for (local.candle = 1; local.candle <= $candle.size; local.candle++)
+		$candle[local.candle] bind $gunstand
+	
+	$chunk1 moveEast 512
+	$chunk1 speed 40
+	$chunk1 move 
+	wait .5
+	$chunk3 moveEast 512
+	$chunk3 speed 40
+	$chunk3 move 
+	wait .75
+	$chunk2 moveEast 512
+	$chunk2 speed 40
+	$chunk2 move
+	
+	$chunk5 moveDown 512
+	$chunk5 speed 25
+	$chunk5 move 
+	
+	$chunk7 moveUp 512
+	$chunk7 speed 28
+	$chunk7 move 
+	
+	wait 1
+	
+	$chunk4 moveDown 512
+	$chunk4 speed 23
+	$chunk4 move 
+	
+	wait .5 
+	
+	$chunk6 moveDown 512
+	$chunk6 speed 28
+	$chunk6 move 
+	
+	wait .25 
+	$chunk8 moveUp 512
+	$chunk8 speed 25
+	$chunk8 move 
+	
+	wait .5
+	
+	$chunk9 moveUp 512
+	$chunk9 speed 23
+	$chunk9 move 
+	
+	wait 2.5
+	
+	$chunkdoorblocka delete
+	
+	wait 2
+	
+	$gunstanddoor moveSouth 512
+	$gunstanddoor speed 60 
+	$gunstanddoor move
+	
+	wait 1.5
+	
+	$gunstand moveUp 48
+	$gunstand speed 25
+	$gunstand waitmove
+	$shottytrig thread Shotty
+		
+	wait 1
+	
+	$roomwallfrontleft1 moveDown 512
+	$roomwallfrontleft1 speed 25
+	$roomwallfrontleft1 move
+	
+	$roomwallfrontleft2 moveDown 512
+	$roomwallfrontleft2 speed 25
+	$roomwallfrontleft2 move
+	
+	$roomwallback moveDown 512
+	$roomwallback speed 25
+	$roomwallback move
+	
+	wait .5 
+	
+	$roomwallleft moveDown 512
+	$roomwallleft speed 25
+	$roomwallleft move
+	
+	$roomwallfrontright1 moveDown 512
+	$roomwallfrontright1 speed 25
+	$roomwallfrontright1 move
+	
+	$roomwallfrontright2 moveDown 512
+	$roomwallfrontright2 speed 25
+	$roomwallfrontright2 move
+	
+	$roomwallentranceside moveDown 512
+	$roomwallentranceside speed 45
+	$roomwallentranceside move
+	
+	wait .5 
+	
+	$roomwallright moveDown 512
+	$roomwallright speed 25
+	$roomwallright move
+	
+	$roomceiling2 moveUp 128
+	$roomceiling2 speed 30
+	$roomceiling2 move
+	
+	$roomfloorentrance moveDown 128
+	$roomfloorentrance speed 30
+	$roomfloorentrance move
+	
+	wait .25 
+	
+	$roomceiling1 moveNorth 512
+	$roomceiling1 speed 55
+	$roomceiling1 move
+	
+	$roomfloor1 moveNorth 512
+	$roomfloor1 speed 25
+	$roomfloor1 move
+	
+	$roomwallentrancebeam moveUp 128
+	$roomwallentrancebeam speed 45
+	$roomwallentrancebeam move
+	
+	wait .25
+	
+	$roomfloor2 moveNorth 512
+	$roomfloor2 speed 45
+	$roomfloor2 move
+	
+	wait .5
+	
+	$roomfloor4 moveSouth 512
+	$roomfloor4 speed 45
+	$roomfloor4 move
+	
+	$roomfloor3 moveSouth 512
+	$roomfloor3 speed 65
+	$roomfloor3 move
+	
+	$roomfloor5 moveSouth 512
+	$roomfloor5 speed 40
+	$roomfloor5 move
+	
+	wait 10
+	
+	for (local.c = 1; local.c <= 9; local.c++)
+		$("chunk" + local.c) delete			
+	$gunstanddoor delete
+	$roomwallfrontleft1 delete
+	$roomwallfrontleft2 delete
+	$roomwallback delete 
+	$roomwallleft delete
+	$roomwallfrontright1 delete
+	$roomwallfrontright2 delete
+	$roomwallentranceside delete	
+	$roomwallright delete 
+	$roomceiling1 delete
+	$roomceiling2 delete
+	$roomfloorentrance delete
+	$roomfloor1 delete
+	$roomfloor2 delete
+	$roomfloor3 delete
+	$roomfloor4 delete
+	$roomfloor5 delete
+	$roomwallentrancebeam delete
+end
+
+Shotty:
+	$shottytrig triggerable
+	
+	$shottytrig waittill trigger
+	
+	$shottytrig remove
+	$shotty remove
+	$player playsound shotgun_snd_pickup
+	$player item weapons/shotgun.tik
+	$player ammo shotgun 92
+	$player useweaponclass heavy	
+end
+
+RampDownFog:
+	level.secret_fog_thread = local									// *!* store thread
+	level.flags[fog_failsafe] = 1									// *!* ramping down fog flag
+	$world farplane_color (0.000000 0.215686 0.215686)
+	for (local.i = 3500; local.i > 1000; local.i -= 100)
+	{
+		$world farplane local.i
+		wait .2
+	}
+	level.flags[fog_failsafe] = 0									// *!* completed ramp down
+end
+
+SecretAmbience:
+	//println "INITIALISING SECRET TRIGGERS"
+	while (1)
+	{
+		$secretmusicon waittill trigger
+		
+		if (level.flags[white_room_transformed])
+		{
+			$world farplane 1000
+			$world farplane_color (0.000000 0.215686 0.215686)
+		}
+		$player stufftext "s_musicvolume 1.0"
+		$player stufftext "tmstop; tmstartloop sound/test_bocage/chilling/Buddug_iceni_tune.wav"
+		
+		$secretmusicoff waittill trigger 
+		
+		if (level.flags[fog_failsafe]) 
+		{
+			level.secret_fog_thread delete 							// *!* trying to leave while fog is ramping down
+			level.flags[fog_failsafe] = 0							// *!* so delete the RampDownFog thread	immediately		
+		}
+		
+		$world farplane level.farplane
+		$world farplane_color level.fogColor
+		$player stufftext "tmstop"
+	}
+end

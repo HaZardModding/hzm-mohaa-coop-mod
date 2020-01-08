@@ -1,0 +1,108 @@
+//-------------------------------------------------------------------
+wrench local.spot local.lookspot:
+//-------------------------------------------------------------------
+	//chrissstrahl - make sure they don't get stuck in a loop
+	//the problem is probably with self.thinkstate != "idle"
+	//if there is time I shall investigate thinkstates
+	//but I will come eventually to that script anyway at some point
+	//so there is no reason to waste any time right now, because we have a working fix
+	if(self.interrupted != NIL && self.interrupted == 1){
+		wait 2
+		end
+	}
+	
+	if(self.thinkstate != "idle")
+	{
+		wait 2
+		end
+	}
+	
+	self.interrupted = 0
+	self.idle_thread = local
+	self forceactivate
+	self type_attack "alarm"
+	
+	self prealarmthread "wrenchinginterrupt"
+	
+	if(self.gun == "" || self.gun == NULL || self.gun == NIL || self.gun == "none")
+		self weapon "walter p38"
+	
+	self exec coop_mod/replace.scr::holster	//chrissstrahl - used to fix unarmed issue
+	waitframe
+	
+	if(self.isinplace != 1)
+	{
+		self.isinplace = 1
+	   	self exec global/walkto.scr local.spot
+ 	  	self waittill movedone
+     	self turnto local.lookspot
+		self waittill turndone
+		self turnto NULL
+	}
+
+	self curiousoff
+	
+	self waitthread weldinganimwait working_wrench_pullout
+	self waitthread weldinganimwait working_wrenching_getdown
+
+	self thread OnPain
+	
+	while( (isalive self) && (self.interrupted != 1) )
+	{
+		self waitthread weldinganimwait working_wrenching
+	}
+
+end
+
+//-------------------------------------------------------------------
+wrenchinginterrupt:{
+//-------------------------------------------------------------------
+	if (self.idle_thread){
+		self.idle_thread delete
+	}
+
+	if( self.interrupted == 1 ){ end }
+	
+	self.interrupted = 1	
+	self exec global/disable_ai.scr	
+	self waitthread weldinganimwait working_wrenching_getup  
+	self anim working_wrenching_putaway
+	wait .5
+	
+	if(isalive self){
+		self exec coop_mod/replace.scr::unholster	//chrissstrahl - used to fix unarmed issue
+	}
+	
+	wait .1
+	
+	if(isalive self){
+     	self exec global/enable_ai.scr
+     	self attackplayer
+	}
+}end
+
+//-------------------------------------------------------------------
+weldinganimwait local.anim:
+//-------------------------------------------------------------------
+	if(isalive self)
+	{
+		self anim local.anim
+		self waittill animdone
+	}
+	else
+	{
+		waitframe
+	}
+
+	end
+
+//-------------------------------------------------------------------
+OnPain:
+//-------------------------------------------------------------------
+	self waittill pain
+
+	self type_attack "turret"
+	self thread wrenchinginterrupt
+
+end
+

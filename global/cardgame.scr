@@ -1,0 +1,857 @@
+//	Card Players scripted by Mackey McCandlish.
+//	
+//	Before level waittill prespawn "exec global/cardgame.scr".
+//	
+//	Used in m1l2a, m2l2a, and m4l3.
+//
+//	Create an animate_furniture_cardtable and give it targetname "cardgame".
+//
+//	Create a clip brush that fits it, and then move it in on the x and y by about 4 units from each direction (basically
+//	creating a mini table in the table because if the table was solid the AI would get stuck on it).
+//
+//	Create either 2 or 3 AI and make the table target them all (give them all a random targetname and make the table use
+//	that as its target).
+//
+//	If you don't lower the hearing/sight of the AI, you'll have a hard time getting close enough to the card game to actually
+//	see it.
+
+main:
+	//exec global/loadout.scr "maps/m5l3.scr"
+
+	level waittill spawn
+
+
+	if ($cardgame == NULL)
+		level.cardgames = 0
+		else
+		level.cardgames = $cardgame.size
+
+
+	if (level.cardgames > 0)
+	{
+		level.cardgame = exec global/makearray.scr $cardgame
+
+		for (local.i=1;local.i<level.cardgames+1;local.i++)
+		{
+
+			if !(level.cardgame[local.i].target)
+				exec global/error.scr ("Error, cardgame at " + level.cardgame[local.i].origin + " has no targets") 1
+				else
+				{
+
+					local.sizer = $(level.cardgame[local.i].target).size
+
+					if ((local.sizer != 2) && (local.sizer != 3))
+						exec global/error.scr ("Error, cardgame at " + level.cardgame[local.i].origin + " does not have 2 or 3 targets") 1
+						else
+							if (local.sizer == 2)
+								level.cardgame[local.i] thread cardgame2 local.i
+								else
+								if (local.sizer == 3)
+									level.cardgame[local.i] thread cardgame3 local.i
+				}
+	
+
+		}
+
+		println ("Spawned " + level.cardgames + " cardgames")
+	}
+
+	for (local.i=1;local.i<$sit.size+1;local.i++)
+		$sit[local.i] thread sitman
+
+end
+
+chairdeath:
+//	local.chair = self.chair
+//	local.rand = randomint (10)
+
+	self waittill death
+
+	if (self.fighting == 0)
+	{
+		self.chair delete
+		local.chair = spawn script_model
+		local.chair model "furniture/cardchair.tik"
+		local.chair.origin = self.origin
+		local.chair.angles = self.angles
+		if (self.chairdeath == "chair_death_forwards")
+			local.chair solid
+		else
+			local.chair notsolid
+
+		waitframe
+		println ("Chair is playing animation " + self.chairdeath)
+		local.chair anim self.chairdeath
+		wait 3
+		local.chair anim (self.chairdeath + "_end")
+		println ("Chair is playing animation " + (self.chairdeath + "_end"))
+		waitframe
+	}
+
+//	wait 2
+end
+
+sitman:
+	if !(self.target)
+	{
+		exec global/error.scr ("ERROR, sit at origin " + self.origin + " has no target") 1
+		end
+	}
+
+	self.target.chair = self
+	self.target thread sitthink
+	self notsolid
+
+end
+
+sitthink:
+
+	self.originalhealth = self.health
+	self.health = 1
+	self exec coop_mod/replace.scr::holster	//chrissstrahl - used to fix unarmed issue
+	self.origin = self.chair.origin
+	self.angles = self.chair.angles
+	self anim chair_radio_listenidle
+	
+	if (randomint (100) > 50)
+		self.chairdeath = "chair_death_forwards"
+	else
+		self.chairdeath = "chair_death_backwards"
+
+	self.fighting = 0
+	self thread chairdeath
+
+	self exec global/setdeathanim.scr self.chairdeath
+
+	while (self.thinkstate == "idle")
+		waitframe
+
+
+	if (isalive self)
+	{
+		self exec coop_mod/replace.scr::lookat	//chrissstrahl - look at closest player
+		self exec global/disable_ai.scr
+
+		self anim chair_alert_stand
+		self.chair anim chair_alert_stand
+		self exec coop_mod/replace.scr::unholster	//chrissstrahl - used to fix unarmed issue
+		wait 0.5
+//		self waittill animdone
+		if (isalive self)
+		{
+			self.fighting = 1
+			self exec global/enable_ai.scr
+			self.health = self.originalhealth
+			self exec global/setdeathanim.scr NIL
+			self exec coop_mod/replace.scr::runtoClosest	//chrissstrahl - runto closest player
+
+			wait 1
+			self.chair anim chair_alert_stand_end
+		}
+	}
+
+
+end
+
+
+
+cabinettrigger:
+	level waittill spawn
+
+	self waittill trigger
+	while ($player istouching self)
+		waitframe
+
+	for (local.i=1;local.i<level.cabinets+1;local.i++)
+	if ((level.cabinet[local.i].set == self.set) && (isalive level.cabinet[local.i]))
+		thread cabinetgo local.i
+
+end
+
+
+cardgame2 local.set:
+
+	self.set = local.set
+	self notsolid
+//	self solid
+	self.current = 1
+	level.carddone[local.set] = 0
+	
+	for (local.i=1;local.i<3;local.i++)
+	{
+		local.card[local.i] = $(self.target)[local.i]
+		local.card[local.i] type_disguise "none"
+		local.o = self gettagposition ("tag_actor0" + local.i)
+		local.a = self gettagangles ("tag_actor0" + local.i)
+
+		local.card[local.i].mumble = 0
+		local.card[local.i] exec coop_mod/replace.scr::holster	//chrissstrahl - used to fix unarmed issue
+		local.card[local.i].no_idle = 1
+//		local.card[local.i].sight = 300
+//		local.card[local.i].hearing = 300
+		local.card[local.i].origin = local.o
+		local.card[local.i].angles = local.a
+		local.card[local.i].creator = self
+//		local.card[local.i] nodamage
+		local.card[local.i].originalhealth = local.card[local.i].health
+		local.card[local.i].health = 2
+		local.card[local.i].noticescale = 1
+
+//		local.card[local.i] exec global/disable_ai.scr
+
+//		local.card[local.i].painhandler = anim/pain.scr::
+		local.card[local.i] thread checkresponse
+
+		if (randomint (100) > 50)
+			local.card[local.i].chairdeath = "chair_death_forwards"
+		else
+			local.card[local.i].chairdeath = "chair_death_backwards"
+
+		local.card[local.i] exec global/setdeathanim.scr local.card[local.i].chairdeath
+
+		local.card[local.i] thread cardgame2anim local.i
+		local.card[local.i].chairthread = parm.previousthread
+
+		local.chair[local.i] = spawn script_model
+		local.chair[local.i] model "furniture/cardchair.tik"
+		local.chair[local.i].origin = local.o
+		local.chair[local.i].angles = local.a
+		local.chair[local.i] notsolid
+		local.card[local.i].chair = local.chair[local.i]
+
+		local.card[local.i].fighting = 0
+		local.card[local.i] thread chairdeath
+
+	}
+
+	while (1)
+	{
+		for (local.current = 1;local.current<8;local.current++)
+		{
+			level.carddone[local.set] = 0
+			self.current = local.current
+			local.time = level.time + 3000
+			while ((level.carddone[local.set] == 0) && (level.time < local.time))
+				waitframe
+		}
+	}
+
+	
+end
+
+/*
+cardgame2:
+
+	for (local.i=1;local.i<3;local.i++)
+	{
+		local.card[local.i] = $(self.target)[local.i]
+
+		local.card[local.i].sight = 500
+		local.card[local.i].hearing = 50
+		local.card[local.i].origin = self gettagposition ("tag_actor0" + local.i)
+		local.card[local.i].angles = self gettagangles ("tag_actor0" + local.i)
+		local.chair[local.i] = spawn script_model
+		local.chair[local.i] model "furniture/cardchair.tik"
+		local.chair[local.i].origin = self gettagposition ("tag_actor0" + local.i)
+		local.chair[local.i].angles = self gettagangles ("tag_actor0" + local.i)
+
+	}
+
+end
+*/
+cardgame3 local.set:
+
+	self.set = local.set
+	self notsolid
+//	self solid
+	self.current = 1
+	level.carddone[local.set] = 0
+	
+	for (local.i=1;local.i<4;local.i++)
+	{
+		local.card[local.i] = $(self.target)[local.i]
+		local.card[local.i] type_disguise "none"
+		local.o = self gettagposition ("tag_actor0" + local.i)
+		local.a = self gettagangles ("tag_actor0" + local.i)
+
+		local.card[local.i].mumble = 0
+		local.card[local.i] exec coop_mod/replace.scr::holster	//chrissstrahl - used to fix unarmed issue
+		local.card[local.i].no_idle = 1
+//		local.card[local.i].sight = 300
+//		local.card[local.i].hearing = 300
+		local.card[local.i].origin = local.o
+		local.card[local.i].angles = local.a
+		local.card[local.i].creator = self
+//		local.card[local.i] nodamage
+		local.card[local.i].originalhealth = local.card[local.i].health
+		local.card[local.i].health = 2
+		local.card[local.i].noticescale = 1
+
+//		local.card[local.i] exec global/disable_ai.scr
+
+//		local.card[local.i].painhandler = anim/pain.scr::
+		local.card[local.i] thread checkresponse
+
+		if (randomint (100) > 50)
+			local.card[local.i].chairdeath = "chair_death_forwards"
+		else
+			local.card[local.i].chairdeath = "chair_death_backwards"
+
+		local.card[local.i] exec global/setdeathanim.scr local.card[local.i].chairdeath
+
+		local.card[local.i] thread cardgame3anim local.i
+		local.card[local.i].chairthread = parm.previousthread
+
+		local.chair[local.i] = spawn script_model
+		local.chair[local.i] model "furniture/cardchair.tik"
+		local.chair[local.i].origin = local.o
+		local.chair[local.i].angles = local.a
+		local.chair[local.i] notsolid
+		local.card[local.i].chair = local.chair[local.i]
+
+		local.card[local.i].fighting = 0
+		local.card[local.i] thread chairdeath
+
+	}
+
+	while (1)
+	{
+		for (local.current = 1;local.current<15;local.current++)
+		{
+			level.carddone[local.set] = 0
+			self.current = local.current
+			local.time = level.time + 3000
+			while ((level.carddone[local.set] == 0) && (level.time < local.time))
+				waitframe
+		}
+	}
+
+	
+end
+
+cardgame2anim local.num:
+	local.current = 0
+
+	if (local.num == 1)
+	while (1)
+	{
+		if (self.creator.current == local.current)
+		{
+			self anim ("Chair_actor1_idleloop")
+			self waittill animdone
+		}
+		else
+		{
+			local.current = self.creator.current
+
+			if (self.creator.current == 1)
+			{
+				self anim ("Chair_actor1_queen")
+				self waittill animdone
+				level.carddone[self.creator.set] = 1
+			}
+			else
+			if (self.creator.current == 2)
+			{
+				self anim ("Chair_actor1_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 3)
+			{
+				self anim ("Chair_actor1_drawcard")
+				self waittill animdone
+				level.carddone[self.creator.set] = 1
+			}
+			else
+			if (self.creator.current == 4)
+			{
+				self anim ("Chair_actor1_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 5)
+			{
+				self anim ("Chair_actor1_fish")
+				self waittill animdone
+				level.carddone[self.creator.set] = 1
+			}
+			else
+			if (self.creator.current == 6)
+			{
+				self anim ("Chair_actor1_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 7)
+			{
+				self anim ("Chair_actor1_idleloop")
+				self waittill animdone
+			}
+		}
+	}
+	else
+	if (local.num == 2)
+	while (1)
+	{
+		if (self.creator.current == local.current)
+		{
+			self anim ("Chair_actor2_idleloop")
+			self waittill animdone
+		}
+		else
+		{
+			local.current = self.creator.current
+
+			if (self.creator.current == 1)
+			{	
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 2)
+			{
+				self anim ("Chair_actor2_fish")
+				self waittill animdone
+				level.carddone[self.creator.set] = 1
+			}
+			else
+			if (self.creator.current == 3)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 4)
+			{
+				self anim ("Chair_actor2_king")
+				self waittill animdone
+				level.carddone[self.creator.set] = 1
+			}
+			else
+			if (self.creator.current == 5)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 6)
+			{
+				self anim ("Chair_actor2_drawcard")
+				self waittill animdone
+				level.carddone[self.creator.set] = 1
+			}
+			else
+			if (self.creator.current == 7)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+				level.carddone[self.creator.set] = 1
+			}
+		}
+	}
+
+end
+
+
+cardgame3anim local.num:
+	local.current = 0
+
+	if (local.num == 1)
+	while (1)
+	{
+		if (self.creator.current == local.current)
+		{
+			self anim ("Chair_actor1_idleloop")
+			self waittill animdone
+		}
+		else
+		{
+			local.current = self.creator.current
+
+			if (self.creator.current == 1)
+			{
+				self anim ("Chair_actor1_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 2)
+			{
+				self anim ("Chair_actor1_fish")
+				self waittill animdone
+				level.carddone[self.creator.set] = 1
+			}
+			else
+			if (self.creator.current == 3)
+			{
+				self anim ("Chair_actor1_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 4)
+			{
+				self anim ("Chair_actor1_queen")
+				self waittill animdone
+				level.carddone[self.creator.set] = 1
+			}
+			else
+			if (self.creator.current == 5)
+			{
+				self anim ("Chair_actor1_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 6)
+			{
+				self anim ("Chair_actor1_drawcard")
+				self waittill animdone
+				level.carddone[self.creator.set] = 1
+			}
+			else
+			if (self.creator.current == 7)
+			{
+				self anim ("Chair_actor1_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 8)
+			{
+				self anim ("Chair_actor1_fish")
+				self waittill animdone
+				level.carddone[self.creator.set] = 1
+			}
+			else
+			if (self.creator.current == 9)
+			{
+				self anim ("Chair_actor1_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 10)
+			{
+				self anim ("Chair_actor1_idleloop")
+				self waittill animdone
+				level.carddone[self.creator.set] = 1
+			}
+			else
+			if (self.creator.current == 11)
+			{
+				self anim ("Chair_actor1_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 12)
+			{
+				self anim ("Chair_actor1_fish")
+				self waittill animdone
+				level.carddone[self.creator.set] = 1
+			}
+			else
+			if (self.creator.current == 13)
+			{
+				self anim ("Chair_actor1_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 14)
+			{
+				self anim ("Chair_actor1_idleloop")
+				self waittill animdone
+			}
+		}
+	}
+	else
+	if (local.num == 2)
+	while (1)
+	{
+		if (self.creator.current == local.current)
+		{
+			self anim ("Chair_actor2_idleloop")
+			self waittill animdone
+		}
+		else
+		{
+			local.current = self.creator.current
+
+			if (self.creator.current == 1)
+			{	
+				self anim ("Chair_actor2_king")
+				self waittill animdone
+				level.carddone[self.creator.set] = 1
+			}
+			else
+			if (self.creator.current == 2)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 3)
+			{
+				self anim ("Chair_actor2_drawcard")
+				self waittill animdone
+				level.carddone[self.creator.set] = 1
+			}
+			else
+			if (self.creator.current == 4)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 5)
+			{
+				self anim ("Chair_actor2_fish")
+				self waittill animdone
+				level.carddone[self.creator.set] = 1
+			}
+			else
+			if (self.creator.current == 6)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 7)
+			{
+				self anim ("Chair_actor2_king")
+				self waittill animdone
+				level.carddone[self.creator.set] = 1
+			}
+			else
+			if (self.creator.current == 8)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 9)
+			{
+				self anim ("Chair_actor2_drawcard")
+				self waittill animdone
+				level.carddone[self.creator.set] = 1
+			}
+			else
+			if (self.creator.current == 10)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 11)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 12)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 13)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 14)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+		}
+	}
+	else
+	if (local.num == 3)
+	while (1)
+	{
+		if (self.creator.current == local.current)
+		{
+			self anim ("Chair_actor2_idleloop")
+			self waittill animdone
+		}
+		else
+		{
+		local.current = self.creator.current
+
+			if (self.creator.current == 1)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 2)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 3)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 4)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 5)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 6)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 7)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 8)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 9)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 10)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 11)
+			{
+				self anim ("Chair_actor2_king")
+				self waittill animdone
+				level.carddone[self.creator.set] = 1
+			}
+			else
+			if (self.creator.current == 12)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+			}
+			else
+			if (self.creator.current == 13)
+			{
+				self anim ("Chair_actor2_drawcard")
+				self waittill animdone
+				level.carddone[self.creator.set] = 1
+			}
+			else
+			if (self.creator.current == 14)
+			{
+				self anim ("Chair_actor2_idleloop")
+				self waittill animdone
+				level.carddone[self.creator.set] = 1
+			}
+		}
+	}
+
+end
+
+
+printtest local.saythis:
+	if (level.printtest == NIL)
+		level.printtest = 1
+
+	if (local.saythis != NIL)
+	print (":::" + local.saythis + " ")
+
+	level.printtest++
+
+
+end
+
+broken:
+	wait randomfloat(1.5)
+	self.creator.broken = 1
+end
+
+
+checkresponse:
+	self.nosurprise = 1
+	self.noticescale = 1
+	self.creator.broken = 0
+
+	while ((self.thinkstate == "idle") && (self.creator.broken == 0))
+		waitframe
+
+	thread broken
+
+//	if (self.thinkstate == "attack")
+	{
+		self exec coop_mod/replace.scr::lookat	//chrissstrahl - look at closest player
+		self exec global/disable_ai.scr
+		self.chairthread delete
+
+		self anim chair_alert_stand
+		if (self.chair)
+		self.chair anim chair_alert_stand
+		self exec coop_mod/replace.scr::unholster	//chrissstrahl - used to fix unarmed issue
+		wait 0.5
+//		self waittill animdone
+		if (isalive self)
+		{
+			self exec coop_mod/replace.scr::unholster	//chrissstrahl - used to fix unarmed issue
+			self exec global/enable_ai.scr
+			self.health = self.originalhealth
+			self exec global/setdeathanim.scr NIL
+			wait 0.1
+			self.fighting = 1
+//			self runto $player
+
+			for (local.i=0;local.i<6;local.i++)
+			{
+				if (isalive self)
+				{
+					self exec coop_mod/replace.scr::unholster	//chrissstrahl - used to fix unarmed issue
+					wait 1
+				}
+			}
+
+			wait 1
+			self.chair anim chair_alert_stand_end
+		}
+
+	}
+end
+//	else
+//	if (self.thinkstate == "curious")
+	{
+		self exec coop_mod/replace.scr::lookat	//chrissstrahl - look at closest player
+		self exec global/disable_ai.scr
+		self.chairthread delete
+
+		self anim chair_curious_stand
+		self.chair anim chair_curious_stand
+		self exec coop_mod/replace.scr::unholster	//chrissstrahl - used to fix unarmed issue
+		wait 0.8
+//		self waittill animdone
+		if (isalive self)
+		{
+			self exec global/enable_ai.scr
+			self.health = self.originalhealth
+			self exec global/setdeathanim.scr NIL
+//			self runto $player
+		}
+	}
+end

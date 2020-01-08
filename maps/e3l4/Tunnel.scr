@@ -1,0 +1,244 @@
+//=========================================================================
+Tunnel:
+//=========================================================================
+{
+	// handle specific exploders individually
+	thread watchTunnelExplosion01
+	thread watchTunnelExplosion02
+	thread watchTunnelExplosion03
+	
+	// start a watch thread for each fake explosion
+	$triggerTunnelFakeExplosion thread watchTunnelFakeExplosion
+	$triggerTunnelSTG thread watchTunnelSTG
+	$triggerTunnelShotgun thread watchTunnelShotgun
+	thread TunnelAutoSave
+}end
+
+//=========================================================================
+watchTunnelExplosion01:
+//=========================================================================
+{
+	$triggerTunnelExplosion01 waittill trigger
+	
+	$player playsound arty_leadin wait
+	$player waittill sounddone
+	$player playsound stonecrash wait	// String soundName, [ Integer channel ], [ Float volume ], [ Float min_distance ], [ Float pitch ] 
+
+	thread global/exploder.scr::explode 501	// Explode Set 501
+	earthquake 1.5 2 0 4			// Earthquake Parameters - Duration, Magnitude, Ramp-Up, Ramp-Down
+	thread spawndust 5 128
+	
+	// now that we've done the first one, run occasional periodic fakes
+	thread periodicTunnelFakeExplosion	
+}end
+
+//=========================================================================
+watchTunnelExplosion02:
+//=========================================================================
+{
+	$triggerTunnelExplosion02 waittill trigger
+	
+	$player playsound arty_leadin wait
+	$player waittill sounddone
+	$player playsound stonecrash wait	// String soundName, [ Integer channel ], [ Float volume ], [ Float min_distance ], [ Float pitch ] 
+
+	thread global/exploder.scr::explode 71	// Explode Set 71
+	earthquake 1.5 4 0 4			// Earthquake Parameters - Duration, Magnitude, Ramp-Up, Ramp-Down
+	thread spawndust 5 128
+}end
+
+//=========================================================================
+watchTunnelExplosion03:
+//=========================================================================
+{
+	$triggerTunnelExplosion03 waittill trigger
+	
+	$player playsound arty_leadin wait
+	$player waittill sounddone
+	$player playsound stonecrash wait	// String soundName, [ Integer channel ], [ Float volume ], [ Float min_distance ], [ Float pitch ] 
+
+	thread global/exploder.scr::explode 73	// Explode Set 73
+	earthquake 1.5 3 0 4			// Earthquake Parameters - Duration, Magnitude, Ramp-Up, Ramp-Down
+	thread spawndust 5 128	
+}end
+
+//=========================================================================
+watchTunnelFakeExplosion:
+//=========================================================================
+{
+	self waittill trigger
+	
+	// catch object params or set defaults
+	if (self.dustcount == NIL) {
+		local.dustcount = 5
+	} 
+	else{
+		local.dustcount = self.dustcount
+	}
+	
+	if (self.dustrange == NIL) {
+		local.dustrange = 128
+	} 
+	else {
+		local.dustrange = self.dustrange
+	}
+	
+	if (self.quakedur == NIL) {
+		local.quakedur = 1.5
+	} 
+	else {
+		local.quakedur = self.quakedur
+	}
+	
+	if (self.quakemag == NIL) {
+		local.quakemag = 2
+	} 
+	else {
+		local.quakemag = self.quakemag
+	}
+	
+	// audio leadin
+	$player playsound arty_leadin wait
+	$player waittill sounddone
+	$player playsound stonecrash wait	// String soundName, [ Integer channel ], [ Float volume ], [ Float min_distance ], [ Float pitch ]
+	
+	// vfx
+	if (local.quakedur){
+		earthquake local.quakedur local.quakemag 0 3			// Earthquake Parameters - Duration, Magnitude, Ramp-Up, Ramp-Down
+	}
+	thread spawndust local.dustcount local.dustrange
+}end
+
+//=========================================================================
+periodicTunnelFakeExplosion:
+//=========================================================================
+{
+	level.bPeriodicExplosion =1
+	while (level.bPeriodicExplosion){
+		local.iRndWait = randomint(45)
+		wait local.iRndWait
+		
+		// audio leadin
+		$player playsound arty_leadin wait
+		$player waittill sounddone
+		$player playsound stonecrash wait	// String soundName, [ Integer channel ], [ Float volume ], [ Float min_distance ], [ Float pitch ]
+
+		// vfx
+		local.fQuakeDur = randomfloat(1.5)
+		local.iQuakeMag = randomint(2)
+		earthquake local.fQuakeDur local.iQuakeMag 0 2	// Earthquake Parameters - Duration, Magnitude, Ramp-Up, Ramp-Down
+		local.iDustCount = 5 * local.fQuakeDur
+		thread spawndust local.iDustCount 256
+	}	
+}end
+
+//=========================================================================
+spawndust local.dustcount local.dustrange:
+//=========================================================================
+{
+	// distributes dust over 4 quadrants
+	local.dustrangeorig 	 = local.dustrange/2			// find the center of the range
+	local.dustrangequad 	 = local.dustrange/4			// find the center of each axis as it extends from that center
+	local.dustrangeoffset 	 = local.dustrangequad + 16		// push the offset a foot away from the player
+	local.dustrangeoffsetneg = local.dustrangeoffset * -1
+	local.xoffsets = 0::local.dustrangeoffset::0::local.dustrangeoffsetneg	// constant array
+	local.yoffsets = local.dustrangeoffsetneg::0::local.dustrangeoffset::0	// constant array
+	
+	// spawn some random dust around the player
+	for (local.i = 0; local.i < local.dustcount; local.i++) {
+		local.index 		= (local.i % 4)+1	// our constant arrays have 4 indices, and are 1-based - bracket values to this space
+		local.dust[local.i] = spawn script_model model models/animate/fx_dust_fallingfromceiling.tik	// spawn dust asset
+		local.xoffset = local.xoffsets[local.index] + (randomint(local.dustrangeorig) - local.dustrangequad)	// distribute x
+		local.yoffset = local.yoffsets[local.index] + (randomint(local.dustrangeorig) - local.dustrangequad)	// distribute y
+
+		//dprintln "dust offsets = " local.xoffset ", " local.yoffset
+		local.dust[local.i].origin = $player.origin + (local.xoffset local.yoffset 128)		// place it using offsets
+		local.dust[local.i].angles = $player.angles
+		local.dust[local.i] thread rundust
+	}
+	$player playsound arty_exp_interior wait	// String soundName, [ Integer channel ], [ Float volume ], [ Float min_distance ], [ Float pitch ] 
+}end
+
+//=========================================================================
+rundust:
+//=========================================================================
+{
+	// run dust animation and clean up asset when done
+	self anim start
+	self notsolid
+	self waittill animdone
+	self remove
+}end
+
+//=========================================================================
+watchTunnelSTG:
+//=========================================================================
+{
+	//dprintln "Thread launched: e3l4\tunnel.scr::watchTunnelSTG"
+	$triggerTunnelSTG waittill trigger
+	
+	//$player take mg					// remove player's BAR, if present
+	$player item weapons/mp44.tik		// add STG to player's inventory
+	iprintln "You picked up an STG-44."
+
+	$wpnTunnelSTG playsound mp44_snd_pickup
+	$wpnTunnelSTG remove			// remove STG prop from world
+	$player ammo mg 120				// give us some ammo
+	$player use "StG 44"			// make STG player's active weapon
+}end
+
+//=========================================================================
+watchTunnelShotgun:
+//=========================================================================
+{
+	//dprintln "Thread launched: e3l4\tunnel.scr::watchTunnelShotgun"
+	$triggerTunnelShotgun waittill trigger
+	$player item weapons/shotgun.tik 		// add shotgun to player's inventory
+	iprintln "You picked up a Shotgun."
+
+	$wpnTunnelShotgun playsound shotgun_snd_pickup
+	$wpnTunnelShotgun remove				// remove shotgun prop from world
+	$player use "Shotgun"					// make shotgun player's active weapon
+}end
+
+//=========================================================================
+TunnelAutoSave:
+//=========================================================================
+{
+	$tunnelautosave waittill trigger
+	exec global/autosave.scr 6 // The Wine Cellar
+
+	// And start the music
+	thread maps/e3l4.scr::startMusic_e3l4_Tunnel
+}end
+
+//=========================================================================
+CleanupTunnels:	
+//=========================================================================
+{
+	local.LowerTunnel = waitthread global/FindTrigger.scr::FindTrigger "secondfloortunnel"
+	local.LowerTunnel waittill trigger
+	level.bPeriodicExplosion =0	// stop periodic fake explosions
+
+	thread global/EntityCleanup.scr::EntityCleanup "tunnel1b1" 	  600
+	thread global/EntityCleanup.scr::EntityCleanup "tunnel1" 	  600
+	thread global/EntityCleanup.scr::EntityCleanup "tunnelguys1b" 600
+	thread global/EntityCleanup.scr::EntityCleanup "tunnel1b" 	  600
+	thread global/EntityCleanup.scr::EntityCleanup "tunnel2" 	  600
+	thread global/EntityCleanup.scr::EntityCleanup "tunnel2b" 	  600
+	thread global/EntityCleanup.scr::EntityCleanup "tunnelguys1"  600
+	thread global/EntityCleanup.scr::EntityCleanup "tunnel3d" 	  600
+	thread global/EntityCleanup.scr::EntityCleanup "tunnel3b" 	  600
+	thread global/EntityCleanup.scr::EntityCleanup "tunnel3" 	  600
+	thread global/EntityCleanup.scr::EntityCleanup "tunnel3c" 	  600		
+
+	// CleanupUpperTunnel:
+	$castleguytrigger waittill trigger
+	thread global/EntityCleanup.scr::EntityCleanup "tunnel4" 	  600
+	thread global/EntityCleanup.scr::EntityCleanup "tunnelguys2b" 600
+	thread global/EntityCleanup.scr::EntityCleanup "tunnelguys2"  600
+	thread global/EntityCleanup.scr::EntityCleanup "tunnelguys2c" 600
+
+	local.tunnel = waitthread global/FindTrigger.scr::FindTrigger "mainhall1"
+	local.tunnel waittill trigger
+}end

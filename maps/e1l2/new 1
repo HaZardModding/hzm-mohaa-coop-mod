@@ -1,0 +1,413 @@
+
+//chrissstrahl - this manages the Hillery for coop
+//=========================================================================
+coop_handleArtillery:{
+//=========================================================================
+// center our turret by default...
+	self.turret thread CenterTurret
+	
+//set state vars
+	self.explosiveset = 0
+	
+//loop while artillery exists
+	while(self != NULL){
+	//check each player if they validate
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player =  $player[local.i]
+			if(	local.player == NULL ||
+				local.player.health <= 0 ||
+				local.player.dmteam == "spectator" ||
+				local.player.flags["coop_isActive"] != 1 ||
+				vector_length (local.player.origin - self.origin) > 200){
+				continue
+			}
+		//explosive set, NO MORE
+			if(self.explosiveset == 1){
+				iprintlnbold_noloc("DEV: charge active, ending thread")
+				end
+			}
+		//valid player pressing use
+			if(local.player.useheld){
+				iprintlnbold_noloc("DEV: valid player pressing use key")
+		//valid player check if player is within range of explosive
+				if (vector_length(local.player.origin-self.charge.origin) < 100){
+		//valid player setting explosive
+					//self.charge doUse //chrissstrahl - presumably uses any close entity
+					self.charge doUse local.player //chrissstrahl
+					self.explosiveset = 1
+					iprintlnbold_noloc("DEV: setting charge")
+				}
+		//valid player in range of turret
+				else{
+		//valid player using, wait until player (gets) interrupt(ed)
+					iprintlnbold_noloc("DEV: useing turret")
+					self waitthread coop_handleArtillery_player local.player				
+				}
+			}
+		//valid player in range not pressing use
+			else{
+				if (vector_length(local.player.origin-self.charge.origin) < 100){
+					exec coop_mod/main.scr::printInfo local.player "Press use to set the explosive." 1 NIL
+				}
+				else if(self canuse local.player){
+					exec coop_mod/main.scr::printInfo local.player "Press use to to use the cannon." 1 NIL
+				}
+			}
+	//abort the for loop and start over fresh again
+			break
+		}
+		waitframe
+	}
+}end
+
+//chrissstrahl - this manages the player inside Hillery for coop
+//=========================================================================
+coop_handleArtillery_player local.player:{
+//=========================================================================
+	iprintlnbold_noloc("DEV: useing turret thread")
+	self unlock
+	self.turret unlock
+	self doUse local.player
+	self lock
+	self.turret lock
+	wait 1		
+	while(1){//run forest run!
+//player left server - player dead - player changed team
+		if( local.player == NULL || local.player.health <= 0 || local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1){
+			iprintlnbold_noloc("DEV: left, team or dead")
+			self waitthread coop_handleArtillery_playerExit NULL
+			break
+		}
+//player out of reach(for what ever reason) - player pressing use (wants to exit)
+		else if(vector_length (local.player.origin - self.origin) > 200 || local.player.useheld){
+			iprintlnbold_noloc("DEV: out of range or pressed use")
+			self waitthread coop_handleArtillery_playerExit local.player local.playerAngles
+			break
+		}
+		waitframe
+	}
+}end
+
+//chrissstrahl - this manages the player leaving Hillery
+//=========================================================================
+coop_handleArtillery_playerExit local.player:{
+//=========================================================================
+	self.turret thread CenterTurret
+	self unlock
+	self.turret unlock
+	//unlock player from turret only if we really need to, or we can get a player stuck in a loop untill they kill them self
+	if(local.player != NIL && local.player != NULL){
+		self doUse local.player
+		waitframe
+	}
+	self lock
+	self.turret lock
+	wait 1
+}end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	self.helpactiveturret 	 = 0
+	self.helpactiveexplosive = 0
+	self.playerinturret 	 = 0
+	//	local.charge setusable 0
+	self.explosiveset = 0
+
+	// center our turret by default...
+	self.turret thread CenterTurret
+	
+	//chrissstrahl - make sure we keep track of the player using the turret
+	local.turretUser = NULL
+
+	while (self){
+		//chrissstrahl - coop
+		if(level.coop_playerReady==0){
+			wait 1
+			continue
+		}
+	
+		//chrissstrahl - Multiplayer/Coop
+		if(level.gametype != 0){
+			//show use message
+			//////local.player = waitexec coop_mod/replace.scr::player_closestTo self NIL
+
+//chrissstrahl - check for any player close
+			if (self.explosiveset == 0){
+				if (self.playerinturret == 0){
+					for (local.i = 1;local.i <= $player.size;local.i++){
+						local.player =  $player[local.i]
+						if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1){
+							if(vector_length((local.player.origin)-(self.origin)) < 200){
+//chrissstrahl - within usage range
+//chrissstrahl - within explosive range
+								if (vector_length(local.player.origin-self.charge.origin) < 100){
+									exec coop_mod/main.scr::printInfo local.player "Press use to set the explosive." 1 NIL
+								}
+//chrissstrahl - within turret seat range
+								else{
+									//if (self canuse local.player){ //chrissstrahl - might not needed in mp
+										if (self.helpactiveturret == 0){
+											self.helpactiveexplosive = 0
+											self.helpactiveturret 	 = 1
+											exec coop_mod/main.scr::printInfo local.player "Press use to to use the cannon." 1 NIL
+										}
+									//}
+								}
+//chrissstrahl - if player holds use key
+								//if use held, decide what to do
+								if (local.player.useheld){
+//chrissstrahl - this sets explosive
+									if (self.helpactiveexplosive == 1){
+										iprintlnbold_noloc("DEV: explosive set 1")
+										self.explosiveset = 1
+										//self.charge setusable 1
+										self.charge doUse
+										end
+									}
+//chrissstrahl - this makes player enter turret
+									else if (self.helpactiveturret == 1){
+										
+										iprintlnbold_noloc("DEV: helpactivate turret 1")
+										
+										//chrissstrahl - remember player
+										if(local.turretUser == NULL){
+											local.turretUser = local.player
+											thread coop_trackUser local.player self self.turret
+										}
+										//chrissstrahl - skip if another player tries to enter the turret
+										else{
+											iprintlnbold_noloc("DEV: bad player")
+											continue
+										}
+										
+										self.helpactiveturret 	 = 0
+										self.helpactiveexplosive = 0
+										self.playerinturret = 1
+										self unlock
+										self.turret unlock
+										self doUse local.player
+										self lock
+										self.turret lock
+										wait 1
+									}
+//chrissstrahl - this makes player leave turret
+									else if (self.playerinturret == 1){
+										iprintlnbold_noloc("DEV: inturret 1")
+										self.playerinturret = 0
+										// center our turret again since the player just moved it away from where the collisionent likes it....
+										self.turret thread CenterTurret
+										self unlock
+										self.turret unlock
+										//self doUse local.turretUser
+										self doUse local.player
+										//self unlock
+										//self.turret unlock
+										wait 1
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			waitframe
+		}
+	
+		//chrissstrahl - singleplayer
+		else{
+			local.canuse = self canuse $player
+
+			if (vector_length($player.origin-self.origin) < 200 && self.explosiveset == 0){
+				if (self.playerinturret == 0){
+					if (vector_length($player.origin-self.charge.origin) < 100){
+						if (self.helpactiveexplosive == 0){
+							self.helpactiveturret 	 = 0
+							self.helpactiveexplosive = 1
+							local.usekey = getboundkey1 "+use"
+							local.msg 	 = (loc_convert_string ("Press " + local.usekey + " to set the explosive."))
+							thread global/throbtext.scr::throbtext local.msg 1000
+						}
+					}
+					else{
+						if (local.canuse == 1){
+							if (self.helpactiveturret == 0){
+								self.helpactiveexplosive = 0
+								self.helpactiveturret 	 = 1
+								local.usekey = getboundkey1 "+use"							
+								local.msg 	 = (loc_convert_string ("Press " + local.usekey + " to use the cannon."))
+								thread global/throbtext.scr::throbtext local.msg 1000
+							}
+						}
+					}
+				}
+				if ($player.useheld){
+
+					if (self.helpactiveexplosive == 1){
+						self.explosiveset = 1
+						//self.charge setusable 1
+						self.charge doUse
+						thread global/throbtext.scr::throbtext_off
+						end
+					}
+					else if (self.helpactiveturret == 1){
+						self.helpactiveturret 	 = 0
+						self.helpactiveexplosive = 0
+						thread global/throbtext.scr::throbtext_off
+						self.playerinturret = 1
+						self unlock
+						self.turret unlock
+						self doUse $player
+						self lock
+						self.turret lock
+						wait 1
+					}
+					else if (self.playerinturret == 1){
+						self.playerinturret = 0
+						// center our turret again since the player just moved it away from where the collisionent likes it....
+						self.turret thread CenterTurret
+						self unlock
+						self.turret unlock
+						self doUse $player
+						self lock
+						self.turret lock
+						wait 1
+					}
+				}
+			}
+			else{
+				if (self.helpactiveturret == 1 || self.helpactiveexplosive == 1){
+					thread global/throbtext.scr::throbtext_off
+					self.helpactiveturret 	 = 0
+					self.helpactiveexplosive = 0
+				}
+			}
+			waitframe
+		}
+	}
+
+
+
+//chrissstrahl - this manages the artillery stuff for coop
+//=========================================================================
+coop_playerUseBohlerThread:{
+//=========================================================================
+	self lock
+	local.backward  = -1 * angles_toforward self.angles
+	iprintlnbold_noloc("DEV: coop_playerUseBohlerThread")
+	//loop
+	while (self) {
+	//check each player if they validate
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player =  $player[local.i]
+			if(	local.player == NULL ||
+				local.player.health <= 0 ||
+				local.player.dmteam == "spectator" ||
+				local.player.flags["coop_isActive"] != 1 ||
+				vector_length (local.player.origin - self.origin) > 200){
+				continue
+			}
+	//valid player
+			if(local.player.useheld){
+	//valid player pressing use key
+				iprintlnbold_noloc("DEV: valid player pressing use key")
+	//valid player check if player is within reach range/angle
+				local.vObjDir = vector_subtract local.player.origin self.origin
+				local.vObjDir = vector_normalize local.vObjDir
+				local.dot 	  = vector_dot local.vObjDir local.backward
+				if (local.dot > .707){
+					iprintlnbold_noloc("DEV: > .707")
+	//vailid player using, wait until player (gets) interrupt(ed)
+					self waitthread coop_playerUseBohlerThread_player local.player
+	//abort the for loop and start over fresh again
+					break
+				}
+			}
+		}
+		waitframe
+	}
+}end
+
+//chrissstrahl - this manages the player using the bohler
+//=========================================================================
+coop_playerUseBohlerThread_player local.player:{
+//=========================================================================
+	iprintlnbold_noloc("DEV: coop_playerUseBohlerThread")
+	local.playerAngles = local.player.viewangles
+	self unlock
+	self doUse local.player
+	self lock
+	wait .25
+	
+	while(1){//run forest run!
+//player left server - player dead - player changed team
+		if( local.player == NULL || local.player.health <= 0 || local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1){
+			iprintlnbold_noloc("DEV: left, team or dead")
+			self waitthread coop_playerUseBohlerThread_playerExit NULL
+			break
+		}
+//player out of reach(for what ever reason) - player pressing use (wants to exit)
+		else if(vector_length (local.player.origin - self.origin) > 200 || local.player.useheld){
+			iprintlnbold_noloc("DEV: out of range or pressed use")
+			self waitthread coop_playerUseBohlerThread_playerExit local.player local.playerAngles
+			break
+		}
+		waitframe
+	}
+	wait .25
+}end
+
+//chrissstrahl - this manages the player exiting the bohler
+//=========================================================================
+coop_playerUseBohlerThread_playerExit local.player local.viewangle:{
+//=========================================================================
+	self unlock
+	//unlock player from turret only if we really need to, or we can get a player stuck in a loop untill they kill them self
+	if(local.player != NIL && local.player != NULL){
+		self doUse local.player
+		local.player face local.viewangle
+		waitframe
+	}
+	self lock
+}end
+
+

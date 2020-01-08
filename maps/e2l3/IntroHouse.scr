@@ -1,0 +1,502 @@
+// IntroHouse
+
+//============================================================================
+Init: {
+//============================================================================
+	if (level.skipintrohouse == 1) {
+		$player.origin = (2800 4600 10)
+		$driver.origin = (2800 4500 10)
+		trigger $GliderSceneTrigger
+		fadein 0.001 0 0 0 1
+		drawhud 1
+		end
+	}
+	
+	if ($startClip) {
+		$startClip notsolid
+	}
+
+	thread Fadein
+
+	level.jeepspeed  = 260
+	level.jeepaccel  = 500
+	level.tank1speed = 13
+	level.tank1accel = 15
+	level.tank2speed = 30
+	level.tank2accel = 15
+
+	// initialization
+	level.startTankDead = 0
+
+	$driver nodamage
+
+	local.porigin = $startjeep gettagposition "passenger0"
+	local.porigin[2] -= 45
+	$player.origin = local.porigin
+	$player.viewangles = ( 0 0 0 )
+
+	// jeep setup
+	$startjeep.turret = $startjeep queryturretslotentity 0
+	
+	if ($startjeep.turret != NULL) {
+		$startjeep.turret lock
+	}
+
+	$startjeep lock
+	$startjeep nodamage
+	
+	//local.col = spawn script_object model  $glider_collide.brushmodel
+	//local.col.origin = $glider.origin
+	//local.col.angles = $glider.angles
+	//local.col safesolid
+
+	$starttank takedamage
+	$starttank.target = $p40_hull
+	$starttank setcollisionentity $p40_hull
+	$starttank.stopforplayer = 0
+	local.gun = $starttank QueryTurretSlotEntity 0
+	local.gun turnSpeed 30
+	level.gotBazooka = 0
+
+	thread DoWork
+}end
+
+//============================================================================
+Fadein: {
+//============================================================================
+	level.startangles = $player.viewangles
+	//waitthread global/fadein.scr::DoFadeIn e2l3_1 e2l3_2 e2l3_3 NIL 1
+	$player.viewangles = level.startangles
+	fadein 5.0 0 0 0 1
+
+	// Something annoying keeps trying to give the player his vickers
+	// sometime in the next 5 seconds. We just supress that here. I wish
+	// I knew what was doing this.
+	local.count = 50
+	while (local.count > 0) {
+		$player safeholster 1
+		local.count--
+		wait 0.1
+	}
+}end
+
+//============================================================================
+DoWork: {
+//============================================================================
+	thread ObjectiveLocateBazooka
+
+	waitthread playerGetOnJeep
+	waitthread driverGetOnJeep
+
+	thread StartTanks
+	thread CrashGate
+	//thread DriverCheck				// check if driver is alive
+	thread BazookaCheck
+
+	$startjeep driveNoWait $jeeppath level.jeepspeed level.jeepaccel 400 200
+	thread CheckTanksDestroyed	
+
+	$driver thread watchTerryLyndon
+	wait 9
+
+	thread unloadJeep
+}end
+
+//============================================================================
+watchTerryLyndon: {
+//============================================================================
+	if (isalive $driver)  {
+		thread driverDialogue
+		// Prepare to crash through gate
+		thread BloodyHell
+	}
+
+	while ($driver && (isalive $driver)) {
+		wait 0.1
+	}
+
+	local.msg = (loc_convert_string "Lt. Terry Lyndon was killed in action.")
+	iprintlnbold local.msg
+}end
+
+//============================================================================
+driverDialogue: {
+//============================================================================
+	if ($driver) {
+		wait 2.0
+		$driver upperanim A_23_TerryTalkA
+		$driver waittill upperanimdone
+		wait 1.0
+		//wait 7.0
+		$driver upperanim A_23_TerryTalkC
+	}
+}end
+
+//============================================================================
+playerGetOnJeep: {
+//============================================================================
+	level.startjeepPassengerSeat = spawn script_origin
+	local.seatpos = $startjeep gettagposition "passenger0"
+	local.seatpos[2] -= 45 
+
+	level.startjeepPassengerSeat.origin = local.seatpos
+	level.startjeepPassengerSeat bind $startjeep
+
+	$player holster
+	$player notsolid
+	$player.viewangles = "0 0 0"
+	$player glue level.startjeepPassengerSeat
+	$player physics_off
+	level.playeronjeep = 1
+}end
+
+//============================================================================
+driverGetOnJeep: {
+//============================================================================
+	$driver takeall
+	$driver gun "none"		//holster
+	waitframe
+
+	$driver notsolid
+	$driver physics_off
+	//$startjeep attachdriverslot 0 $driver
+	$driver attach $startjeep driver_seat 1 ( 0 0 0 )
+	//$driver thread global/loopanim.scr::LoopAnim AV_jeep_passenger_idle
+	$driver thread global/LoopAnim.scr::LoopAnim A_22_driving_idle
+}end
+
+//============================================================================
+driverRunInShack: {
+//============================================================================
+	if($driver.getoutofjeep == 1) {
+		End
+	}
+
+	$driver.getoutofjeep = 1
+	$driver thread global/loopanim.scr::LoopAnimStop
+
+	//waitframe
+	//waitthread global/jeepanim.scr::DriverGetOutJeep $startjeep $driver
+	//$startjeep detachdriverslot 0 $driver
+	//$startjeep lock
+	//$driver notsolid
+
+	waitframe
+	$driver exec global/disable_ai.scr
+	waitthread global/jeepanim.scr::DriverGetOutJeep $startjeep $driver
+	//$driver waitthread global/friendly.scr::friendlystop
+	$driver waitthread global/SafeMoveTo.scr::SafeRunTo_Wait $driverRunTo
+
+	while (level.duckManDuck == NIL){
+		wait 0.1
+	}
+
+	$driver thread global/LoopAnim.scr::LoopAnim AA_huddle2
+	$driver exec global/enable_ai.scr
+	//iprintlnbold "driver: Quick let's take cover in that house"	
+}end
+
+//============================================================================
+isDriverNearKillspot: {
+//============================================================================
+	while (vector_length($driver.origin - $killDriver.origin) > 100) {
+		 waitframe
+	}
+}end
+
+//============================================================================
+BloodyHell: {
+//============================================================================
+	$jeepCrashGate_BloodyHell waittill trigger
+	$starttank.gun anim fire
+
+	$startjeep driveNoWait NULL 500 level.jeepaccel 400 200
+	local.s = $starttank QuerySpeed
+	$starttank driveNoWait NULL 500 level.jeepaccel 400 200
+
+	if ($driver) {
+		$driver upperanim A_23_TerryTalkB
+		$driver waittill upperanimdone
+		$driver anim A_22_driver_turnright
+	}
+}end
+
+//============================================================================
+CrashGate: {
+//============================================================================
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "jeepCrashGate"
+	local.trigger waittill trigger
+	$startjeep playsound Jeep_thru_fence1
+	$startjeep thread playSecondFenceSound
+	$driver anim A_22_driver_turnleft
+	$driver waittill animdone
+	$driver anim A_22_driver_turnright
+}end
+
+//============================================================================
+playSecondFenceSound: {
+//============================================================================
+	wait 0.7
+	self playsound Jeep_thru_fence2
+}end
+
+//============================================================================
+unloadJeep: {
+//============================================================================
+	//Eject the driver from the jeep
+	$startjeep waittill drive
+	wait 0.5
+
+	thread driverRunInShack
+	//thread handleTankKillingDriver	// ** dks ** should tank kill driver??
+
+	$player solid
+	$player physics_on
+	drawhud 1
+
+	local.usekey = getboundkey1 "+use"
+	local.msg = ( loc_convert_string ( "Press " + local.usekey + " to exit the Jeep." ) )
+	thread global/throbtext.scr::throbtext local.msg 0
+
+	while (!$player.useheld && $player.health > 0) {
+		waitframe
+	}
+
+	thread global/throbtext.scr::throbtext "" 0
+
+	local.startpos = $player.origin
+	local.exitpos = $startjeep gettagposition "passenger_enter"
+	level.playeronjeep = 0
+
+	$player unglue
+	$player.origin = local.exitpos
+	$startjeep notsolid
+
+	local.playerspot = spawn script_origin origin local.startpos
+	$player glue local.playerspot 0
+	local.playerspot time 0.2
+	local.playerspot moveto local.exitpos
+	local.playerspot move
+	
+	wait 0.2
+	$player unglue
+	
+	//AUTO SAVE
+	waitthread maps/e2l3/saves.scr::DoAutoSave "afterJeepRide"	
+}end
+
+//============================================================================
+gotBazooka: {
+//============================================================================
+	level.gotBazooka = 1
+}end
+
+//============================================================================
+ObjectiveLocateBazooka: {
+//============================================================================
+	while (level.gotBazooka != 1) {
+		waitframe
+	}
+}end
+
+//============================================================================
+ObjectiveDestroyTank: {
+//============================================================================
+	$starttank takedamage
+	if (level.hackSkipDestroyTank == 1) {
+		end
+	}
+
+	$starttank waittill death
+}end
+
+//============================================================================
+CleanupSceneTankCrash: {
+//============================================================================
+}end
+
+//============================================================================
+StartTanks: {
+//============================================================================
+	$Start_Tanks waittill trigger
+	$starttank projectilevulnerable 2
+	$starttank thread StartTankThinkThread 1
+}end
+
+//============================================================================
+InitTank: {
+//============================================================================
+	spawn trigger_relay targetname "HutTankFireTrigger"
+	self.tankFireTrigger = $HutTankFireTrigger
+	self.health = 400
+	self.health_set = 1
+	self.tankType = empty_carroP40
+	self.tankSpeed = level.tank1speed
+	self.tankAccel = level.tank1accel
+	self.tankLookAhead = 200
+	self.tankPath = $tankpath
+	self.tankPathLoop = 0
+	self.tankDriveDelay = 0
+	self.tankEngageDelay = 0
+	self.tankStunTime = 0
+	self.tankGuysJumpOut = 0
+	self.tankReloadTime = 4
+	self.tankDisableDriveEngage = 1
+	level.tankDebugPrint = 0
+
+	// wait here for wounded soldier to get healed
+	self.gun = self QueryTurretSlotEntity 0
+	self takedamage
+	wait 1
+}end
+
+//============================================================================
+StartTankThinkThread local.delay: {
+//============================================================================
+	self waitthread InitTank
+	wait local.delay
+
+	$house1_wentoutside[1] setthread PlayerOutside
+	$house1_wentoutside[2] setthread PlayerOutside
+	$house1_stayinside setthread PlayerInside
+	level.playeroutside = 1
+
+	self thread maps/e2l3/thinkTank.scr::tankGo
+	self waittill drive
+	//self.collisionent = self.target
+	wait 1
+
+	self.tankTarget = "startjeep"
+	self.tankFireTrigger waittill trigger
+	local.jeep_origin = $startjeep.origin
+	local.jeep_angles = $startjeep.angles
+
+	$startjeep takedamage
+	$startjeep.health = 1
+	$startjeep damage $world 55000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+
+	exec global/earthquake.scr 2 5 0 0
+	level.duckManDuck = 1
+
+	if (level.playeronjeep == 1) {
+		$player exec global/bullethit.scr (0 -1 0) 200000 50 1
+	}
+
+	$startjeep delete
+	local.kiltjeep = spawn script_model model "models/vehicles/Jeep_des.tik"
+	local.kiltjeep.origin = local.jeep_origin
+	local.kiltjeep.angles = local.jeep_angles
+	local.kiltjeep playsound e2l3_jeep_explo
+
+	if ($player istouching local.kiltjeep) {
+		$player exec global/bullethit.scr (0 -1 0) 200000 50 1
+	}
+		
+	if ($startClip) {
+		$startClip solid
+	}	
+
+	//thread timedFireAndSmoke (local.kiltjeep.origin + (0 60 20)) 60 360
+	wait 4
+
+	if (self) {
+		self.tankTarget = waitthread TankPickTarget
+	}
+
+	while (self && isalive self && self.tankTarget) {
+		//iprintln self.tankTarget[1]
+		self.tankFireTrigger waittill trigger
+
+		// If this is our last target, kill the dude
+		if (self.tankTarget == $tankfire_target6) {
+			if (self != NULL && self != NIL && (IsAlive self)) {
+				$driver takedamage
+				$driver damage $world 55000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+			}
+		}
+
+		// As long as our target isn't the player, remove it after we've shot at it, so we don't target it again
+		if (self.tankTarget != $player) {
+			self.tankTarget remove
+		}
+		wait 1
+
+		if (self){
+			self.tankTarget = waitthread TankPickTarget
+		}
+	}
+
+	$house1_wentoutside[1] remove
+	$house1_wentoutside[2] remove
+	$house1_stayinside remove
+}end
+
+//============================================================================
+PlayerOutside: {
+//============================================================================
+	level.playeroutside = 1
+}end
+
+//============================================================================
+PlayerInside: {
+//============================================================================
+	level.playeroutside = 0
+}end
+
+//============================================================================
+TankPickTarget: {
+//============================================================================
+	// If the player is outside, just shoot at him
+	if (level.playeroutside == 1) {
+		end $player
+	}
+
+	// Otherwise, shoot at these targets, they will remove themselves after they are shot at
+	if ($tankfire_target1) {
+		end $tankfire_target1
+	}
+
+	if ($tankfire_target2) {
+		end $tankfire_target2
+	}
+
+	if ($tankfire_target3) {
+		end $tankfire_target3
+	}
+
+	if ($tankfire_target4) {
+		end $tankfire_target4
+	}
+
+	if ($tankfire_target5) {
+		end $tankfire_target5
+	}
+
+	if ($tankfire_target6) {
+		end $tankfire_target6
+	}
+}end $player
+
+//============================================================================
+CheckTanksDestroyed: {
+//============================================================================
+	while ($starttank.health > 0) {
+		wait 0.1
+	}
+
+	level.startTankDead = 1
+	wait 1.5
+
+	$driver thread global/LoopAnim.scr::LoopAnimStop
+	trigger $GliderSceneTrigger
+}end
+
+//============================================================================
+BazookaCheck: {
+//============================================================================
+	while ($startbazooka) {
+		wait 0.2
+	}
+
+	$player use "bazooka"
+}end

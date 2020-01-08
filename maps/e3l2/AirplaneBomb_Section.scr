@@ -1,0 +1,483 @@
+// AirplaneBomb_Section
+//=========================================================================
+InitSection: {
+//=========================================================================
+	$medic threatbias ignoreme
+	$player heal 1
+
+	if ($AirAxis1) {
+		$AirAxis1.targetname = "AirAxis"
+	}
+
+	if ($AirAxis2) {
+		$AirAxis2.targetname = "AirAxis"
+	}
+
+	if ($AirAxis3) {
+		$AirAxis3.targetname = "AirAxis"
+	}
+
+	if ($AirAxis4) {
+		$AirAxis4.targetname = "AirAxis"
+	}
+
+	if ($AirAxis5) {
+		$AirAxis5.targetname = "AirAxis"
+	}
+
+	waitframe
+	for (local.i=1; local.i<=$AirAxis.size; local.i++) {
+		$AirAxis[local.i] ai_off
+	}
+
+	$airplane_bomb_fx thread PrepExploderFire
+
+	level.first_bomb_exploder = NULL
+	for (local.i=1; local.i<=$explodertrigger.size; local.i++) {
+		if ($explodertrigger[local.i].set == 5) {
+			level.first_bomb_exploder = $explodertrigger[local.i]
+			break
+		}
+	}
+
+	if ($FirstStreetTruck1) {
+		$FirstStreetTruck1.collisionent = $MiniCourtTruck.target
+		$FirstStreetTruck1.collisionent disconnect_paths
+		$FirstStreetTruck1 vehicleanim idlenolights
+		$FirstStreetTruck1 nodamage
+	}
+	if ($FirstStreetTruck2) {
+		$FirstStreetTruck2.collisionent = $MiniCourtTruck.target
+		$FirstStreetTruck2.collisionent disconnect_paths
+		$FirstStreetTruck2 vehicleanim idlenolights
+		$FirstStreetTruck2 nodamage
+	}
+
+	thread DoSection
+	thread DoRoomGag
+}end
+
+//=========================================================================
+DoSection: {
+//=========================================================================
+	fadein 3.5 0 0 0 1
+
+	if ((level.warp_to_section == NIL) || (level.warp_to_section == "None")) {
+		//	thread DoIntroPlaneGag
+		// do intro-section
+		$player physics_off
+
+		if (level.skip_opening_briefing) {
+			goto SkipBriefingGoto
+		}
+
+		wait 2
+		$medic turnto $player
+		$medic say A_32_Whittaker_1B
+		$medic waittill saydone
+		wait 0.5
+
+		$medic say A_32_Whittaker_1C
+		$medic waittill saydone
+		//$medic anim A_32_MedTalk_01  //we should be careful
+		//$medic waittill animdone
+		$medic turnto NULL
+	}
+
+SkipBriefingGoto:
+	$player physics_on
+	drawhud 1
+	waitthread maps/e3l2.scr::InitPlayer
+	waitthread global/ObjMgr.scr::RevealObj "findPOWs"
+	waitthread global/ObjMgr.scr::SetCurrObj "findPOWs"
+
+	$AirSectionStartTrigger waittill trigger
+	$AirAxis thread AirAxisThink
+
+	$AirSectionLatterTrigger waittill trigger
+	thread MedicNearingBattle_Thread
+
+	$AirBombTrigger waittill trigger
+	thread DoPlaneBombGag
+}end
+
+//=========================================================================
+AirAxisThink: {
+//=========================================================================
+	self ai_on
+	self german		// in case guy still has the wrong model... (it was flagged as american)
+	self favoriteenemy $player
+
+	if (self.target && $(self.target)) {
+		self exec global/RunChainWhileShooting.scr $(self.target)
+	}
+
+	/*
+	local.dest_name = self.target
+	while (local.dest_name && $(local.dest_name))
+	{
+		local.dest = $(local.dest_name)
+
+		self.type_attack = "runandshoot"
+		self runto local.dest
+		self waittill movedone
+
+		local.dest_name = local.dest.target
+	}
+	*/
+}end
+
+//=========================================================================
+Die: {
+//=========================================================================
+    wait (randomfloat 3)
+    self exec global/bullethit.scr (0 0 20) 5000 0 1
+    self playsound m1_snd_fire
+}end
+
+
+// RunBabyRun
+//=========================================================================
+RunBabyRun local.dest: {
+//=========================================================================
+	if (isalive self) {
+		self heal 1
+		self threatbias ignoreme
+		self exec global/disable_ai.scr
+		self waitthread ReliableRunTo local.dest 100 1		
+	}
+	self.gotThere = 1
+}end
+
+//=========================================================================
+MedicNearingBattle_Thread: {
+//=========================================================================
+	local.any_alive = waitthread NamedGuysAlive "AirAxis"
+	if (local.any_alive) {
+		local.huddle_point = spawn script_origin
+		local.huddle_point.origin = ( 4648 -5900 -440 )
+
+		if ($MedicHuddle_FirstStreet) {
+			waitthread maps/e3l2/medic_think.scr::MedicForceHuddle $MedicHuddle_FirstStreet
+		}
+		else {
+			waitthread maps/e3l2/medic_think.scr::MedicForceHuddle local.huddle_point
+		}
+
+		waitexec global/MultiDeathWait.scr "AirAxis"
+		waitthread maps/e3l2/medic_think.scr::MedicLeaveForcedHuddle
+		wait 2
+
+		local.huddle_point delete
+	}
+}end
+
+//=========================================================================
+NamedGuysAlive local.name: {
+//=========================================================================
+	for (local.i=1; local.i<=$(local.name).size; local.i++) {
+		if (isalive $(local.name)[local.i]) {
+			end 1
+		}
+	}
+}end 0
+
+// plane stuff stolen from e3l1
+//DoIntroPlaneGag:
+//
+//	wait 2
+//
+//	waitthread InitIntroPlaneGag
+//	level.stuka2.active = 1
+//	level.stuka2 followpath $plane2path
+////	level.stuka2 flypath $plane2path 1500 400 256			//2250 2000 500
+//	level.stuka2 playsound plane_by			//stuka_by
+//
+//	level.stuka2 waitmove
+//	level.stuka2 hide
+//	level.stuka2.active = 0
+//
+//end
+
+//=========================================================================
+DoPlaneBombGag: {
+//=========================================================================
+	waitthread InitPlaneBombGag
+	level.stuka.active = 1
+	level.stuka followpath $plane1path
+	//level.stuka flypath $plane1path 1500 400 256			//2250 2000 500
+	level.stuka playsound plane_by							//stuka_by
+
+	$plane1trigger1 thread TriggerPlaneDropBomb
+	//$plane1trigger2 thread TriggerPlaneDropBomb
+	//$plane1trigger3 thread TriggerPlaneDropBomb
+	//$plane1trigger4 thread TriggerPlaneDropBomb
+
+	level.stuka waitmove
+	level.stuka hide
+	level.stuka.active = 0
+}end
+
+//InitIntroPlaneGag:
+//
+//	// create & initialize the plane
+//	level.stuka2 = spawn script_model_realdamage "spawnflags" "2"
+//	level.stuka2.origin = $plane2path.origin
+//	level.stuka2.angles = (0 0 315)		//$plane1path.angles
+//	level.stuka2 model "vehicles/stuka_strafe.tik"
+//	level.stuka2 anim idle
+//
+//	// set up the right gun
+//	level.stukagunr2 = spawn script_aimedstrafinggunfire
+//	level.stukagunr2.origin = level.stuka2 gettagposition "tag_barrel1"
+//	level.stukagunr2.angles = level.stuka2.angles
+//	level.stukagunr2 bind level.stuka2
+//	//level.stukagunr2 tracerFrequency 1
+//
+//	// set the left gun
+//	level.stukagunl2 = spawn script_aimedstrafinggunfire
+//	level.stukagunl2.origin = level.stuka2 gettagposition "tag_barrel2"
+//	level.stukagunl2.angles = level.stuka2.angles
+//	level.stukagunl2 bind level.stuka2
+//	//level.stukagunl2 tracerFrequency 1
+//
+//	// give the stuka some health and game parameters
+//	//level.stuka2.health = 1			// # shots @ 180 HP
+//
+//	level.stuka2.collisionent = level.stuka2.target
+//	level.stuka2 solid
+//
+//	level.stuka2.health = 100	
+//	level.stuka2 takedamage
+//
+//	level.stuka2 rendereffects "-shadow"
+//	//level.stuka2 thread StukaDeathHandler
+//
+//end
+
+//=========================================================================
+InitPlaneBombGag: {
+//=========================================================================
+	// create & initialize the plane
+	level.stuka = spawn script_model_realdamage "spawnflags" "2"
+	level.stuka.origin = $plane1path.origin
+	level.stuka.angles = (0 0 315)		//$plane1path.angles
+	level.stuka model "vehicles/stuka_strafe.tik"
+	level.stuka anim idle
+
+	// set up the right gun
+	level.stukagunr = spawn script_aimedstrafinggunfire
+	level.stukagunr.origin = level.stuka gettagposition "tag_barrel1"
+	level.stukagunr.angles = level.stuka.angles
+	level.stukagunr bind level.stuka
+	//level.stukagunr tracerFrequency 1
+
+	// set the left gun
+	level.stukagunl = spawn script_aimedstrafinggunfire
+	level.stukagunl.origin = level.stuka gettagposition "tag_barrel2"
+	level.stukagunl.angles = level.stuka.angles
+	level.stukagunl bind level.stuka
+	//level.stukagunl tracerFrequency 1
+
+	// give the stuka some health and game parameters
+	//level.stuka.health = 1			// # shots @ 180 HP
+
+	level.stuka.collisionent = level.stuka.target
+	level.stuka solid
+	level.stuka.health = 100	
+	level.stuka takedamage
+	level.stuka rendereffects "-shadow"
+	//level.stuka thread StukaDeathHandler
+}end
+
+//=========================================================================
+TriggerPlaneDropBomb: {
+//=========================================================================
+	while ( !(level.stuka istouching self) ) {
+		waitframe
+	}
+
+	// create bomb
+	local.ent = spawn script_model "spawnflags" "2"
+	local.ent.origin = level.stuka gettagposition "tag_bomb"
+	local.ent.angles = level.stuka.angles
+	local.ent model "ammo/stuka_bomb.tik"
+	local.ent notsolid
+	local.ent scale 1
+
+	// have stuka play its bomb animation
+	level.stuka anim bomb
+	local.ent playsound arty_leadin09
+
+	// get the bomb path from the trigger
+	local.bpath = $(self.target)
+	local.bpath.origin = local.ent.origin
+
+	// set the bomb on its way
+	local.ent flypath local.bpath 1500 20000 500
+	local.ent waitmove
+
+	// we are done, so remove the bomb
+	local.ent remove
+
+	// do the explosion FX and damage
+	exec global/model.scr local.ent.origin "models/fx/bombblast_snow.tik"
+	self playsound explode_building_small1
+
+	// set off explosion
+	trigger level.first_bomb_exploder
+	$airplane_bomb_fx thread DoExploderFire
+	earthquake 2 5 0 0
+
+	//	level.dangerousness--
+}end
+
+//=========================================================================
+PrepExploderFire: {
+//=========================================================================
+	self hide
+}end
+
+//=========================================================================
+DoExploderFire: {
+//=========================================================================
+	self show
+	self anim start
+	wait 6
+
+	self anim idle
+	wait 10
+
+	self remove	
+}end
+
+//=========================================================================
+ReliableRunTo local.dest local.movedonerad local.crouch_at_dest: {
+//=========================================================================
+	if (self.reached_dest_thread == NIL) {
+		self.reached_dest_thread = NULL
+	}
+	else if (self.reached_dest_thread != NULL) {
+		self.reached_dest_thread delete
+		self.reached_dest_thread = NULL
+		waitframe
+	}
+
+	self.reached_dest = 0
+	self.destination = local.dest
+	self.movedoneradius = local.movedonerad
+	self runto self.destination
+	self thread ReliableRunTo_ReachedDestThread local.crouch_at_dest
+	self.reachedDest_thread = parm.previousthread
+}end
+
+//=========================================================================
+ReliableRunTo_ReachedDestThread local.crouch_at_dest: {
+//=========================================================================
+	self waittill movedone
+
+	while ((isalive self) && !(vector_within self.origin self.destination.origin self.movedoneradius)) {
+		wait 1
+		self runto self.destination
+		self waittill movedone
+	}
+
+	if (isalive self) {
+		if ((local.crouch_at_dest != NIL) && (local.crouch_at_dest == 1)) {
+			self exec global/crouch.scr
+			self waittill animdone
+		}
+
+		self.reached_dest = 1
+	}
+
+	self.reached_dest_thread = NULL
+}end
+
+// DoRoomGag
+//=========================================================================
+DoRoomGag: {
+//=========================================================================
+	waitthread global/ManSpawnNamed.scr::Init "RoomGuy1"
+	waitthread global/ManSpawnNamed.scr::Init "RoomGuy2"
+	waitthread global/ManSpawnNamed.scr::Init "RoomGuy3"
+	waitthread global/ManSpawnNamed.scr::Init "RoomGuy4"
+	$RoomGuysTrigger waittill trigger
+
+	waitthread global/ManSpawnNamed.scr::Spawn "RoomGuy1"
+	waitthread global/ManSpawnNamed.scr::Spawn "RoomGuy2"
+	waitthread global/ManSpawnNamed.scr::Spawn "RoomGuy3"
+	waitthread global/ManSpawnNamed.scr::Spawn "RoomGuy4"
+	waitframe
+
+	spawn trigger_relay "targetname" "RoomGuysDeadTrigger"
+	thread global/MultiDeathWait.scr::MultiDeathTrigger $RoomGuysDeadTrigger "RoomGuy1" "RoomGuy2" "RoomGuy3" "RoomGuy4"			// "AirAxis"
+	thread RoomGagMedicThink
+	// level.dangerousness++
+
+	// $RoomGuy2 thread maps/e3l2.scr::EnableGuy
+	$RoomGuy2 favoriteenemy $player
+	$RoomGuy3 favoriteenemy $player
+	$RoomGuy4 favoriteenemy $player
+	
+	// $RoomGuy1 waitthread maps/e3l2.scr::EnableGuy
+	$RoomGuy1 waitexec global/disable_ai.scr
+	$Door2Trigger2 open $RoomGuy1	
+	$RoomGuy1 favoriteenemy $player
+	$RoomGuy1 thread maps/e3l2.scr::doRunTo $guyonetarget
+	$RoomGuy1 waittill movedone
+	$RoomGuy1.target = $player
+	$RoomGuy1 exec global/enable_ai.scr
+
+	if (($RoomGuy1 && (isalive $RoomGuy1)) ||
+			($RoomGuy2 && (isalive $RoomGuy2)) ||
+			($RoomGuy3 && (isalive $RoomGuy3)) ||
+			($RoomGuy4 && (isalive $RoomGuy4))) {
+		$RoomGuysDeadTrigger waittill trigger
+	}
+
+	// level.dangerousness--
+	$TankPinDoor unlock
+}end
+
+//=========================================================================
+RoomGagMedicThink: {
+//=========================================================================
+	local.any_alive = waitthread NamedGuysAlive "AirAxis"
+	if (local.any_alive) {
+		waitthread maps/e3l2/medic_think.scr::MedicLeaveForcedHuddle
+		wait 0.5
+	}
+
+	//	waitexec global/MultiDeathWait.scr "AirAxis"
+	//	wait 1
+
+	if (($RoomGuy1 && (isalive $RoomGuy1)) ||
+			($RoomGuy2 && (isalive $RoomGuy2)) ||
+			($RoomGuy3 && (isalive $RoomGuy3)) ||
+			($RoomGuy4 && (isalive $RoomGuy4))) {
+		if ($MedicHuddle_RoomGag) {
+			waitthread maps/e3l2/medic_think.scr::MedicForceHuddle $MedicHuddle_RoomGag
+		}
+		else {
+			level.dangerousness++
+		}
+
+		$RoomGuysDeadTrigger waittill trigger
+
+		if ($MedicHuddle_RoomGag) {
+			waitthread maps/e3l2/medic_think.scr::MedicLeaveForcedHuddle
+		}
+		else {
+			level.dangerousness--
+		}
+	}
+
+	wait 0.5
+
+	if ($MedicHuddle_UpstairsGag) {
+		waitthread maps/e3l2/medic_think.scr::MedicForceHuddle $MedicHuddle_UpstairsGag
+	}
+}end
+
+

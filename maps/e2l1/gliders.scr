@@ -1,0 +1,295 @@
+//============================================================================
+init: {
+//============================================================================
+	thread RailwayFlyby
+}end
+
+//============================================================================
+startfirstflyby: {
+//============================================================================
+	dprintln "startfirstflyby"
+	thread startfirstflyby_2
+
+	local.flyby1 = spawn script_model model "models/vehicles/cg4aglider_chunky.tik"
+	local.flyby1.origin = $flybypath1_2.origin
+	local.flyby1.angles = $flybypath1_2.angles
+	local.flyby1 notsolid
+	local.flyby1 scale 0.5
+	local.flyby1 anim emitter_off
+	local.flyby1 notsolid
+	local.flyby1 flypath $flybypath1_2 600 600 500
+	local.flyby1 waitmove
+	local.flyby1 remove
+}End
+
+//============================================================================
+startfirstflyby_2: {
+//============================================================================
+	wait 4
+	dprintln "startfirstflyby_2"
+
+	local.flyby1 = spawn script_model model "models/vehicles/cg4aglider_chunky.tik"
+	local.flyby1.origin = $flybypath1_2.origin
+	local.flyby1.angles = $flybypath1_2.angles
+	local.flyby1 notsolid
+	local.flyby1 scale 0.4
+	local.flyby1 anim emitter_off
+	local.flyby1 notsolid
+	local.flyby1 flypath $flybypath1_2 550 550 500
+	local.flyby1 waitmove
+	local.flyby1 remove
+}End
+
+//============================================================================
+startsecondflyby: {
+//============================================================================
+	dprintln "startsecondflyby"
+	thread startsecondflyby_2
+
+	level.flyby2_1 = spawn script_model model "models/vehicles/cg4aglider_chunky.tik"
+	level.flyby2_1.origin = $flybypath2_1.origin
+	level.flyby2_1.angles = $flybypath2_1.angles
+	level.flyby2_1 notsolid
+	level.flyby2_1 scale 0.4
+	level.flyby2_1 anim emitter_off
+	level.flyby2_1 notsolid
+	level.flyby2_1 flypath $flybypath2_1 450 450 500
+
+	if ($aagun2 && isalive $aagun2) {
+		$aagun2 thread maps/e2l1/aaguns.scr::SetAAGunTarget level.flyby2_1
+	}
+
+	//$destroyflyby2_1trigger thread Destroy2_1Glider
+
+	level.flyby2_1 thread ExplodeWhenClose 1500
+	level.flyby2_1 waitmove
+	level.flyby2_1 remove
+}End
+
+//============================================================================
+startsecondflyby_2: {
+//============================================================================
+	wait 6
+	dprintln "startsecondflyby_2"
+
+	level.flyby2_2 = spawn script_model model "models/vehicles/cg4aglider_chunky.tik"
+	level.flyby2_2.origin = $flybypath2_2.origin
+	level.flyby2_2.angles = $flybypath2_2.angles
+	level.flyby2_2 notsolid
+	level.flyby2_2 scale 0.25 //was .15
+	level.flyby2_2 anim emitter_off
+	level.flyby2_2 notsolid
+	level.flyby2_2 flypath $flybypath2_2 400 400 500
+
+	if ($aagun1 && isalive $aagun1) {
+		$aagun1 thread maps/e2l1/aaguns.scr::SetAAGunTarget level.flyby2_2
+	}
+
+	level.flyby2_2 thread ExplodeWhenClose 1000
+	level.flyby2_2 waitmove
+	level.flyby2_2 remove
+}End
+
+//============================================================================
+ExplodeWhenClose local.distexplode: {
+//============================================================================
+	local.dist = 10000
+	while (local.dist > local.distexplode) {
+		local.toGlider = $player.origin - self.origin
+		local.toGlider[2] = 0
+		local.dist = vector_length(local.toGlider)
+		waitframe
+	}
+
+	self anim explode
+	wait 1
+
+	self thread spawn_fx models/emitters/explosion_tank.tik
+	self playsound explode_glider
+	wait 0.5
+
+	self loopsound glider_fire
+}End
+
+//============================================================================
+spawn_fx local.fx: {
+//============================================================================
+	local.temp = spawn script_model model local.fx
+	local.temp notsolid
+	local.temp.origin = self.origin
+	local.temp anim start
+	local.temp notsolid
+	wait 5
+
+	local.temp remove
+}end
+
+//============================================================================
+Destroy2_2Glider: {
+//============================================================================
+	while ( !(level.flyby2_2 istouching self) ) {
+		waitframe
+	}
+
+	self remove
+
+	if ($aagun1.stopfiring == 0) {
+		level.flyby2_2 anim explode
+	}
+}End
+
+//============================================================================
+startthirdflyby: {
+//============================================================================
+	thread thirdflybyiteration 1
+	wait (2 + randomint(2))
+	thread thirdflybyiteration 2
+	wait (2 + randomint(2))
+	thread thirdflybyiteration 3
+	wait (2 + randomint(2))
+	thread thirdflybyiteration 4
+	wait (2 + randomint(2))
+	thread thirdflybyiteration 5
+	wait (2 + randomint(2))
+	thread thirdflybyiteration 6
+}End
+
+//============================================================================
+thirdflybyiteration local.path: {
+//============================================================================
+	local.flyby3 = spawn script_model model "models/vehicles/cg4aglider_chunky.tik"
+	local.flyby3 notsolid
+	local.flyby3 anim emitter_off
+	local.flyby3 notsolid
+
+	if (local.path == 1) {
+		local.flyby3 scale 0.3
+		local.flyby3.origin = $flybypath3_2.origin
+		local.flyby3.angles = $flybypath3_2.angles
+		local.flyby3 flypath $flybypath3_2 350 350 500
+	}
+	else if (local.path == 2) {
+		local.flyby3 scale 0.15
+		local.flyby3.origin = $flybypath3_1.origin
+		local.flyby3.angles = $flybypath3_1.angles
+		local.flyby3 flypath $flybypath3_1 210 210 500
+	}
+	else if (local.path == 3) {
+		local.flyby3 scale 0.18
+		local.flyby3.origin = $flybypath3_3.origin
+		local.flyby3.angles = $flybypath3_3.angles
+		local.flyby3 flypath $flybypath3_3 240 240 500
+	}
+	else if (local.path == 4) {
+		local.flyby3 scale 0.25
+		local.flyby3.origin = $flybypath3_2.origin
+		local.flyby3.angles = $flybypath3_2.angles
+		local.flyby3 flypath $flybypath3_2 310 310 500
+		local.flyby3 thread ExplodeWhenClose 1500
+	}
+	else if (local.path == 5) {
+		local.flyby3 scale 0.11
+		local.flyby3.origin = $flybypath3_3.origin
+		local.flyby3.angles = $flybypath3_3.angles
+		local.flyby3 flypath $flybypath3_3 180 180 500
+	}
+	else if (local.path == 6) {
+		local.flyby3 scale 0.15
+		local.flyby3.origin = $flybypath3_1.origin
+		local.flyby3.angles = $flybypath3_1.angles
+		local.flyby3 flypath $flybypath3_1 200 200 500
+	}
+
+	local.flyby3 waitmove
+	local.flyby3 remove
+}End
+
+//============================================================================
+startfifthflyby: {
+//============================================================================
+	self remove
+	waitthread maps/e2l1/FinalBattle.scr::ShowFinalBattleStuff
+	
+	thread fifthflybyiteration 1
+	wait (2)
+	thread fifthflybyiteration 2
+	wait (1)
+	thread fifthflybyiteration 3
+	wait (1)
+	thread fifthflybyiteration 4
+
+	thread EndGliderLand
+}End
+
+//============================================================================
+fifthflybyiteration local.path: {
+//============================================================================
+	local.flyby5 = spawn script_model model "models/vehicles/cg4aglider_chunky.tik"
+	local.flyby5 notsolid
+	local.flyby5 anim emitter_off
+	local.flyby5 notsolid
+
+	if (local.path == 1) {
+		local.flyby5 scale 0.15
+		local.flyby5.origin = $flybypath5_1.origin
+		local.flyby5.angles = $flybypath5_1.angles
+		local.flyby5 flypath $flybypath5_1 450 350 500
+	}
+	else if (local.path == 2) {
+		local.flyby5 scale 0.08
+		local.flyby5.origin = $flybypath5_3.origin
+		local.flyby5.angles = $flybypath5_3.angles
+		local.flyby5 flypath $flybypath5_3 280 180 500
+	}
+	else if (local.path == 3) {
+		local.flyby5 scale 0.12
+		local.flyby5.origin = $flybypath5_1.origin
+		local.flyby5.angles = $flybypath5_1.angles
+		local.flyby5 flypath $flybypath5_1 360 260 500
+	}
+	else if (local.path == 4) {
+		local.flyby5 scale 0.8
+		local.flyby5.origin = $flybypath5_2.origin
+		local.flyby5.angles = $flybypath5_2.angles
+		local.flyby5 followpath $flybypath5_2 900 900 500
+		level.endgliderflying = local.flyby5
+		local.flyby5 thread ExplodeWhenClose 1000
+	}
+
+	local.flyby5 waitmove
+	local.flyby5 remove
+}End
+
+//============================================================================
+EndGliderLand: {
+//============================================================================
+	//	while ( !(level.endgliderflying istouching $startgliderlandingsoundtrigger) )
+	//	{
+	//		waitframe
+	//	}
+
+	//$startgliderlandingsoundtrigger remove
+	//	level.endgliderflying playsound e2l1_gliderland1
+}End
+
+//============================================================================
+RailwayFlyby: {
+//============================================================================
+	level waittill spawn
+	$glider_railway_trigger waittill trigger
+
+	dprintln "Doing railway flyby..."
+
+	local.flyby = spawn script_model model "models/vehicles/cg4aglider_chunky.tik"
+	local.flyby.origin = $flybypath_railway.origin
+	local.flyby.angles = $flybypath_railway.angles
+	local.flyby notsolid
+	local.flyby scale 0.3
+	local.flyby anim emitter_off
+	local.flyby notsolid
+	local.flyby flypath $flybypath_railway 650 650 500
+	local.flyby thread ExplodeWhenClose 2000
+	local.flyby waitmove
+	local.flyby remove
+}end
+

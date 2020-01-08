@@ -1,0 +1,2449 @@
+//	Friendly system created by Mackey McCandlish.
+//	
+//	Before level waittill spawn "exec global/friendly.scr".
+//	
+//	To setup a friendly give a (preferrably American) AI targetname "friendly".
+//	
+//	You can set his #fnum to be 1 through 10. In the scripting system you can access him as level.friendly# (# being whatever 
+//	fnum you set).
+//	
+//	You can make a friendly stop avoiding the player by setting his .avoidplayer to 0. You can turn it back on by setting
+//	his .avoidplayer to 1.
+//	
+//	When you want to turn on the friendly AI, do "level.friendly# thread global/friendly.scr::friendlythink".
+//	Afterwards you can set his friendtype like this: level.friendly#.friendtype = 1.
+//	
+//	The default friendtype is 0. Friendtypes actually used in MOH are:
+//	
+//	0	Offset Behavior:
+//
+//			The AI follows/leads the player at an offset from his current position (used in m1l1, m4l0, m5l1a, and m5l1b).
+//
+//		Give the nodes you want the friendlies to potentially stop at a targetname of "friendlynode".
+//
+//		Give the nodes a #set value ranging from 10 up to however high you go. You start with 10 at the beginning of the level
+//		and then go up by 10s as you go through the level. So a "friendlynode" at the beginning of the level would be #set 10
+//		and a node at the end of the level might have #set 600, whereas a node in the middle (in this case) would be roughly
+//		#set 300. Multiple nodes can have the same #set value and you can use finer values like 15 or 11 or whatnot where you
+//		need to.
+//		
+//		It helps to use $targetname instead of targetname so that the targetname is not changed every time you copy and paste 
+//		a node. To further differentiate the nodes, press K and change their editor color for the 3d view.
+//
+//		You can also give groups of nodes a identical #area value (like #area 1 for example). When the AI feels like going to
+//		a node with a .area of a given value, he will not go to any node that doesn't have that .area value until all the
+//		enemies with targetname "enemy" and the same #area value (including enemies from enemyspawners that have the same #area
+//		value) are dead. Then he will turn off those nodes forever and the AI will not try to go back to those nodes. Such
+//		nodes obviously must be placed in the same general area, like in a singular building, so the AI can run in and clear
+//		out the building then run out.
+//
+//		To determine where a friendly will follow in relation to the player, set his .mins and .maxs. For example to make a
+//		friendly lead the player, like in m1l1, set his .mins to 20 and .maxs to 40. To make a friendly follow the player, like
+//		m5l1a and m5l1b, set the mins to -40 and maxs to -20. Don't set the mins higher than the maxs.
+//
+//		You can further tweak the friendly with .distance and .waittime (they determine how close he has to get to nodes before
+//		he goes for his next node and how long he waits at each node before following the player).
+//
+//
+//	1	Barney Behavior (ahem).
+//	
+//			The AI follows the player at a distance (used in the majority of levels with friendlies aside from m1l1, m5l1a, 
+//			and m5l1b).		
+//
+//		You can alter how close the friendly follows with .distance and how long he waits with .waittime.
+//
+//	4	Leader Behavior.
+//
+//		Leader Behavior is very special case and was created exclusively for m1l2a (the SAS Agent). Basically he uses the same
+//		friendlynode/#set system as Offset Behavior friendlies, but he stays slightly ahead of the player and fills in the nodes
+//		one by one as he moves through the map (filling them in sequentially). Therefore nodes can not have the same #set and
+//		there is no .mins or .maxs.
+//
+//		Friendlynodes for Leader Behavior can have a #flag value as well, like #flag 0. When the friendly gets to that node, he
+//		will enable friendly avoid and then execute a thread called "flagthread0" in the current level.script. 
+//
+//		Anybody trying to setup such a friendly would have to spend a lot of time getting to know m1l2a.scr.
+//
+//	5	Medic Behavior.
+//		
+//			The AI follows the player and friendlies around like a Barney guy (with preference for friendlies over the player)
+//			and will heal them if they're wounded sufficiently. He'll also heal himself a few times (limited). Occurs in m5l1b
+//			and m4l0.
+//
+//		You don't have to do anything special with medics, but its nice to make sure they have a medic model. You can set their
+//		.distance to control how close they follow.
+//
+//	All the other friendly types are unsupported and just didn't turn out to be needed in the game. You should use friendtype
+//	-1 when you want an AI to not do any special friendly AI and then do a wait 1 after setting friendtype -1 to make sure it
+//	is active before you issue and new commands.
+main:{
+	//$player.entref = -1 //chrissstrahl - dono what this is used for yet
+	waitthread friendlygen
+}end
+
+soondie:
+	level waittill spawn
+	wait 4
+	while (isalive self)
+	{
+		self damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+		wait 1
+	}
+end
+
+
+debug:
+	level.frienddebug = 1
+end
+
+//chrissstrahl - this was implemented for e1l2
+//-----------------------------------------------------
+friendlystop:
+//
+//	After you've called friendlythink, you can call this to 
+//	get rid of the friendly behaviour...
+//
+//-----------------------------------------------------
+	self.friendly_stopped	= 1
+end
+
+//chrissstrahl - this was implemented for e1l2
+friendlythink:
+	//chrissstrahl - handle for aa
+	if(level.coop_aaMap == 1){
+		thread friendlythinkstart
+		local.thread = parm.previousthread
+		self waittill death
+		if (local.thread)
+		local.thread delete
+	}
+	//handle for BT
+	else{
+		if ( self.friendlythink_thread==NIL || self.friendlythink_thread==NULL ){
+			self.friendlythink_thread = NULL
+			self.friendlythinkstart_thread = NULL
+			self.friendlythink_thread = local
+			self.friendly_stopped = 0
+			
+			//chrissstrahl - fixed not executed by a entity
+			//thread friendlythinkstart
+			self thread friendlythinkstart
+			
+			self.friendlythinkstart_thread = parm.previousthread
+			self waittill death
+
+			if (self.friendlythinkstart_thread!=NULL){
+				self.friendlythinkstart_thread delete
+			}
+			self.friendlythink_thread = NULL
+			self.friendlythinkstart_thread = NULL
+		}
+		else{
+			if ( self.friendly_stopped==1 ){
+				self.friendly_stopped = 0
+				if ( self.friendtype<0 ){
+					self.friendtype = 1
+				}
+			}
+		}
+	}
+end
+
+
+forceactiveatime:
+	while (isalive self)
+	{
+		self forceactivate
+		wait 50
+	}
+end
+
+friendlyhealth:
+	while (isalive self)
+	{
+		local.health = self.health
+		self waittill pain
+		print3d (self.origin + (0 0 70)) 2 (local.health - self.health)
+		local.health = self.health
+	}
+end
+
+
+friendlythinkstart:
+	if (level.frienddebug == NIL)
+	println (self + " did friendlythink")
+
+		level.entref++
+		self.entref = "friendly" + level.entref
+
+		if (self.lookat_time == NIL)
+			self.lookat_time = 1
+
+		if (self.look == NIL)
+			self.look = 1
+
+		if (self.area == NIL)
+			self.area = -1
+
+		if (self.mins == NIL)
+			self.mins = -20
+
+		if (self.maxs == NIL)
+			self.maxs = 20
+
+		if (self.friendtype == NIL)
+			self.friendtype = 0
+
+
+		if (self.distance == NIL)
+			self.distance = 250
+
+		if ((self.destination == NIL) || !(self.destination))
+		{
+			if (level.friendlynodes < 1){
+				//iprintlnbold_noloc(self + " NO FRIENDLYNODES")//chrissstrahl - debug temporary
+				//chrissstrahl - handle sp
+				if(level.gametype == 0){
+					self.destination = $player
+				}
+				//chrissstrahl - handle mp
+				else{
+					self.destination = level.coop_player
+				}
+			}
+			else
+			if (self.friendtype == 0)
+			{
+				for (local.i=1;local.i<level.friendlynodes+1;local.i++)
+				{
+					if (level.friendlyused[local.i] == 0)
+					{
+						self.destination = level.friendlynode[local.i]
+						level.friendlyused[local.i] = 1
+						local.i = level.friendlynodes + 5
+					}
+				}
+			}
+			else{
+				//iprintlnbold_noloc (self + " friendtype other than 0")//chrissstrahl - debug temporary
+				//chrissstrahl - handle sp
+				if(level.gametype == 0){
+					self.destination = $player
+				}
+				//chrissstrahl - handle mp
+				else{
+					self.destination = level.coop_player
+				}
+			}
+		}
+
+		//println ("destination is " + self.destination + " and friendtype is " + self.friendtype)//chrissstrahl - debug temporary
+			
+		if (getcvar(debug) == "1")
+			println ("destination is " + self.destination + " and friendtype is " + self.friendtype)
+
+
+		if (self.friendlyrepulsetest)
+			thread friendlyrepulse
+
+		if (self.destinationset == NIL)
+			self.destinationset = 10
+
+		if (self.destinationnum == NIL)
+			self.destinationnum = 10
+
+		if (self.maxhealth == NIL)
+			self.maxhealth = self.health
+
+		if (self.friendtype == 5)
+		{
+			self gun "none"
+			self exec global/disable_ai.scr
+
+			if (self.lasthealed == NIL)
+				self.lasthealed = level.time + 1
+
+			if (self.playerhealed == NIL)
+				self.playerhealed = level.time + 1
+
+			self.mins = -15
+			self.maxs = 5
+		}
+
+//		if (getcvar(debug) == "1")
+//			thread friendlyhealth
+
+		self.originaldestination = self.destination
+
+//	self type_attack "cover"
+//	self.health = 5000
+//	self ammo_grenade 4
+
+	
+		//iprintlnbold_noloc (self + " lastdestination = $player")//chrissstrahl - debug temporary
+		if(level.gametype == 0){ //chrissstrahl - singleplayer
+			self.lastdestination = $player // was -1
+		}else{ //chrissstrahl - multiplayer/coop
+			self.lastdestination = level.coop_player // was -1
+		}
+		
+		local.standtime = level.time
+		local.runtime = level.time
+		local.friendrange = 50
+		local.stand = 0
+		thread forceactiveatime
+
+		local.lastplayerset = -1
+ 
+	while (isalive self)
+	{
+		if (self.thinkstate != "attack")
+		{
+	//		println (self.entref + "'s attackstate is " + self.thinkstate)
+	//			println self.health
+	//			println $player.health
+//				wait 1 //frame
+				waitframe
+	//			println self.friendtype
+
+			
+			if (self.friendtype == -1)
+			{
+						if (self.waittime == -1)
+							waitframe
+						else
+							wait self.waittime
+			}
+			else
+			if (self.friendtype == 2)
+			{		
+				for (local.i = level.playernodenum;local.i<level.friendlynodes+1;local.i++)
+				if (level.friendlyused[local.i] == 0)
+				{
+					self.olddestinationnum = self.destinationnum
+					self.destination = level.friendlynode[local.i]
+					self.destinationset = level.friendlynode[local.i].set
+					self.destinationnum = local.i
+
+					//chrissstrahl - this is debug stuff, so we can leave this
+					if (level.frienddebug == 1){
+						println ("best choice was " + (vector_length($player.origin - level.friendlynode[local.i].origin)) + " away from player")
+					}
+
+					local.i = level.friendlynodes + 5
+				}
+
+					thread friendlyused self.destinationnum
+
+				if (self.destination != self.lastdestination)
+				{
+
+					self thread ailookrun
+					self runto self.destination
+
+				if (level.frienddebug == 1)
+					println (self + " is running to " + self.destinationnum)
+
+					wait 1
+
+					if (level.friendlyused[self.olddestinationnum] == 1)
+						level.friendlyused[self.olddestinationnum] = 0
+
+					self waittill movedone
+//					wait (1 + randomfloat(2))
+//					self.lookthread delete
+
+				}
+
+				self.lastdestination = self.destination
+			}
+			else
+			if (self.friendtype == 8)
+			{
+		
+				for (local.i = level.playernodenum;local.i<level.friendlynodes+1;local.i++)
+				if ((level.friendlyused[local.i] == 0) && (level.friendlynode[local.i].set > self.destinationset))
+				{
+					self.olddestinationnum = self.destinationnum
+					self.destination = level.friendlynode[local.i]
+					self.destinationset = level.friendlynode[local.i].set
+					self.destinationnum = local.i
+
+					//chrissstrahl - debug for president
+					if (level.frienddebug == 1){
+						println ("best choice was " + (vector_length($player.origin - level.friendlynode[local.i].origin)) + " away from player")
+					}
+
+					local.i = level.friendlynodes + 5
+				}
+
+					thread friendlyused self.destinationnum
+
+				if (self.destination != self.lastdestination)
+				{
+
+					self thread ailookrun
+					self runto self.destination
+
+				if (level.frienddebug == 1)
+					println (self + " is running to " + self.destinationnum)
+
+					wait 1
+
+					if (level.friendlyused[self.olddestinationnum] == 1)
+						level.friendlyused[self.olddestinationnum] = 0
+
+					self waittill movedone
+//					wait (1 + randomfloat(2))
+//					self.lookthread delete
+
+				}
+
+				self.lastdestination = self.destination
+			}
+			else if (self.friendtype == 1){
+				if (!(isalive self.destination) || !(self.destination)){
+					
+					//chrissstrahl - finally this is fixed, this is used in m5l1a
+					//self.destination = $player //chrissstrahl
+					//self.originaldestination = $player //chrissstrahl
+					
+					self waitexec coop_mod/main.scr::destination //chrissstrahl - coop compatibility
+					self.originaldestination = self.destination //chrissstrahl - coop compatibility
+					
+					if(level.friendlyLastFuckingDebugSHittMessage == NIL){
+						level.friendlyLastFuckingDebugSHittMessage = -100
+					}
+					if(level.friendlyLastFuckingDebugSHittMessage + 10 < level.time){
+						level.friendlyLastFuckingDebugSHittMessage = level.time
+						//iprintlnbold_noloc ( "#set destination $player..." )//chrissstrahl - debug temporary
+					}
+				}
+
+				self.destination = self.originaldestination
+
+				for (local.i=1;local.i<level.friendlys+1;local.i++){
+					if (isalive level.friendly[local.i])
+					{
+						if ((level.friendly[local.i].friendtype == 1) && (level.friendly[local.i].destination == self.destination) && (self != level.friendly[local.i])){
+							if (((self.origin - self.destination.origin) * (self.origin - self.destination.origin)) >
+							((level.friendly[local.i].origin - self.destination.origin) * (level.friendly[local.i].origin - self.destination.origin)))
+								self.destination = level.friendly[local.i]
+							else
+								level.friendly[local.i].destination = self 
+						}
+					}
+				}
+
+				local.movethread = -1
+
+				self.movedoneradius = self.distance // + local.friendrange
+//				self thread ailookrun
+//				self runto self.destination.origin
+
+				//chrissstrahl - make sure we catch the player array in mp for coop compatibility
+				//if it is a array, set the new destination entity by using coop mod handle
+				if( self.destination.size > 1){
+					//wait for valid player 
+					while(level.coop_player==NULL){
+						wait 1
+						println ( "#waiting for player..." )
+					}
+					self.destination = level.coop_player
+					self.tether = level.coop_player
+					
+					//chrissstrahl - debug
+					if(level.coop_player.targetname != "player"){
+						iprintlnbold_noloc("DEV: shiet friendly nullish")
+					}
+				}
+				//end chrissstrahl
+			
+				if ( self.destination != NULL && vector_length (self.destination.origin - self.origin) > self.distance + local.friendrange){ //chrissstrahl - added check for NULL
+//					println ("running to " + self.destination + " with movedoneradius " + self.distance)
+//					self thread ailookrun
+//					if (getcvar(debug) == "1")
+//						println "Starting the run"
+					self runto self.destination // .origin
+					local.stand = 0
+					self waittill movedone
+
+					if !(self.destination){
+						//self exec coop_mod/main.scr::friendlyDestination //chrissstrahl - made coop mod compatible
+						self exec coop_mod/main.scr::destination //chrissstrahl - made coop mod compatible
+					}
+
+					if (getcvar(debug) == "1")
+						println "Ending the run"
+					if (vector_length (self.destination.origin - self.origin) < self.distance + local.friendrange){
+						self exec global/stand.scr
+//						println "standing"
+					}
+//					else
+//						println ((vector_length (self.destination.origin - self.origin)) + " ----- " + (self.distance + local.friendrange) )
+				}
+				else{
+					if (local.stand == 0){
+						self exec global/stand.scr
+						local.stand = 1
+					}
+					wait 1
+				}
+			}
+			else if (self.friendtype == 0){
+
+//				if (getcvar(debug) == "1")
+//				println ("current time is " + level.time + " and current attack state is " + self.thinkstate)
+
+/*
+				if (getcvar(debug) == "1")
+				if (self.area == -1)
+					println (self.entref + " has no area")
+				else
+					println (self.entref + "'s # of enemies in area " + self.area + " is " + level.enemyarea[self.area])
+*/
+
+				local.wanted_node = -1
+//				println ("THE NUMBER IS " + local.wanted_node)
+
+				if (level.time > local.runtime)
+				{
+					local.entarray = -1
+					local.entarrayentree = 0
+					
+					local.setnum = -1
+					local.nodenum = -1
+
+					if (self.area != -1)
+					{
+
+						if (level.enemyarea[self.area] < 1)
+						{
+							/*
+							for (local.i=1;local.i<level.friendlynodes+1;local.i++)
+							{
+								if (level.friendlynode[local.i].area == self.area)
+									level.friendlyused[local.i] = -1
+							}
+							
+							*/
+							if (level.friendlynode[self.destinationnum].area == self.area)
+								level.friendlyused[self.destinationnum] = -1
+
+							self.area = -1
+							if (getcvar(debug) == "1")
+								println (self.entref + " is now at area " + self.area)
+
+						}	
+						else
+						for (local.i=1;local.i<level.friendlynodes+1;local.i++)
+						{
+//							if ((level.friendlynode[local.i].area == self.area) && (level.friendlyused[local.i] == -1))
+//								self.area = -1
+//							else
+							{
+								local.entnum = -1
+								local.entset = -1
+
+								if (level.friendlynode[local.i].area == self.area)
+								if ((self.destinationset < level.friendlynode[local.i].set) && (level.friendlyused[local.i] == 0) && (self.lastdestination != level.friendlynode[local.i]))
+								if (level.friendlynode[local.i].set > local.entset)
+								{
+									local.entset = level.friendlynode[local.i].set
+									local.entnum = local.i
+									local.entarray = -1
+									local.entarrayentree = -1
+								}
+
+								if (local.entnum != -1)
+								{
+									
+									/*
+									if (level.friendlyused[self.destinationnum] == 1)
+										level.friendlyused[self.destinationnum] = 0
+
+									self.destinationnum = local.entnum
+									thread friendlyused self.destinationnum
+
+									self.destination = level.friendlynode[local.entnum]
+									self.destinationset = level.friendlynode[local.entnum].set
+									local.i = level.friendlynodes + 5
+									if (getcvar(debug) == "1")
+										println (self.entref + " wants to go to a pathnode with area " + level.friendlynode[local.entnum].area)
+									*/
+									local.wanted_node = local.entnum
+									local.i = level.friendlynodes + 5
+
+								}
+								else
+								if (level.friendlynode[local.i].area == self.area)
+								if ((self.lastdestination != level.friendlynode[local.i]) && (self.destinationset <= level.friendlynode[local.i].set) && (level.friendlyused[local.i] == 0) && (self.lastdestination != level.friendlynode[local.i]))
+								{
+									local.entarrayentree++
+									if (local.entarray == -1)
+									{
+										local.entarray = NIL
+										local.entarrayentree = 1
+									}
+
+									local.entarray[local.entarrayentree] = local.i
+								}
+							}
+						}
+					}
+					else
+					if (local.lastplayerset != level.playernodeset)
+//					if ((self.destinationset < level.playernodeset + self.mins) || (self.destinationset > level.playernodeset + self.maxs))
+					{
+						local.lastplayerset = level.playernodeset
+		//				println ("We were at:" + (self.destinationset) + " min: " +  (level.playernodeset + self.mins) + " player: " + (level.playernodeset) + " max: " + (level.playernodeset + self.maxs))
+
+						
+						for (local.i=1;local.i<level.friendlynodes+1;local.i++)
+						{
+								
+
+							if ((local.setnum < level.friendlynode[local.i].set) && ((level.friendlynode[local.i].set > level.playernodeset + self.mins) && (level.friendlynode[local.i].set < level.playernodeset + self.maxs) && (level.friendlyused[local.i] == 0)) && (self.lastdestination != level.friendlynode[local.i]) && (self.destinationset != level.friendlynode[local.i].set))
+							{
+		//						println ("last/next" + (self.destinationset) + "/" + (level.friendlynode[local.i].set) + " min: " +  (level.playernodeset + self.mins) + " player: " + (level.playernodeset) + " max: " + (level.playernodeset + self.maxs))
+								/*
+								if (
+								((level.playernodeset < self.destinationset) && (level.friendlynode[local.i].set < self.destinationset)) 
+								|| 
+								((level.playernodeset > self.destinationset) && (level.friendlynode[local.i].set > self.destinationset)))
+								*/
+								{
+									local.setnum = level.friendlynode[local.i].set
+									local.nodenum = local.i
+								}
+
+								if (local.nodenum != -1)
+								{
+
+									/*
+									if (level.friendlyused[self.destinationnum] == 1)
+										level.friendlyused[self.destinationnum] = 0
+
+									self.destinationnum = local.nodenum
+
+									println ("THE USED WAS " + level.friendlyused[local.nodenum] + " ON SET " + level.friendlynode[local.nodenum].set + " for " + self.entref)
+									thread friendlyused self.destinationnum
+									println ("THE USED IS NOW " + level.friendlyused[local.nodenum] + " ON SET " + level.friendlynode[local.nodenum].set + " for " + self.entref)
+									self.destination = level.friendlynode[local.nodenum]
+									self.destinationset = level.friendlynode[local.nodenum].set
+
+									if (level.friendlynode[local.nodenum].area != -1)
+									{
+										self.area = level.friendlynode[local.nodenum].area
+										if (getcvar(debug) == "1")
+											println (self + " joined area " + self.area)
+									}
+		//							local.i = level.friendlynodes + 5
+									*/
+
+									local.wanted_node = local.nodenum
+								
+								}
+								else
+								if (getcvar(debug) == "1")
+									println (self.entref + " failed to find an acceptable node")
+							}
+						}
+					}
+
+//					if (getcvar(debug) == "1")
+//					if ((self.destination.area != NIL) && (self.destination.area != -1))
+//						println (self.entref + "'s current area is " + self.destination.area)
+
+					if (local.entarray != -1)
+					{
+						local.num = (randomint (local.entarrayentree) + 1)
+						local.i = local.entarray [local.num]
+
+						/*
+						if (getcvar(debug) == "1")
+							println (self.entref + " could go to " + local.num + " of a possible quantity of " + local.entarrayentree)
+
+						if (level.friendlyused[self.destinationnum] == 1)
+							level.friendlyused[self.destinationnum] = 0
+
+						self.destinationnum = local.i
+						thread friendlyused self.destinationnum
+						self.destination = level.friendlynode[local.i]
+						self.destinationset = level.friendlynode[local.i].set
+						*/
+
+						local.wanted_node = local.i
+
+					}
+
+					if (local.wanted_node != -1)
+					{
+						if (level.friendlynode[self.destinationnum])
+						if (level.friendlynode[self.destinationnum].set)
+						println (self.entref + " gave up node " + level.friendlynode[self.destinationnum].set)
+
+						if (level.friendlyused[self.destinationnum] == 1)
+							level.friendlyused[self.destinationnum] = 0
+
+						self.destinationnum = local.wanted_node
+						println (self.entref + " took node " + level.friendlynode[local.wanted_node].set)
+						thread friendlyused self.destinationnum
+						self.destination = level.friendlynode[local.wanted_node]
+						self.destinationset = level.friendlynode[local.wanted_node].set
+
+						if (level.friendlynode[local.wanted_node].area != -1)
+							self.area = level.friendlynode[local.wanted_node].area
+					}
+
+					self turnto NULL								
+					self waitthread seekdestination local.friendrange local.runtime
+
+					for (local.i=1;local.i<level.friendlys+1;local.i++)
+					{
+						if (isalive level.friendly[local.i])
+						{
+//							if ((self.area == -1) && ((level.friendly[local.i].area != -1) && (level.enemyarea[level.friendly[local.i].area] > 0)) && (level.friendly[local.i].friendtype == 0))
+							if ((self.area == -1) && (level.friendly[local.i].area != -1) && (level.enemyarea[level.friendly[local.i].area] > 0) && (level.friendly[local.i].friendtype == 0))
+							{
+								self.area = level.friendly[local.i].area
+								if (self.fnum == NIL)
+									self.fnum = -2
+
+//								if (getcvar(debug) == "1")
+//									println (self.fnum + " got area " + level.friendly[local.i].area + " from " + level.friendly[local.i].fnum)
+
+//								self.destination = level.friendly[local.i]
+//								self.friendtype = 1
+							}
+
+						}
+					}
+				}
+			}
+//LEAD PLAYER////////////////////////////////////////////////////
+//LEAD PLAYER////////////////////////////////////////////////////
+//LEAD PLAYER////////////////////////////////////////////////////
+//LEAD PLAYER////////////////////////////////////////////////////
+			else if (self.friendtype == 4){
+				local.set = 5000
+				local.nodenum = -1
+
+
+				for (local.i=1;local.i<level.friendlynodes+1;local.i++){
+//				println ("Num is " + local.i + " used is " + level.friendlyused[local.i]) // + " set is " + level.friendlyused[local.i].set)
+
+					if ((level.friendlyused[local.i] == 0) && (level.friendlynode[local.i].set < local.set)){
+						local.set = level.friendlynode[local.i].set
+						local.nodenum = local.i
+						if (getcvar(debug) == "1"){
+							println ("SAS wants to go to #SET " + local.set + " and nodenum " + local.nodenum)
+						}
+					}
+				}
+
+				if (local.nodenum == -1)
+					local.nodenum = self.destinationnum
+					
+				if (local.nodenum != -1)
+					level.friendlyused[local.nodenum] = 1
+				
+				local.break = 0
+				local.offset = 1 // was 10
+				local.break = 0
+
+				local.turntime = level.time + 2 + randomfloat (0.6)
+				self.turndoneerror = 70
+
+				while (local.break == 0){
+					if (level.time > local.turntime){
+						//self lookat $player //chrissstrahl
+						self exec coop_mod/replace.scr::lookat //chrissstrahl - friendtype 4 only - use closest player					
+					}
+
+					if (level.time > local.turntime + 1.2 + randomfloat (0.6)){
+						self exec coop_mod/replace.scr::turnto //chrissstrahl - friendtype 4 only - use closest player
+						thread turntonull
+						local.turntime = level.time + 9000
+					}
+					
+//					if (getcvar(debug) == "1")
+//						println ("nodenum is " + local.nodenum) // + " and the origin of friendlynode of such nodenum is " + level.friendlynode[local.nodenum].origin)
+
+					// 200 was self.distance
+					local.break = 1
+					if (!(self exec coop_mod/replace.scr::cansee) && (local.set > level.playernodeset + local.offset) ){ //chrissstrahl - friendtype 4 only - use any player
+						local.break = 0
+					}
+					//else if ((vector_length (self.origin - $player.origin) > 200) && (level.friendlyused[local.nodenum] == 1) && (local.set > level.playernodeset + local.offset)) //chrissstrahl
+					else if (	((exec coop_mod/replace.scr::withinDistanceOf self 200) != 1) &&
+								(level.friendlyused[local.nodenum] == 1) &&
+								(local.set > level.playernodeset + local.offset)) //chrissstrahl - make coop compatible
+					{					
+						local.break = 0
+					}
+					//else if ((vector_length (self.origin - $player.origin) > 200 ) && (local.set > level.playernodeset + local.offset) && !(sighttrace $player.origin level.friendlynode[local.nodenum].origin 1)){ //chrissstrahl
+					else if (	((exec coop_mod/replace.scr::withinDistanceOf self 200) != 1) &&		//chrissstrahl - friendtype 4 only - use any player
+								(local.set > level.playernodeset + local.offset) &&
+								!((exec coop_mod/replace.scr::sighttrace (0 0 0) level.friendlynode[local.nodenum].origin 1)) )	//chrissstrahl - friendtype 4 only - use any player
+					{ 
+						local.break = 0
+					}
+				
+					//chrissstrahl - this is used for debug, so we can leave it that way
+					//chrissstrahl - this is used for debug, so we can leave it that way
+					//chrissstrahl - this is used for debug, so we can leave it that way
+					if (getcvar(sas) == "1")
+					{
+						println "------------------------"
+						println ("Break was " + local.break)
+
+						if (self cansee $player)
+							println "SAS could see the player"
+						else
+							println "SAS could NOT see the player"
+
+						if (local.set > level.playernodeset + local.offset)
+							println ("Friendlynode set " + local.set + " was greater than playernode set " + level.playernodeset + " + offset")
+						else
+							println ("Friendlynode set " + local.set + " was NOT greater than playernode set " + level.playernodeset + " + offset")
+				
+						local.length = vector_length (self.origin - $player.origin)
+						if (local.length > 200)
+							println ("Vector length " + local.length + " was greater than 200")
+						else
+							println ("Vector length " + local.length + " was NOT greater than 200")
+
+						if (sighttrace $player.origin level.friendlynode[local.nodenum].origin 1)
+							println ("Sight trace from player origin to SAS origin was true")
+							else
+							println ("Sight trace from player origin to SAS origin was false")
+						println "------------------------"
+					}
+					wait 0.1
+
+					if (getcvar(hangin) == "1")
+						println (self.entref + " is hangin out at 0 " + local.set)
+
+					if (level.friendlyused[local.nodenum] != 1)
+					{
+						if (getcvar(debug) == "1")
+							println (self.entref + " broke out of " + local.set + " to move on")
+
+						local.break = 1
+					}
+
+				}
+
+				if (level.friendlynode[self.destinationnum + 1])
+					self thread lookpastlow level.friendlynode[self.destinationnum + 1] 0.6
+				else
+					self thread lookpastlow self.destination 0.6
+
+//				wait 0.4
+	
+					// println ("****** Turning towards " + self.destination)
+//					self turnto self.destination
+//					thread turntonull
+//				wait 0.3
+
+				local.tempnodenum = 0
+				//if (!(self cansee $player) && (local.set > level.playernodeset + local.tempnodenum) ){//chrissstrahl
+				if (!(self exec coop_mod/replace.scr::cansee) && (local.set > level.playernodeset + local.tempnodenum) ){//chrissstrahl - made coop compatible
+					local.break = 1
+					//iprintlnbold_noloc ( "friendly break 1" ) //chrissstrahl - debug
+				}
+				//chrissstrahl - here we use the closest player as reference, because the ai leads the way. If we have a ai following we are using level.coop_player are reference!!!
+				//else if ((vector_length (self.origin - $player.origin) > self.distance) &&  (level.friendlyused[local.nodenum] == 1) && (local.set > level.playernodeset + local.tempnodenum)){//chrissstrahl
+				else if ((exec coop_mod/replace.scr::withinDistanceOf self self.distance) != 1 &&  (level.friendlyused[local.nodenum] == 1) && (local.set > level.playernodeset + local.tempnodenum)){	//chrissstrahl - made coop compatible
+					local.break = -1
+					//iprintlnbold_noloc ( "friendly break MINUS 1" ) //chrissstrahl - debug
+				}
+
+				if (local.set < level.playernodeset + local.tempnodenum){
+					local.break = 1
+					//iprintlnbold_noloc ( "frindly break last" ) //chrissstrahl - debug
+				}
+
+
+
+				if (level.friendlyused[local.nodenum] == 1)
+				if (local.nodenum != -1)
+				{
+					self.destination = level.friendlynode[local.nodenum]
+					self.destinationnum = local.nodenum
+					self.destinationset = level.friendlynode[local.nodenum].set
+
+
+	//				println (self + " is running to " + local.set + " which is " + vector_length (self.origin - self.destination.origin) + " distance away")
+		
+					if (getcvar(debug) == "1")
+						println (self + " ran to " + self.destination + " at " + self.destination.origin + " with set # " + self.destination.set + " and player has set " + level.playernodeset)
+		
+					if (getcvar(debug) == "1")
+						println ("======================== local.set is " + local.set + " and playerset is " + level.playernodeset)
+
+					local.broke = 0
+					self.distance = 350
+					self.movedoneradius = 350
+
+					while (local.broke == 0){
+						self runto self.destination
+
+//						println ("set is " + self.destination.set)
+
+						if (getcvar(debug) == "1")
+							println ("1 Friendly used is " + level.friendlyused[local.nodenum])
+
+						local.elapsedtime = level.time + 6
+
+						if (getcvar(debug) == "1")
+							println (self.entref + " may hang out at 1 " + local.set)
+						self.checkmovedone = 0
+
+						thread checkmovedone
+						
+	//					while ((vector_length (self.origin - self.destination.origin) > self.distance) && ( level.friendlyused[local.nodenum] == 1))
+	//					while ((vector_length (self.origin - self.destination.origin) > self.distance) && ( level.friendlyused[local.nodenum] == 1))
+						while ((self.checkmovedone == 0) && ( level.friendlyused[local.nodenum] == 1))
+						{
+							if (getcvar(hangin) == "1")		
+								println (self.entref + " is hangin out at 1 " + local.set)
+
+							wait self.waittime
+							/*
+							if (level.time > local.elapsedtime)
+								self runto self.destination
+							*/
+						}
+
+						if (self.checkthread)
+							self.checkthread delete
+
+						if (self.destination.target)
+						{
+							local.ent = self.destination.target
+							while (local.ent.target)
+								local.ent = local.ent.target
+
+							local.origin = local.ent.origin
+						}
+						else
+						local.origin = self.destination.origin
+
+						if (vector_length (self.origin - local.origin) < self.distance + 25)
+							local.broke = 1
+
+						waitframe
+					}
+
+
+					if (getcvar(debug) == "1")
+						println ("2 Friendly used is " + level.friendlyused[local.nodenum])
+
+					if (level.friendlynode[local.nodenum].flag != NIL) 
+					{
+//						self waittill movedone
+//						while (parm.movedone == 0)
+						self.movedoneradius = 0					
+						while (vector_length (self.origin - level.friendlynode[local.nodenum].origin) > 100)
+						{
+							if (getcvar(hangin) == "1")
+								println (self.entref + " is hangin out at 4 " + local.set)
+
+								if (getcvar(debug) == "1")
+									println ("======================== local.set is " + local.set + " and playerset is " + level.playernodeset)
+
+								if (local.break == 1)
+										self runto self.destination
+									else
+										self walkto self.destination
+
+									self waittill movedone
+									waitframe
+
+							if (getcvar(hangin) == "1")
+								println (self.entref + " is hangin out at 3 " + local.set)
+
+						}
+
+						if (level.friendlynode[local.nodenum].flag != NIL) 
+						if (level.friendlyused[local.nodenum] == 1)
+						{
+							self.avoidplayer = 1
+							self exec level.script::("flagthread" + level.friendlynode[local.nodenum].flag) //chrissstrahl - using exec with waitframe here instead of thread
+							waitframe
+							//chrissstrahl - this gives us huge troubles in multiplayer, because scripts don't run the same as in sp
+							//making this entity flag set to NIL before it is executed, otherwise I can not explain it not working before				
+							level.friendlynode[local.nodenum].flag = NIL
+						}
+						else{
+							if (getcvar(debug) == "1"){
+								println ("Didn't run flagthread " + ("flagthread" + level.friendlynode[local.nodenum].flag))
+							}
+						}
+					}
+				}
+			}
+			else if (self.friendtype == 5){
+				if (level.time > self.lasthealed){
+					self.lasthealed = level.time + level.medictime
+					waitthread heal $player
+					for (local.i=1;local.i<level.friendlys+1;local.i++){
+						if (level.friendly[local.i] != self){
+							waitthread heal level.friendly[local.i]
+						}
+					}
+					
+					if(level.gametype == 0){ //chrissstrahl - sp
+						if ((self.health * 100) / self.maxhealth < 40){
+							waitthread canteen
+						}
+					}//chrissstrahl - coop - adjust medic health to the players, players might be scattered arround the level, the medic will have a hard time staying alive
+					else{
+						local.playerNum = waitexec coop_mod/replace.scr::player_numActive
+						if(local.playerNum < 1){ local.playerNum = 1 } //minimum health like 1 player is active
+						if(local.playerNum > 4){ local.playerNum = 4 } //maximum health like 4 players are alive
+						self.maxhealth = ( level.coopMedicHealth * local.playerNum )
+						if ((self.health * 100) / self.maxhealth < 50){
+							waitthread canteen
+						}
+					}				
+				}
+
+
+//				if (level.time > local.runtime)
+				{
+
+					if (isalive level.friendly2){
+						self.destination = level.friendly2
+					}
+					else if (isalive level.friendly3){
+						self.destination = level.friendly3
+					}
+					else{
+						//chrissstrahl - sp
+						if(level.gametype == 0){
+							self.destination = $player
+						}else{//chrissstrahl - coop
+							self.destination = level.coop_player
+						}
+					}
+
+
+					self.distance = 150
+					self.movedoneradius = self.distance - 25
+					if (vector_length (self.destination.origin - self.origin) > self.distance + local.friendrange) 
+					{
+						self runto self.destination
+						self waittill movedone
+						self exec global/crouch.scr // was stand
+					}
+				}
+			}
+			else
+			if (self.friendtype == 6)
+			{
+
+				if (level.friendlyused[self.destinationnum] == 1)
+					level.friendlyused[self.destinationnum] = 0
+
+					local.run = 0
+				if (vector_length (self.destination.origin - self.origin) < 100)
+					self exec global/stand.scr
+				else
+				{
+					self runto self.destination.origin
+					local.run = 1
+				}
+
+				while (vector_length (self.destination.origin - self.origin) > 100)
+				{
+					if (getcvar(debug) == "1")
+						println "running"
+		
+					wait self.waittime
+				}
+		
+
+				wait self.waittime
+
+			}
+			else
+			if (self.friendtype == 7)
+			{
+				if (level.time > local.runtime)
+				{
+					local.entarray = -1
+					local.entarrayentree = 0
+					
+					local.setnum = -1
+					local.nodenum = -1
+
+					if ((self.destinationset < level.playernodeset + self.mins) || (self.destinationset > level.playernodeset + self.maxs))
+					{
+						for (local.i=1;local.i<level.friendlynodes+1;local.i++)
+						{
+							if ((level.friendlynode[local.i].set > self.destinationset) && (local.setnum < level.friendlynode[local.i].set) && ((level.friendlynode[local.i].set > level.playernodeset + self.mins) && (level.friendlynode[local.i].set < level.playernodeset + self.maxs) && (level.friendlyused[local.i] == 0)) && (self.lastdestination != level.friendlynode[local.i]) && (self.destinationset != level.friendlynode[local.i].set))
+							{
+								{
+									local.setnum = level.friendlynode[local.i].set
+									local.nodenum = local.i
+								}
+
+								if (local.nodenum != -1)
+								{
+
+									if (level.friendlyused[self.destinationnum] == 1)
+										level.friendlyused[self.destinationnum] = 0
+
+									self.destinationnum = local.nodenum
+									thread friendlyused self.destinationnum
+									self.destination = level.friendlynode[local.nodenum]
+									self.destinationset = level.friendlynode[local.nodenum].set
+									
+									if (level.friendlynode[local.nodenum].area != -1)
+									{
+										self.area = level.friendlynode[local.nodenum].area
+										if (getcvar(debug) == "1")
+											println (self + " joined area " + self.area)
+									}
+								}
+							}
+						}
+					}
+								
+					self waitthread seekdestination local.friendrange local.runtime
+
+				}
+			}
+
+
+		}
+		else{
+			//chrissstrahl - fix infinite loop - if entity or info is missing
+			if(self == NULL || self.waittime == NIL){
+				wait 5
+			}else{
+				wait self.waittime
+			}
+		}
+		
+	}
+
+	if (self.destinationnum != NIL)
+	if ((level.friendlyused[self.destinationnum] == 1) && (self.friendtype == 0))
+		level.friendlyused[self.destinationnum] = 0
+	
+end
+
+canteen:
+
+	if (self.canteen == NIL)
+		self.canteen = 0
+
+	self.canteen++
+//	while (self.thinkstate == "attack")
+//		waitframe
+
+	if (self.canteen < 3)
+	{
+		wait 1
+		self lookat NULL
+		self nodamage
+		self upperanim pass_canteen_drink
+		self waittill upperanimdone
+
+		if (getcvar(debug) != "1")
+		self takedamage
+			self.health = self.maxhealth
+	}
+
+end
+
+//=========================================================================
+checkmovedone:{
+//=========================================================================
+//chrissstrahl - modified for coop - don't spam like this, I am trying to fix this
+	if (self.checkthread){
+		self.checkthread delete
+	}
+
+	self.checkthread = local
+
+	//println "started the wait"
+	
+	self waittill movedone
+	self.checkmovedone = 1
+	
+	//println "ended the wait"
+}end
+
+
+//=========================================================================
+heal local.ent:{
+//=========================================================================
+	//chrissstrahl - make coop compatible
+	if( local.ent.size > 1 ){//chrissstrahl - assume this is a $player array in multiplayer
+		//chrissstrahl - heal closest player
+		local.ent = exec coop_mod/replace.scr::player_closestTo self
+	}
+	
+	if (isalive local.ent){
+		local.health = (local.ent.health * 100) / local.ent.max_health //chrissstrahl - changed maxhealth to max_health
+
+		if (local.health < level.medicmin){
+			self.no_idle = 0
+
+			self.movedoneradius = 100
+			self runto local.ent
+			self waittill movedone
+
+			self exec global/stand.scr
+
+			if (isalive local.ent){
+				local.vec = vector_length (self.origin - local.ent.origin)
+				if (local.vec < 140){
+					self nodamage
+					self.avoidplayer = 0
+//					self.no_idle = 1
+					self upperanim pass_canteen_start
+					self waittill upperanimdone
+
+					local.ent heal 0.5
+					self playsound med_kit
+
+					self upperanim pass_canteen_end
+					self waittill upperanimdone
+
+					self.avoidplayer = 1
+
+					if (getcvar(alive) != "1")
+						self takedamage
+//					self.no_idle = 0
+				}
+			}
+			if (getcvar(debug) == "1")
+				println ("medic healed " + local.ent)
+		}
+	}
+}end
+
+
+friendlyrepulse: 
+
+	while (isalive self)
+	{
+		local.range = 40
+		for (local.i=1;local.i<level.friendlys+1;local.i++)
+		{
+			if ((isalive level.friendly[local.i]) && (self != level.friendly[local.i]))
+			{
+				local.newrange = vector_length (self.origin - level.friendly[local.i].origin)
+				println local.newrange
+				if (local.newrange < local.range)
+				{
+					local.repulse = level.friendly[local.i]
+					local.range = local.newrange
+				}
+			}
+		}
+
+		if (local.repulse)
+		{
+			local.ai_gap = 55
+			local.avoidtime = level.time + 5.5 + randomfloat (1)
+//			while ((vector_length (local.repulse.origin - self.origin) < 70) && (level.time < local.avoidtime))
+//			{
+//				local.ent = spawn script_origin "targetname" self.fnum
+//				local.ent model animal/cockroach.tik
+//				local.ent scale 100
+				local.player_ai_delta = vector_normalize (self.origin - local.repulse.origin) * local.ai_gap
+//				local.ent.origin = local.player_ai_delta + local.repulse.origin + ( 0 0 25 )
+				local.origin = local.player_ai_delta + local.repulse.origin + ( 0 0 25 )
+				self runto local.origin
+//				wait 2
+//				waitframe
+//				local.ent remove
+//			}	
+
+	//		self thread ailookstand
+//			if (vector_length (self.origin - local.repulse.origin) > 60)
+//				self exec global/stand.scr
+		}
+
+		wait 3
+	}
+end 
+
+
+seekdestination local.friendrange local.runtime:
+	// was self.distance + local.friendrange
+//		self runto self.destination
+//		self waittill movedone
+
+	if ((vector_length(self.origin - self.destination.origin) > self.distance - local.friendrange) && (self.destination != NIL))
+	{
+		self thread ailookrun
+
+		if (getcvar(debug) == "1")
+		if ((self.destination.area != NIL) && (self.destination.area != -1))
+		{
+			println (self.entref + " is trying to run to area " + self.destination.area + " with nodeset " + self.destinationnum + "/" + self.destinationset)
+//			println ("self destination's node/set is " + self.destination. 
+
+		}
+
+
+		
+		self.movedoneradius = 90 // self.distance - local.friendrange
+		if (getcvar(debug) == "1")
+			println (self.entref + " is running to " + self.destinationset)
+		self runto self.destination
+		self waittill movedone
+		if (getcvar(debug) == "1")
+			println (self.entref + " arrived")
+	
+		self thread ailookrun
+
+//		local.runtime = level.time + 2
+
+//		while ((vector_length (self.origin - self.destination.origin) > self.distance - local.friendrange) && (level.playernodeset > self.destinationset + self.mins) && (level.playernodeset < self.destinationset + self.maxs))
+//			wait self.waittime
+
+
+//		self.lookthread delete
+	}
+	else
+	{
+		wait 1
+		thread friendlyused self.destinationnum
+	}
+
+	self.lastdestination = self.destination
+
+end
+
+movedone:
+	self.movedone = 0
+	self waittill movedone
+	self.movedone = parm.movedone
+end
+
+
+repulse:
+	local.ai_gap = 150
+	spawn script_origin targetname temp_scr_org
+	local.player_ai_delta = vector_normalize (self.origin - self.destination.origin) * local.ai_gap
+	$temp_scr_org.origin = local.player_ai_delta + self.destination.origin
+	self runto $temp_scr_org.origin
+	self waittill movedone
+	$temp_scr_org remove
+end
+
+
+
+
+
+
+
+turntonull:
+	thread turntonull1
+	thread turntonull2
+end
+
+turntonull1:	
+	self waittill turndone
+	self turnto NULL
+end
+
+turntonull2:	
+	wait 2
+	self turnto NULL
+end
+
+
+
+ailookstand:
+
+	if (self.lookthread != NIL)
+		self.lookthread delete
+
+	if (self.look == 0)
+		end
+
+
+//	self lookat level.friendly1 
+//	end
+
+	self.lookthread = local
+//	self lookat self.destination
+//	wait (randomfloat (3) + 2)
+
+	while (isalive self)
+	{	
+		println "WTF"
+		local.random = randomint(100)
+		if (local.random > 50)
+		{
+			if (level.friendlynodes > 0)
+			{
+		
+				if (level.friendlynode[self.destinationnum])
+				local.look = level.friendlynode[self.destinationnum]
+				else
+				local.look = 1
+
+				while (level.friendlynode[local.look] == self.destination)
+				{
+					local.look = level.playernodenum + randomint(10) - 5
+					if (local.look < 1)
+						local.look = 1
+
+					if (local.look > level.friendlynodes)
+						local.look = level.friendlynodes
+				}
+					
+				if (vector_length (self.origin - level.friendlynode[local.look].origin) > 180)
+				{
+					self thread lookpastlow level.friendlynode[local.look]
+					self.turndoneerror = 70
+					self thread turn_null level.friendlynode[local.look]
+				}
+			}
+			else
+			{
+				local.look = randomint(level.friendlys) + 1
+
+				if (local.look < 1)
+					local.look = 1
+
+				if (local.look > level.friendlys)
+					local.look = level.friendlys
+
+				if (isalive level.friendly[local.look])
+				{
+					self lookat level.friendly[local.look]
+					self.turndoneerror = 30
+					self thread turn_null level.friendly[local.look]
+				}
+			}
+		}
+		else
+		if (vector_length (self.origin - self.destination.origin) > 180)
+		{
+			self thread lookpastlow self.destination
+			self.turndoneerror = 30
+			self thread turn_null self.destination
+		}
+
+		wait (randomfloat (6) + 1.5)
+	}
+end
+
+turn_null local.ent:
+	self.turndoneerror = 70
+	self turnto local.ent
+	self waittill turndone
+	self turnto NULL
+end
+
+
+ailookrun:
+
+	if (self.lookthread != NIL)
+		self.lookthread delete
+
+	if (self.look == 0)
+		end
+
+	self.lookthread = local
+
+	self lookat NULL
+
+	local.wait_time = 0.5
+
+	while (isalive self)
+	{	
+		if (level.time > self.lookat_time)
+		{
+			local.random = randomint(100)
+			
+			if ((level.friendlynodes > 0) && (local.random > 75))
+			{
+				local.look = level.playernodenum + randomint(4) + 4
+
+				if (self.destination == level.friendlynode[local.look])
+					local.look++
+
+				if (local.look > level.friendlynodes)
+					local.look = level.friendlynodes
+
+				if (vector_length (self.origin - level.friendlynode[local.look].origin) < 200)
+					local.look++
+
+				if (local.look > level.friendlynodes)
+					local.look = level.friendlynodes
+
+				self thread lookpastlow level.friendlynode[local.look]
+				local.wait_time = (randomfloat (3) + 1)
+			}
+			else if (local.random > 50)
+			{
+				local.ent = level.friendly[randomint(level.friendlys) + 1]
+
+	//			if (sighttrace (self.origin + (0 0 35)) (local.ent.origin + (0 0 35)) 1)
+				if (self cansee local.ent 90)
+				{
+					self lookat local.ent
+					local.wait_time = (randomfloat (1.5) + 0.5)
+				}
+				else
+				{
+					self lookat NULL
+					local.wait_time = 0.5
+				}
+			}
+			else if (local.random > 25)
+			{
+				self exec coop_mod/replace.scr::lookat //chrissstrahl - make coop compatible
+				local.wait_time = (randomfloat (1.5) + 0.5)
+			}
+			else
+			{
+				self lookat NULL
+				local.wait_time = 0.5
+			}
+
+			self.lookat_time = level.time + local.wait_time 
+
+			wait local.wait_time 
+			self lookat NULL
+			wait (1 + randomfloat(1))
+		}
+		else
+			wait 1
+	}
+end
+
+
+
+nodeprint:
+
+	local.p = 0
+	local.z = 0
+
+	local.timer = level.time
+	while (1)
+	{
+		local.p = local.z
+
+		if (level.time > local.timer)
+		{
+			local.z++
+			local.timer = level.time + 1
+			if (local.z > 2)
+				local.z = 0
+		}
+
+		if (getcvar(debug) == "1")
+		for (local.i=1;local.i<level.friendlynodes+1;local.i++)
+		{
+			local.p++
+			if (local.p == 3)
+			{
+				thread tempprint3d (level.friendlynode[local.i].origin + (0 0 35)) 2 level.friendlynode[local.i].set
+				local.p = 0
+			}
+		}
+		waitframe
+	}
+
+end
+
+tempprint3d local.org local.sizer local.num:
+	level waittill postthink
+	print3d local.org local.sizer local.num
+end
+
+
+playernode:
+	//$player.fnum = -1 //chrissstrahl - probably used for coordination, coop mod will handle this
+	if (level.usedrange == NIL)
+		level.usedrange = 2
+
+
+	level.playernodenum = 1
+	level.playernodeset = 1
+	println ("playernodeset is " + level.playernodeset)
+
+	level waittill spawn
+	thread nodeprint
+
+//	level.playernodeset = level.friendlynode[level.playernodenum].set
+//	println ("level playernodeset is " + level.playernodeset)
+//	level.playernoderadius = 50000
+
+
+	local.setnum = 0
+	level.playernode = level.friendlynode[1]
+	level.playernoderadius = vector_length (level.friendlynode[level.playernodenum].origin - (exec coop_mod/main.scr::friendlyPlayerOrigin) )//chrissstrahl - made coop mod compatible
+
+	local.num = level.playernodenum
+
+	for (local.i=1;local.i<level.friendlys+1;local.i++)
+		local.number[local.i] = level.friendly[local.i].area
+
+	local.min = -10
+	local.max = 10
+
+	local.playerheld = -1
+	while (1)
+	{
+		if (level.script == "maps/m1l2a.scr")
+		{
+//			println "held is -1"
+			local.playerheld = -1
+		}
+	local.playerheld = -1
+
+		if (local.playerheld != -1)
+		{
+			level.friendlyused[local.playerheld] = 0
+			local.playerheld = -1
+		}
+		// debug stuff
+		/*
+		for (local.i=1;local.i<level.friendlys+1;local.i++)
+		{
+			if ((isalive level.friendly[local.i]) && (level.friendly[local.i].area != NIL))
+			if (local.number[local.i] != level.friendly[local.i].area)
+			{
+
+					println "-**************************************-"
+				for (local.p=1;local.p<level.friendlys+1;local.p++)
+				{
+					if ((isalive level.friendly[local.p]) && (level.friendly[local.p].area != NIL))
+					{
+						huddraw_font (local.i + 100) "facfont-20"
+						huddraw_string (local.i + 100) level.friendly[local.p].area
+						huddraw_align (local.i + 100) left top
+						huddraw_rect (local.i + 100) 0 (80 + local.i*18) 0 0
+						local.number[local.p] = level.friendly[local.p].area
+
+//						println (level.friendly[local.p] + " is exploring area " + level.friendly[local.p].area)
+					}
+				}
+					println "-**************************************-"
+				local.i = level.friendlys + 5
+			}
+		}
+		*/
+
+		level.playernoderadius = vector_length (level.friendlynode[level.playernodenum].origin - (exec coop_mod/main.scr::friendlyPlayerOrigin) )//chrissstrahl - made coop mod compatible
+//		level.playernoderadius = 50000
+		local.p = 0
+		local.newnum = -1
+		local.lowset = level.playernodenum + local.min
+
+		if (local.lowset < 1)
+			local.lowset = 1
+
+			local.highset = level.playernodenum + local.max
+
+		if (local.highset > level.friendlynodes)
+			local.highset = level.friendlynodes
+
+		if (getcvar(playerset) == "1")
+			println ("highset is " + local.highset + " with set " + level.friendlynode[local.highset].set)
+
+		if (local.setnum != level.playernodenum)
+		{
+		if (getcvar(playerset) == "1")
+				println ("lowest = " + local.lowset + " and highest = " + local.highset + " and playernum = " + level.playernodenum)
+
+			local.setnum = level.playernodenum
+		}
+
+		for (local.i=local.lowset;local.i<local.highset+1;local.i++)
+		{
+			if (level.friendlyused[local.i] < level.usedrange)
+			local.radius = vector_length (level.friendlynode[local.i].origin - (exec coop_mod/main.scr::friendlyPlayerOrigin) )//chrissstrahl - made coop mod compatible
+			if (local.radius < level.playernoderadius + 1)
+			{
+		if (getcvar(playerset) == "1")
+				println ("Local radius is " + local.radius + " and level.playernoderadius is " + level.playernoderadius)
+
+				local.newnum = local.i
+		if (getcvar(playerset) == "1")
+				println ("The playernoderadius is " + level.playernoderadius + " and the node was " + level.playernodeset + " at distance " + vector_length ((exec coop_mod/main.scr::friendlyPlayerOrigin) - level.friendlynode[level.playernodenum].origin) + " but is now node with set " + level.friendlynode[local.newnum].set + " at distance of " + vector_length ((exec coop_mod/main.scr::friendlyPlayerOrigin) - level.friendlynode[local.newnum].origin)) //chrissstrahl - made coop mod compatible
+				level.playernoderadius = local.radius
+			}
+		}
+
+		if (getcvar(playerset) == "1")
+			println ("node 1 " + local.newnum)
+
+		if (level.playernoderadius > 600)
+			local.newnum = -1
+
+
+		if (local.newnum == -1)
+		{
+			local.radi = 50000
+			for (local.i=1;local.i<level.friendlynodes+1;local.i++)
+			{
+				if (level.friendlyused[local.i] < level.usedrange)
+				local.radius = vector_length (level.friendlynode[local.i].origin - (exec coop_mod/main.scr::friendlyPlayerOrigin)) //chrissstrahl - made coop mod compatible
+
+				if (local.radius < local.radi)
+				{
+					local.radi = local.radius
+					level.playernoderadius = local.radius
+					local.newnum = local.i
+				}
+			}
+		}
+
+		if (getcvar(playerset) == "1")
+			println ("node 2 " + local.newnum)
+	
+		if ((local.newnum != -1) && (level.friendlynode[local.newnum].set != -1))
+		{
+			if (local.playerheld != -1)
+			if (level.friendlyused[local.newnum] == 0)
+			{
+				level.friendlyused[local.newnum] = 1
+				local.playerheld = local.newnum
+			}
+
+			level.playernodenum = local.newnum
+			level.playernodeset = level.friendlynode[local.newnum].set
+			level.playernoderadius = vector_length (level.friendlynode[level.playernodenum].origin - (exec coop_mod/main.scr::friendlyPlayerOrigin)) //chrissstrahl - made coop mod compatible
+		}
+
+		if (getcvar(playerset) == "1")
+			println ("node 3 " + local.newnum)
+
+		if (getcvar(cnode) == "1")
+			println ("Player's distance to his current node is " + level.playernoderadius + " and that node set is " + level.friendlynode[local.newnum].set)
+
+//		if (local.num != level.playernodeset)
+//		{
+//			println level.playernodeset
+			local.num = level.playernodeset
+//		}
+		waitframe
+	}
+
+
+	for (local.i=1;local.i<level.friendlynodes+1;local.i++)
+	{
+		if (level.time > level.friendlyusedtime[local.i])
+		if (level.friendlyused[local.i] == 1)
+		{
+			if (getcvar(debug) == "1")
+				print "C"
+
+			level.friendlyused[local.i] = 0
+			level.friendlyusedtime[local.i] = level.time + level.friendlyusedtimeupdate
+		}
+	}
+	
+end
+
+
+friendlyinit:
+	self.fnum = -3
+	self.waittime = 0.2
+	self.noticescale = 1
+	self.area = -1
+	self.mins = -20
+	self.maxs = 20
+	self.friendtype = 0
+	self.distance = 250
+	self.destination = $player //chrissstrahl - issue here is that this is a script origin
+	self.destinationset = 10
+	self.destinationnum = 10
+end
+
+
+friendlygen:
+	level.playernodenum = -1
+	level.playernodeset = -1
+
+	level.friendlyavoid = 1
+
+	if (level.entref == NIL)
+		level.entref = 0
+
+	//$player.maxhealth = $player.health //chrissstrahl - not sure this is even used anywhere
+	level.deadent = spawn script_origin
+	level.deadent thread friendlyinit
+
+	level.medictime = 4 // was 2.5
+
+	if (getcvar(skill) == "0")
+		level.medicmin = 65
+	else
+	if (getcvar(skill) == "1")
+		level.medicmin = 65
+	else
+	if (getcvar(skill) == "2")
+		level.medicmin = 65
+
+
+
+	if (level.frienddebug == NIL)
+		level.frienddebug = 0
+
+	level.friendlyusedtimeupdate = 5
+
+	if ($friendly == NULL)
+		level.friendlys = 0
+		else
+		level.friendlys = $friendly.size
+
+
+	if (level.friendlys > 0)
+	{
+		level.friendly = exec global/makearray.scr $friendly
+
+		for (local.i=1;local.i<level.friendlys+1;local.i++)
+		{
+			if (getcvar(debug) == "1")
+				println ("friendly gen " + local.i)
+	
+			if (level.friendly[local.i].fnum == NIL)
+				println ("Warning, friendly at origin " + level.friendly[local.i].origin + "has no #fnum") 1
+				else
+				println ("Spawned friendly " + level.friendly[local.i].fnum)
+
+			
+
+			
+			level.friendly[local.i].waittime = 0.2
+			level.friendly[local.i].noticescale = 1
+			level.friendly[local.i].area = -1
+			level.friendly[local.i].mins = -5
+			level.friendly[local.i].maxs = 40
+			level.friendly[local.i].friendtype = 0
+			level.friendly[local.i].distance = 250
+//			level.friendly[local.i].destination = $player
+			level.friendly[local.i].destinationset = 10
+			level.friendly[local.i].destinationnum = 10
+
+
+			if (level.friendly[local.i].fnum == 1)
+				level.friendly1 = level.friendly[local.i] 
+
+			if (level.friendly[local.i].fnum == 2)
+				level.friendly2 = level.friendly[local.i] 
+
+			if (level.friendly[local.i].fnum == 3)
+				level.friendly3 = level.friendly[local.i] 
+
+			if (level.friendly[local.i].fnum == 4)
+				level.friendly4 = level.friendly[local.i] 
+
+			if (level.friendly[local.i].fnum == 5)
+				level.friendly5 = level.friendly[local.i] 
+
+			if (level.friendly[local.i].fnum == 6)
+				level.friendly6 = level.friendly[local.i] 
+
+			if (level.friendly[local.i].fnum == 7)
+				level.friendly7 = level.friendly[local.i] 
+
+			if (level.friendly[local.i].fnum == 8)
+				level.friendly8 = level.friendly[local.i] 
+
+			if (level.friendly[local.i].fnum == 9)
+				level.friendly9 = level.friendly[local.i] 
+
+			if (level.friendly[local.i].fnum == 10)
+				level.friendly10 = level.friendly[local.i] 
+
+			if (level.friendly[local.i].fnum == 11)
+				level.friendly11 = level.friendly[local.i] 
+
+			if (level.friendly[local.i].fnum == 12)
+				level.friendly12 = level.friendly[local.i] 
+
+			level.friendly[local.i] thread friendlydeath
+			
+			if (getcvar(medic) == "1")
+				level.friendly[local.i] thread soondie
+
+		}
+	}
+
+
+	if ($friendlynode == NULL)
+		level.friendlynodes = 0
+		else
+		level.friendlynodes = $friendlynode.size
+
+	if (level.friendlynodes > 0)
+	{
+		level.friendlynode = exec global/makearray.scr $friendlynode
+
+		for (local.i=1;local.i<level.friendlynodes+1;local.i++)
+		{
+			level.friendlyused[local.i] = 0
+			level.friendlyusedtime[local.i] = level.time + level.friendlyusedtimeupdate
+
+			if (level.friendlynode[local.i].area == NIL)
+				level.friendlynode[local.i].area = -1
+
+			if (level.enemyarea[level.friendlynode[local.i].area] == NIL)
+				level.enemyarea[level.friendlynode[local.i].area] = 0
+
+
+			if (level.friendlynode[local.i].set == NIL)
+			{
+				println ("Warning, friendlynode at origin " + level.friendlynode[local.i].origin + "has no #set")
+				level.friendlynode[local.i].set = -1
+			}
+		}
+
+	// fwap
+
+		println ("Spawned " + level.friendlynodes + " friendlynodes")
+
+		for (local.i=1;local.i<level.friendlynodes+1;local.i++)
+			local.used[local.i] = 0
+
+		for (local.count=1;local.count<level.friendlynodes+1;local.count++)
+		{
+			local.num = 50000
+			local.node = -1000
+
+			for (local.i=1;local.i<level.friendlynodes+1;local.i++)
+			{
+				if ((level.friendlynode[local.i].set < local.num) && (local.used[local.i] == 0))
+				{
+//					println ("1 local.used " + local.node + " = " + local.used[local.node])
+					local.node = local.i
+					local.num = level.friendlynode[local.i].set
+				}
+			}
+
+			if (local.node == -1000)
+				println ("ERROR No node found  __ " + local.count)
+
+				level.friendlynodetemp[local.count] = level.friendlynode[local.node]
+				local.used[local.node] = 1
+//				println ("2 local.used " + local.node + " = " + local.used[local.node])
+		}
+
+		for (local.i=1;local.i<level.friendlynodes+1;local.i++)
+		{
+			level.friendlynode[local.i] = level.friendlynodetemp[local.i]
+			level.friendlynodetemp[local.i] = NIL
+			//println ("Set for friendlynode " + local.i + " is " + level.friendlynode[local.i].set) //chrissstrahl - stop spam
+		}
+
+		if (getcvar(medic) != "1")
+		thread playernode
+		thread hudd
+	}
+
+
+	if ($enemy == NULL)
+		level.enemys = 0
+		else
+		level.enemys = $enemy.size
+
+		println ("There are " + level.enemys + " enemies")
+
+	if (level.enemys > 0)
+	{
+		level.enemy = exec global/makearray.scr $enemy
+
+		for (local.i=1;local.i<level.enemys+1;local.i++)
+		{
+				println ("Spawned enemy " + local.i)
+
+			if (level.enemy[local.i].area == NIL)
+				level.enemy[local.i].area = -1
+			else
+			{
+				if (level.enemyarea[level.enemy[local.i].area] == NIL)
+					level.enemyarea[level.enemy[local.i].area] = 0
+
+					level.enemy[local.i] thread areatrigger 1
+			}
+				
+			if (level.enemy[local.i].group == NIL)
+				level.enemy[local.i].group = -1
+			else
+			{
+				if (level.enemyset[level.enemy[local.i].group] == NIL)
+					level.enemyset[level.enemy[local.i].group] = 0
+
+					level.enemy[local.i] thread settrigger
+			}
+				
+		}
+
+	}
+	//chrissstrahl - compatible to coop
+//	level waittill spawn
+	waitthread coop_mod/replace.scr::waitForPlayer
+end
+
+hudd:
+	level waittill spawn
+
+local.float = 0.5
+local.base = 0.5
+
+	local.timer = level.time - 1
+
+	while (1){
+		if (level.time > local.timer){
+			local.timer = level.time + 2
+			
+			for (local.i=1;local.i<level.friendlys+30;local.i++)
+				huddraw_alpha (local.i + 100) 0
+
+			for (local.i=1; local.i<level.friendlys+1;local.i++)
+				if ((isalive level.friendly[local.i]) && (level.friendly[local.i].entref == NIL))
+				{
+					level.entref++
+					level.friendly[local.i].entref = "friendly" + level.entref
+				}
+
+		}
+
+		if (getcvar(debug) == "1")
+		{
+
+			local.y = 210
+			local.y = 160
+
+			local.base += 0.11
+			if (local.base > 1.5)
+				local.base = local.base - 1
+
+			local.add = 0
+
+			for (local.i=1;local.i<level.friendlys+1;local.i++)
+			{
+				huddraw_alpha (local.i + 100) 0
+				if ((isalive level.friendly[local.i]) && (level.friendly[local.i].entref != NIL))
+				{
+					local.add += 0.11
+					local.float = local.base + local.add
+					
+
+					while (local.float > 1.0)
+						local.float = local.float - 0.5
+
+					local.y += 18
+					huddraw_font (local.i + 100) "verdana-12"
+
+					if (level.friendly[local.i].destination)
+					{
+						if (level.friendly[local.i].destination.entref)
+							local.destname = ("F" + level.friendly[local.i].destination.entref)
+						else
+						if (level.friendly[local.i].destination == $player)
+							local.destname = "Player"
+						else
+							local.destname = level.friendly[local.i].destination.targetname
+					}
+						else
+							local.destname = "None"
+
+					if (level.friendly[local.i].area != -1)
+						huddraw_string (local.i + 100) (level.friendly[local.i].entref + ":d" + local.destname + ":" + level.friendly[local.i].thinkstate + ":s" + level.friendly[local.i].destinationset + ":f" + level.friendly[local.i].friendtype + ":h" + level.friendly[local.i].health + ":a" + level.friendly[local.i].area + ":" + level.enemyarea[level.friendly[local.i].area])
+					else
+						huddraw_string (local.i + 100) (level.friendly[local.i].entref + ":d" + local.destname + ":" + level.friendly[local.i].thinkstate + ":s" + level.friendly[local.i].destinationset + ":f" + level.friendly[local.i].friendtype + ":h" + level.friendly[local.i].health)
+
+					huddraw_align (local.i + 100) left top
+					huddraw_rect (local.i + 100) 0 local.y 0 0
+					huddraw_alpha (local.i + 100) local.float
+				}
+			}
+
+			if ((level.currentfriendlies != NIL) && (level.maxfriendlies != NIL))
+			{
+				local.p = 98
+				local.y += 18
+
+						huddraw_font (local.p + 100) "verdana-12"
+
+						local.string = ((level.currentfriendlies) + "/" + (level.maxfriendlies))
+						huddraw_string (local.p + 100) local.string
+
+						huddraw_align (local.p + 100) left top
+						huddraw_rect (local.p + 100) 0 local.y 0 0
+						huddraw_alpha (local.p + 100) local.float
+
+			}
+
+
+			local.i++
+			local.y += 18
+
+			huddraw_font (local.i + 100) "verdana-12"
+
+			local.string = ("Playerset: " + level.playernodeset)
+			huddraw_string (local.i + 100) local.string
+
+			huddraw_align (local.i + 100) left top
+			huddraw_rect (local.i + 100) 0 local.y 0 0
+			huddraw_alpha (local.i + 100) local.float
+
+
+			local.i++
+			local.y += 18
+
+					huddraw_font (local.i + 100) "verdana-12"
+
+					local.string = " "
+					local.stringcount = 1
+
+				for (local.p=1;local.p<level.friendlynodes+1;local.p++)
+				{
+					local.stringcount++
+					if (local.stringcount > 12)
+					{
+						local.string = (local.string + "\n")
+						local.stringcount = 0
+					}
+
+				if (level.friendlyused[local.p] == 0)
+					local.string = (local.string + "0")
+					else
+					local.string = (local.string + level.friendlyused[local.p])
+				}
+
+					huddraw_string (local.i + 100) local.string
+
+					huddraw_align (local.i + 100) left top
+					huddraw_rect (local.i + 100) 0 local.y 0 0
+					huddraw_alpha (local.i + 100) local.float
+
+
+
+		}
+		wait 1 
+	}
+end
+
+
+friendlyused local.num:
+
+	if ((level.friendlyused[local.num] == 0) || (level.friendlyused[local.num] == 1))
+	{
+		level.friendlyused[local.num] = 1
+		level.friendlyusedtime[local.num] = level.time + level.friendlyusedtimeupdate
+	}
+
+end
+
+
+settrigger:
+	level waittill spawn
+	level.enemyset[self.group]++
+
+	self waittill death
+
+	level.enemyset[self.group]--
+	println ("*******set**** " + level.enemyset[self.group] + " left in " + self.group)
+
+	if (level.enemyset[self.group] < 1)
+		thread level.script::("enemythread" + self.group)
+	
+end
+
+
+
+areatrigger local.waitspawn:
+//	println ("localwaitspawn is " + local.waitspawn)
+	if (local.waitspawn != NIL)
+		level waittill spawn
+
+	if (level.friendlynodes == NIL)
+		end
+
+//	println ("health is " + self.health)
+	
+	level.enemyarea[self.area]++
+
+	if (getcvar(debug) == "1")
+		println ("Areatrigger " + self.area + " has " + level.enemyarea[self.area] + " enemies in it")
+
+	for (local.i=1;local.i<level.friendlynodes+1;local.i++)
+	{
+		if (level.friendlynode[local.i].area == self.area)
+			level.friendlyused[local.i] = 0
+	}
+
+//	println ("self is " + self.targetname + " and self area is " + self.area)
+
+	self waittill death
+//	println self.health
+
+	level.enemyarea[self.area]--
+	println ("*******area**** " + level.enemyarea[self.area] + " left in " + self.area)
+
+	if (level.enemyarea[self.area] < 1)
+	{
+		for (local.i=1;local.i<level.friendlynodes+1;local.i++)
+		{
+			if (level.friendlynode[local.i].area == self.area)
+				level.friendlyused[local.i] = -1
+		}
+	}
+
+	
+end
+
+friendlydeath:
+	level waittill spawn
+	self waittill death
+	for (local.i=1;local.i<level.friendlys+1;local.i++)
+		if (level.friendly[local.i] == self)
+			level.friendly[local.i] = level.deadent
+
+end
+
+
+/*
+
+					if (vector_length(self.origin - self.destination.origin) > self.distance + local.friendrange)
+					{
+						self runto self.destination
+						local.runtime = level.time + 2
+
+						while ((vector_length (self.origin - self.destination.origin) > self.distance - local.friendrange))
+							wait self.waittime
+
+//						if (parm.movedone != 1)
+//							println (self + " did not get to " + self.destination.set)
+					}
+
+
+					if (vector_length (self.destination.origin - self.origin) > self.distance + local.friendrange) 
+					{
+						self runto self.destination.origin
+						if (self.waittime == -1)
+							waitframe
+						else
+							wait self.waittime
+
+
+					}
+					else
+					if (vector_length (self.destination.origin - self.origin) < self.distance) 
+					{
+						local.standtime = level.time + 0.1
+						if (local.stood == 0)
+						{
+							self exec global/stand.scr
+							local.stood = 1
+						}
+
+						if (self.waittime == -1)
+							waitframe
+						else
+							wait self.waittime
+
+
+					}
+*/
+			/*
+		
+				if (level.frienddebug == 1)
+				if (level.time > local.runtime)
+				{
+					local.runtime = level.time + 2
+					print ("dist: " + self.distance + "     ")
+					if (self.destination == $player)
+					println (self + "/" + self.fnum + " is supposed to run to " + self.destination)
+					else
+					println (self + "/" + self.fnum + " is supposed to run to " + self.destination + "/" + self.destination.fnum)
+
+				}
+
+				if !(isalive self.destination)
+				{
+					if (self.area != -1)
+					{
+						self.friendtype = self.areapast
+					}
+					else
+					{
+						if ((self.destination.destination != NIL) && (isalive self.destination.destination))
+							self.destination = self.destination.destination
+						else
+							self.destination = $player
+					}
+				}
+
+				if (self.destination != $player)
+				for (local.i=1;local.i<level.friendlys+1;local.i++)
+				{
+					if (isalive level.friendly[local.i])
+					{
+						if (((self.area == -1) && (level.friendly[local.i].area != -1)) || ((level.friendly[local.i].destination == self.destination) && (self != level.friendly[local.i])))
+							self.destination = level.friendly[local.i]
+					}
+				}
+
+				if (level.time > local.standtime)
+				{
+					local.destination = self.destination
+					local.tempnum = 0
+					while ((isalive local.destination.destination) && (self.destination != $player) && (local.tempnum < 10))
+					{
+						local.tempnum++
+						if (local.destination == self)
+							self.destination = $player
+
+							local.destination = local.destination.destination
+					}
+
+					if (vector_length (self.destination.origin - self.origin) > self.distance + local.friendrange) 
+					{
+						local.runtime = level.time + 5
+						self runto self.destination.origin
+						if (self.waittime == -1)
+							waitframe
+						else
+							wait self.waittime
+					}
+					else
+					if (vector_length (self.destination.origin - self.origin) < self.distance) 
+					{
+						local.standtime = level.time + 2
+	//					self runto self
+						self exec global/stand.scr
+						if (self.waittime == -1)
+							waitframe
+						else
+							wait self.waittime
+					}
+				}
+
+					thread repulse
+
+			}
+			*/
+
+	/*
+				if (level.time > local.runtime)
+				{
+					local.entarray = -1
+					local.entarrayentree = 0
+					
+					local.setnum = -1
+					local.nodenum = -1
+
+					if ((self.destinationset < level.playernodeset + self.mins) || (self.destinationset > level.playernodeset + self.maxs))
+					{
+						
+						for (local.i=1;local.i<level.friendlynodes+1;local.i++)
+						{
+							if (self.destination.set == NIL)
+								self.destination = level.friendlynode[1]
+
+							if ((level.friendlynode[local.i].set > self.destinationset) && (local.setnum < level.friendlynode[local.i].set) && ((level.friendlynode[local.i].set > level.playernodeset + self.mins) && (level.friendlynode[local.i].set < level.playernodeset + self.maxs) && (level.friendlyused[local.i] == 0)) && (self.lastdestination != level.friendlynode[local.i]) && (self.destinationset != level.friendlynode[local.i].set))
+							{
+									local.setnum = level.friendlynode[local.i].set
+									local.nodenum = local.i
+
+								if (local.nodenum != -1)
+								{
+
+									if (level.friendlyused[self.destinationnum] == 1)
+										level.friendlyused[self.destinationnum] = 0
+
+									self.destinationnum = local.nodenum
+									thread friendlyused self.destinationnum
+									self.destination = level.friendlynode[local.nodenum]
+									self.destinationset = level.friendlynode[local.nodenum].set
+								}
+							}
+						}
+					}
+
+					if (vector_length(self.origin - self.destination.origin) > self.distance + local.friendrange)
+					{
+						self thread ailook0
+
+
+						self runto self.destination
+						local.runtime = level.time + 2
+
+						while ((vector_length (self.origin - self.destination.origin) > self.distance - local.friendrange) && (level.playernodeset > self.destinationset + self.mins) && (level.playernodeset < self.destinationset + self.maxs))
+							wait self.waittime
+
+			
+						self.lookthread delete
+					}
+					else
+					{
+						wait 1
+						thread friendlyused self.destinationnum
+					}
+
+					self.lastdestination = self.destination
+				}
+
+	*/
+/*
+
+	self runto such&such
+	self waittill move
+	if (parm.movefail != 1)
+		self waittill movedone
+		else
+*/
+
+testprint local.o:
+	local.t = level.time + 4
+	while (local.t > level.time)
+	{
+		print3d local.o 2 "000"
+		waitframe
+	}
+end
+
+lookpast local.see:
+	local.vect = (local.see.origin - self.origin)
+	local.vect = vector_normalize (local.vect)
+
+//	local.dist = vector_length (self.origin - local.dest.origin)
+	
+	local.vect[0] = 	local.vect[0] * (40)
+	local.vect[1] = 	local.vect[1] * (40)
+	local.vect[2] = 	local.vect[2] * (40)
+
+//	local.o = (self.origin - local.see.origin) + local.see.origin
+	local.vect = local.see.origin + local.vect
+	self lookat local.vect
+//	thread testprint local.vect
+
+end
+
+lookpastlow local.see local.delay:
+	if (local.delay != NIL)
+		wait local.delay
+	local.vect = ((local.see.origin + (0 0 70)) - self.origin)
+	local.vect = vector_normalize (local.vect)
+
+//	local.dist = vector_length (self.origin - local.dest.origin)
+	
+	local.vect[0] = 	local.vect[0] * (40)
+	local.vect[1] = 	local.vect[1] * (40)
+	local.vect[2] = 	local.vect[2] * (40)
+
+	local.vect = (local.see.origin + (0 0 70)) + local.vect
+	self lookat local.vect
+//	thread testprint local.vect
+end

@@ -1,0 +1,514 @@
+//
+// tankBattle.scr
+//
+// by ccaron  4/21/2003
+//
+// End of e2l1
+// A tank and some number of
+// enemy soldiers are spawned
+//
+// NEED: 4-5 script_origins to spawn guys from
+//
+// The origins are in an array labeled:
+// tankbattlespawnorigin[1..n]
+//
+// NEED:
+//  script_origin
+//  $targetname 
+//   - a spawn origin has a '$target' which is an origin
+//     where the spawned guys rally point is
+//
+//  vehiclepoint
+//  $targetname tankbattletankpathstart
+//
+// NEED: 
+//  collisionhull for tank
+//  $targetname tankbattletankcollisionhull
+//
+// Battle Sequence over when 'StartTankBattle' returns
+
+//============================================================================
+HideFinalBattleStuff: {
+//============================================================================
+	if ( level.warpToFinalBattle==1 ) {
+		end
+	}
+
+	for (local.i=1;local.i<=$finalbattleequipment.size;local.i++) {
+		$finalbattleequipment[local.i] hide
+		$finalbattleequipment[local.i] nottriggerable
+	}
+
+	if ($finalbattletrigger == NIL) {
+	  // iprintln "can't find final battle trigger"
+	}
+
+	$finalbattletrigger nottriggerable
+	$endglider hide
+	$endglider notsolid
+	$endglider anim emitter_off
+	
+	$phillips hide
+	$phillips gun "vickers"
+	$johnson hide
+	$gobs hide
+
+	$phillips notsolid
+	$johnson notsolid
+	$gobs notsolid
+
+	$briefingtrigger nottriggerable
+}End
+
+//============================================================================
+ShowFinalBattleStuff: {
+//============================================================================
+	for (local.i=1;local.i<=$finalbattleequipment.size;local.i++) {
+		$finalbattleequipment[local.i] show
+		$finalbattleequipment[local.i] triggerable
+	}
+
+	$finalbattletrigger triggerable
+	$briefingtrigger triggerable
+
+	$endglider model "models/vehicles/cg4aglider_chunky.tik"
+	$endglider show
+	$endglider notsolid
+	$endglider anim emitter_off
+
+	local.col = spawn script_object model  $glider_collide.brushmodel
+	local.col.origin = $endglider.origin
+	local.col.angles = $endglider.angles
+	local.col safesolid
+	local.col disconnect_paths
+
+	$phillips solid
+	$johnson solid
+	$gobs solid
+
+	$phillips show
+	$phillips.interval = 128
+	$phillips.nolimp = 1
+
+	$johnson show
+	$johnson.interval = 128
+
+	$gobs show
+	$gobs.interval = 128
+}End
+
+//============================================================================
+startMusic_e2l1_finalBattle: {
+//============================================================================
+	$player stufftext "tmstop; tmstart sound/music/mus_aircraftfacility.mp3"
+	//waitthread global/music.scr::StopSong 1.0
+	//thread global/music.scr::PlaySong "sound/music/mus_aircraftfacility.mp3"
+}end
+
+//============================================================================
+StartEndBattle: {
+//============================================================================
+	thread startMusic_e2l1_finalBattle
+	exec global/autosave.scr 4
+	waitframe
+
+	$phillips nodamage
+	$johnson  nodamage
+
+	$phillips ai_on
+	$johnson ai_on
+	$gobs ai_on
+
+	$phillips.myhome = $phillips.origin
+	$johnson.myhome = $johnson.origin
+	$gobs.myhome = $gobs.origin
+
+	level.finalbattleguysdead = 0
+	$finalbattleguys thread RunAndShoot
+
+	while (level.finalbattleguysdead == 0) {
+		level.finalbattleguysdead = 1
+
+		for (local.i=1;local.i<=$finalbattleguys.size;local.i++) {
+			if (isalive $finalbattleguys[local.i]) {
+				level.finalbattleguysdead = 0			
+			}
+		}
+		waitframe
+	}
+
+	$briefingtrigger waittill trigger
+	wait 1
+
+	$phillips say AA_Phillips_talk01 // Sgt. Baker, glad...
+	thread StartTankBattle
+
+   	$phillips waittill saydone
+	$phillips turnto $tank_spot
+	$phillips lookat $tank_spot
+	thread new_look
+
+  	$phillips say AA_Phillips_talk02 // What's that?
+  	$phillips waittill saydone
+	waitthread maps/e2l1/objectives.scr::transition "protect505"
+	
+	//$gobs lookat NULL
+	$phillips takedamage
+	$johnson  takedamage
+	thread FriendliesTakeCover
+}end
+
+//============================================================================
+new_look: {
+//============================================================================
+	wait .3
+	$gobs lookat $tank_spot
+	dprintln "trying gobs to look"
+	wait .3
+	$gobs turnto $tank_spot
+	wait .2
+	$johnson lookat $tank_spot
+	wait .3
+	$johnson turnto $tank_spot
+}end
+
+//============================================================================
+RunAndShoot: {
+//============================================================================
+	self type_attack "runandshoot"
+}end
+
+//============================================================================
+FriendliesTakeCover: {
+//============================================================================
+	$gobs thread TakeCover
+	$phillips thread TakeCover
+	$johnson thread TakeCover
+}end
+
+//============================================================================
+TakeCover: {
+//============================================================================
+	if ( !isAlive self ) {
+		end
+	}
+
+	if ( self.target ) {
+		self.movedoneradius = 64
+		self type_attack "runandshoot"
+		self waitthread global/SafeMoveTo.scr::reach self.target
+	}
+
+	wait 1
+	self aimat level.last_tank.targetname
+	self.enableEnemy = 1
+}end
+
+// When player sneaks up on an allie, he is startled
+// use local.anim as the startled anim
+//============================================================================
+StartledSoldier local.anim local.scale: {
+//============================================================================
+  // while not startled, looking away from player
+  self.lookpoint = spawn script_origin
+  
+  self.startled = 0
+  while (self.startled == 0) {
+	  local.vec = $player.origin - self.origin
+	  local.temp = local.vec[0]
+	  local.vec[0] = local.vec[1] * -1
+	  local.vec[1] = local.temp
+	  local.vec = vector_normalize local.vec
+	  local.vec = vector_scale local.vec local.scale
+  
+	  self.lookpoint.origin = self.origin + local.vec
+	  self turnto self.lookpoint
+	  self lookat self.lookpoint
+	  wait 0.1
+  }
+
+  self.lookpoint remove
+  self anim local.anim
+  self lookat NULL
+  self waittill animdone
+}end
+
+// Initialize and run the tank battle
+// the battle is over when this thread returns
+//============================================================================
+StartTankBattle: {
+//============================================================================
+	wait 2
+
+ 	waitthread initTankBattle
+  	local.ent = spawn models/vehicles/It_V_CarroP40_Base.tik targetname tankBattleTank
+  	level.last_tank = local.ent
+  	waitframe
+
+  	local.temp = $tankbattletankpathstart.target.origin
+  	local.ent.origin = local.temp
+  	local.ent.target = $p40_hull
+  	local.ent thread TankGo $tankbattletankpathstart.target.target.target 200 p40
+  	local.ent health 700
+	waitframe
+
+	local.ent.abortstun = 1
+
+  	for (local.i = 0; local.i < level.tankBattleMaxFighting; local.i ++) {
+      thread spawnTankBattleGuy
+  	}
+
+  	while (isalive $tankBattleTank) {
+    	wait 1
+  	}
+
+  	while (level.tankBattleSpawnDead < level.tankBattleMaxSpawners) {
+    	wait 1
+  	}
+
+	$aagun6 thread maps/e2l1/aaguns.scr::GunOKExplode
+	waitthread maps/e2l1/objectives.scr::transition "protect505_done"
+	
+	if ( isAlive $aagun6 ) {
+		//dprintln "Phillips is running to player!"
+		$phillips nodamage
+		$phillips.movedoneradius = 150
+		$phillips.enableEnemy = 0
+		$phillips waitthread global/SafeMoveTo.scr::reach $player
+		$phillips turnto $player
+		$phillips lookat $player
+		wait 0.5
+
+		if ( isAlive $aagun6 ) {
+			$phillips say AA_Phillips_talk03
+			$phillips waittill saydone
+			wait 2
+			$phillips waitthread global/SafeMoveTo.scr::reach $phillips_fight
+		}
+		$phillips.enableEnemy = 1
+	}
+
+	$phillips turnto NULL
+	$phillips lookat NULL
+}end
+
+//============================================================================
+initTankBattle: {
+//============================================================================
+  // max guys to spawn total
+  level.tankBattleMaxSpawners = 13 //was 20
+
+  // max enemies fighting at any given time
+  level.tankBattleMaxFighting = 6    
+
+  // track number of spawned soldiers
+  level.tankBattleSpawnCount = 0
+  level.tankBattleSpawnDead = 0
+
+  // println "found " $tankbattlespawnorigin.size " tank battle spawn points"
+}end
+
+//============================================================================
+TankGo local.path local.speed local.type: {
+//============================================================================
+	self immune aagun
+	self thread global/vehicles_thinkers.scr::enemy_tank_think 1 local.type
+	self thread drive_path local.path local.speed
+	self waittill death
+}end
+
+//============================================================================
+drive_path local.path local.speed: {
+//============================================================================
+	self.driving = 1
+	self.playerstop = 0
+
+	level.playertanktarget = NULL
+
+	self drive local.path local.speed 30 64 64
+	self thread tankTargeting
+	self waittill drive
+
+	if (self) {
+		self stop
+		self.driving = 0
+		//self thread global/vehicles_thinkers.scr::enemy_tank_think 0 empty_tiger
+	}
+}end
+
+//============================================================================
+waitToDie: {
+//============================================================================
+  	level.tankBattleSpawnCount ++
+  	self waittill death
+  	level.tankBattleSpawnDead ++
+  	
+  	// once dead, spawn a new guy
+  	//println "a guy died"
+
+  	if (level.tankBattleSpawnCount < level.tankBattleMaxSpawners) {
+    	thread spawnTankBattleGuy
+  	}
+}end
+
+// choose a random origin to spawn from
+//============================================================================
+chooseRandomSpawnPoint: {
+//============================================================================
+  	local.rand = 1 + randomint ($tankbattlespawnorigin.size)
+}end $tankbattlespawnorigin[local.rand]
+
+// spawned a guy, he runs to player for a sec
+//============================================================================
+spawnTankBattleGuy: {
+//============================================================================
+  	local.spawnpoint = thread chooseRandomSpawnPoint
+
+  	if (randomint(2) == 0) {
+    	local.guytype = "models/human/Sc_AX_Ital_Inf" // .tik?
+  	}
+  	else {
+    	local.guytype = "models/human/Sc_AX_Ital_Inf2" // .tik?
+  	}
+
+  	local.ent = spawn local.guytype "targetname" "tankBattleSpawner" 
+  	//"type_attack" "cover"
+  	local.ent.origin = local.spawnpoint.origin
+  	local.ent thread paradeRun local.spawnpoint.target
+  	local.ent thread HavingPathProblems local.spawnpoint
+  	local.ent thread waitToDie
+}end
+
+// make spawned guys run to rally point
+//============================================================================
+paradeRun local.rallyPoint: {
+//============================================================================
+	if ((local.rallyPoint == NIL) || (local.rallyPoint == NULL)) {
+		// dprintln "no rally point - quitting thread"
+		self.enableEnemy = 1
+		end
+	}
+
+	self forceactivate
+	self.enableEnemy = 0
+	self type_attack "runandshoot"
+	self runto local.rallyPoint
+	
+    local.noise = 100 + randomint 300
+	while (vector_length (self.origin - local.rallyPoint.origin) > local.noise) {
+	  	wait (0.5)	
+	}
+		
+	self.enableEnemy = 1
+	self favoriteenemy $player
+	self aimat $player
+}end
+
+// If I am close to my spawn point for 10 seconds, die
+//============================================================================
+HavingPathProblems local.spawnpoint: {
+//============================================================================
+	self.timealive = level.time
+	while (self && isalive self) {
+		if ((level.time - self.timealive > 5) && (vector_length(self.origin-local.spawnpoint.origin) < 100)) {
+			//println "killing stuck guy"
+			self exec global/bullethit.scr (0 -1 90) 1000 50 1
+		}
+		waitframe
+	}
+}End
+
+//============================================================================
+tank_attack_loop local.gun: {    //self is the tank
+//============================================================================
+	if ( self.paused==NIL ) {
+		self.paused = 0
+	}
+
+	local.waited = 0
+	level.tank_target = $gobs
+	local.sight_fault = 0
+
+	while (IsAlive self) {
+		local.gun setaimtarget level.tank_target
+		//dprintln "attack loop:" level.tank_target
+		// get our gun on target 1st...
+		local.gun waittill ontarget
+
+		if ( self.paused==0 ) {
+			local.gun waittill ontarget
+			wait 0.25	// center on target for just a little..
+			local.trace_offset = local.gun.origin + (0 0 48)
+
+			if (self.stunned == 1) {
+				//dprintln "z:             " self " is not firing because stunned"
+				wait 1
+				local.waited = 1
+			}
+			else if !(vector_within level.tank_target.centroid local.trace_offset level.sightdistance) {		
+				//dprintln "z:             " self " is not firing because range"
+				wait 1
+				local.waited = 1
+			}
+			else if (!(sighttrace level.tank_target.centroid local.trace_offset 1)) {
+				//dprintln "z:             " self " is not firing at " level.tank_target " because of sight trace"
+				wait 1
+				local.waited = 1
+				local.sight_fault ++
+			}
+			else {
+				local.sight_fault = 0
+				//dprintln "z:         " self " on target, firing!"
+				// wait 3
+
+				if ( local.waited==0 ) {
+					wait 2
+					local.waited = 1
+				}
+
+				if (self.stunned != 1) {
+					local.gun anim fire
+				}
+				wait 5
+			}
+		}
+		else {
+			wait 1
+		}
+
+		if ( !isAlive level.tank_target ) {
+			waitthread nexttanktarget
+		}
+	}
+}end
+
+//============================================================================
+nexttanktarget: {
+//============================================================================
+	if ( isAlive $gobs ) {
+		level.tank_target = $gobs
+		end
+	}
+
+	if ( isAlive $johnson ) {
+		wait 3
+		level.tank_target = $johnson
+		end
+	}
+
+	if ( isAlive $phillips ) {
+		wait 3
+		level.tank_target = $phillips
+		end
+	}
+
+	level.tank_target = $player
+}end
+
+//============================================================================
+tankTargeting: {
+//============================================================================
+	wait 6
+	self thread tank_attack_loop self.gun
+}end
+

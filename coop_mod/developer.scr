@@ -1,0 +1,208 @@
+//chrissstrahl - since the game refuses to let me use cheats in multiplayer
+//I am fucking gonna use this shitt, ya, screw you bitch! I WIN!!!1111
+//
+//Contains developer related commands that are needed for proper map testing
+//
+
+
+
+//this was specifically desiged to test ohama beach without coop mod
+//=========================================================================
+spawnUpdater:{
+//=========================================================================
+//chrissstrahl - temp fixme
+while($player == NULL || $player.size < 1){
+	waitframe
+}
+	//mäke süre the pläyer will respäwn where he died düring this test phäse, sö the script döes nöt bräke
+	local.lastpos = (0 0 0)
+	while($player.size < 2){
+		if($player.dmteam != "spectator"){
+			if($player.health == 100 && $player.flags["chrissstrahlMove"] != NIL && local.lastpos != (0.000000 0.000000 0.000000)){
+				$player origin local.lastpos
+				$player.flags["chrissstrahlMove"] = NIL
+				//iprintlnbold_noloc("DEV: You have been moved to your last safe pos("+local.lastpos+").")
+			}else if($player.health < 100){
+				if($player.health <= 0){
+					$player.flags["chrissstrahlMove"] = 1
+					waitframe
+					//iprintlnbold_noloc("DEV: dead.")
+				}else{
+					//iprintlnbold_noloc("DEV: lastpos.")
+					local.lastpos = $player.origin				
+				}
+			}
+		}
+		wait 0.25
+	}
+	iprintlnbold_noloc("DEV: spawnupdater ENDED more than 1 player!!!")
+}end
+
+
+//MOM related
+//=========================================================================
+noclip:{
+//=========================================================================
+	if( self == NULL || self.health <= 0 ){
+		end
+	}
+	
+	self noclip
+	iprintlnbold_noloc ( "developer noclip on (look up to end noclip)" )
+	
+	local.lookinguptime = 0;
+	while( self != NULL ){
+		waitframe
+		//if player is looking up
+		if( self.viewangles[0] < -70 ){
+			local.lookinguptime++
+		}else{
+			local.lookinguptime = 0
+		}
+		//if dead
+		if( self.health <= 0 ){
+			local.lookinguptime = 9999
+		}
+		
+		if( local.lookinguptime > 40 ){
+			self notsolid
+			self noclip
+			thread coop_mod/main.scr::playerMakeSolidAsap self
+			iprintlnbold_noloc ( "developer noclip off" )
+			break
+		}
+	}
+}end
+
+//MOM related
+//=========================================================================
+heal:{
+//=========================================================================
+	if( self == NULL || self.health <= 0 ){
+		end
+	}
+	
+	iprintlnbold_noloc ( "developer heal" )
+	
+	self heal 1
+}end
+
+//MOM related
+//=========================================================================
+spawnpoints:{
+//=========================================================================
+	if( self == NULL || self.health <= 0 ){
+		end
+	}
+	
+	iprintlnbold_noloc ( "developer spawnpoints" )
+	iprintlnbold_noloc ( "!!! MOVE AWAY TO CONTINUE !!!" )
+	self nodamage
+	
+	for(local.i=1;local.i<=8;local.i++){
+		if(self == NULL ){	end	}
+		if(self.health <= 0 ){
+			self takedamage
+			end
+		}
+
+		local.vec = level.flags["coop_spawn"+local.i+"origin"]
+		
+		if(local.vec == NIL){
+			iprintlnbold_noloc ( "coop_spawn"+local.i+"origin was NIL!" )
+			continue
+		}
+		
+		self forcelegsstate STAND
+		self tele local.vec
+		self thread coop_mod/main.scr::playerFace level.flags["coop_spawn"+local.i+"angles"]	
+		
+		while( self != NULL && self.health > 0 && vector_length( local.vec - self.origin) < 100 && local.i<8 ){
+			waitframe
+		}
+		if(local.i<8){
+			iprintlnbold_noloc ( "Developer check" )
+			wait 1
+		}
+	}
+	iprintlnbold_noloc ( "Developer Test complete" )
+	self takedamage
+}end
+
+
+//MOM related
+//=========================================================================
+makeweak:{
+//=========================================================================
+	iprintlnbold_noloc ( "developer make enemies weak" )
+	iprintlnbold_noloc ( "incomplete" )
+}end
+
+
+//MOM related
+//=========================================================================
+showtouch:{
+//=========================================================================
+	//end touch
+	if(self.flags["coop_momShowTouch"] != NIL){
+		self.flags["coop_momShowTouch"] = NIL
+		iprintlnbold_noloc ( "Show TOUCH OFF" )
+		end
+	}
+
+	iprintlnbold_noloc ( "Show TOUCH ON" )
+	self.flags["coop_momShowTouch"] = 1
+	
+//prints out a message what the player is touching
+//this is used for debugging objects that are hard to find otherwise
+	while(self != NULL){
+		local.maxentities = int(getcvar("maxentities"))	
+		//check every entity
+		for (local.i = 0; local.i < local.maxentities; local.i++) {
+			local.ent = getentbyentnum local.i
+			//exists and has a model (is a tiki)
+			if ( local.ent != NULL && local.ent.model != NIL && self istouching local.ent){
+				if(local.ent.model.size > 6 ){
+					//filter weapons and player (current weapon and playermodel)
+					if(waitexec coop_mod/main.scr::containsText local.ent.model "weapons/" ||
+						waitexec coop_mod/main.scr::containsText local.ent.model "player/"){
+						//exec coop_mod/main.scr::printInfo $player[1] "touching a weapon" 1 NIL
+					}else{// if(waitexec coop_mod/main.scr::containsText local.ent.model "/"){
+						exec coop_mod/main.scr::printInfo self ("touching: $"+local.ent.targetname+":"+local.ent.model) 1 NIL
+					}
+				}
+			}
+		}
+		waitframe		
+	}
+}end
+
+
+//MOM related
+//=========================================================================
+notarget:{
+//=========================================================================
+	self notarget
+	self iprint "toggled notarget" 1
+}end
+
+
+//MOM related
+//=========================================================================
+threatbias:{
+//=========================================================================
+	if(self.flags["mom_coopThreatbias"] == NIL){
+		self.flags["mom_coopThreatbias"] = 1
+		self threatbias ignoreme
+		self iprint "threatbias ignoreme" 1
+	}else{
+		self.flags["mom_coopThreatbias"]= NIL
+		self threatbias 1
+		self iprint "threatbias 1" 1
+	}
+}end
+
+
+
+
+

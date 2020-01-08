@@ -1,0 +1,115 @@
+//
+// CollisionHull.scr
+//
+// ccaron 5.29.03
+//
+// usage : exec /global/CollisionHull.scr
+//
+// Search through every entity on the board
+// If they target : $((panzer_tank|sherman_tank|dastruck)_hull)
+//    then their collisionent is set to that hull
+//
+// This script will work for any maps where the collision
+// hulls and their targetnames are consistent with those in
+// Map_Source -> collision_hulls.map and entities target
+// those hulls either with 'target' || '$collision_hull'
+//=========================================================================
+main:
+//=========================================================================
+{
+	// The number of entities to search for
+	println "COLLISIONHULL >>> Looking for collision hulls ..."
+
+	if (!$panzer_tank_hull){
+		println "COLLISIONHULL >>> Can't find $panzer_tank_hull"
+		end
+	}
+
+	if (!$sherman_tank_hull){
+		println "COLLISIONHULL >>> Can't find $sherman_tank_hull"
+		end
+	}
+
+	if (!$dastruck_hull){
+		println "COLLISIONHULL >>> Can't find $dastruck_hull"
+		end
+	}
+
+	// Look for trucks, tanks ect to setup collision
+	for (local.scene = 1; local.scene <= 6; local.scene++){
+		for (local.tank = 1; local.tank <= 10; local.tank++){
+			local.ent = $("scene" + local.scene + "AlliedTank" + local.tank)
+
+			if (local.ent){
+				local.ent waitthread AttachHull $sherman_tank_hull
+			}
+
+			local.ent = $("scene" + local.scene + "AxisTank" + local.tank)
+
+			if (local.ent){
+				local.ent waitthread AttachHull $panzer_tank_hull
+			}
+			
+			local.ent = $("scene" + local.scene + "Truck" + local.tank)
+
+			if (local.ent){
+				local.ent waitthread AttachHull $dastruck_hull
+			}
+
+			//local.ent = $("scene" + local.scene + "DeadTruck" + local.tank)
+			//if (local.ent)
+			//	local.ent waitthread AttachHull $dastruck_hull
+		}
+	}
+
+	//$scene1BlockerTank waitthread AttachHull $sherman_tank_hull
+	//$introTank_1 waitthread AttachHull $introTank_1.collision
+}end
+
+//=========================================================================
+AttachHull local.hull:
+//=========================================================================
+{
+	if (!self){
+		println "COLLISIONHULL >>> self is NULL"
+		end
+	}
+
+	if (!local.hull){
+		//println "COLLISIONHULL >>> local.hull is NULL"
+		//end
+
+		if (self.target){
+			if (self.target == $panzer_tank_hull ||
+				self.target == $sherman_tank_hull ||
+				self.target == $dastruck_hull){
+				local.hull = self.target
+			}
+		}
+
+		if (self.collision){
+			if (self.collision == $panzer_tank_hull ||
+				self.collision == $sherman_tank_hull ||
+				self.collision == $dastruck_hull){
+				local.hull = self.collision
+			}
+		}
+
+		if (self.collision_hull){
+			if (self.collision_hull == $panzer_tank_hull ||
+				self.collision_hull == $sherman_tank_hull ||
+				self.collision_hull == $dastruck_hull){
+				local.hull = self.collision_hull
+			}
+		}
+
+		if (!local.hull){
+			end
+		}
+	}
+
+	println "COLLISIONHULL >>> Attaching " local.hull " to " self
+	self setcollisionentity local.hull
+	self.collisionent = local.hull
+}end
+

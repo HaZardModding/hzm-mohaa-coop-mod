@@ -1,0 +1,1022 @@
+// Parades:
+//
+// No scripting needs to be done to implement parades.  THe work can be done entirely in the map.
+
+// The required elements:
+
+// ***********************************************
+// A.
+// A script origin with the following properties:
+// $targetname: (anything you want)
+// $target: (the name of the AI nodes where you want AI to spawn (D))
+// #activeguys: (the number of guys that can be active at once)
+
+// either
+// #time: (how long the parade lasts)
+// or
+// #totalguys: (how many guys to spawn before ending the parade)
+// or both (the first condition to be satisfied will end the parade)
+
+// Many optional parameters are available, see thread SpawnRandomGuyType
+
+// ***********************************************
+// B.
+// A trigger with the following properties:
+// $targetname: paradetrigger (it must be called this for it to work)
+// $target: (the name of your parade script origin (A))
+
+// This trigger will start the parade
+
+// ***********************************************
+// Optional:
+// C.
+// One or more triggers with the following properties:
+// $targetname: paradeaborttrigger
+// $target: (the name of the parade script origin whose parade you wish to abort)
+
+// This trigger will stop the parade from spawning new guys
+
+// ***********************************************
+// D. Paradepausetrigger -- triggers will pause the parade 
+//	$targetname: paradepausetrigger
+//  $target: (the name of the parade script origin whose parade you wish to pause)
+
+// This trigger will pause the parade from spawning new guys
+
+// ***********************************************
+
+// D. Paradeunpausetrigger -- triggers will pause the parade 
+//	$targetname: paradeunpausetrigger
+//  $target: (the name of the parade script origin whose parade you wish to pause)
+
+// This trigger will unpause the parade so it starts spawning new guys
+
+// ***********************************************
+
+// E. paradedeletetrigger -- triggers will delete the guys and the script origin 
+//	$targetname: paradedeletetrigger
+//  $target: (the name of the parade script origin whose parade you wish to pause)
+
+// This trigger will delete the parade, stop it from making more guys
+// It only delete the guys when you are not looking
+// there is also a distance parameter on it which will let you set how far away they are from the player before they start getting deleted
+
+// ***********************************************
+// F.
+// A number of AI nodes that will act as the spawn points for the parade.  They should all have the same 
+// targetname and your script origin should target these.  They should each have another AI node which they 
+// target (E).
+// These origins can also specify the gun that guys spawned from this point will have.  This will override any other gun specifications:
+// IF you use info_aispawnpoint instead, you can use the properties from the AI window, (and the model button) and anyone spawned from that point will take on those properties.
+// Other optional stuff:
+// #delay -- delay before this spawn point is active again
+// #totalguys -- total number of guys allowed to spawn from this point
+// #stopdist -- the distance from the rally point that you want the guys to stop
+
+// ***********************************************
+// Optional:
+// G.
+// A number of AI nodes that will act as rally points for the spawn points.  Each spawn point should target one of these rally points.
+// Both of these are options not necessary
+// self.ai_enabled == 1  -- Results in the guys having their ai_enabled while they run, which means they sometimes will not reach their destination
+// self.guyhealth        -- Results in the guys that spawn from this parade manager having the health specificed by this value
+
+//  
+main:
+	
+	println "Initializing parade script"
+	if ($paradetrigger)
+	{
+		for (local.i=1;local.i<=$paradetrigger.size;local.i++)
+		{
+			if($paradetrigger[local.i] == NULL){continue}//chrissstrahl
+			
+			if ($paradetrigger[local.i].target == NIL)
+			{
+				println "paradetrigger has no target"
+				continue
+			}
+			
+			if($paradetrigger[local.i].target == NULL){continue}//chrissstrahl
+			
+			//if ($paradetrigger[local.i].target.target == NIL) //chrissstrahl - this can't be right
+			if ($paradetrigger[local.i].target.target == NIL) //chrissstrahl - it probably is right
+			{
+				println "parade script origin has no target"
+				continue
+			}
+			if ($paradetrigger[local.i].target.activeguys == NIL)
+			{
+				println "parade script origin has no activeguys field"
+				continue
+			}
+			$paradetrigger[local.i] setthread StartParade
+			$paradetrigger[local.i].target.started = 0
+			$paradetrigger[local.i].target.pause = 0
+			if ($($paradetrigger[local.i].target).classname != "AISpawnPoint")
+				$($paradetrigger[local.i].target) rendereffects "+dontdraw"
+
+//			println ("Initializing parade " + local.i)
+			
+		}
+	}
+
+	if ($paradeaborttrigger)
+	for (local.i=1;local.i<=$paradeaborttrigger.size;local.i++)
+	{
+	
+		if ($paradeaborttrigger[local.i].target == NIL)
+		{
+//			println "paradeaborttrigger has no target"
+			continue
+		}
+		
+		$paradeaborttrigger[local.i] setthread AbortParadeTrigger
+		println ("Initializing parade abort " + local.i)
+		
+	}
+	
+	if($paradedeletetrigger){
+		for (local.i=1;local.i<=$paradedeletetrigger.size;local.i++){
+			if ($paradedeletetrigger[local.i].target == NIL){
+				continue
+			}
+			if($paradedeletetrigger[local.i] != NULL){
+				$paradedeletetrigger[local.i] setthread DeleteParadeTrigger
+			}
+		}
+	}
+
+	if($paradepausetrigger)
+	for (local.i=1;local.i<=$paradepausetrigger.size;local.i++)
+	{
+		if ($paradepausetrigger[local.i].target == NIL)
+		{
+//			println "paradepausetrigger has no target"
+			continue
+		}
+		
+		$paradepausetrigger[local.i] setthread PauseParadeTrigger
+//		println ("Initializing parade pause " + local.i)
+	}
+
+	if($paradeunpausetrigger)
+	for (local.i=1;local.i<=$paradeunpausetrigger.size;local.i++)
+	{
+		if ($paradeunpausetrigger[local.i].target == NIL)
+		{
+//			println "paradeunpausetrigger has no target"
+			continue
+		}
+		
+		$paradeunpausetrigger[local.i] setthread UnpauseParadeTrigger
+//		println ("Initializing parade unpause " + local.i)
+	}
+
+end
+
+// ---------------------------------------------------
+// Initialize and run the parade
+// ---------------------------------------------------
+StartParade:
+
+	println "Starting parade"
+
+	self delete
+
+	self.target thread RunParade
+
+end
+
+// ---------------------------------------------------
+// Ends the parade
+// ---------------------------------------------------
+AbortParadeTrigger:
+
+	self.target waitthread AbortParade
+
+end
+
+// ---------------------------------------------------
+// Ends the parade
+// ---------------------------------------------------
+AbortParade:
+
+	if (self.started == 1)
+		self.done = 1
+
+end
+
+// ---------------------------------------------------
+// Ends the parade
+// ---------------------------------------------------
+DeleteParadeTrigger:
+
+	self.target waitthread DeleteParade self.distance
+
+end
+
+// ---------------------------------------------------
+// Ends the parade
+// ---------------------------------------------------
+DeleteParade local.distance:
+
+		self.done = 1
+	self.spawndead = self.spawncount
+	//iprintln "DeleteParade Called"
+	local.guysname = self.targetname + "_paradeguy"
+	/*
+	for(local.i = 1; local.i <= $($(self.target).target).size; local.i++)
+		thread deleteAI_far_frm_player $($(self.target).target)[local.i] self.distance
+	*/
+	
+	if(!(local.distance))
+		local.distance = 1000
+
+	if($(local.guysname)[1])
+		thread deleteAI_far_frm_player $(local.guysname)[1].targetname local.distance
+
+	if($(self.enemyname)[1])
+		thread deleteAI_far_frm_player $(self.enemyname)[1].targetname local.distance
+
+	for(local.i = 1; local.i <= $(self.target).size; local.i++)
+		thread deleteAI_far_frm_player $(self.target)[local.i].enemyname local.distance
+
+		
+	/*
+		local.ent.targetname = $(local.spawnpoint).enemyname
+		local.ent.targetname = self.enemyname
+		local.ent.targetname = self.targetname + "_paradeguy"
+	*/	
+end
+
+// ---------------------------------------------------
+// Pauses the parade
+// ---------------------------------------------------
+PauseParade:
+
+	self.target.pause = 1
+
+end
+
+PauseParadeTrigger:
+
+	self.target waitthread PauseParade
+
+end
+
+// ---------------------------------------------------
+// Unpauses the parade
+// ---------------------------------------------------
+UnpauseParade:
+
+	self.target.pause = 0
+
+end
+
+UnpauseParadeTrigger:
+
+	self.target waitthread UnpauseParade
+
+end
+
+//------------------------------------------------------------------
+//	Can call this to delete a group of AI by name.
+//  Also checks to see if distance for player
+//  example of it being called:
+//    	thread deleteAI_far_frm_player $start_allies 1048
+//  
+//------------------------------------------------------------------
+deleteAI_far_frm_player local.name local.dist:
+	//chrissstrahl - handle coop
+	if(level.gametype){
+		waitthread coop_deleteAI_far_frm_player local.name local.dist
+		end
+	}
+
+
+	local.count = 0
+	 // println ("Are you in DeleteAI and we are deleting " + local.name)
+	 // print   (" " + local.name.size + " guys")
+
+	while (local.count < $(local.name).size)
+	{
+		local.angles = $player.angles
+		if ($player.turret)
+		{
+			local.angles = local.angles + $player.turret.angles
+		}
+		else if ($player.vehicle)
+		{
+			local.angles = local.angles + $player.vehicle.angles
+		}
+
+		for (local.i=1;local.i<=$(local.name).size;local.i++){
+			local.distance = vector_length($player.origin-$(local.name)[local.i].origin)
+			//iprintlnbold("Player distance from guy = " + local.distance )
+
+			if(local.distance > local.dist){
+				local.vObjDir	= vector_subtract $(local.name)[local.i].origin $player.origin
+				local.vObjDir	= vector_normalize local.vObjDir
+				local.vForward  = angles_toforward ( local.angles )
+				//println("foward direction" + local.vForward)
+				//println("direction: " + local.vObjDir)
+				local.dot		= vector_dot local.vForward local.vObjDir
+			
+				if(local.dot < 0.707){
+//					iprintlnbold( " Deleting guy ")
+					$(local.name)[local.i] delete
+					local.count++
+				}
+			/*	
+				if (!($player cansee $(local.name)[local.i] 30))
+				{
+					$(local.name)[local.i] delete
+					local.count++
+				}
+				*/
+			}
+		}
+
+		wait 1.0
+	}
+End
+
+//chrissstrahl - coop version of the function
+//=========================================================================
+coop_deleteAI_far_frm_player local.name local.dist:{
+//=========================================================================
+	local.count = 0
+	while (local.count < $(local.name).size){
+		
+		/*
+		local.angles = $player.angles
+		if ($player.turret){
+			local.angles = local.angles + $player.turret.angles
+		}
+		else if ($player.vehicle){
+			local.angles = local.angles + $player.vehicle.angles
+		}
+		*/
+
+		for (local.i=1;local.i<=$(local.name).size;local.i++){
+			local.delete = 1
+			
+			local.player = NULL
+			for (local.i = 1;local.i <= $player.size;local.i++){
+				local.player = $player[local.i]
+				if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 ){
+					
+					//chrissstrahl - grab angle
+					local.angles = local.player.angles
+					if (local.player.turret){
+						local.angles = local.angles + local.player.turret.angles
+					}
+					else if (local.player.vehicle){
+						local.angles = local.angles + local.player.vehicle.angles
+					}
+					//do everything else
+					local.distance = vector_length(local.player.origin-$(local.name)[local.i].origin)
+					if(local.distance > local.dist){
+						local.vObjDir	= vector_subtract $(local.name)[local.i].origin local.player.origin
+						local.vObjDir	= vector_normalize local.vObjDir
+						local.vForward  = angles_toforward ( local.angles )
+						local.dot		= vector_dot local.vForward local.vObjDir
+					
+						if(local.dot > 0.707){
+							local.delete = 0
+						}
+					}
+				}
+			}
+			if(local.delete){
+//				iprintlnbold( " Deleting guy ")
+				$(local.name)[local.i] delete
+				local.count++
+			}
+		}
+	//wait a lil longer in coop
+	wait 2.0
+	}
+}end
+
+/*
+// Wont' work until we can set script variables on info_aispawnpoint
+TurnOffSpawnPoint local.set:
+
+	for (local.i=1;local.i<=$(self.target).size;local.i++)
+	{
+		$($(self.target)[local.i]).off = 1
+	}
+
+end
+
+TurnOnSpawnPoint local.set:
+
+	for (local.i=1;local.i<=$(self.target).size;local.i++)
+	{
+		$($(self.target)[local.i]).off = 0
+	}
+
+end
+*/
+
+// ---------------------------------------------------
+// the battle is over when this thread returns
+// ---------------------------------------------------
+RunParade:
+
+	// track number of spawned soldiers
+	self.spawncount = 0
+	self.spawndead = 0
+
+	// if we have a duration, start the timer
+	if (self.time)
+	{
+		self.starttime = level.time
+	}
+
+	if (self.delay == NIL)
+		self.delay = 1
+
+	// let the guy spawning begin!
+	self.done = 0
+	self.started = 1
+	self.pause = 0
+	while (self.done == 0)
+	{
+
+		if (self.pause == 0 && self.spawncount - self.spawndead < self.activeguys)
+		{
+			self thread SpawnParadeGuy
+		}
+//		println "All active slots filled"
+		wait self.delay
+
+		if (self.totalguys)
+		{
+			if (self.spawncount >= self.totalguys)
+				self.done = 1
+		}
+		if (self.time)
+		{
+			if (self.starttime + self.time < level.time)
+				self.done = 1
+		}
+	}
+
+	println "All guys spawned"
+	while (self.spawndead < self.spawncount)
+		wait 1
+
+	if (self.setthread)
+	{
+		thread level.script::self.setthread
+	}
+
+//	println "All guys dead"
+
+end
+
+// ---------------------------------------------------
+// Spawn a guy, let the counter know, tell him to run to his rallypoint, then wiattill death
+// ---------------------------------------------------
+SpawnParadeGuy:
+
+//	println "looking for spawn point"
+	local.spawnpoint = self waitthread ChooseRandomSpawnPoint
+
+	if (local.spawnpoint)
+	{
+//		println "Spawning guy"
+
+		local.ent = self waitthread SpawnRandomGuyType local.spawnpoint
+		if ( !(local.ent) ) end
+
+
+		self.spawncount ++
+
+		if(self.ai_enabled == 1)
+			local.ent thread paradeRunAI_enabled local.spawnpoint // self.ai_enabledtime
+		else
+			local.ent thread paradeRun local.spawnpoint
+
+		self thread ParadeGuyDie local.ent
+
+		if (self.paradeguy.size <= 0)
+			self.paradeguy[1] = local.ent
+		else
+			self.paradeguy[self.paradeguy.size+1] = local.ent
+
+	}
+
+end
+
+// ---------------------------------------------------
+// Waittill death and let the counter know
+// ---------------------------------------------------
+ParadeGuyDie local.ent:
+
+		local.ent waittill death
+//		iprintln "Parade guy died"
+//		iprintln local.ent.targetname
+
+		// Make the parade counter aware of this new guy
+		self.spawndead ++
+End
+
+// ---------------------------------------------------
+// Pick a random guy type to spawn
+// ---------------------------------------------------
+
+ChooseRandomSpawnPoint:
+	//chrissstrahl - handle for coop
+	if(level.gametype != 0){
+		//[200] chrissstrahl - fixed returning waitthread instead of a actual entity
+		local.spawnpointSelected = waitthread coop_ChooseRandomSpawnPoint
+		end local.spawnpointSelected
+	}
+
+	local.distToParadeGuy = 1000
+	local.attempts = 0
+	local.spawnpoint = NULL
+	local.insight = 1
+	local.off = 0
+	while (local.distToParadeGuy < 50 || local.insight == 1 || local.off == 1)
+	{
+		if (local.attempts == 5)
+		{
+			End NULL
+		}
+
+		local.attempts++
+		local.spawnpointindex = 1 + randomint($(self.target).size)
+		local.spawnpoint = $(self.target)[local.spawnpointindex]
+
+		if (self.dontspawninsight == 1)
+		{
+			local.vObjDir	= vector_subtract $(self.target)[local.spawnpointindex].origin $player.origin
+			local.vObjDir	= vector_normalize local.vObjDir
+			local.vForward  = angles_toforward ( $player.angles )
+			local.dot		= vector_dot local.vForward local.vObjDir
+			
+			if ( local.dot < 0.707 )
+				local.insight = 0
+			else
+				local.insight = 1
+
+		}
+		else
+		{
+			local.insight = 0
+		}
+
+		if (local.spawnpoint.off == 1)
+			local.off = 1
+		else
+			local.off = 0
+
+		for (local.i=1;local.i<=self.paradeguy.size;local.i++)
+		{
+			if (self.paradeguy[local.i] && isalive self.paradeguy[local.i])
+			{
+				local.dist = vector_length(local.spawnpoint.origin-self.paradeguy[local.i].origin)
+				if (local.dist < local.distToParadeGuy)
+					local.distToParadeGuy = local.dist
+			}
+		}
+
+	}
+
+	if (!local.spawnpoint.numspawned) local.spawnpoint.numspawned = 0
+	local.spawnpoint.numspawned++
+
+	if (local.spawnpoint.totalguys && local.spawnpoint.numspawned == local.spawnpoint.totalguys)
+	{
+		local.spawnpoint.off = 1
+	}
+	else if (local.spawnpoint.delay  && local.spawnpoint.delay > 0)
+	{
+		// if this spawn point has a delay, make it wait till the delay is up then allow spawning again
+		local.spawnpoint thread Delay
+	}
+End local.spawnpoint
+
+//chrissstrahl - coop version
+//=========================================================================
+coop_ChooseRandomSpawnPoint:{
+//=========================================================================
+	local.distToParadeGuy = 1000
+	local.attempts = 0
+	local.spawnpoint = NULL
+	local.insight = 1
+	local.off = 0
+	while (local.distToParadeGuy < 50 || local.insight == 1 || local.off == 1){
+		if (local.attempts == 5){
+			end NULL
+		}
+
+		local.attempts++
+		local.spawnpointindex = 1 + randomint($(self.target).size)
+		local.spawnpoint = $(self.target)[local.spawnpointindex]
+
+		if (self.dontspawninsight == 1){
+			local.player = NULL
+			local.insight = 0
+			for (local.i = 1;local.i <= $player.size;local.i++){
+				local.player = $player[local.i]
+				if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 ){
+					local.vObjDir	= vector_subtract $(self.target)[local.spawnpointindex].origin local.player.origin
+					local.vObjDir	= vector_normalize local.vObjDir
+					local.vForward  = angles_toforward ( local.player.angles )
+					local.dot		= vector_dot local.vForward local.vObjDir
+					
+					if ( local.dot >= 0.707 ){
+						local.insight = 1
+					}
+				}
+			}
+		}
+		else{
+			local.insight = 0
+		}
+
+		if (local.spawnpoint.off == 1){
+			local.off = 1
+		}
+		else{
+			local.off = 0
+		}
+
+		for (local.i=1;local.i<=self.paradeguy.size;local.i++){
+			if (self.paradeguy[local.i] && isalive self.paradeguy[local.i]){
+				local.dist = vector_length(local.spawnpoint.origin-self.paradeguy[local.i].origin)
+				if (local.dist < local.distToParadeGuy){
+					local.distToParadeGuy = local.dist
+				}
+			}
+		}
+	}
+
+	//if (!local.spawnpoint.numspawned){ local.spawnpoint.numspawned = 0 } //chrissstrahl
+	if (local.spawnpoint.numspawned == NIL){ local.spawnpoint.numspawned = 0 } //chrissstrahl
+	local.spawnpoint.numspawned++
+
+	if (local.spawnpoint.totalguys && local.spawnpoint.numspawned == local.spawnpoint.totalguys){
+		local.spawnpoint.off = 1
+	}else if (local.spawnpoint.delay  && local.spawnpoint.delay > 0){
+		// if this spawn point has a delay, make it wait till the delay is up then allow spawning again
+		local.spawnpoint thread Delay
+	}
+}end local.spawnpoint
+
+// ---------------------------------------------------
+// Wait to spawn again from this location
+// ---------------------------------------------------
+Delay:
+	self.off = 1
+	wait self.delay
+	self.off = 0
+end
+
+// ---------------------------------------------------
+// Pick a random guy type to spawn
+// ---------------------------------------------------
+SpawnRandomGuyType local.spawnpoint:
+	
+	// SPAWN THE DUDE
+	if (local.spawnpoint.model != NIL && local.spawnpoint.model != "")
+		local.ent = spawn local.spawnpoint.model
+	else if (self.model != NIL && self.model != "")
+		local.ent = spawn self.model
+	else
+		local.ent = spawn "models/human/Sc_AX_Ital_Inf"
+
+
+	// ORIGIN
+	local.ent.origin = local.spawnpoint.origin
+
+
+	// HEALTH
+	if (local.spawnpoint.health != NIL && local.spawnpoint.health != 0)
+		local.ent.health = local.spawnpoint.health
+	else if (self.health != NIL && self.health > 0)
+		local.ent.health = self.health
+	else
+	{
+		if (self.friendly == 1)
+			local.ent.health = 100
+		else
+			local.ent.health = level.enemyhealth*level.enemyhealthscalar
+	}
+
+
+	// TARGETNAME
+	if (local.spawnpoint.enemyname != NIL && local.spawnpoint.enemyname != "")
+		local.ent.targetname = local.spawnpoint.enemyname
+	else if (self.enemyname != NIL && self.enemyname != "")
+		local.ent.targetname = self.enemyname
+	else
+		local.ent.targetname = self.targetname + "_paradeguy"
+
+
+	// AI PROPERTIES
+	if (local.spawnpoint.accuracy != NIL && local.spawnpoint.accuracy != 0)
+		local.ent.accuracy = local.spawnpoint.accuracy
+	else if (self.accuracy != NIL)
+		local.ent.accuracy = self.accuracy
+
+	if (local.spawnpoint.ammo_grenade != NIL && local.spawnpoint.ammo_grenade != 0)
+		local.ent.ammo_grenade = local.spawnpoint.ammo_grenade
+	else if (self.ammo_grenade != NIL)
+		local.ent.ammo_grenade = self.ammo_grenade
+
+	if (local.spawnpoint.angle != NIL)
+		local.ent.angle = local.spawnpoint.angle
+
+	if (local.spawnpoint.balconyheight != NIL && local.spawnpoint.balconyheight != 0)
+		local.ent.balconyheight = local.spawnpoint.balconyheight
+	else if (self.balconyheight != NIL)
+		local.ent.balconyheight = self.balconyheight
+
+	if (local.spawnpoint.disguise_level != NIL && local.spawnpoint.disguise_level != 0)
+		local.ent.disguise_level = local.spawnpoint.disguise_level
+	else if (self.disguise_level != NIL)
+		local.ent.disguise_level = self.disguise_level
+
+	if (local.spawnpoint.disguise_period != NIL && local.spawnpoint.disguise_period != 0)
+		local.ent.disguise_period = local.spawnpoint.disguise_period
+	else if (self.disguise_period != NIL)
+		local.ent.disguise_period = self.disguise_period
+
+	if (local.spawnpoint.disguise_range != NIL && local.spawnpoint.disguise_range != 0)
+		local.ent.disguise_range = local.spawnpoint.disguise_range
+	else if (self.disguise_range != NIL)
+		local.ent.disguise_range = self.disguise_range
+
+	if (local.spawnpoint.enemysharerange != NIL && local.spawnpoint.enemysharerange != 0)
+		local.ent.enemysharerange = local.spawnpoint.enemysharerange
+	else if (self.enemysharerange != NIL)
+		local.ent.enemysharerange = self.enemysharerange
+
+	if (local.spawnpoint.fixedleash != NIL && local.spawnpoint.fixedleash != 0)
+		local.ent.fixedleash = local.spawnpoint.fixedleash
+	else if (self.fixedleash != NIL)
+		local.ent.fixedleash = self.fixedleash
+
+	if (local.spawnpoint.gren_awareness != NIL && local.spawnpoint.gren_awareness != 0)
+		local.ent.gren_awareness = local.spawnpoint.gren_awareness
+	else if (self.gren_awareness != NIL)
+		local.ent.gren_awareness = self.gren_awareness
+
+	if (local.spawnpoint.gun != NIL && local.spawnpoint.gun != "")
+		local.ent.gun = local.spawnpoint.gun
+	else if (self.gun != NIL && self.gun != "")
+		local.ent.gun = self.gun
+
+	if (local.spawnpoint.noticescale != NIL && local.spawnpoint.noticescale != 0)
+		local.ent.noticescale = local.spawnpoint.noticescale
+	else if (self.noticescale != NIL)
+		local.ent.noticescale = self.noticescale
+
+	if (local.spawnpoint.sound_awareness != NIL && local.spawnpoint.sound_awareness != 0)
+		local.ent.sound_awareness = local.spawnpoint.sound_awareness
+	else if (self.sound_awareness != NIL)
+		local.ent.sound_awareness = self.sound_awareness
+
+	// Don't use AI default, use RunAndShoot as default
+	if (local.spawnpoint.type_attack != NIL && local.spawnpoint.type_attack != "")
+		local.ent.type_attack = local.spawnpoint.type_attack
+	else if (self.type_attack != NIL && self.type_attack != "")
+		local.ent.type_attack = self.type_attack
+	else
+		local.ent.type_attack = "runandshoot"
+
+	if (local.spawnpoint.type_disguise != NIL && local.spawnpoint.type_disguise != "")
+		local.ent.type_disguise = local.spawnpoint.type_disguise
+	else if (self.type_disguise != NIL && self.type_disguise != "")
+		local.ent.type_disguise = self.type_disguise
+
+	if (local.spawnpoint.type_grenade != NIL && local.spawnpoint.type_grenade != "")
+		local.ent.type_grenade = local.spawnpoint.type_grenade
+	else if (self.type_grenade != NIL && self.type_grenade != "")
+		local.ent.type_grenade = self.type_grenade
+
+	if (local.spawnpoint.type_idle != NIL && local.spawnpoint.type_idle != "")
+		local.ent.type_idle = local.spawnpoint.type_idle
+	else if (self.type_idle != NIL && self.type_idle != "")
+		local.ent.type_idle = self.type_idle
+
+	if (local.spawnpoint.waittrigger != NIL && local.spawnpoint.waittrigger != false)
+		local.ent.waittrigger = local.spawnpoint.waittrigger
+	else if (self.waittrigger != NIL)
+		local.ent.waittrigger = self.waittrigger
+
+	if (local.spawnpoint.hearing != NIL && local.spawnpoint.hearing != 0)
+		local.ent.hearing = local.spawnpoint.hearing
+	else if (self.hearing != NIL)
+		local.ent.hearing = self.hearing
+
+	if (local.spawnpoint.sight != NIL && local.spawnpoint.sight != 0)
+		local.ent.sight = local.spawnpoint.sight
+	else if (self.sight != NIL)
+		local.ent.sight = self.sight
+
+	if (local.spawnpoint.fov != NIL && local.spawnpoint.fov != 0)
+		local.ent.fov = local.spawnpoint.fov
+	else if (self.fov != NIL)
+		local.ent.fov = self.fov
+
+	if (local.spawnpoint.leash != NIL && local.spawnpoint.leash != 0)
+		local.ent.leash = local.spawnpoint.leash
+	else if (self.leash != NIL)
+		local.ent.leash = self.leash
+
+	if (local.spawnpoint.mindist != NIL && local.spawnpoint.mindist != 0)
+		local.ent.mindist = local.spawnpoint.mindist
+	else if (self.mindist != NIL)
+		local.ent.mindist = self.mindist
+
+	if (local.spawnpoint.maxdist != NIL && local.spawnpoint.maxdist != 0)
+		local.ent.maxdist = local.spawnpoint.maxdist
+	else if (self.maxdist != NIL)
+		local.ent.maxdist = self.maxdist
+
+	switch (level.skill)
+	{
+	case 0:
+		local.ent.accuracy = local.ent.accuracy * 0.5
+		break
+	case 1:
+		local.ent.accuracy = local.ent.accuracy * 0.75
+		break
+	case 2:
+		local.ent.accuracy = local.ent.accuracy * 1.0
+		break
+	}
+
+
+	
+	// MISC PROPERTIES
+	if (local.spawnpoint.interval != NIL && local.spawnpoint.interval != 0)
+		local.ent.interval = local.spawnpoint.interval
+	else if (self.interval != NIL)
+		local.ent.interval = self.interval
+	else
+		local.ent.interval = 100
+
+
+	if (self.dontdropweapons == 1 || level.dontdropweapons == 1)
+		local.ent dontdropweapons
+
+	if (self.dontdrophealth == 1)
+		local.ent thread DontDropHealth
+
+	if (local.spawnpoint.favoriteenemy != NIL && local.spawnpoint.favoriteenemy != "")
+		local.ent favoriteenemy $(local.spawnpoint.favoriteenemy)
+	else if (self.favoriteenemy != NIL)
+		local.ent favoriteenemy $(self.favoriteenemy)
+
+	local.ent.nosurpise = 1
+
+	// Added by JP on August 10, 2003 to allow the mapper to set the ainoprone and ainocrouch
+	// these parameters, if set to 1, should make it so it is impossible for the ai's who spawn
+	// from those points to crouch or lay prone.
+	  
+	if (local.spawnpoint.ainoprone != NIL && local.spawnpoint.ainoprone != "")  
+		local.ent.ainoprone = local.spawnpoint.ainoprone
+
+	if (local.spawnpoint.ainocrouch != NIL && local.spawnpoint.ainocrouch != "")
+		local.ent.ainocrouch = local.spawnpoint.ainocrouch
+
+	local.ent droptofloor
+
+End local.ent
+
+
+DontDropHealth:
+	self waittill death
+	self takeall                      // IMPORTANT PART
+End
+
+// ---------------------------------------------------
+// make spawned guys run to rally point
+// ---------------------------------------------------
+paradeRun local.spawnPoint:
+//	if ((local.spawnPoint.target == NIL) || (local.spawnPoint.target == NULL))
+//	{
+//		self.enableEnemy = 1
+//		end
+//	}
+	if ($(local.spawnPoint.target)){
+
+		local.i = 1 + randomint( $(local.spawnPoint.target).size )
+		local.rallypoint = $(local.spawnPoint.target)[local.i]
+
+		self.donerally = 0
+
+		self forceactivate
+	//	self.enableEnemy = 0
+		self runto local.rallypoint
+		
+		if (local.spawnPoint.stopdist != NIL)
+			local.stopdist = local.spawnPoint.stopdist
+		else
+			local.stopdist = 100 + randomint 300
+
+		while (self && isalive self && vector_length (self.origin - local.rallypoint.origin) > local.stopdist)
+		  wait (0.5)	
+		if !(self)
+			End
+		self.donerally = 1
+
+		self runto NULL
+	//	self.enableEnemy = 1
+	}
+end
+
+// ---------------------------------------------------
+// make spawned guys run to rally point
+// ---------------------------------------------------
+paradeRunAI_enabled local.spawnPoint local.time:
+	if ((local.spawnPoint.target == NIL) || (local.spawnPoint.target == NULL)){
+		self.enableEnemy = 1
+		end
+	}
+	// self thread TimeOn local.time
+	local.mindist =	self.mindist 
+	local.maxdist =	self.maxdist 
+	local.leash	  = self.leash 
+	local.fixedleash =	self.fixedleash 
+	local.sight	= self.sight 
+	local.noticescale =	self.noticescale
+	local.hearing =	self.hearing 
+	local.enemysharerange =	self.enemysharerange 
+	local.sound_awareness =	self.sound_awareness 
+	local.interval =	self.interval 
+	local.sight = self.sight
+	local.hearing = self.hearing
+
+	if(self.mindist != 0)
+		self.mindist = self.mindist / 5
+	if(self.maxdist != 0)
+		self.maxdist = self.maxdist / 5
+	if(self.leash != 0)
+		self.leash  = self.leash  / 5
+	if(self.fixedleash != 0)
+		self.fixedleash = self.fixedleash / 5
+	if(self.sight != 0)
+		self.sight = self.sight / 5
+	if(self.noticescale != 0)
+		self.noticescale = self.noticescale / 5 
+	if(self.hearing != 0)
+		self.hearing = self.hearing / 5
+	if(self.enemysharerange != 0)
+		self.enemysharerange = self.enemysharerange / 5
+	if(self.sound_awareness != 0)
+		self.sound_awareness = self.sound_awareness / 5
+	if(self.interval != 0)
+		self.interval = self.interval / 5
+	if(self.sight != 0)
+		self.sight = self.sight / 5
+	if(self.hearing  != 0)
+		self.hearing = self.hearing  / 5
+
+	local.i = 1 + randomint( $(local.spawnPoint.target).size )
+	local.rallypoint = $(local.spawnPoint.target)[local.i]
+
+	self.donerally = 0
+
+	self forceactivate
+
+	self runto local.rallypoint
+	
+    local.noise = 100 + randomint 300
+
+	while (self && isalive self && vector_length (self.origin - local.rallypoint.origin) > local.noise)
+	  wait (0.5)	
+
+	self.donerally = 1
+
+	self runto NULL
+	self.enableEnemy = 1
+	
+	self.mindist = local.mindist
+	self.maxdist = local.maxdist
+	self.leash  = local.leash 
+	self.fixedleash = local.fixedleash
+	self.sight = local.sight
+	self.noticescale = local.noticescale
+	self.hearing = local.hearing
+	self.enemysharerange = local.enemysharerange
+	self.sound_awareness = local.sound_awareness 
+	self.interval = local.interval
+	self.sight = local.sight
+	self.hearing = local.hearing
+end
+
+TimeOn local.time:
+	wait local.time
+	self.enable_Enemy = 1
+End
+

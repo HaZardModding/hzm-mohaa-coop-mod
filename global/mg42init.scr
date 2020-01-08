@@ -1,0 +1,194 @@
+
+//-------------------------------------------------------------
+// AttachGuyToMG42 
+//-------------------------------------------------------------
+// Should attach any guy to an arbitary mg42 gun
+// Example Call: $mymg42 thread global/mg42init.scr::AttachGuyToMG42 $Bob
+// self is the mg42
+// local.guy is the guy to attach
+
+AttachGuyToMG42 local.guy local.movedoneradius local.auto_reattach:
+
+	if (!isalive local.guy)
+		end
+
+	if (!local.movedoneradius)
+		local.movedoneradius = 150
+	if (!local.auto_reattach)
+		local.auto_reattach = 0
+
+	//local.guy pophelmet
+	local.guy runto self
+	local.guy avoidplayer 0
+
+	while(local.guy && vector_length(local.guy.origin - self.origin) > local.movedoneradius)
+		waitframe
+	
+	if (!local.guy || !(isalive local.guy))
+		end
+
+	self.target = local.guy
+	self thread mg42_start NIL local.auto_reattach
+	local.guy physics_off
+End
+
+
+mg42_start local.type local.auto_reattach:
+
+	if !(self.set)
+		self.set = -1
+	
+	if (self.target)
+	{
+		local.man = $(self.target)
+		local.man.mg = self
+		local.man thread gunner_think local.auto_reattach
+	}
+	else
+	{
+		println ("Error, MG42 at " + self.origin + " had no target gunner.")
+		end
+	}
+end
+
+gunner_think local.auto_reattach:
+	self.mg targettype "auto"
+	self type_idle "machinegunner"
+	self type_attack "machinegunner"
+	self type_disguise "machinegunner"
+	self type_grenade "machinegunner"
+	self gun "MG42"
+	self turret self.mg
+	self threatbias 300
+
+	if (local.auto_reattach == 1)
+	{
+		self thread gunner_auto_reattach_thread
+	}
+	else
+	{
+		self thread gunner_allow_natural_detach_thread
+	}
+
+	local.mg = self.mg
+	local.org = self.origin
+	if (self.target) // I have no idea what this does -- JP
+	{  
+		local.siz = $(self.target).size
+		for (local.i=local.siz;local.i>0;local.i--)
+		{
+			local.ent[local.i] = $(self.target)[local.i]
+			local.ent[local.i] = waitthread global/spawner.scr::spawner_create local.ent[local.i]
+		}
+	}
+
+//	self.targetname = "not_feeling_like_myself_anymore"
+	if (local.mg.min_time)
+		local.mg burstfiresettings local.mg.min_time local.mg.max_time local.mg.min_delay local.mg.max_delay
+
+	self waittill death
+	if (local.mg.thread)
+	{
+		thread level.script::local.mg.thread
+		println ("ran thread " + local.mg.thread)
+	}
+	else
+		println ("no thread to ran thread")
+
+	local.spawn_org = spawn script_origin
+	local.spawn_org.origin = local.org
+
+	while (local.siz)
+	{
+		for (local.i=1;local.i<local.siz+1;local.i++)
+		{
+			//chrissstrahl - using now replacment function - keept logic/statement
+			if !(local.ent[local.i] waitexec coop_mod/replace.scr::canseenoents)
+			{
+				local.newent = waitthread global/spawner.scr::spawner_activate local.ent[local.i]
+				local.newent tether local.spawn_org
+				local.newent leash 16
+
+				while ((isalive local.newent) && (vector_length (local.newent.origin - local.org) > 128))
+				{
+					local.newent runto local.org
+					wait 2
+				}
+
+				if (isalive local.newent)
+				{
+					local.newent type_idle "machinegunner"
+					local.newent type_attack "machinegunner"
+					local.newent type_disguise "machinegunner"
+					local.newent type_grenade "machinegunner"
+					local.newent gun "MG42"
+					local.newent turret local.mg
+					local.newent threatbias 5000
+
+					local.newent waittill death
+
+//					if (local.mg.thread)
+//						thread level.script::local.mg.thread
+
+					wait (7 + randomint(4))
+				}
+			}
+		}
+		wait 2
+	}
+
+end
+
+
+gunner_auto_reattach_thread:
+
+	while (self && (isalive self) && self.abortmg42 != 1)
+	{
+		if (self.type_attack != "machinegunner")
+		{
+			self.mg targettype "auto"
+			self type_idle "machinegunner"
+			self type_attack "machinegunner"
+			self type_disguise "machinegunner"
+			self type_grenade "machinegunner"
+			self gun "MG42"
+			self turret self.mg
+		}
+
+		waitframe
+	}
+
+	if (self)
+	{
+		self.abortmg42 = 0
+		
+		self turret NULL
+		self type_idle "idle"
+		self type_attack "turret"
+		self type_disguise "salute"
+		self type_grenade "grenade"
+	}
+
+end
+
+
+gunner_allow_natural_detach_thread:
+
+	while (self && (isalive self) &&
+			(self.abortmg42 != 1) &&
+			(self.type_attack == "machinegunner"))
+		waitframe
+
+	// he popped off of his own accord, so turn his physics back on
+
+	if (self && (isalive self)){
+		self physics_on
+		//chrissstrahl - make sure he works in coop
+		if(level.gametype != 0){
+			self gun "MP40"
+		}
+	}
+
+end
+
+

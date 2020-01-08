@@ -1,0 +1,79 @@
+movecrate local.cratetomove local.cratetomoveto:
+	wait 1
+	if(self.thinkstate != "idle" && self.thinkstate != "currious")
+		end
+	if(self.cratebreak == 1)
+		end	
+	self alarmthread dropthecrate
+	if(self.gun == "" || self.gun == NULL || self.gun == NIL || self.gun == "none")
+		self gun "walter p38"
+	waitframe
+	self holster
+	self type_attack "alarm"
+	self type_disguise "none"
+	local.o = local.cratetomove gettagposition "pickup"
+	self exec global/walkto.scr local.o
+	self waittill movedone
+	local.o = local.cratetomove gettagposition "box"
+	self exec global/turnto.scr local.o
+	local.distance = vector_length (self.origin - local.o)
+	println "distance to pickup crate '" local.o "' is " local.distance
+	if(local.distance > 45 )
+	{
+		println "crate guy " self.targetname " failed to get to " local.o
+		if(self.thinkstate == "curious")
+			println "cause of failure: curious"
+		self waitthread dropthecrate
+		end
+	}
+	self anim crate_pickup1
+	self waittill animdone
+	self.hasthecrate = 1
+	local.cratetomove hide
+	self anim crate_pickup2
+	self waittill animdone
+	local.o = local.cratetomoveto gettagposition "pickup"
+	self exec global/moveto.scr "anim/crate_walk.scr" local.o
+	if(self.cratebreak != 1){
+		self waittill movedone
+		local.o = local.cratetomoveto gettagposition "box"
+		local.distance = vector_length (self.origin - local.o)
+		println "distance to putdown crate '" local.o "' is " local.distance
+		if(local.distance > 45){
+     		println "crate guy " self.targetname " cannot find his way to box drop location at " local.o
+     		if(self.thinkstate == "curious")
+     			println "cause of failure: curious"
+			self waitthread dropthecrate
+     		end
+     	}
+		self exec global/turnto.scr local.o
+		self anim crate_putdown1
+		self waittill animdone
+		wait .05
+		local.cratetomoveto show
+		self.hasthecrate = 0
+		self anim crate_putdown2
+		self waittill animdone
+	}
+end
+
+dropthecrate:
+	if(self.cratebreak == 1)
+		end
+	self.cratebreak = 1
+	self exec global/disable_ai.scr
+	self turnto NULL
+	waitframe
+	if(self.hasthecrate == 1)
+	{	
+		self anim_noclip crate_drop
+		wait .2
+		self anim crate_detach
+	}
+	self exec coop_mod/replace.scr::turnto //chrissstrahl - coop compatible
+	if(self.gun == "" || self.gun == NULL || self.gun == NIL || self.gun == "none")
+		self gun "walter p38"
+	waitframe
+	self unholster
+	self exec global/enable_ai.scr
+end

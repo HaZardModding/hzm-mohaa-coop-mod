@@ -1,0 +1,3104 @@
+//==========================================================================================================//
+// LEVEL: 			M6L3A																					//
+// CAMPAIGN: 		Germany																					//			
+// TITLE:			Storming Fort Schmerzen																	//
+// GEOMETRY/DESIGN: 	Benson Russell, Adam Bellefeuil, Keith Bell											//	
+// SCRIPTING:		Steve Fukuda, Benson Russell															//		
+//==========================================================================================================//
+
+//====================================================================//
+//SPECIAL DIALOGUE REFERENCE LIST
+
+/*
+alias dfr_M6L3_613h sound/dialogue/M6L3/A/dfr_M6L3_613h.wav soundparms 1.0 0.1 1.0 0.05 160 1600 dialog
+We're almost there. Get ready.
+
+alias dfr_M6L3_614a_1 sound/dialogue/M6L3/A/dfr_M6L3_614a_1.wav soundparms 1.0 0.1 1.0 0.05 160 1600 dialog
+Alright Powell, we're going to move the train to the prison section. Go ahead and start planting the explosives.
+
+alias dfr_M6L3_615h_1 sound/dialogue/M6L3/A/dfr_M6L3_615h_1.wav soundparms 1.0 0.1 1.0 0.05 160 1600 dialog
+Stand back. I'm going to blow the door!
+
+alias den_m2l2_253p sound/dialogue/m2l2/g/den_m2l2_253p.wav soundparms 1.0 0.1 1.0 0.05 160 1600 dialog
+Attention! Attention!  Private Gustav Vogel report to the office of area seven. Repeat. Private Gustav Vogal report to the area seven office.
+
+alias den_m2l2_254p sound/dialogue/m2l2/g/den_m2l2_254p.wav soundparms 1.0 0.1 1.0 0.05 160 1600 dialog
+Attention Attention!  Sergeant Karl Dittmer report to equipment bay two. Sergeant Dittmer go to equipment bay two.
+
+alias den_m2l2_255p sound/dialogue/m2l2/g/den_m2l2_255p.wav soundparms 1.0 0.1 1.0 0.05 160 1600 dialog
+Attention Attention!  LT Gerbig requests two additional equipment loaders be brought to warehouse one immediately.
+
+alias aggressivealarm sound/dialogue/m2l2/g/den_M2L2_258p.wav soundparms 0.9 0.2 1.0 0.0 160 1600 dialog
+Attention Attention!  There is a saboteur in the complex. CUTOFF AT 3.x SECONDS
+*/
+
+//SOUND REFERENCE LIST
+
+/*
+Global Mechanic Door Sounds - All wavs in the main/sound/mechanics directory
+alias door_railcar_open sound/mechanics/DoorRailcarOpen_01.wav soundparms 0.8 0.2 0.8 0.2 160 1600 item
+
+alias alarmbell sound/mechanics/Mec_Alarm_02.wav soundparms 1.0 0.0 1.0 0.0 100 2000 item
+
+M6L3a - Schmerzen outdoor emergency siren at train platform - existing sound from the main/sound/mechanics directory
+alias alarm_siren sound/mechanics/Mec_Alarm_10.wav soundparms 0.8 0.2 0.8 0.2 160 1600 item
+
+M6L3a - Armored Train Coasting along rails - looping 'rolling on tracks' sound
+alias armoredtrain_rolling sound/vehicle/veh_train_m6l3a_move.wav soundparms 1.5 0.0 1.0 0.0 4000 5000 auto loaded
+
+M6L3a - Armored Train coming to a complete stop
+alias armoredtrain_stopping sound/vehicle/veh_train_m6l3a_stop.wav soundparms 1.0 0.0 1.0 0.0 800 4000 auto loaded
+
+alias gate_large_open sound/mechanics/GateWoodOpen_01.wav soundparms 0.8 0.2 0.8 0.2 160 1600 item
+
+alias gate_metal_locked sound/mechanics/GateWoodClose_01.wav soundparms 0.8 0.2 0.8 0.2 160 1600 item
+*/
+
+//GENERIC DIALOGUE LIST
+
+/*
+alias streamed_dfr_scripted_M3L1_102a sound/dialogue/m3l1/A/streamed_dfr_scripted_M3L1_102a.wav soundparms 1.0 0.1 1.0 0.05 160 1600 dialog
+Go! Go! Get moving, come on, go! Go!
+*/
+//============================================================================
+main:{
+//============================================================================
+	level.coopNextMap = "m6l3b"					//Pasted by Criminal for coop comp. - set next map (for mom voteing)
+	level.coopPrevMap = "m6l2b"					//Pasted by Criminal for coop comp. - set previouse map (for mom voteing)
+	level.coop_aaMap = 1						//Pasted by Criminal for coop comp. - let global scripts know this is a AA level
+	thread coop_mod/main.scr::main         		//Pasted by Criminal for coop comp. - start coop mod extensions
+	level.coop_disableSpawnWarper = TRUE		//chrissstrahl - make sure respawn warper is off or respawning in train does not work
+	
+	//chrissstrahl - prevent ai, especially those in the tower to prone or crouch
+	level.aipronechance = 0
+	level.aicrouchchance = 0
+	
+	//chrissstrahl - moved here so we can easier adjust the scheisse
+	level.scene2_spawntower1_population = 3	//change this to alter gameplay balance
+	level.scene2_spawntower2_population = 3	//change this to alter gameplay balance
+	level.scene2_spawntower3_population = 3	//change this to alter gameplay balance
+	level.scene2_spawntower4_population = 3	//change this to alter gameplay balance
+	
+	//chrissstrahl - overwrite during development, to make testing easier
+	//who ever came up with the fucktardish idea to make it this hard should be shot
+	if(level.gametype == 0){
+		level.scene2_spawntower1_population = 0	//change this to alter gameplay balance
+		level.scene2_spawntower2_population = 0	//change this to alter gameplay balance
+		level.scene2_spawntower3_population = 0	//change this to alter gameplay balance
+		level.scene2_spawntower4_population = 0	//change this to alter gameplay balance
+	}
+
+	exec global/loadout.scr maps/m6l3a.scr
+
+	exec global/door_locked.scr::lock
+
+	//*** DISCONNECT THE CRATES FOR THE SILENT ALARM GUYS AFTER THE VALVE
+	exec global/disc.scr $endcrate1 
+	exec global/disc.scr $endcrate2 
+	exec global/disc.scr $endcrate3 
+
+	//*** INITIALIZE ALARM SYSTEM
+	level.alarm_nosound = 1
+	exec global/alarmer.scr 
+
+	//*** INITIALIZE EXPLODING GEOMETRY
+	thread global/exploder.scr::main
+
+	level waitTill prespawn
+
+	level.script = maps/m6l3a.scr
+
+	//*** SET FRIENDLY SCRIPT
+	thread global/friendly.scr::friendlygen
+
+	//*** STOP ANY PREVIOUSLY PLAYING MUSIC
+	//$player stufftext "tmstop" 		//Criminal.
+	exec coop_mod/replace.scr::tmstop 	//Criminal - coop mod.
+
+	//*** INITIALIZE ANY EXPLODING CRATES
+	//thread global/crate.scr::explosive_crate
+
+	//*** INITIALIZE BACKGROUND AMBIENT SOUNDTRACK
+	soundtrack music/m6l3a.mus
+
+/*
+	Allied weapons
+	$player item weapons/colt45.tik
+	$player item weapons/m1_garand.tik
+	$player item weapons/silencedpistol.tik
+	$player item weapons/Springfield.tik
+	$player item weapons/ThompsonSMG.tik
+	$player item weapons/BAR.tik
+	$player item weapons/M2frag_grenade_sp.tik
+	$player item weapons/bazooka.tik
+	$player item weapons/shotgun.tik
+ 
+	German weapons
+	$player item weapons/P38.tik    
+	$player item weapons/KAR98.tik
+	$player item weapons/KAR98sniper.tik
+	$player item weapons/mp40.tik
+	$player item weapons/mp44.tik
+	$player item weapons/steilhandgranate.tik
+	$player item weapons/panzerschreck.tik
+
+	$player ammo pistol 40
+	$player ammo rifle 120
+	$player ammo smg 180
+	$player ammo mg 240
+	$player ammo grenade 2
+	$player ammo shotgun 16
+	$player ammo heavy 0
+
+	$player useweaponclass pistol
+	$player useweaponclass rifle
+	$player useweaponclass smg
+	$player useweaponclass mg
+	$player useweaponclass grenade
+	$player useweaponclass shotgun
+	$player useweaponclass heavy
+*/
+
+	//*** INITIALIZE AMBIENT SOUND SYSTEM
+	exec global/ambient.scr m6l3a
+
+	//*** INITIALIZE DOOR LOCKING SYSTEM
+	//exec global/door_locked.scr::lock
+
+	//*** SET SPECIAL ITEMS
+	//waitthread global/items.scr::add_item "binoculars"
+
+	//*** INITIALIZE WEATHER EFFECTS (SNOW)
+	setcvar "cg_rain_shader" "textures/snow"
+	setcvar "cg_rain_numshaders" "12"
+	setcvar "cg_rain_speed" "240"
+	setcvar "cg_rain_speed_vary" "100"
+	setcvar "cg_rain_min_dist" "3072"
+	setcvar "cg_rain_length" "2"
+	setcvar "cg_rain_width" "2"
+	setcvar "cg_rain_density" ".4"
+	setcvar "cg_rain_slant" "300"
+	//setcvar "cg_rain" "1"
+
+//*** PAUSE ALL FX ANIMATIONS
+/*
+$objective1_fireball1 anim stop
+$objective1_fireball2 anim stop
+$objective1_fireball3 anim stop
+$objective1_fireball4 anim stop
+$objective1_fireball5 anim stop
+$objective1_fireball6 anim stop
+$objective1_fireball7 anim stop
+*/
+
+	//*** BIND THE TRAIN PIECES TOGETHER
+	$ghost_train_engine notsolid
+
+	$ghost_train_engine bind $solid_train_engine
+	$train_boxcars bind $solid_train_engine
+	$train_engine_door1 bind $solid_train_engine
+	$train_engine_door2 bind $solid_train_engine
+	$train_boxcars_door bind $train_boxcars
+	$train_boxcars_door2 bind $train_boxcars
+	$train_playerclip bind $train_boxcars
+
+	$scene1_friendlyanchor1 bind $solid_train_engine
+	$scene1_friendlyanchor2 bind $solid_train_engine
+	$scene1_friendlyanchor3 bind $solid_train_engine	
+	$scene1_friendlyanchor4 bind $solid_train_engine
+
+	$scene1_captainspot bind $solid_train_engine
+
+	//*** INITIALIZE FOG DISTANCE AND COLOR
+	level.farplaneswitching = 0 		//initialize checking variable
+	level.farplane = 800				//original 1600
+	level.farplane_color = ".1 .1 .2"
+
+	$world farplane level.farplane
+	$world farplane_color level.farplane_color
+
+	//*** LOOP CHECKING VARIABLES FOR SCENE2 RANGER ASSAULT
+	level.objective1 = 0
+	level.scene2_snipers = 0
+
+	//*** SETUP FRIENDLY SCRIPT
+	exec global/friendly.scr
+
+	//*** INITIALIZE SPAWNER INFORMATION FOR SCENE2 TOWERS
+	level.scene2_spawntower1_killed = 0
+	level.scene2_spawntower2_killed = 0
+	level.scene2_spawntower3_killed = 0
+	level.scene2_spawntower4_killed = 0
+
+	//*** INITIALIZE SPAWNER INFORMATION FOR SCENE3 HANGAR
+	level.scene3_triggerspawn2_active = 0
+	level.scene3_triggerspawn3_active = 0
+
+	//*** INITIALIZE SPECIAL SCENE 3 HEAVY BLAST DOORS
+	level.wheelhintprintdone = 0
+
+	level.heavydoor1 = 0
+	level.heavydoor2 = 0
+	level.heavydoor3 = 0
+	level.heavydoor1moving = 0
+	level.heavydoor2moving = 0
+	level.heavydoor3moving = 0
+
+	//*** MAKE MOVING SWITCH OBJECTS NONSOLID TO AVOID INTERFERENCE WITH PLAYER
+	$scene3_heavydoor1_flywheel notsolid
+	$scene3_heavydoor1_flywheel_reverse notsolid
+	$scene3_heavydoor2_flywheel notsolid
+	$scene3_heavydoor2_flywheel_reverse notsolid
+	$scene3_heavydoor3_flywheel notsolid
+	$scene3_heavydoor3_flywheel_reverse notsolid
+
+	$scene4_master_jailswitch_ghost notSolid
+	$scene4_master_jailswitch notsolid
+
+	//*** DISABLE AI ON SCENE4 JAILER ENEMIES NEAR THE 3RD SLIDING DOOR
+	$scene4_jailer1 exec global/disable_ai.scr
+	$scene4_jailer2 exec global/disable_ai.scr
+	$scene4_jailer3 exec global/disable_ai.scr
+	$scene4_jailer4 exec global/disable_ai.scr
+	$scene4_jailer5 exec global/disable_ai.scr
+
+	//*** SCENE 4 CUTSCENE ENABLING/TERMINATING CONDITION
+	level.scene4_cutscene = 0
+
+	//*** HIDE THE HINGEBOMBS AND DETONATOR
+	$scene5_hingebomb1 hide
+	$scene5_hingebomb2 hide
+	$scene5_hingewire hide
+	$scene5_detonatorwire hide
+	$plunger hide
+
+	//*** INITIALIZE THE SCENE5 DETONATION AUTHORIZATION CODE
+	level.scene5_demolition_authorization_key = 0
+
+	//*** How many guys off the train you are allowed to lose before you don't get the medal for Mission 6
+	level.scene2_alliedspawn_teamdeathlimit_medal = 4
+
+	level.friendly3 remove
+	level.friendly4 remove
+
+	//***	Find out what skill the player is using for difficulty checking 
+	level.skill = getcvar (skill)
+	
+	
+	
+	//chrissstrahl - wait until the train is ready to move with coop setup complete
+	if(level.gametype != 0){
+		waitthread coop_createSpawningInTrain
+	}
+
+	//level waitTill spawn //chrissstrahl
+	waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl - coop mod replacement
+	
+	
+	waitthread global/items.scr::add_item "explosives" nomessage
+
+
+	//*** DON'T LET THE PLAYER JUMP IN THE ELEVATOR
+	$scene7_elevator_blocker solid
+
+	//*** Restore the player's health to full
+	if(level.gametype == 0){ //chrissstrahl - only do this in sp
+		$player heal 1
+	}
+
+	//*** Save some polys 
+	$scene4_mg1_gunner hide
+	$scene4_mg1_gunner notsolid
+	$scene4_mg1_gunner nodamage
+
+	$scene4_mg2_gunner hide
+	$scene4_mg2_gunner notsolid
+	$scene4_mg2_gunner nodamage
+
+	$scene4_jailer1 hide
+	$scene4_jailer2 hide
+	$scene4_jailer3 hide
+	$scene4_jailer4 hide
+	$scene4_jailer5 hide
+
+	//*** No more guys running through closed doors or trying to
+	$scene3_heavydoor1_pathblocker disconnect_paths
+	$scene3_heavydoor2_pathblocker disconnect_paths
+	$scene3_heavydoor3_pathblocker disconnect_paths
+
+	//*** DISENGAGE ANY TRIGGERS THAT NEED TO BE TURNED OFF
+	$ambientsound_outdoor_battle_over_trigger nottriggerable
+
+	//*** SET RANGER BARNEY AI NAMES
+	level.anderson = level.friendly1
+	level.bueller = level.friendly2
+	//level.cameron = level.friendly3
+	//level.daniels = level.friendly4
+	level.assaulter1 = level.friendly5
+	level.assaulter2 = level.friendly6
+
+	//***	SET UP THE FRIENDLY BEHAVIOR
+	level.anderson thread global/friendly.scr::friendlythink
+	level.anderson.friendtype = -1 //toggle this to -1 to shut down following
+	//level.anderson.destination = $player //chrissstrahl
+	level.anderson exec coop_mod/main.scr::destination //chrissstrahl - coop compatible
+	level.anderson.distance = 192
+	level.anderson.accuracy = 10
+
+	level.bueller thread global/friendly.scr::friendlythink
+	level.bueller.friendtype = -1 //toggle this to -1 to shut down following
+	//level.bueller.destination = $player //chrissstrahl
+	level.bueller exec coop_mod/main.scr::destination //chrissstrahl - coop compatible
+	level.bueller.distance = 192
+	level.anderson.accuracy = 10
+
+/*
+level.cameron thread global/friendly.scr::friendlythink
+level.cameron.friendtype = -1 //toggle this to -1 to shut down following
+level.cameron.destination = $player
+level.cameron.distance = 192
+level.cameron.accuracy = 15
+
+level.daniels thread global/friendly.scr::friendlythink
+level.daniels.friendtype = -1 //toggle this to -1 to shut down following
+level.daniels.destination = $player
+level.daniels.distance = 192
+level.daniels.accuracy = 15
+*/
+
+	//*** OPEN THE MAIN DOORS
+	thread scene1_opendoors
+	println "OPENDOORS"
+
+//*** SETUP NOTES
+
+/*
+
+	Scene 1: The Train Approach
+	Scene 2: Platform Battle with the Snipers
+	Scene 3: Inside the Facility Cargo Hold
+	Scene 4: Inside the Prison Block
+	Scene 5: Blowing the Hatch 
+	Scene 6: Planting the Bombs and Turning the Valves
+	Scene 7: Getting to the Elevator
+
+	Objective 1: Snipe the Tower Guards.
+	Objective 2: Find and Rescue the POWs.
+	Objective 3: Open the fuel line valves.
+	Objective 4: Plant explosives on the pipelines.
+	Objective 5: Find a way to the lower levels. Check the elevators for enemy reinforcements.
+
+*/
+
+	//*** CONFIRM PROGRAM INITIALIZATION 
+	println "STEVEFU: MARKER 1" 
+
+	//*** INITIALIZE OBJECTIVES
+	waitthread global/objectives.scr::add_objectives 1 2 "Snipe the tower guards. Keep losses at a minimum. Do not lose more than 9 members of the assault team across the two boxcars." $player.origin
+	thread global/objectives.scr::current_objectives 1
+
+	//*** GET THE PASSENGERS FIXED AND PREPARED
+	level.anderson glue $scene1_friendlyanchor1 0
+	level.bueller glue $scene1_friendlyanchor2 0
+	//	level.cameron glue $scene1_friendlyanchor3 0
+	//	level.daniels glue $scene1_friendlyanchor4 0
+	$scene1_captain glue $scene1_captainspot 0
+
+	level.anderson physics_off
+	//	level.anderson notsolid
+	level.anderson exec global/disable_ai.scr
+
+	level.bueller physics_off
+	//	level.bueller notsolid
+	level.bueller exec global/disable_ai.scr
+
+	//	level.cameron physics_off
+	//	level.cameron notsolid
+	//	level.cameron exec global/disable_ai.scr
+
+	//	level.daniels physics_off
+	//	level.daniels notsolid
+	//	level.daniels exec global/disable_ai.scr
+
+	$scene1_captain physics_off
+	//	$scene1_captain notsolid
+	$scene1_captain exec global/disable_ai.scr
+	$scene1_captain nodamage
+
+	$scene1_captain exec global/turnto.scr $train_boxcars_door
+	level.anderson exec global/turnto.scr $train_boxcars_door
+	level.bueller exec global/turnto.scr $train_boxcars_door
+	//	level.cameron exec global/turnto.scr $train_boxcars_door
+	//	level.daniels exec global/turnto.scr $train_boxcars_door
+
+	//*** PREP THE 'SEED' SNIPERS 
+	$scene2_sniper_tower1 thread scene2_sniperdeath1
+	$scene2_sniper_tower2 thread scene2_sniperdeath2
+	$scene2_sniper_tower3 thread scene2_sniperdeath3
+	$scene2_sniper_tower4 thread scene2_sniperdeath4
+
+	//*** START SOME SUSPENSEFUL MUSIC AS A ONE SHOT
+	//$player stufftext "tmstart sound/music/mus_04b_suspense.mp3" //Criminal. //20 seconds long
+	exec coop_mod/replace.scr::tmstart "sound/music/mus_04b_suspense.mp3" //Criminal - coop comp.
+
+	//*** SCENES
+	thread scene1	
+}end
+
+//SCENE 1: THE TRAIN APPROACH
+//============================================================================
+scene1:{
+//============================================================================
+	/* COMPONENTS LIST
+
+		$solid_train_engine 			(player rides in this, collision masks the train engine model, this is what drives along)
+		$train_engine_door1 			(opens to let the player out of the engine cab)
+		$train_engine_door2			(opens to let the player out of the engine cab)
+		$ghost_train_engine			(the train engine model) 
+		$train_boxcars				(two train boxcars attached to the engine)
+		level.anderson 				(friendly)
+		level.bueller				(friendly)
+		level.cameron				(friendly)
+		level.daniels				(friendly)
+		$solid_train_engine_destination	(this is the script_origin that the engine drives towards)
+		$scene1_loudspeaker1			(this is used as a source of German military base speech coming from an unknown source)
+
+	*/
+
+	//*** Move the train into the station
+	wait 0.5
+
+	thread scene1_trainmove	
+	//level.bueller lookAt $player 					//Criminal.
+	level.bueller exec coop_mod/replace.scr::lookat //Criminal - coop comp.
+	level.bueller anim thompson_crate_alert
+	wait 3
+
+	//*** NPC friendlies talk to player
+	//level.anderson lookAt $player 					//Criminal.
+	level.anderson exec coop_mod/replace.scr::lookat 	//Criminal - coop comp.
+	level.anderson anim thompson_crate_alert
+		
+	level.anderson say dfr_m6l3_613h	//"We're almost there. Get ready."
+	wait 0.25
+
+	$scene1_captain anim thompson_crate_alert
+	wait 0.15
+
+	level.bueller anim thompson_crate_alert
+	wait 0.18
+	//	level.cameron anim rifle_crate_alert
+	//	wait 0.2
+	//	level.daniels anim rifle_crate_alert
+		
+	//*** Play some miscellaneous base loudspeaker announcements as the train enters the station
+	wait 4
+	$scene1_loudspeaker1 playsound den_m2l2_254p
+
+	wait 8
+	$scene1_loudspeaker2 playsound den_m2l2_255p
+
+	wait 5
+	$scene1_loudspeaker1 playsound den_m2l2_253p
+}end
+
+//============================================================================
+scene1_trainmove:{
+//============================================================================
+	local.trainspeed = 164 	//initial speed of train (original 128)
+	local.nodenumbers = 17	//number of script_origins on tracks
+	local.stepspeed = 4	//decrement speed by this amount at each script_origin 'node'
+	local.stopsoundnode = 15 //node at which to play the train stopping sound
+	local.stagedownnode1 = 14 //first deceleration tweak at this 'node'
+	local.stagedownnode2 = 15 //second deceleration tweak at this 'node'
+	local.stagedownspeed1 = 6 //new deceleration step size at first tweak
+	local.stagedownspeed2 = 8 //new deceleration step size at second tweak
+
+	//*** MAKE THE TRAIN MOVING SOUND
+	thread scene1_trainsound
+
+	//*** MOVE THE TRAIN AND DECELERATE BY CHANGING SPEEDS PERIODICALLY AT EACH TRAINNODE (script_origins on the track)
+	for (local.i=1;local.i<local.nodenumbers+1;local.i++){
+		local.trainspeed = local.trainspeed - local.stepspeed
+		if (local.i == local.stopsoundnode){
+			//$player stoploopsound 									//Criminal.
+			//$player playsound armoredtrain_stopping 					//Criminal.
+			exec coop_mod/replace.scr::stoploopsound 					//Criminal - coop comp.
+			exec coop_mod/replace.scr::playsound armoredtrain_stopping 	//Criminal - coop comp.
+		}
+	
+		//*** Further deceleration made more specific by changing step size at two points near the end 
+		if (local.i == local.stagedownnode1){
+			local.stepspeed = local.stagedownspeed1
+			thread farplane_far
+		}
+
+		if (local.i == local.stagedownnode2){
+			local.stepspeed = local.stagedownspeed2
+		}
+
+		println "TRAINSPEED IS " local.trainspeed		
+		println "CURRENT NODE IS " local.i
+
+		$solid_train_engine moveto $("trainnode" + local.i).origin
+		$solid_train_engine speed local.trainspeed
+		$solid_train_engine waitmove
+	}
+	thread scene1_closedoors
+
+	//*** Start the train platform battle	
+	thread scene2
+}end		
+
+//============================================================================
+scene1_opendoors:{
+//============================================================================
+	$scene1_entrydoor1 playsound gate_large_open // 2 0.5 1500 1.0 temporary parameters that didn't work
+
+	$scene1_entrydoor1 moveto $scene1_entrydoor1_opennode.origin
+	$scene1_entrydoor1 waitmove 
+
+	$scene1_entrydoor2 moveto $scene1_entrydoor2_opennode.origin
+	$scene1_entrydoor2 waitmove
+}end
+
+//============================================================================
+scene1_closedoors:{
+//============================================================================
+	$scene1_entrydoor1 playsound gate_metal_locked // 2 0.5 1500 1.0 temporary parameters that didn't work
+
+	$scene1_entrydoor1 moveto $scene1_entrydoor1_closenode.origin
+	$scene1_entrydoor1 waitmove
+	$scene1_entrydoor2 moveto $scene1_entrydoor2_closenode.origin
+	$scene1_entrydoor2 waitmove
+}end
+
+//============================================================================
+scene1_siren:{
+//============================================================================
+	$scene1_loudspeaker2 exec global/loopsound.scr alarm_siren 
+}end
+
+//============================================================================
+scene1_trainsound:{
+//============================================================================
+	//$player exec global/loopsound.scr armoredtrain_rolling //	Criminal - TEST SHIT - may not work.
+	exec coop_mod/replace.scr::loopsound armoredtrain_rolling //Criminal - coop comp.
+}end
+
+
+//SCENE 2: SNIPING FROM THE TRAIN PLATFORM
+//============================================================================
+scene2:{
+//============================================================================
+	level.coop_trainIsMoving = 0 //chrissstrahl - stop updating the spawnpositions to the object markers in the train
+
+	spawn models/human/german_winter_type1 "targetname" "scene2_platformguy1"
+	$scene2_platformguy1.origin = $scene2_platformguy1_spawn.origin
+	$scene2_platformguy1.health = 40
+	$scene2_platformguy1 exec global/disable_ai.scr
+	$scene2_platformguy1 exec global/turnto.scr $scene1_captain
+
+	$scene1_captain turnto $scene2_platformguy1
+	$scene1_captain lookat $scene2_platformguy1
+	wait 4
+
+	$train_boxcars_door notSolid
+	$train_boxcars_door moveSouth 128
+	$train_boxcars_door speed 48
+	$train_boxcars_door playsound door_railcar_open
+	$train_boxcars_door move 
+	wait 1
+
+	$scene2_platformguy1 exec global/enable_ai.scr
+	$train_boxcars_door2 notSolid
+	$train_boxcars_door2 moveSouth 128
+	$train_boxcars_door2 speed 48
+	$train_boxcars_door2 playsound door_railcar_open
+	$train_boxcars_door2 move 
+
+	//	$player unglue 
+	//	$player physics_on
+
+	$scene1_captain unglue
+	$scene1_captain solid
+	$scene1_captain physics_on
+	wait 0.5	//original 2, wait a bit so the door clears the Captain's line of fire to the platformguy
+
+	//*** The Captain gives the 'go' signal
+	thread scene2_captain_sequence
+
+	//*** Release everyone from their starting positions after Captain kills the one Platformguy 
+	wait 2.5
+	thread scene2_platform_egress
+
+	//*** Start the combat soundtrack
+	forcemusic aux1
+
+	//*** Start the first annoying alarm sound and repeat over and over for a 'while'
+	thread scene1_siren
+
+	//*** Start the music
+	//$player stufftext "tmstartloop sound/music/mus_Schmerzen_01a.mp3"			//Criminal.
+	exec coop_mod/replace.scr::tmstartloop "sound/music/mus_Schmerzen_01a.mp3"	//Criminal - coop comp.
+
+	//*** Wake up the snipers and monitor for their deaths. Go to completion thread when all snipers are killed.
+	thread scene2_sniperactivate
+
+	//chrissstrahl - fuck this shitt i always hated this part in the game
+	//while (level.scene2_snipers != 4){
+		waitframe
+	//}
+
+	thread scene2_complete
+}end
+
+//============================================================================
+scene2_platform_egress:{
+//============================================================================
+//*** Remove the playerclip that holds the player in his area	
+	$train_playerclip remove
+	wait 0.5
+
+	level.anderson unglue
+	level.anderson solid
+	level.anderson physics_on
+	//level.anderson.friendtype = 1 
+	level.anderson thread anderson_death
+	level.anderson thread scene2_main_platform_deployment $anderson_startnode
+	wait 0.75
+
+	level.bueller unglue
+	level.bueller solid
+	level.bueller physics_on
+	//level.bueller.friendtype = 1 
+	level.bueller thread bueller_death
+	level.bueller thread scene2_main_platform_deployment $bueller_startnode
+	wait 0.75
+
+//	level.cameron unglue
+//	level.cameron solid
+//	level.cameron physics_on
+//	level.cameron thread cameron_death
+//	level.cameron thread scene2_main_platform_deployment $cameron_startnode
+//	wait 1.5
+
+//	level.daniels unglue
+//	level.daniels solid
+//	level.daniels physics_on
+//	level.daniels thread daniels_death
+//	level.daniels thread scene2_main_platform_deployment $daniels_startnode
+//	wait 1.5
+}end
+
+//============================================================================
+scene2_main_platform_deployment local.nodename:{
+//============================================================================
+	self exec global/runto.scr local.nodename
+	self waittill movedone
+	self exec global/enable_ai.scr
+}end
+
+//============================================================================
+scene2_sniperactivate:{
+//============================================================================
+	//*** Enable the snipers' AI 
+	$scene2_sniper_tower1 exec global/enable_ai.scr
+	$scene2_sniper_tower2 exec global/enable_ai.scr
+	$scene2_sniper_tower3 exec global/enable_ai.scr
+	$scene2_sniper_tower4 exec global/enable_ai.scr
+	$scene2_sniper_woodtower1a exec global/enable_ai.scr
+	$scene2_sniper_woodtower1b exec global/enable_ai.scr
+	$scene2_sniper_woodtower2a exec global/enable_ai.scr
+}end
+
+//============================================================================
+anderson_death:{
+//============================================================================
+	self waittill death
+	waitframe
+	self.targetname = ""
+
+	//*** Send death into the count for the rest of the Ranger pool
+	level.scene2_alliedspawn_teamdeaths ++
+}end
+
+//============================================================================
+bueller_death:{
+//============================================================================
+	self waittill death
+	waitframe
+	self.targetname = ""
+
+	//*** Send death into the count for the rest of the Ranger pool
+	level.scene2_alliedspawn_teamdeaths ++
+}end
+
+//============================================================================
+cameron_death:{
+//============================================================================
+	self waittill death
+	waitframe
+	self.targetname = ""
+
+	//*** Send death into the count for the rest of the Ranger pool
+	level.scene2_alliedspawn_teamdeaths ++
+}end
+
+//============================================================================
+daniels_death:{
+//============================================================================
+	self waittill death
+	waitframe
+	self.targetname = ""
+
+	//*** Send death into the count for the rest of the Ranger pool
+	level.scene2_alliedspawn_teamdeaths ++
+}end
+
+//============================================================================
+scene2_sniperdeath1:{
+//============================================================================
+	self waittill death
+	wait 1
+	self.targetname = ""	
+	wait 7
+
+	if (level.objective1 != 1){
+		thread scene2_spawntower1
+	}
+}end
+
+//============================================================================
+scene2_sniperdeath2:{
+//============================================================================
+	self waittill death
+	waitframe
+	self.targetname = ""
+	wait 4
+
+	if (level.objective1 != 1){
+		thread scene2_spawntower2
+	}
+}end
+
+//============================================================================
+scene2_sniperdeath3:{
+//============================================================================
+	self waittill death
+	wait 1
+	self.targetname = ""
+	wait 6
+	
+	if (level.objective1 != 1){	
+		thread scene2_spawntower3
+	}
+}end
+
+//============================================================================
+scene2_sniperdeath4:{
+//============================================================================
+	self waittill death
+	waitframe
+	self.targetname = ""
+	wait 5
+	
+	if (level.objective1 != 1){
+		thread scene2_spawntower4
+	}
+}end
+
+//============================================================================
+scene2_spawntower1:{
+//============================================================================
+	if (level.scene2_spawntower1_killed < level.scene2_spawntower1_population){
+		level.scene2_spawntower1_killed ++
+		//*** Spawn NPC and disable AI and activate a death thread
+		spawn models/human/german_winter_type2 "targetname" "scene2_snipertower1_ai" "type_attack" "turret" 
+		$scene2_snipertower1_ai exec global/disable_ai.scr
+
+		//*** Position the NPC, call NPC Death and Navigation threads
+		$scene2_snipertower1_ai.origin = $scene2_tower1_spawner.origin	//place the guy in the correct spot						
+		$scene2_snipertower1_ai thread scene2_sniperdeath1 			//call a waittill death thread
+		$scene2_snipertower1_ai exec global/runto.scr $scene2_snipernode1	//navigate to destination	
+
+		$scene2_snipertower1_ai waittill movedone
+
+		if !(isAlive $scene2_snipertower1_ai)	{end}
+
+		//*** Set the NPC parameters
+		$scene2_snipertower1_ai.mindist = 1
+		$scene2_snipertower1_ai.health = 100
+		$scene2_snipertower1_ai.maxdist = 6000
+		$scene2_snipertower1_ai.leash = 1
+		$scene2_snipertower1_ai.fixedleash = 1
+		$scene2_snipertower1_ai.sight = 6000
+		$scene2_snipertower1_ai.noticescale = 5
+		$scene2_snipertower1_ai.accuracy = 100
+		$scene2_snipertower1_ai.hearing = 6000
+
+		//*** Enable AI
+		$scene2_snipertower1_ai exec global/enable_ai.scr
+
+		//*** Position reassignment thread to keep AI from ending up out of player's sight, sends him back to the proper node
+		$scene2_snipertower1_ai thread scene2_snipertower_realignment $scene2_snipernode1	
+	}else{
+		level.scene2_snipers ++
+	}
+}end
+
+//============================================================================
+scene2_spawntower2:{
+//============================================================================
+	if (level.scene2_spawntower2_killed < level.scene2_spawntower2_population){
+		level.scene2_spawntower2_killed ++
+	
+		//*** Spawn NPC and disable AI and activate a death thread
+		spawn models/human/german_winter_type2 "targetname" "scene2_snipertower2_ai" "type_attack" "turret" 
+		$scene2_snipertower2_ai exec global/disable_ai.scr
+
+		//*** Position the NPC, call NPC Death and Navigation threads
+		$scene2_snipertower2_ai.origin = $scene2_tower2_spawner.origin	//place the guy in the correct spot						
+		$scene2_snipertower2_ai thread scene2_sniperdeath2 			//call a waittill death thread
+		$scene2_snipertower2_ai exec global/runto.scr $scene2_snipernode2	//navigate to destination	
+		$scene2_snipertower2_ai waittill movedone
+
+		if !(isAlive $scene2_snipertower2_ai)	{end}
+
+		//*** Set the NPC parameters
+		$scene2_snipertower2_ai.mindist = 1
+		$scene2_snipertower2_ai.health = 100
+		$scene2_snipertower2_ai.maxdist = 6000
+		$scene2_snipertower2_ai.leash = 1
+		$scene2_snipertower2_ai.fixedleash = 1
+		$scene2_snipertower2_ai.sight = 6000
+		$scene2_snipertower2_ai.noticescale = 5
+		$scene2_snipertower2_ai.accuracy = 100
+		$scene2_snipertower2_ai.hearing = 6000
+
+		//*** Enable AI
+		$scene2_snipertower2_ai exec global/enable_ai.scr
+
+		//*** Position reassignment thread to keep AI from ending up out of player's sight, sends him back to the proper node
+		$scene2_snipertower2_ai thread scene2_snipertower_realignment $scene2_snipernode2
+	}else{
+		level.scene2_snipers ++
+	}
+}end
+
+//============================================================================
+scene2_spawntower3:{
+//============================================================================
+	if (level.scene2_spawntower3_killed < level.scene2_spawntower3_population){
+		level.scene2_spawntower3_killed ++
+		//*** Spawn NPC and disable AI and activate a death thread
+		spawn models/human/german_winter_type2 "targetname" "scene2_snipertower3_ai" "type_attack" "turret" 
+		$scene2_snipertower3_ai exec global/disable_ai.scr
+
+		//*** Position the NPC, call NPC Death and Navigation threads
+		$scene2_snipertower3_ai.origin = $scene2_tower3_spawner.origin	//place the guy in the correct spot						
+		$scene2_snipertower3_ai thread scene2_sniperdeath3 			//call a waittill death thread
+		$scene2_snipertower3_ai exec global/runto.scr $scene2_snipernode3	//navigate to destination	
+		$scene2_snipertower3_ai waittill movedone
+
+		if !(isAlive $scene2_snipertower3_ai)	{end}
+
+		//*** Set the NPC parameters
+		$scene2_snipertower3_ai.mindist = 1
+		$scene2_snipertower3_ai.health = 100
+		$scene2_snipertower3_ai.maxdist = 6000
+		$scene2_snipertower3_ai.leash = 1
+		$scene2_snipertower3_ai.fixedleash = 1
+		$scene2_snipertower3_ai.sight = 6000
+		$scene2_snipertower3_ai.noticescale = 5
+		$scene2_snipertower3_ai.accuracy = 100
+		$scene2_snipertower3_ai.hearing = 6000
+
+		//*** Enable AI
+		$scene2_snipertower3_ai exec global/enable_ai.scr
+
+		//*** Position reassignment thread to keep AI from ending up out of player's sight, sends him back to the proper node
+		$scene2_snipertower3_ai thread scene2_snipertower_realignment $scene2_snipernode3
+	}else{
+		level.scene2_snipers ++
+	}
+}end
+
+//============================================================================
+scene2_spawntower4:{
+//============================================================================
+	if (level.scene2_spawntower4_killed < level.scene2_spawntower4_population){
+		level.scene2_spawntower4_killed ++
+
+		//*** Spawn NPC and disable AI and activate a death thread
+		spawn models/human/german_winter_type2 "targetname" "scene2_snipertower4_ai" "type_attack" "turret" 
+		$scene2_snipertower4_ai exec global/disable_ai.scr
+
+		//*** Position the NPC, call NPC Death and Navigation threads
+		$scene2_snipertower4_ai.origin = $scene2_tower4_spawner.origin	//place the guy in the correct spot						
+		$scene2_snipertower4_ai thread scene2_sniperdeath4 			//call a waittill death thread
+		$scene2_snipertower4_ai exec global/runto.scr $scene2_snipernode4	//navigate to destination	
+		$scene2_snipertower4_ai waittill movedone
+
+		if !(isAlive $scene2_snipertower4_ai)	{end}
+
+		//*** Set the NPC parameters
+		$scene2_snipertower4_ai.mindist = 1
+		$scene2_snipertower4_ai.health = 100
+		$scene2_snipertower4_ai.maxdist = 6000
+		$scene2_snipertower4_ai.leash = 1
+		$scene2_snipertower4_ai.fixedleash = 1
+		$scene2_snipertower4_ai.sight = 6000
+		$scene2_snipertower4_ai.noticescale = 5
+		$scene2_snipertower4_ai.accuracy = 100
+		$scene2_snipertower4_ai.hearing = 6000
+
+		//*** Enable AI
+		$scene2_snipertower4_ai exec global/enable_ai.scr
+
+		//*** Position reassignment thread to keep AI from ending up out of player's sight, sends him back to the proper node
+		$scene2_snipertower4_ai thread scene2_snipertower_realignment $scene2_snipernode4
+	}else{
+	level.scene2_snipers ++
+	}
+}end
+
+//============================================================================
+scene2_snipertower_realignment local.ainode:{
+//============================================================================
+	if (level.gametype==0){ //Criminal - Singleplayer
+		while (isAlive self){
+			if !(self cansee $player) {
+				self exec global/disable_ai.scr 
+				self exec global/runto.scr local.ainode
+				self waittill movedone
+
+				if !(isAlive self)	{end}
+
+				self exec global/turnto.scr $player 
+				wait 0.25
+		
+				if !(isAlive self)	{end}
+				self exec global/enable_ai.scr
+			}	
+			wait 5
+		}
+		end //Criminal.
+	}	
+	
+	//chrissstrahl - for the coop we need to handle this differently
+	//we need to check if any player can be seen that is alive, and active
+	//if no player can be seen act
+	while(IsAlive self){ //Criminal - Multiplayer
+		local.aiCanSeePlayer = 0
+		for (local.i = 1; local.i <= $player.size; local.i++) {
+			local.player = $player[local.i]
+			if(local.player != NULL && local.player.dmteam !="spectator" && local.player.health > 0 && local.player.flags["coop_isActive"] == 1){
+				if(self cansee local.player){
+					local.aiCanSeePlayer = 1
+					wait 2
+					break
+				}
+			}
+		}
+		//chrissstrahl - ai can't see a player get to node then close to a player
+		if(local.aiCanSeePlayer != 1){
+			self exec global/disable_ai.scr 
+			self exec global/runto.scr local.ainode
+			self waittill movedone
+
+			if !(isAlive self)	{end}
+
+			self exec coop_mod/replace.scr::turnto
+			wait 0.25
+	
+			if !(isAlive self)	{end}
+			
+			self exec global/enable_ai.scr		
+		}
+		wait 5
+	}	
+}end
+
+//============================================================================
+scene2_captain_sequence:{
+//============================================================================
+	$train_boxcars playsound door_railcar_open
+
+	//*** Captain McDevitt gets a brief burst of skill from the Fu
+	$scene1_captain.accuracy = 100
+	$scene1_captain aimat $scene2_platformguy1
+	$scene1_captain exec global/shoot.scr 
+	wait 1.5
+
+	$scene1_captain exec global/disable_ai.scr
+	$scene1_captain runto $scene1_captain_node
+	wait 1
+
+	$scene1_captain.accuracy = 2 //original 20, then 10
+	$scene1_captain exec global/enable_ai.scr
+
+	//*** Start the Allied Assault - spawn in the boxcar troops
+	thread scene2_alliedspawn_initialize
+}end
+
+//============================================================================
+scene2_alliedspawn_initialize:{
+//============================================================================
+	//*** Set up initial conditions for the 2nd boxcar cannon fodder spawner
+	level.scene2_alliedspawn_teamvalue = 0			//initializes variable for total number spawned to date
+	level.scene2_alliedspawn_teamdeathlimit = 9		//initializes constant for number that may die before mission failure (original 15)
+	level.scene2_alliedspawn_teamdeaths = 0			//initializes variable for number that have died so far
+	level.scene2_alliedspawn_currentalive = 0		//initializes variable for number of enemies currently alive from this spawner
+	level.scene2_alliedspawn_currentalivemax = 2	//initializes constant for maximum number allowed to be alive at any given time from this spawner original 4
+	level.scene2_alliedspawn_loopwaittime = 0.2		//initializes constant for time between respawns
+	level.scene2_alliedspawn_deactivator = 0		//initializes variable for shutting down this loop's ability to spawn 
+	level.scene2_ai_waypointnumber = 1				//initializes navigation waypoints for the navigation thread
+
+	thread scene2_alliedspawn_control
+	thread scene2_alliedspawn_showalive
+	thread scene2_alliedspawn_checkstatus
+}end
+
+//============================================================================
+scene2_alliedspawn_control:{
+//============================================================================
+	//*** Spawn cannon fodder in waves, from the 2nd boxcar
+	while ((level.scene2_alliedspawn_deactivator == 0) || (level.scene2_alliedspawn_teamdeaths <= level.scene2_alliedspawn_teamdeathlimit)){
+		if ((level.scene2_alliedspawn_currentalive + level.scene2_alliedspawn_currentalivemax) <= level.scene2_alliedspawn_currentalivemax){
+			//*** Spawn 4 friendly soldiers per wave if none are alive	
+			for (level.scene2_alliedspawn_currentalive = 1; level.scene2_alliedspawn_currentalive <= level.scene2_alliedspawn_currentalivemax; level.scene2_alliedspawn_currentalive ++){ 
+				//*** Setup NPC names
+				local.scene2_alliedspawn_ai_name = "scene2_alliedspawn_ai" + level.scene2_alliedspawn_currentalive
+				
+				//*** Setup spawn points
+				local.scene2_friendlyspawn_name = "scene2_friendlyspawn" + level.scene2_alliedspawn_currentalive
+				local.org = $(local.scene2_friendlyspawn_name).origin
+
+				//*** Spawn NPC
+				spawn models/human/2nd-ranger_private "targetname" (local.scene2_alliedspawn_ai_name) "type_attack" "cover" 
+
+				//*** Set the NPC parameters
+				$(local.scene2_alliedspawn_ai_name).mindist = 128
+
+				if (level.skill == "0"){
+					$(local.scene2_alliedspawn_ai_name).health = 250	//original 1200, 400
+				}else if (level.skill == "1"){
+					$(local.scene2_alliedspawn_ai_name).health = 200	//original 600
+				}else if (level.skill == "2"){
+					$(local.scene2_alliedspawn_ai_name).health = 50		//original 50
+				}
+
+				$(local.scene2_alliedspawn_ai_name).maxdist = 6000
+				$(local.scene2_alliedspawn_ai_name).leash = 3200
+				$(local.scene2_alliedspawn_ai_name).fixedleash = 0
+				$(local.scene2_alliedspawn_ai_name).sight = 3140	//4000
+				$(local.scene2_alliedspawn_ai_name).noticescale = 20
+
+				if (level.skill == "0"){
+					$(local.scene2_alliedspawn_ai_name).accuracy = 13 //original 50 then 20 then 15d
+				}else if (level.skill == "1"){
+					$(local.scene2_alliedspawn_ai_name).accuracy = 12 //original 50 then 20
+				}else if (level.skill == "2"){
+					$(local.scene2_alliedspawn_ai_name).accuracy = 10 //original 50 then 20
+				}
+
+				$(local.scene2_alliedspawn_ai_name).hearing = 4000
+				$(local.scene2_alliedspawn_ai_name).alreadyfiring = 0
+
+				//*** Position the NPC, call NPC Death and Navigation threads
+				$(local.scene2_alliedspawn_ai_name).origin = local.org			//place the guy in the correct spot						
+				$(local.scene2_alliedspawn_ai_name) thread scene2_alliedspawn_death 	//call a waittill death thread
+				$(local.scene2_alliedspawn_ai_name) thread scene2_alliedspawn_navigate 	//call navigation thread 
+
+				level.scene2_alliedspawn_teamvalue ++						//track the total population
+				println ("SPAWNING PERSON NUMBER " + level.scene2_alliedspawn_currentalive)
+			}	
+			level.scene2_alliedspawn_currentalive --
+			println ("CURRENTALIVE IS " + level.scene2_alliedspawn_currentalive)
+		}
+		wait level.scene2_alliedspawn_loopwaittime			//every local.loopwaittime seconds, repeat the while loop	
+	}
+}end
+
+//============================================================================
+scene2_alliedspawn_death:{
+//============================================================================
+	//*** Detect death and decrement currently alive population
+	self waittill death
+	self.targetname = ""
+	level.scene2_alliedspawn_currentalive --
+	println level.scene2_alliedspawn_currentalive
+	level.scene2_alliedspawn_teamdeaths ++
+}end
+
+//============================================================================
+scene2_alliedspawn_navigate:{
+//============================================================================
+	//*** Set up a destination point and name it, number of waypoints dependent on number of NPCs per wave
+	if (level.scene2_ai_waypointnumber >= level.scene2_alliedspawn_currentalivemax){
+		level.scene2_ai_waypointnumber = 1 //recycling to the first waypoint if the highest number was reached on a previous call
+	}				
+
+	local.scene2_ai_waypointname = "scene2_allied_waypoint" + level.scene2_ai_waypointnumber
+	
+	println ("THE WAYPOINTNUMBER IS " + level.scene2_ai_waypointnumber)
+	println ("THE WAYPOINTNAME IS " + local.scene2_ai_waypointname)
+
+	//*** Run the NPC to the destination point
+	self thread scene2_alliedspawn_run local.scene2_ai_waypointname 
+
+	//*** Increment the waypoint to avoid identical consecutive destinations
+	level.scene2_ai_waypointnumber ++	
+}end
+
+//============================================================================
+scene2_alliedspawn_run local.scene2_ai_waypointname:{
+//============================================================================
+	//*** Run the generic Ranger to the appropriate spot
+	self exec global/disable_ai.scr 
+	self exec global/runto.scr $(local.scene2_ai_waypointname)
+	self waittill movedone
+
+	if !(isAlive self)	{end}
+
+	self exec global/enable_ai.scr
+}end
+
+//============================================================================
+scene2_alliedspawn_showalive:{
+//============================================================================
+	//*** Initialize the checking value so the objectives aren't updated every frame
+	level.scene2_alliedspawn_teamdeaths_current = level.scene2_alliedspawn_teamdeaths
+
+	//*** Draw the status of the 2nd boxcar Rangers - how many casualties have been taken (ie: 'acceptable losses') by updating objectives
+	while (level.objective1 != 1){
+		if (level.scene2_alliedspawn_teamdeaths == level.scene2_alliedspawn_teamdeaths_current){
+			//do nothing
+		}else if (level.scene2_alliedspawn_teamdeaths < level.scene2_alliedspawn_teamdeathlimit){
+			level.scene2_alliedspawn_teamdeaths_current = level.scene2_alliedspawn_teamdeaths
+
+			//***	This will print the same info on screen as an official game condition message
+			iprintlnbold_noloc (loc_convert_string "Ranger Casualties: ") level.scene2_alliedspawn_teamdeaths (loc_convert_string " of ") level.scene2_alliedspawn_teamdeathlimit
+
+			//*** This draws the info in the objectives area
+			level.objective1text = ("Snipe the tower guards. Keep losses at a minimum. Do not lose more than 9 members of the assault team across the two boxcars. [ " + level.scene2_alliedspawn_teamdeaths + " of " + level.scene2_alliedspawn_teamdeathlimit + " ]")
+			//iprintlnbold_noloc("DEV: NOTE objectives marker relevance! Is $player [1]")
+			waitthread global/objectives.scr::add_objectives 1 2 level.objective1text $world.origin //chrissstrahl
+		}else{
+		//if (level.scene2_alliedspawn_teamdeaths >= level.scene2_alliedspawn_teamdeathlimit)
+			wait 1
+			level.scene2_alliedspawn_deactivator = 1
+			iprintlnbold "Mission Failed: Not enough Rangers survived!"
+			wait 2
+			missionfailed
+			end
+		}
+		waitframe
+	}
+}end
+
+//============================================================================
+scene2_levelalpha:{
+//============================================================================
+	while (level.alpha < 0.75){
+		level.alpha = level.alpha + 0.05
+		waitframe
+	}
+}end
+
+//============================================================================
+scene2_alliedspawn_checkstatus:{
+//============================================================================
+//	while (level.objective1 != 1)
+//	{
+//		waitframe
+//	}
+}end
+
+//============================================================================
+scene2_complete:{
+//============================================================================
+	//*** Set the next ambient soundtrack, outside after battle
+	forcemusic aux3
+
+	//*** Objective 1 is complete 
+	level.scene2_alliedspawn_deactivator = 1 	//Immediately stop the spawning of boxcar Rangers 
+	level.objective1 = 1				//Objective (tracker variable for loops) is completed
+	//	huddraw_alpha 200 0				//Vanish the visible "Ranger Casualties" counter [index] [alpha %]
+	
+	//*** UPDATE OBJECTIVES
+	//iprintlnbold_noloc("DEV: NOTE objectives marker relevance! Is $player [2]")
+	waitthread global/objectives.scr::add_objectives 1 3 "Snipe the tower guards. Avoid excessive casualties." $world.origin
+	waitthread global/objectives.scr::add_objectives 2 2 "Unlock the cellblock doors and free the POWs." $scene4_master_jailswitch.origin
+	thread global/objectives.scr::current_objectives 2
+
+	if(level.gametype==0){//Criminal - Singleplayer.
+		//*** *Autosave*
+		exec global/autosave.scr 2	//"Cargo hold"
+	} 
+
+	thread scene3
+}end
+
+
+//SCENE 3: AT THE TRAIN PLATFORM
+//============================================================================
+scene3:{
+//============================================================================
+	//$scene1_captain turnto $player //Criminal.
+	//$scene1_captain lookat $player //Criminal.
+	$scene1_captain exec coop_mod/replace.scr::turnto //Criminal - coop comp.
+	$scene1_captain exec coop_mod/replace.scr::lookat //Criminal - coop comp.
+
+	$scene1_captain say dfr_M6L3_614a_1	//"Alright Powell, we're going to move the train..."
+	$scene1_captain waittill saydone
+
+	$scene1_captain turnto NULL
+	$scene1_captain lookat NULL
+	//	wait 6
+
+	thread scene3_instaspawn $scene3_instaspawn1 "scene3_instaspawn1_soldier"
+	thread scene3_instaspawn $scene3_instaspawn2 "scene3_instaspawn2_soldier"
+	thread scene3_instaspawn $scene3_instaspawn3 "scene3_instaspawn3_soldier"
+	thread scene3_instaspawn $scene3_instaspawn4 "scene3_instaspawn4_soldier"
+	thread scene3_instaspawn $scene3_instaspawn5 "scene3_instaspawn5_soldier"
+	thread scene3_instaspawn $scene3_instaspawn6 "scene3_instaspawn6_soldier"
+	thread scene3_instaspawn $scene3_instaspawn7 "scene3_instaspawn7_soldier"
+
+	$scene3_hangardoor1 moveNorth 128
+	$scene3_hangardoor1 speed 48
+	$scene3_hangardoor1 playsound door_railcar_open
+	$scene3_hangardoor1 move 
+
+	$scene3_hangardoor2 moveSouth 128
+	$scene3_hangardoor2 speed 48
+	$scene3_hangardoor2 playsound door_railcar_open
+	$scene3_hangardoor2 move 
+}end
+
+//============================================================================
+scene3_instaspawn local.soldierspawn local.soldier:{
+//============================================================================
+	spawn models/human/german_wehrmact_soldier.tik "targetname" (local.soldier) "type_attack" "cover" 
+	
+	local.soldier.mindist = 64
+	local.soldier.maxdist = 2000
+	local.soldier.leash = 10000
+	local.soldier.fixedleash = 0
+	local.soldier.sight = 2000
+	local.soldier.noticescale = 15	//75
+	local.soldier.accuracy = 99	//60
+	local.soldier.origin = local.soldierspawn.origin
+	
+	local.soldier exec global/disable_ai.scr
+	//local.soldier exec global/turnto.scr $player //Criminal.
+	local.soldier exec coop_mod/replace.scr::turnto //Criminal - coop comp.
+	local.soldier exec global/enable_ai.scr
+}end
+
+//============================================================================
+scene3_triggerspawn1:{
+//============================================================================
+	spawn models/human/german_wehrmact_NCO.tik "targetname" "scene3_triggerspawn1_soldier" "type_attack" "cover" 
+	
+	$scene3_triggerspawn1_soldier.mindist = 64
+	$scene3_triggerspawn1_soldier.maxdist = 4000
+	$scene3_triggerspawn1_soldier.leash = 10000
+	$scene3_triggerspawn1_soldier.fixedleash = 0
+	$scene3_triggerspawn1_soldier.sight = 4000
+	$scene3_triggerspawn1_soldier.noticescale = 5	//25
+	$scene3_triggerspawn1_soldier.accuracy = 100	
+
+	$scene3_triggerspawn1_soldier.origin = $scene3_triggerspawner1.origin
+	$scene3_triggerspawn1_soldier exec global/runto.scr $scene3_triggerspawn1_dest
+}end
+
+//============================================================================
+scene3_triggerspawn2:{
+//============================================================================
+	if (level.scene3_triggerspawn2_active == 0){
+		level.scene3_triggerspawn2_active = 1
+
+		spawn models/human/german_wehrmact_soldier.tik "targetname" "scene3_triggerspawn2_soldier" "type_attack" "cover" 
+	
+		$scene3_triggerspawn2_soldier.mindist = 64
+		$scene3_triggerspawn2_soldier.maxdist = 4000
+		$scene3_triggerspawn2_soldier.leash = 10000
+		$scene3_triggerspawn2_soldier.fixedleash = 0
+		$scene3_triggerspawn2_soldier.sight = 4000
+		$scene3_triggerspawn2_soldier.noticescale = 5 	//25
+		$scene3_triggerspawn2_soldier.accuracy = 100
+		$scene3_triggerspawn2_soldier.origin = $scene3_triggerspawner2.origin
+		$scene3_triggerspawn2_soldier exec global/runto.scr $scene3_triggerspawn2_dest
+	}
+}end
+
+//============================================================================
+scene3_triggerspawn3:{
+//============================================================================
+	if (level.scene3_triggerspawn3_active == 0){
+		level.scene3_triggerspawn3_active = 1
+
+		spawn models/human/german_wehrmact_soldier.tik "targetname" "scene3_triggerspawn3_soldier" "type_attack" "cover" 
+	
+		$scene3_triggerspawn3_soldier.mindist = 64
+		$scene3_triggerspawn3_soldier.maxdist = 4000
+		$scene3_triggerspawn3_soldier.leash = 10000
+		$scene3_triggerspawn3_soldier.fixedleash = 0
+		$scene3_triggerspawn3_soldier.sight = 4000
+		$scene3_triggerspawn3_soldier.noticescale = 5	//25
+		$scene3_triggerspawn3_soldier.accuracy = 100
+		$scene3_triggerspawn3_soldier.origin = $scene3_triggerspawner3.origin
+		$scene3_triggerspawn3_soldier exec global/runto.scr $scene3_triggerspawn3_dest
+	}
+}end
+
+//============================================================================
+scene3_heavydoor1_flywheel_animateX:{
+//============================================================================
+	if (level.wheelhintprintdone == 0){
+		$wheel_door_hint_text_trigger remove
+	}
+
+	level.wheelhintprintdone = 1
+	
+	if (level.heavydoor1 == 0 && level.heavydoor1moving == 0){
+		level.heavydoor1 = 1												//Door is now flagged by this variable as 'open'
+		level.heavydoor1moving = 1											//Door is now moving, set this to lock out any other door flywheels
+
+		if(level.gametype==0){ //Criminal - singleplayer.
+			//$scene3_heavydoor1 open $player //chrissstrahl
+			$scene3_heavydoor1 open $world //chrissstrahl - made coop compatible
+		}else{ //Criminal - Multiplayer.
+			local.player = exec coop_mod/replace.scr::player_closestTo $scene3_heavydoor1
+			$scene3_heavydoor1 open local.player
+		}
+
+		$scene3_heavydoor1 playsound door_vault_roll_open 
+
+		//*** Make the door flywheel 'switch' rotate
+		$scene3_heavydoor1_flywheel thread scene3_flywheel_x360_up
+		wait 3																//This is the 'time' keyvalue used on the door entity in the bsp
+		
+		level.heavydoor1moving = 0											//Door is stopped, set this to enable the door flywheels again
+		$scene3_heavydoor1_pathblocker connect_paths
+
+	}else if (level.heavydoor1 == 1 && level.heavydoor1moving == 0){
+		$scene3_heavydoor1_pathblocker disconnect_paths
+
+		level.heavydoor1 = 0												//Door is now flagged by this variable as 'open'
+		level.heavydoor1moving = 1											//Door is now moving, set this to lock out any other door flywheels
+
+		$scene3_heavydoor1 close 
+		$scene3_heavydoor1 playsound door_vault_roll_close	
+
+		//*** Make the door flywheel 'switch' rotate
+		$scene3_heavydoor1_flywheel thread scene3_flywheel_x360_down
+		wait 3																//This is the 'time' keyvalue used on the door entity in the bsp
+		level.heavydoor1moving = 0											//Door is stopped, set this to enable the door flywheels again	
+	}
+}end
+
+//============================================================================
+scene3_heavydoor1_flywheel_animateZ_reverse:{
+//============================================================================
+	if (level.heavydoor1 == 0 && level.heavydoor1moving == 0){
+		level.heavydoor1 = 1													//Door is now flagged by this variable as 'open'
+		level.heavydoor1moving = 1												//Door is now moving, set this to lock out any other door flywheels
+
+		//$scene3_heavydoor1 open $player //chrissstrahl
+		$scene3_heavydoor1 open $world //chrissstrahl - made coop compatible
+		$scene3_heavydoor1 playsound door_vault_roll_open
+
+		//*** Make the door flywheel 'switch' rotate
+		$scene3_heavydoor1_flywheel_reverse thread scene3_flywheel_z360_up
+		wait 3																	//This is the 'time' keyvalue used on the door entity in the bsp
+		
+		level.heavydoor1moving = 0												//Door is stopped, set this to enable the door flywheels again
+		$scene3_heavydoor1_pathblocker connect_paths
+	}else if (level.heavydoor1 == 1 && level.heavydoor1moving == 0){
+		$scene3_heavydoor1_pathblocker disconnect_paths
+
+		level.heavydoor1 = 0													//Door is now flagged by this variable as 'open'
+		level.heavydoor1moving = 1												//Door is now moving, set this to lock out any other door flywheels
+
+		$scene3_heavydoor1 close
+		$scene3_heavydoor1 playsound door_vault_roll_close	
+
+		//*** Make the door flywheel 'switch' rotate
+		$scene3_heavydoor1_flywheel_reverse thread scene3_flywheel_z360_down
+		wait 3																	//This is the 'time' keyvalue used on the door entity in the bsp
+		level.heavydoor1moving = 0												//Door is stopped, set this to enable the door flywheels again
+	}
+}end
+
+//============================================================================
+scene3_heavydoor2_flywheel_animateZ:{
+//============================================================================
+	if (level.heavydoor2 == 0 && level.heavydoor2moving == 0){
+		level.heavydoor2 = 1													//Door is now flagged by this variable as 'open'
+		level.heavydoor2moving = 1												//Door is now moving, set this to lock out any other door flywheels
+
+		//$scene3_heavydoor2 open $player //chrissstrahl
+		$scene3_heavydoor2 open $world //chrissstrahl - made coop compatible
+		$scene3_heavydoor2 playsound door_vault_roll_open	
+
+		//*** Make the door flywheel 'switch' rotate
+		$scene3_heavydoor2_flywheel thread scene3_flywheel_z360_up
+		wait 3																	//This is the 'time' keyvalue used on the door entity in the bsp
+		
+		level.heavydoor2moving = 0												//Door is stopped, set this to enable the door flywheels again
+		$scene3_heavydoor2_pathblocker connect_paths
+	}else if (level.heavydoor2 == 1 && level.heavydoor2moving == 0){
+		$scene3_heavydoor2_pathblocker disconnect_paths
+
+		level.heavydoor2 = 0													//Door is now flagged by this variable as 'open'
+		level.heavydoor2moving = 1												//Door is now moving, set this to lock out any other door flywheels
+
+		$scene3_heavydoor2 close
+		$scene3_heavydoor2 playsound door_vault_roll_close	
+
+		//*** Make the door flywheel 'switch' rotate
+		$scene3_heavydoor2_flywheel thread scene3_flywheel_z360_down
+		wait 3																	//This is the 'time' keyvalue used on the door entity in the bsp
+		level.heavydoor2moving = 0												//Door is stopped, set this to enable the door flywheels again	
+	}
+}end
+
+//============================================================================
+scene3_heavydoor2_flywheel_animateZ_reverse:{
+//============================================================================
+	if (level.heavydoor2 == 0 && level.heavydoor2moving == 0){
+		level.heavydoor2 = 1															//Door is now flagged by this variable as 'open'
+		level.heavydoor2moving = 1														//Door is now moving, set this to lock out any other door flywheels
+
+		//$scene3_heavydoor2 open $player //chrissstrahl
+		$scene3_heavydoor2 open $world //chrissstrahl - made coop compatible
+		$scene3_heavydoor2 playsound door_vault_roll_open	
+		
+		//*** Make the door flywheel 'switch' rotate
+		$scene3_heavydoor2_flywheel_reverse thread scene3_flywheel_z360_up
+		wait 3																			//This is the 'time' keyvalue used on the door entity in the bsp
+		
+		level.heavydoor2moving = 0														//Door is stopped, set this to enable the door flywheels again
+		$scene3_heavydoor2_pathblocker connect_paths
+	}else if (level.heavydoor2 == 1 && level.heavydoor2moving == 0){
+		$scene3_heavydoor2_pathblocker disconnect_paths
+		level.heavydoor2 = 0															//Door is now flagged by this variable as 'open'
+		level.heavydoor2moving = 1														//Door is now moving, set this to lock out any other door flywheels
+
+		$scene3_heavydoor2 close
+		$scene3_heavydoor2 playsound door_vault_roll_close
+
+		//*** Make the door flywheel 'switch' rotate
+		$scene3_heavydoor2_flywheel_reverse thread scene3_flywheel_z360_down
+		wait 3																			//This is the 'time' keyvalue used on the door entity in the bsp
+		
+		level.heavydoor2moving = 0														//Door is stopped, set this to enable the door flywheels again	
+	}
+}end
+
+//============================================================================
+scene3_heavydoor3_flywheel_animateZ:{
+//============================================================================
+	if (level.heavydoor3 == 0 && level.heavydoor3moving == 0){
+		level.heavydoor3 = 1															//Door is now flagged by this variable as 'open'
+		level.heavydoor3moving = 1														//Door is now moving, set this to lock out any other door flywheels
+
+		//$scene3_heavydoor3 open $player //chrissstrahl
+		$scene3_heavydoor3 open $world //chrissstrahl - made coop compatible
+		$scene3_heavydoor3 playsound door_vault_roll_open	
+
+		//*** Make the door flywheel 'switch' rotate 
+		$scene3_heavydoor3_flywheel thread scene3_flywheel_z360_up
+		wait 3																			//This is the 'time' keyvalue used on the door entity in the bsp
+		
+		level.heavydoor3moving = 0														//Door is stopped, set this to enable the door flywheels again
+		//	$scene3_heavydoor3_pathblocker connect_paths
+	}else if (level.heavydoor3 == 1 && level.heavydoor3moving == 0){
+		$scene3_heavydoor3_pathblocker disconnect_paths
+		level.heavydoor3 = 0															//Door is now flagged by this variable as 'open'
+		level.heavydoor3moving = 1														//Door is now moving, set this to lock out any other door flywheels
+
+		$scene3_heavydoor3 close
+		$scene3_heavydoor3 playsound door_vault_roll_close	
+
+		//*** Make the door flywheel 'switch' rotate 
+		$scene3_heavydoor3_flywheel thread scene3_flywheel_z360_down
+		wait 3																			//This is the 'time' keyvalue used on the door entity in the bsp
+		
+		level.heavydoor3moving = 0														//Door is stopped, set this to enable the door flywheels again	
+	}
+}end
+
+//============================================================================
+scene3_heavydoor3_flywheel_animateX_reverse:{
+//============================================================================
+	if (level.heavydoor3 == 0 && level.heavydoor3moving == 0){
+		level.heavydoor3 = 1															//Door is now flagged by this variable as 'open'
+		level.heavydoor3moving = 1														//Door is now moving, set this to lock out any other door flywheels
+
+		//$scene3_heavydoor3 open $player //chrissstrahl
+		$scene3_heavydoor3 open $world //chrissstrahl - made coop compatible
+		$scene3_heavydoor3 playsound door_vault_roll_open
+		
+		//*** Make the door flywheel 'switch' rotate 
+		$scene3_heavydoor3_flywheel_reverse thread scene3_flywheel_x360_up
+		wait 3																			//This is the 'time' keyvalue used on the door entity in the bsp
+		
+		level.heavydoor3moving = 0														//Door is stopped, set this to enable the door flywheels again
+		$scene3_heavydoor3_pathblocker connect_paths
+	}else if (level.heavydoor3 == 1 && level.heavydoor3moving == 0){
+		$scene3_heavydoor3_pathblocker disconnect_paths
+		level.heavydoor3 = 0															//Door is now flagged by this variable as 'open'
+		level.heavydoor3moving = 1														//Door is now moving, set this to lock out any other door flywheels
+
+		$scene3_heavydoor3 close
+		$scene3_heavydoor3 playsound door_vault_roll_close	
+
+		//*** Make the door flywheel 'switch' rotate
+		$scene3_heavydoor3_flywheel_reverse thread scene3_flywheel_x360_down
+		wait 3																			//This is the 'time' keyvalue used on the door entity in the bsp
+		
+		level.heavydoor3moving = 0														//Door is stopped, set this to enable the door flywheels again	
+	}
+}end
+
+//============================================================================
+scene3_flywheel_x360_up:{
+//============================================================================
+	self time 3
+	self rotateXup 360
+	self playsound flywheel
+	self waitmove
+}end
+
+//============================================================================
+scene3_flywheel_x360_down:{
+//============================================================================
+	self time 3
+	self rotateXdown 360
+	self playsound flywheel
+	self waitmove
+}end
+
+//============================================================================
+scene3_flywheel_z360_up:{
+//============================================================================
+	self time 3
+	self rotateZup 360
+	self playsound flywheel
+	self waitmove
+}end
+
+//============================================================================
+scene3_flywheel_z360_down:{
+//============================================================================
+	self time 3
+	self rotateZdown 360
+	self playsound flywheel
+	self waitmove
+}end
+
+
+//SCENE 4: THE JAILBREAK
+//============================================================================
+scene4:{
+//============================================================================
+	//*** Unhide the enemies in the cellblock area
+	$scene4_mg1_gunner show
+	$scene4_mg1_gunner solid
+	$scene4_mg1_gunner takedamage
+
+	$scene4_mg2_gunner show
+	$scene4_mg2_gunner solid
+	$scene4_mg2_gunner takedamage
+
+	$scene4_jailer1 show
+	$scene4_jailer2 show
+	$scene4_jailer3 show
+	$scene4_jailer4 show
+	$scene4_jailer5 show
+
+	//*** Engage the ai on the guys near the door
+	$scene4_jailer1 exec global/enable_ai.scr
+	$scene4_jailer2 exec global/enable_ai.scr
+	$scene4_jailer3 exec global/enable_ai.scr
+	$scene4_jailer4 exec global/enable_ai.scr
+	$scene4_jailer5 exec global/enable_ai.scr
+
+	$scene4_jailer1.accuracy = 99
+	$scene4_jailer1.noticescale = 5
+
+	$scene4_jailer2.accuracy = 99
+	$scene4_jailer2.noticescale = 5
+
+	$scene4_jailer3.accuracy = 99
+	$scene4_jailer3.noticescale = 5
+
+	$scene4_jailer4.accuracy = 99
+	$scene4_jailer4.noticescale = 5
+
+	$scene4_jailer5.accuracy = 99
+	$scene4_jailer5.noticescale = 5
+
+	//*** Remove the final gates
+	$traindoors_final remove
+	println "!!!!!!!!!!!!!!!!!!!!!!!!REMOVED FINAL TRAIN DOORS"
+
+	//*** Magically teleport the train (it was moved while the player was indoors, yeah!) to a final position at about warp 10
+	$solid_train_engine moveto $trainnode_final.origin
+	$solid_train_engine speed 1000000
+	$solid_train_engine waitmove
+	//$solid_train_engine.origin = $trainnode_final.origin
+
+	println "!!!!!!!!!!!!!!!!!!!!!!!!MOVED TRAIN"
+
+	//***	Close the cargo hold doors
+	$scene3_hangardoor1 moveSouth 128
+	$scene3_hangardoor1 speed 1000
+	$scene3_hangardoor1 playsound door_railcar_open
+	$scene3_hangardoor1 move 
+
+	$scene3_hangardoor2 moveNorth 128
+	$scene3_hangardoor2 speed 1000
+	$scene3_hangardoor2 playsound door_railcar_open
+	$scene3_hangardoor2 move 
+
+	//scene4_captain_sequence_trigger
+	//$scene4_master_jailswitch
+	//$scene4_mg_escapetrigger
+	//$scene4_mg1_escapenode
+	//$scene4_mg2_escapenode
+	//$scene4_mg1_gunner
+	//$scene4_mg2_gunner
+
+	//*** Hide real jailswitch, position the switches at the correct angle
+	$scene4_master_jailswitch hide
+
+	$scene4_master_jailswitch time 1
+	$scene4_master_jailswitch rotateZup 50
+	$scene4_master_jailswitch waitmove
+
+	$scene4_master_jailswitch_ghost time 1
+	$scene4_master_jailswitch_ghost rotateZup 50
+	$scene4_master_jailswitch_ghost waitmove
+
+	//*** Start the machineguns
+	thread scene4_machinegun $scene4_mg1 $scene4_mg1_target
+	thread scene4_machinegun $scene4_mg2 $scene4_mg2_target
+}end
+
+//============================================================================
+scene4_machinegun local.machinegun local.guntarget:{
+//============================================================================
+	local.machinegun setaimtarget local.guntarget
+	local.machinegun startfiring
+}end
+
+//============================================================================
+scene4_mg_escape local.escapetrigger local.escapenode:{
+//============================================================================
+	local.escapetrigger waittill trigger
+
+	if (isAlive self){
+		self type_idle idle
+		self type_attack cover
+		self type_disguise salute
+		self type_grenade grenade
+		self gun "StG44"
+		self unholster
+		self health 100
+		self turret NULL
+		self exec global/runto.scr local.escapenode
+	}
+}end
+
+//============================================================================
+scene4_jailswitch_activate:{
+//============================================================================
+	$scene4_master_jailswitch playsound throw_switch
+
+	//*** If the two mg42 guys are still going at it, kill them now (they must have been killed by the Allied troops outside!)
+	if (isAlive $scene4_mg1_gunner){
+		$scene4_mg1_gunner damage $world 15000 $world (0 0 0) (0 270 0) (0 0 0) 0 5 0 0	//hit the head - location designation #5
+	}
+		
+	if (isAlive $scene4_mg2_gunner){
+		$scene4_mg2_gunner damage $world 15000 $world (0 0 0) (0 270 0) (0 0 0) 0 5 0 0	//hit the head - location designation #5
+	}
+
+	//*** Start the Captain and team on its way 
+	thread scene4_captain_sequence_init
+
+	//*** Animate the switch going down
+	$scene4_master_jailswitch_ghost remove
+	$scene4_master_jailswitch show
+	$scene4_master_jailswitch time 1
+	$scene4_master_jailswitch rotateZdown 100
+	$scene4_master_jailswitch waitmove
+
+	//*** Open all the doors in the main cellbloc
+	//$scene4_prisondoor1a open $player //chrissstrahl
+	$scene4_prisondoor1a open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor1a playsound door_vault_open
+
+	//$scene4_prisondoor1b open $player //chrissstrahl
+	$scene4_prisondoor1b open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor1b playsound door_vault_open
+	wait 0.5
+
+	//$scene4_prisondoor2a open $player //chrissstrahl
+	$scene4_prisondoor2a open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor2a playsound door_vault_open
+
+	//$scene4_prisondoor2b open $player //chrissstrahl
+	$scene4_prisondoor2b open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor2b playsound door_vault_open
+	wait 0.5
+
+	//$scene4_prisondoor3a open $player //chrissstrahl
+	$scene4_prisondoor3a open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor3a playsound door_vault_open
+
+	//$scene4_prisondoor3b open $player //chrissstrahl
+	$scene4_prisondoor3b open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor3b playsound door_vault_open
+	wait 0.5
+
+	//$scene4_prisondoor4a open $player //chrissstrahl
+	$scene4_prisondoor4a open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor4a playsound door_vault_open
+
+	//$scene4_prisondoor4b open $player //chrissstrahl
+	$scene4_prisondoor4b open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor4b playsound door_vault_open
+	wait 0.5
+
+	//$scene4_prisondoor5a open $player //chrissstrahl
+	$scene4_prisondoor5a open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor5a playsound door_vault_open
+
+	//$scene4_prisondoor5b open $player //chrissstrahl
+	$scene4_prisondoor5b open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor5b playsound door_vault_open
+	wait 0.5
+
+	//$scene4_prisondoor6a open $player //chrissstrahl
+	$scene4_prisondoor6a open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor6a playsound door_vault_open
+
+	//$scene4_prisondoor6b open $player //chrissstrahl
+	$scene4_prisondoor6b open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor6b playsound door_vault_open
+
+	//***	Arm the scripted sequence of POWs making a run for it 
+	thread scene4_pow_sequence
+}end
+
+//============================================================================
+scene4_pow_sequence:{
+//============================================================================
+	//*** POWs emerge from their dark cells and run for the exit haphazardly
+	$scene4_pow_sequence_trigger waittill trigger	//trigger_multiple in the bsp
+
+	//*** *Autosave* only on easy or medium difficulty
+	if (level.skill == "0"){
+		exec global/autosave.scr 3	//"Jailbreak"
+	}else if (level.skill == "1"){
+		exec global/autosave.scr 3	//"Jailbreak"
+	}
+
+	spawn human/1st-ranger_private_prisoner "targetname" "scene4_pow1" "type_attack" "cover" 
+	spawn human/1st-ranger_private_prisoner "targetname" "scene4_pow2" "type_attack" "cover"
+	spawn human/1st-ranger_private_prisoner "targetname" "scene4_pow3" "type_attack" "cover"
+	spawn human/1st-ranger_private_prisoner "targetname" "scene4_pow4" "type_attack" "cover"
+	spawn human/1st-ranger_private_prisoner "targetname" "scene4_pow5" "type_attack" "cover"
+	spawn human/1st-ranger_private_prisoner "targetname" "scene4_pow6" "type_attack" "cover"
+	spawn human/1st-ranger_private_prisoner "targetname" "scene4_pow7" "type_attack" "cover"
+	spawn human/1st-ranger_private_prisoner "targetname" "scene4_pow8" "type_attack" "cover"
+	spawn human/1st-ranger_private_prisoner "targetname" "scene4_pow9" "type_attack" "cover"
+	spawn human/1st-ranger_private_prisoner "targetname" "scene4_pow10" "type_attack" "cover"
+
+	/*
+		$scene4_pow1.origin = $scene4_pow_spawn1.origin
+		$scene4_pow2.origin = $scene4_pow_spawn2.origin
+		$scene4_pow3.origin = $scene4_pow_spawn3.origin
+		$scene4_pow4.origin = $scene4_pow_spawn4.origin
+		$scene4_pow5.origin = $scene4_pow_spawn5.origin
+		$scene4_pow6.origin = $scene4_pow_spawn6.origin
+		$scene4_pow7.origin = $scene4_pow_spawn7.origin
+		$scene4_pow8.origin = $scene4_pow_spawn8.origin
+		$scene4_pow9.origin = $scene4_pow_spawn9.origin
+		$scene4_pow10.origin = $scene4_pow_spawn10.origin
+
+		$scene4_pow1 exec global/disable_ai.scr
+		$scene4_pow2 exec global/disable_ai.scr
+		$scene4_pow3 exec global/disable_ai.scr
+		$scene4_pow4 exec global/disable_ai.scr
+		$scene4_pow5 exec global/disable_ai.scr
+		$scene4_pow6 exec global/disable_ai.scr
+		$scene4_pow7 exec global/disable_ai.scr
+		$scene4_pow8 exec global/disable_ai.scr
+		$scene4_pow9 exec global/disable_ai.scr
+		$scene4_pow10 exec global/disable_ai.scr
+
+		$scene4_pow1.leash = 100000
+		$scene4_pow2.leash = 100000
+		$scene4_pow3.leash = 100000
+		$scene4_pow4.leash = 100000
+		$scene4_pow5.leash = 100000
+		$scene4_pow6.leash = 100000
+		$scene4_pow7.leash = 100000
+		$scene4_pow8.leash = 100000
+		$scene4_pow9.leash = 100000
+		$scene4_pow10.leash = 100000
+		$scene4_pow1 runto $scene4_exit_node
+		wait (randomint(4))
+		$scene4_pow2 runto $scene4_exit_node
+		wait (randomint(4))
+		$scene4_pow3 runto $scene4_exit_node
+		wait (randomint(4))
+		$scene4_pow4 runto $scene4_exit_node
+		wait (randomint(4))
+		$scene4_pow5 runto $scene4_exit_node
+		wait (randomint(4))
+		$scene4_pow6 runto $scene4_exit_node
+		wait (randomint(4))
+		$scene4_pow7 runto $scene4_exit_node
+		wait (randomint(4))
+		$scene4_pow8 runto $scene4_exit_node
+		wait (randomint(4))
+		$scene4_pow9 runto $scene4_exit_node
+		wait (randomint(4))
+		$scene4_pow10 runto $scene4_exit_node
+		wait (randomint(4))
+	*/
+	for (local.i=1;local.i<11;local.i++){
+		local.rndwaittime = randomint(2)					//pick a random amount of time to wait between spawns
+		
+		local.prisonername = ("scene4_pow" + local.i)		//assign a name to the prisoner - "I am not a number! I am a free man!"
+		local.orgname = ("scene4_pow_spawn" + local.i)		//create the name of the script_origin already in the map
+		local.org1 = $(local.orgname).origin				//grab the origin of the script_origin already in the map
+
+		println local.orgname
+		println local.prisonername
+		println local.org1
+
+		local.ent =	spawn human/1st-ranger_private_prisoner
+		local.ent.origin = local.org1						//place the guy in the correct spot						
+		local.ent exec global/disable_ai.scr	
+		local.ent thread scene4_pow_escape					//run for the exit point
+
+		wait local.rndwaittime
+	}
+}end
+
+//============================================================================
+scene4_pow_escape:{
+//============================================================================
+	self runto $scene4_exit_node
+	self waittill movedone
+	wait 4
+	self remove
+}end
+
+//============================================================================
+scene4_captain_sequence_init:{
+//============================================================================
+	//*** Reposition the Captain in preparation for the speech sequence
+	$scene1_captain.origin = $scene4_captain_start_node.origin
+	$scene1_captain exec global/disable_ai.scr
+
+	//*** Spawn some bot buddies for the Captain so he looks like he might actually be in charge here
+	spawn models/human/2nd-ranger_private.tik "targetname" "scene4_redshirt1" "type_attack" "cover" 
+	spawn models/human/2nd-ranger_private.tik "targetname" "scene4_redshirt2" "type_attack" "cover"
+	spawn models/human/2nd-ranger_private.tik "targetname" "scene4_redshirt3" "type_attack" "cover"
+
+	$scene4_redshirt1.origin = $scene4_redshirt1_node.origin
+	$scene4_redshirt2.origin = $scene4_redshirt2_node.origin
+	$scene4_redshirt3.origin = $scene4_redshirt3_node.origin
+
+	$scene4_redshirt1 exec global/disable_ai.scr
+	$scene4_redshirt2 exec global/disable_ai.scr
+	$scene4_redshirt3 exec global/disable_ai.scr
+
+	//*** Activate the Captain speech scripted sequence 
+	thread scene4_captain_sequence
+
+	//*** Start Scene 5 now that all the major events of Scene 4 are either done or underway
+	thread scene5
+}end
+
+//============================================================================
+scene4_captain_sequence:{
+//============================================================================
+	if (level.scene4_cutscene == 1)	{end}
+	level.scene4_cutscene = 1
+
+	//*** Captain runs to node from the outside and faces player before speaking
+	$scene1_captain exec global/runto.scr $scene4_captain_speech_node
+	//$scene1_captain exec global/turnto.scr $player //chrissstrahl
+	//$scene1_captain lookAt $player //chrissstrahl
+	$scene1_captain exec coop_mod/replace.scr::turnto //chrissstrahl - coop compatible
+	$scene1_captain exec coop_mod/replace.scr::lookat //chrissstrahl - coop compatible
+
+	$scene4_redshirt1 exec global/runto.scr $scene4_redshirt1_scenenode
+//	$scene4_redshirt1 exec global/turnto.scr $player //chrissstrahl
+//	$scene4_redshirt1 lookAt $player //chrissstrahl
+	$scene4_redshirt1 exec coop_mod/replace.scr::turnto //chrissstrahl - coop compatible
+	$scene4_redshirt1 exec coop_mod/replace.scr::lookat //chrissstrahl - coop compatible
+
+	$scene4_redshirt2 exec global/runto.scr $scene4_redshirt2_scenenode
+//	$scene4_redshirt2 exec global/turnto.scr $player //chrissstrahl
+//	$scene4_redshirt2 lookAt $player //chrissstrahl
+	$scene4_redshirt2 exec coop_mod/replace.scr::turnto //chrissstrahl - coop compatible
+	$scene4_redshirt2 exec coop_mod/replace.scr::lookat //chrissstrahl - coop compatible
+
+	$scene4_redshirt3 exec global/runto.scr $scene4_redshirt3_scenenode
+//	$scene4_redshirt3 exec global/turnto.scr $player //chrissstrahl
+//	$scene4_redshirt3 lookAt $player //chrissstrahl
+	$scene4_redshirt3 exec coop_mod/replace.scr::turnto //chrissstrahl - coop compatible
+	$scene4_redshirt3 exec coop_mod/replace.scr::lookat //chrissstrahl - coop compatible
+	
+	//$scene1_captain waittill movedone
+
+	//*** WAIT UNTIL THE PLAYER GETS CLOSE ENOUGH
+	$scene4_captain_sequence_trigger waittill trigger
+	$scene1_captain say dfr_m6l3_add04
+	//centerprint "\n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \nAll right Powell, we'll hold this area and take care of the POWs!"
+	wait 4
+
+	$scene1_captain say dfr_m6l3_add05
+	//centerprint "\n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \nI've sent a few more men your way to help you out. Now go ahead and start planting those explosives!"
+	wait 5
+
+	$scene1_captain say dfr_m6l3_add06
+	//centerprint "\n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \nMeet us back here when you're done!"
+	wait 3
+
+	$scene1_captain exec global/turnto.scr $scene4_redshirt3_scenenode
+	$scene1_captain lookAt $scene4_redshirt3
+	$scene1_captain say dfr_m6l3_add07
+	//centerprint "\n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \nOk, guys, let's get those POWs out of there! Go! Go! Go!"
+	wait 1.5
+
+	//*** Captain runs off with the rest of the guys
+	$scene4_redshirt3 exec global/runto.scr $scene4_terminate_node
+	wait 0.75
+
+	$scene4_redshirt2 exec global/runto.scr $scene4_terminate_node
+	wait 0.75
+
+	$scene4_redshirt1 exec global/runto.scr $scene4_terminate_node
+	wait 0.5
+
+	$scene1_captain exec global/runto.scr $scene4_terminate_node
+	$scene1_captain waittill movedone
+
+	//*** Once they've all hit the termination node out of line of sight from the player, remove them
+	$scene1_captain remove	
+	$scene4_redshirt1 remove
+	$scene4_redshirt2 remove
+	$scene4_redshirt3 remove
+}end
+
+//============================================================================
+scene4_nocaptain_sequence:{
+//============================================================================
+	if (level.scene4_cutscene == 1)	{end}
+	level.scene4_cutscene = 1
+
+	//*** Call from scene5_hingebomb_sequence, player has gone well away from the Captain and that conversation is not needed as a result
+	//*** Remove the sequence starting trigger, thread scene4_captain_sequence will never happen beyond the waittill trigger
+	$scene4_captain_sequence_trigger remove
+
+	//*** Captain runs off with the rest of the guys
+	$scene4_redshirt3 exec global/runto.scr $scene4_terminate_node
+	wait 0.75
+
+	$scene4_redshirt2 exec global/runto.scr $scene4_terminate_node
+	wait 0.75
+
+	$scene4_redshirt1 exec global/runto.scr $scene4_terminate_node
+	wait 0.5
+
+	$scene1_captain exec global/runto.scr $scene4_terminate_node
+	$scene1_captain waittill movedone
+
+	//*** Once they've all hit the termination node out of line of sight from the player, remove them
+	$scene1_captain remove	
+	$scene4_redshirt1 remove
+	$scene4_redshirt2 remove
+	$scene4_redshirt3 remove
+}end
+
+//SCENE 5: BATTLE AT THE CATWALK
+//*** Called from scene4_jailswitch_activate
+//============================================================================
+scene5:{
+//============================================================================
+	//*** UPDATE OBJECTIVES and activate bomb tracking
+	waitthread global/objectives.scr::add_objectives 2 3 "Unlock the cellblock doors and free the POWs."
+	waitthread global/objectives.scr::add_objectives 3 2 "Plant explosives on the fuel flow control units." $scene6_fuelbomb1.origin
+	waitthread global/objectives.scr::add_objectives 4 2 "Open the main fuel line valve." $scene7_objective_marker.origin
+	thread global/objectives.scr::current_objectives 3
+	thread scene6 
+
+	//*** SHOW THE HINGEBOMBS AND DETONATOR
+	$scene5_hingebomb1 show
+	$scene5_hingebomb2 show
+	$scene5_hingewire show
+	$scene5_detonatorwire show
+	$plunger show
+
+	//*** Enable the trigger for the door blowing sequence
+	thread scene5_hingebomb_sequence
+	
+	//*** Relocate the Ranger reinforcements to the bomb area on either side of the door, ready to go
+	thread scene5_rangerteam_setup	
+}end
+
+//============================================================================
+scene5_rangerteam_setup:{
+//============================================================================
+	level.assaulter1 nodamage
+	level.assaulter2 nodamage
+
+	//*** Position the Ranger friendlies
+	level.assaulter1.origin = $scene5_reinforcement_node1.origin
+	level.assaulter2.origin = $scene5_reinforcement_node2.origin
+	
+	//*** Set any properties of the friendlies here
+	level.assaulter1 exec global/enable_ai.scr
+	level.assaulter2 exec global/enable_ai.scr
+
+	level.assaulter1.friendtype = -1
+	level.assaulter2.friendtype = -1
+
+	level.assaulter1.angles = (0 180 0)
+	level.assaulter2.angles = (0 170 0)
+
+	//level.assaulter1 lookAt $player //chrissstrahl
+	//level.assaulter2 lookAt $player //chrissstrahl
+	level.assaulter1 exec coop_mod/replace.scr::lookat //chrissstrahl - coop compatible
+	level.assaulter2 exec coop_mod/replace.scr::lookat //chrissstrahl - coop compatible
+}end
+
+//============================================================================
+scene5_hingebomb_sequence:{
+//============================================================================
+	$scene5_hingebomb_sequence_trigger waittill trigger
+
+	//*** Cancel the Captain speech 
+	thread scene4_nocaptain_sequence
+
+	level.assaulter2 say dfr_M6L3_add08
+	//centerprint "\n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \n \nOk sir, we've rigged the door to blow. Its all yours now!"
+	wait 3
+
+	iprintlnbold "HINT: Use the plunger to blow the door open."
+
+	//*** Player uses the plunger
+	level.scene5_demolition_authorization_key = 1		
+}end
+
+//============================================================================
+scene5_detonation:{
+//============================================================================
+	if (level.scene5_demolition_authorization_key == 1){
+		$scene5_detonation_usetrigger nottriggerable
+
+		//*** Animate the plunger going down
+		$plunger anim "fire"
+
+		//*** Play the plunger sound effect
+		//$player playsound plunger //chrissstrahl
+		$plunger playsound plunger //chrissstrahl - make coop compatible
+
+		//*** Detonate the bombs
+		wait 0.45 	//dramatic pause!
+
+		//*** Hide the bombs
+		$scene5_hingebomb1 hide
+		$scene5_hingebomb2 hide
+		$scene5_hingewire hide
+	
+		//*** Get rid of the special locked door sound trigger_use
+		$exploding_door_locked_trigger remove
+
+		//*** Detonate
+		thread global/exploder.scr::explode 1
+		
+		//*** Play the exploding door sound
+		//$player playsound explode_door //chrissstrahl
+		exec coop_mod/replace.scr::playsound explode_door //chrissstrahl - make coop compatible
+
+		//*** Shake the player's view hard
+		exec global/earthquake.scr .33 4 0 0
+	
+		//*** Generate some neat explosion effects to blow off the hinges from the door
+		local.effect_org1 = $scene5_hingebomb1.origin 
+		//local.effect_org1.angles = (0 180 0)
+		local.effect_org2 = $scene5_hingebomb1.origin + (16 48 0)
+		//local.effect_org2.angles = (0 180 0)
+		local.effect_org3 = $scene5_hingebomb2.origin 
+		//local.effect_org3.angles = (0 180 0)
+		local.effect_org4 = $scene5_hingebomb2.origin + (16 48 18)
+		//local.effect_org4.angles = (0 180 0)
+
+		exec global/model.scr local.effect_org1 "models/emitters/explosion_bombmetalwall.tik" 1
+		exec global/model.scr local.effect_org2 "models/emitters/explosion_bombmetalwall.tik" 1
+		exec global/model.scr local.effect_org3 "models/emitters/explosion_bombmetalwall.tik" 1
+		exec global/model.scr local.effect_org4 "models/emitters/explosion_bombmetalwall.tik" 1.2
+	
+		//*** Enable the reinforcements 
+		level.assaulter1 takedamage
+		level.assaulter2 takedamage
+		wait 0.5
+
+		level.assaulter1 lookAt NULL
+		level.assaulter2 lookAt NULL
+		level.assaulter1 turnto NULL
+		level.assaulter2 turnto NULL
+
+		//*** Setup for Assaulter1
+		level.assaulter1.accuracy		= 20		//marksmanship
+		level.assaulter1.mindist		= 128		//range to stop closing in
+		level.assaulter1.maxdist		= 4000		//range to close to on enemy for longest range shot
+		level.assaulter1.leash			= 10000
+		//level.assaulter1 tether $player //chrissstrahl
+		level.assaulter1 exec coop_mod/main.scr::tether //chrissstrahl - made coop compatible
+		level.assaulter1.sight			= 4000
+		level.assaulter1.noticescale	= 1
+		level.assaulter1.waittime		= 0.1		//respond as fast as possible to player movement		
+		level.assaulter1.fov			= 180		//sees better this way
+
+		//*** Assaulter1 follows the player
+		level.assaulter1 thread global/friendly.scr::friendlythink
+		level.assaulter1.friendtype = 1 			//toggle this to -1 to shut down following
+		//level.assaulter1.destination = $player //chrissstrahl
+		level.assaulter1 exec coop_mod/main.scr::destination //chrissstrahl - made coop compatible
+		level.assaulter1.distance = 192
+		level.assaulter1 exec global/enable_ai.scr
+
+		//*** Setup for Assaulter2
+		level.assaulter2.accuracy		= 20		//marksmanship
+		level.assaulter2.mindist		= 128		//range to stop closing in
+		level.assaulter2.maxdist		= 4000		//range to close to on enemy for longest range shot
+		level.assaulter2.leash			= 10000
+		//level.assaulter2 tether $player //chrissstrahl
+		level.assaulter2 exec coop_mod/main.scr::tether //chrissstrahl - make coop compatible
+		level.assaulter2.sight			= 4000
+		level.assaulter2.noticescale	= 1
+		level.assaulter2.waittime		= 0.1		//respond as fast as possible to player movement
+		level.assaulter2.fov			= 180		//sees better this way
+
+		//*** Assaulter2 follows the player
+		level.assaulter2 thread global/friendly.scr::friendlythink
+		level.assaulter2.friendtype = 1 			//toggle this to -1 to shut down following
+		//level.assaulter2.destination = $player //chrissstrahl
+		level.assaulter2 exec coop_mod/main.scr::destination //chrissstrahl - make coop compatible
+		level.assaulter2.distance = 192
+		level.assaulter2 exec global/enable_ai.scr
+		thread scene5_machinegun1
+	}
+}end
+
+//============================================================================
+scene5_machinegun1:{
+//============================================================================
+	$scene5_mg1 burstFireSettings 0.5 1 0.25 0.5
+	//$scene5_mg1 maxYawOffset 180
+	//$scene5_mg1 bulletdamage 20
+	//$scene5_mg1 bulletspread 1 1 
+
+	//*** Targeting directions for the gunner, alternating between the player and the friendlies
+	while (isAlive $scene5_mg1_gunner){
+		$scene5_mg1 startFiring
+		if (isAlive level.assaulter1){
+			$scene5_mg1 setaimtarget level.assaulter1
+			wait 1.5
+		}
+		if (isAlive level.assaulter2){
+			$scene5_mg1 setaimtarget level.assaulter2
+			wait 1.5
+		}
+		
+		//$scene5_mg1 setaimtarget $player //chrissstrahl
+		$scene5_mg1 setaimtarget (exec coop_mod/replace.scr::player_closestTo $scene5_mg1) //chrissstrahl
+		wait 2.5
+
+		$scene5_mg1 stopfiring
+
+		if (level.skill == "0"){
+			wait 3
+		}else if (level.skill == "1"){
+			wait 2.5
+		}else if (level.skill == "2"){
+			wait 2
+		}
+	}
+	//When the gunner dies, activate these spawning routines	
+	thread scene5_spawner1_initialize
+	thread scene5_spawner2_initialize	
+}end
+
+//============================================================================
+scene5_spawner1_initialize:{
+//============================================================================
+	level.scene5_spawn1_teamvalue = 0		//initializes variable for total number spawned to date
+	level.scene5_spawn1_teamlimitmax = 6	//initializes constant for total number allowed to spawn 
+	level.scene5_spawn1_currentalive = 0	//initializes variable for number of enemies currently alive from this spawner
+	level.scene5_spawn1_currentalivemax = 1	//initializes constant for maximum number allowed to be alive at any given time from this spawner
+	level.scene5_spawn1_loopwaittime = 1	//initializes constant for time between respawns
+	level.scene5_spawn1_deactivator = 0		//initializes variable for shutting down this loop's ability to spawn when the player is past this area
+
+	thread scene5_spawndetector1_control
+}end
+
+//============================================================================
+scene5_spawndetector1_control:{
+//============================================================================
+	local.loopwaittime = 0.2
+
+	//while ($player isTouching $scene5_spawndetector1){ //chrissstrahl
+	while (exec coop_mod/replace.scr::istouching $scene5_spawndetector1){ //chrissstrahl - coop compatible
+		//*** 3 at a time, use +3 
+		//*** Crazy fire and maneuver enemy attack, use nothing
+		if ((level.scene5_spawn1_currentalive + 1) <= level.scene5_spawn1_currentalivemax && level.scene5_spawn1_deactivator == 0 && level.scene5_spawn1_teamvalue < level.scene5_spawn1_teamlimitmax){
+		//if ((level.scene5_spawn1_currentalive) <= level.scene5_spawn1_currentalivemax && level.scene5_spawn1_deactivator == 0 && level.scene5_spawn1_teamvalue < level.scene5_spawn1_teamlimitmax)
+			//centerprint(level.scene5_spawn1_currentalive + "<" + level.scene5_spawn1_currentalivemax + "\n" + level.scene5_spawn1_deactivator + "=" + level.scene5_spawn1_deactivator+ "\n" + level.scene5_spawn1_teamvalue + "<" + level.scene5_spawn1_teamlimitmax )		
+			local.scene5_spawn1_ai_name1 = "scene5_spawn1_ai1_" + level.scene5_spawn1_teamvalue	//assign a name to the spawned enemy
+			local.org1 = $scene5_spawndetector1_spawner1.origin						//spawn location as a script_origin
+			
+			//*** Spawn 1 enemy soldier in a wave
+			spawn models/human/german_wehrmact_soldier.tik "targetname" (local.scene5_spawn1_ai_name1) "type_attack" "cover" 
+
+			$(local.scene5_spawn1_ai_name1).origin = local.org1				//place the guy in the correct spot						
+			level.scene5_spawn1_currentalive ++							//increment the max allowed alive at any given time			
+			level.scene5_spawn1_teamvalue ++							//track the scene's enemy population
+			$(local.scene5_spawn1_ai_name1) thread scene5_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene5_spawn1_ai_name1) thread scene5_spawn1_ai_navigate1 	//call navigation thread 
+
+			local.scene5_spawn1_ai_name1.mindist = 128
+			local.scene5_spawn1_ai_name1.maxdist = 4000
+			local.scene5_spawn1_ai_name1.leash = 10000
+			local.scene5_spawn1_ai_name1.fixedleash = 0
+			local.scene5_spawn1_ai_name1.sight = 2000
+			local.scene5_spawn1_ai_name1.noticescale = 5	//50
+			local.scene5_spawn1_ai_name1.accuracy = 100
+			local.scene5_spawn1_ai_name1.hearing = 4000
+			local.scene5_spawn1_ai_name1.interval = 128
+	
+			//centerprint(level.scene5_spawn1_currentalive + "<" + level.scene5_spawn1_currentalivemax + "\n" + level.scene5_spawn1_deactivator + "=" + level.scene5_spawn1_deactivator+ "\n" + level.scene5_spawn1_teamvalue + "<" + level.scene5_spawn1_teamlimitmax )		
+		}
+		wait local.loopwaittime			//every local.loopwaittime seconds, resume the while loop	
+	}	
+	wait local.loopwaittime				//prevent infinite loop warning
+	goto scene5_spawndetector1_control
+}end
+
+//============================================================================
+scene5_spawn1_detect_death:{
+//============================================================================
+	self waittill death
+	level.scene5_spawn1_currentalive --	//decrement the population count 
+}end
+
+//============================================================================
+scene5_spawn1_ai_navigate1:{
+//============================================================================
+	if !(isAlive self)	{end}
+
+	self exec global/runto.scr $scene5_spawn1_rallypoint1
+}end
+
+//============================================================================
+scene5_spawn1_terminate:{
+//============================================================================
+	level.scene5_spawn1_deactivator = 1
+}end
+
+//============================================================================
+scene5_spawner2_initialize:{
+//============================================================================
+	level.scene5_spawn2_teamvalue = 0		//initializes variable for total number spawned to date
+	level.scene5_spawn2_teamlimitmax = 6	//initializes constant for total number allowed to spawn 
+	level.scene5_spawn2_currentalive = 0	//initializes variable for number of enemies currently alive from this spawner
+	level.scene5_spawn2_currentalivemax = 2	//initializes constant for maximum number allowed to be alive at any given time from this spawner
+	level.scene5_spawn2_loopwaittime = 1	//initializes constant for time between respawns
+	level.scene5_spawn2_deactivator = 0		//initializes variable for shutting down this loop's ability to spawn when the player is past this area
+
+	thread scene5_spawndetector2_control
+}end
+
+//============================================================================
+scene5_spawndetector2_control:{
+//============================================================================
+	local.loopwaittime = 0.2
+
+	//while ($player isTouching $scene5_spawndetector2 || $player isTouching $scene5_spawndetector2a){ //chrissstrahl
+	while (exec coop_mod/replace.scr::istouching $scene5_spawndetector2 || exec coop_mod/replace.scr::istouching $scene5_spawndetector2a){ //chrissstrahl - make coop compatible
+		//*** 3 at a time, use +3 
+		//*** Crazy fire and maneuver enemy attack, use nothing
+		if ((level.scene5_spawn2_currentalive + 2) <= level.scene5_spawn2_currentalivemax && level.scene5_spawn2_deactivator == 0 && level.scene5_spawn2_teamvalue < level.scene5_spawn2_teamlimitmax){
+		//if ((level.scene5_spawn2_currentalive) <= level.scene5_spawn2_currentalivemax && level.scene5_spawn2_deactivator == 0 && level.scene5_spawn2_teamvalue < level.scene5_spawn2_teamlimitmax)
+			//centerprint(level.scene5_spawn2_currentalive + "<" + level.scene5_spawn2_currentalivemax + "\n" + level.scene5_spawn2_deactivator + "=" + level.scene5_spawn2_deactivator+ "\n" + level.scene5_spawn2_teamvalue + "<" + level.scene5_spawn2_teamlimitmax )
+			local.scene5_spawn2_ai_name1 = "scene5_spawn2_ai1_" + level.scene5_spawn2_teamvalue		//assign a name to the spawned enemy
+			local.org1 = $scene5_spawndetector2_spawner1.origin										//spawn location as a script_origin
+
+			local.scene5_spawn2_ai_name2 = "scene5_spawn2_ai2_" + level.scene5_spawn2_teamvalue
+			local.org2 = $scene5_spawndetector2_spawner2.origin					
+			
+			//*** Spawn 3 enemy soldiers in a wave
+			spawn models/human/german_wehrmact_soldier "targetname" (local.scene5_spawn2_ai_name1) "type_attack" "cover" 
+
+			$(local.scene5_spawn2_ai_name1).origin = local.org1						//place the guy in the correct spot						
+			level.scene5_spawn2_currentalive ++										//increment the max allowed alive at any given time			
+			level.scene5_spawn2_teamvalue ++										//track the scene's enemy population
+			$(local.scene5_spawn2_ai_name1) thread scene5_spawn2_detect_death 		//call a waittill death thread
+			$(local.scene5_spawn2_ai_name1) thread scene5_spawn2_ai_navigate1 		//call navigation thread 
+
+			local.scene5_spawn2_ai_name1.mindist = 128
+			local.scene5_spawn2_ai_name1.maxdist = 4000
+			local.scene5_spawn2_ai_name1.leash = 10000
+			local.scene5_spawn2_ai_name1.fixedleash = 0
+			local.scene5_spawn2_ai_name1.sight = 2000
+			local.scene5_spawn2_ai_name1.noticescale = 5	//50
+			local.scene5_spawn2_ai_name1.accuracy = 100
+			local.scene5_spawn2_ai_name1.hearing = 4000
+			local.scene5_spawn2_ai_name1.interval = 128
+	
+			spawn models/human/german_wehrmact_nco "targetname" (local.scene5_spawn2_ai_name2) "type_attack" "cover" 
+			
+			$(local.scene5_spawn2_ai_name2).origin = local.org2					//place the guy in the correct spot						
+			level.scene5_spawn2_currentalive ++									//increment the max allowed alive at any given time
+			level.scene5_spawn2_teamvalue ++
+			$(local.scene5_spawn2_ai_name2) thread scene5_spawn2_detect_death 	//call a waittill death thread
+			$(local.scene5_spawn2_ai_name2) thread scene5_spawn2_ai_navigate2 	//call navigation thread 
+			
+			$(local.scene5_spawn2_ai_name2) gun "mp40"
+
+			local.scene5_spawn2_ai_name2.mindist = 128
+			local.scene5_spawn2_ai_name2.maxdist = 4000
+			local.scene5_spawn2_ai_name2.leash = 10000
+			local.scene5_spawn2_ai_name2.fixedleash = 0
+			local.scene5_spawn2_ai_name2.sight = 2000
+			local.scene5_spawn2_ai_name2.noticescale = 1
+			local.scene5_spawn2_ai_name2.accuracy = 100
+			local.scene5_spawn2_ai_name2.hearing = 4000
+			local.scene5_spawn2_ai_name2.interval = 128
+			//centerprint(level.scene5_spawn2_currentalive + "<" + level.scene5_spawn2_currentalivemax + "\n" + level.scene5_spawn2_deactivator + "=" + level.scene5_spawn2_deactivator+ "\n" + level.scene5_spawn2_teamvalue + "<" + level.scene5_spawn2_teamlimitmax )		
+		}
+		wait local.loopwaittime			//every local.loopwaittime seconds, resume the while loop	
+	}
+	wait local.loopwaittime				//prevent infinite loop warning
+	goto scene5_spawndetector2_control
+}end
+
+//============================================================================
+scene5_spawn2_detect_death:{
+//============================================================================
+	self waittill death
+	level.scene5_spawn2_currentalive --	//decrement the population count 
+}end
+
+//============================================================================
+scene5_spawn2_ai_navigate1:{
+//============================================================================
+	if !(isAlive self)	{end}
+	self exec global/runto.scr $scene5_spawn2_rallypoint1
+}end
+
+//============================================================================
+scene5_spawn2_ai_navigate2:{
+//============================================================================
+	if !(isAlive self)	{end}
+	self exec global/runto.scr $scene5_spawn2_rallypoint2
+}end
+
+//============================================================================
+scene5_spawn2_terminate:{
+//============================================================================
+	level.scene5_spawn2_deactivator = 1
+}end
+
+//SCENE 6: THE FUEL LINE BOMBS & FUEL VALVES		
+///============================================================================
+scene6:{
+//============================================================================
+	thread scene6_initialize_bombsites
+
+	//*** Initialize variable for bomb placement and valve turning combined
+	level.scene6_objectives_complete = 0 
+
+	//*** Detect when both bomb placement and valve turning objectives are completed
+	thread scene6_objectives_complete_monitor
+
+	//*** Activate the spawners to keep the player busy in the downstairs area
+	thread scene6_spawner1_initialize
+	thread scene6_spawner2_initialize
+}end
+
+//============================================================================
+scene6_initialize_bombsites:{
+//============================================================================
+	//*** Initialize values used in tracking fuel pressure regulator objective status
+	level.scene6_bombcount = 3
+	level.scene6_bombpoint1_status = 0	
+	level.scene6_bombpoint2_status = 0	
+	level.scene6_bombpoint3_status = 0	
+
+	thread scene6_bombtracker
+	thread scene6_objective_assignment	
+}end
+
+//============================================================================
+scene6_bombplant1:{ //*** Trigger_useonce in bsp
+//============================================================================
+	$scene6_fuelbomb1 model items/explosive.tik
+	$scene6_fuelbomb1 playsound plantbomb
+
+	level.scene6_bombcount --
+	level.scene6_bombpoint1_status = 1
+	
+	thread scene6_bombtracker
+	thread scene6_objective_assignment
+}end
+
+//============================================================================
+scene6_bombplant2:{ //*** Trigger_useonce in bsp
+//============================================================================
+	$scene6_fuelbomb2 model items/explosive.tik
+	$scene6_fuelbomb2 playsound plantbomb
+
+	level.scene6_bombcount --
+	level.scene6_bombpoint2_status = 1
+	thread scene6_bombtracker
+	thread scene6_objective_assignment
+
+	//*** *Autosave*
+	exec global/autosave.scr 4	//"Fuel Flow Unit"
+}end
+
+//============================================================================
+scene6_bombplant3:{ //*** Trigger_useonce in bsp
+//============================================================================
+	$scene6_fuelbomb3 model items/explosive.tik
+	$scene6_fuelbomb3 playsound plantbomb
+
+	level.scene6_bombcount --
+	level.scene6_bombpoint3_status = 1
+	thread scene6_bombtracker
+	thread scene6_objective_assignment
+}end
+
+//============================================================================
+scene6_bombtracker:{
+//============================================================================
+	//*** Tracks how many bomb locations are left and reports with text embedded in objectives
+	level.locationchecktext = ("Plant explosives on the fuel flow control units. [" + level.scene6_bombcount + " remaining]")
+
+	//*** When all the bombs are planted, update the objective to successful
+	if (level.scene6_bombcount == 0){
+		//*** UPDATE OBJECTIVES
+		//waitthread global/objectives.scr::add_objectives 1 3 "Snipe the tower guards. Avoid excessive casualties." $player.origin
+		//waitthread global/objectives.scr::add_objectives 2 3 "Unlock the cellblock doors and free the POWs."
+
+		waitthread global/objectives.scr::add_objectives 3 3 "Plant explosives on the fuel flow control units."
+		thread global/objectives.scr::current_objectives 4
+		level.scene6_objectives_complete = level.scene6_objectives_complete + 0.5
+		end
+	}
+}end
+
+//============================================================================
+scene6_objective_assignment:{
+//============================================================================
+	//*** Moves the compass waypoint indicator to the next bomb plant location
+
+	if (level.scene6_bombpoint1_status == 0){
+		//waitthread global/objectives.scr::add_objectives 1 3 "Snipe the tower guards. Avoid excessive casualties." $player.origin
+		//waitthread global/objectives.scr::add_objectives 2 3 "Unlock the cellblock doors and free the POWs."
+		waitthread global/objectives.scr::add_objectives 3 2 level.locationchecktext $scene6_fuelbomb1.origin
+
+		thread global/objectives.scr::current_objectives 3
+	}else if (level.scene6_bombpoint2_status == 0){
+		//waitthread global/objectives.scr::add_objectives 1 3 "Snipe the tower guards. Avoid excessive casualties." $player.origin
+		//waitthread global/objectives.scr::add_objectives 2 3 "Unlock the cellblock doors and free the POWs."
+		waitthread global/objectives.scr::add_objectives 3 2 level.locationchecktext $scene6_fuelbomb2.origin
+		thread global/objectives.scr::current_objectives 3
+	}else if (level.scene6_bombpoint3_status == 0){
+		//waitthread global/objectives.scr::add_objectives 1 3 "Snipe the tower guards. Avoid excessive casualties." $player.origin
+		//waitthread global/objectives.scr::add_objectives 2 3 "Unlock the cellblock doors and free the POWs."
+		waitthread global/objectives.scr::add_objectives 3 2 level.locationchecktext $scene6_fuelbomb3.origin
+		thread global/objectives.scr::current_objectives 3
+	}
+}end
+
+//============================================================================
+scene6_valve_function:{
+//============================================================================
+	//*** *Autosave* only on easy or medium
+	if (level.skill == "0"){
+		exec global/autosave.scr 5	//"Fuel valve"
+	}else if (level.skill == "1"){
+		exec global/autosave.scr 5	//"Fuel valve"
+	}else if (level.skill == "2"){
+		exec global/autosave.scr 5	//"Fuel valve"
+	}
+
+	//*** Activate the silent alarm to spawn the reinforcements
+	level.alarm_always_on = 1
+	//$endcrate1 notsolid
+	//$endcrate2 notsolid
+	//$endcrate3 notsolid
+	$endcrate1 connect_paths	
+	$endcrate2 connect_paths
+	$endcrate3 connect_paths
+	$endcrate1 remove
+	$endcrate2 remove
+	$endcrate3 remove
+	thread global/alarmer.scr::turn_alarm_on	
+	thread scene7_silentalarm_terminate
+
+	$scene6_valve.model = animate/redvalve_nopulse.tik
+	$scene6_valve time 3
+	$scene6_valve rotateZdown 360
+	$scene6_valve playsound flywheel
+	$scene6_valve waitmove
+	wait 2
+
+	waitthread global/objectives.scr::add_objectives 4 3 "Open the main fuel line valve." $scene7_objective_marker.origin
+	level.scene6_objectives_complete = level.scene6_objectives_complete + 0.5
+
+	//*** SPAWN IN REINFORCEMENTS TO THE PUMPING STATION ROOM
+	thread scene7_spawner1_initialize
+		
+	//*** KILL ANY REMAINING FRIENDLIES SO THEY DON'T FOLLOW THE PLAYER INTO THE ELEVATOR FROM HERE ONWARD
+	if (isAlive level.assaulter1){
+		level.assaulter1 damage $world 15000 $world (0 0 0) (0 270 0) (0 0 0) 0 5 0 0	//hit the head - location designation #5
+	}
+
+	if (isAlive level.assaulter2){
+		level.assaulter2 damage $world 15000 $world (0 0 0) (0 270 0) (0 0 0) 0 5 0 0	//hit the head - location designation #5
+	}
+}end
+
+//============================================================================
+scene6_objectives_complete_monitor:{
+//============================================================================
+	//*** When the bombs are all planted and the valve is turned, the completion variable adds up to 1 and satisfies the loop
+	while (level.scene6_objectives_complete != 1) {
+		waitframe
+	}
+
+	//*** Go on to the final sequence of events towards M6L3b
+	thread scene7
+}end
+
+//============================================================================
+scene6_spawner1_initialize:{
+//============================================================================
+	level.scene6_spawn1_teamvalue = 0		//initializes variable for total number spawned to date
+	level.scene6_spawn1_teamlimitmax = 6	//initializes constant for total number allowed to spawn 
+	level.scene6_spawn1_currentalive = 0	//initializes variable for number of enemies currently alive from this spawner
+	level.scene6_spawn1_currentalivemax = 1	//initializes constant for maximum number allowed to be alive at any given time from this spawner
+	level.scene6_spawn1_loopwaittime = 1	//initializes constant for time between respawns
+	level.scene6_spawn1_deactivator = 0		//initializes variable for shutting down this loop's ability to spawn when the player is past this area
+
+	thread scene6_spawndetector1_control
+}end
+
+//============================================================================
+scene6_spawndetector1_control:{
+//============================================================================
+	local.loopwaittime = 0.2
+
+	//while ($player isTouching $scene6_spawndetector1){ //chrissstrahl
+	while (exec coop_mod/replace.scr::istouching $scene6_spawndetector1){ //chrissstrahl - make coop compatible
+		//*** 3 at a time, use +3 
+		//*** Crazy fire and maneuver enemy attack, use nothing
+		if ((level.scene6_spawn1_currentalive + 1) <= level.scene6_spawn1_currentalivemax && level.scene6_spawn1_deactivator == 0 && level.scene6_spawn1_teamvalue < level.scene6_spawn1_teamlimitmax){
+		//if ((level.scene6_spawn1_currentalive) <= level.scene6_spawn1_currentalivemax && level.scene6_spawn1_deactivator == 0 && level.scene6_spawn1_teamvalue < level.scene6_spawn1_teamlimitmax)
+			//centerprint(level.scene6_spawn1_currentalive + "<" + level.scene6_spawn1_currentalivemax + "\n" + level.scene6_spawn1_deactivator + "=" + level.scene6_spawn1_deactivator+ "\n" + level.scene6_spawn1_teamvalue + "<" + level.scene6_spawn1_teamlimitmax )		
+			local.scene6_spawn1_ai_name1 = "scene6_spawn1_ai1_" + level.scene6_spawn1_teamvalue	//assign a name to the spawned enemy
+			local.org1 = $scene6_spawndetector1_spawner1.origin					//spawn location as a script_origin
+			
+			//*** Spawn 3 enemy soldiers in a wave
+			spawn models/human/german_wehrmact_soldier "targetname" (local.scene6_spawn1_ai_name1) "type_attack" "cover" 
+
+			$(local.scene6_spawn1_ai_name1).origin = local.org1					//place the guy in the correct spot						
+			level.scene6_spawn1_currentalive ++									//increment the max allowed alive at any given time			
+			level.scene6_spawn1_teamvalue ++									//track the scene's enemy population
+			$(local.scene6_spawn1_ai_name1) thread scene6_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene6_spawn1_ai_name1) thread scene6_spawn1_ai_navigate1 	//call navigation thread 
+
+			local.scene6_spawn1_ai_name1.mindist = 128
+			local.scene6_spawn1_ai_name1.maxdist = 4000
+			local.scene6_spawn1_ai_name1.leash = 10000
+			local.scene6_spawn1_ai_name1.fixedleash = 0
+			local.scene6_spawn1_ai_name1.sight = 2000
+			local.scene6_spawn1_ai_name1.noticescale = 50
+			local.scene6_spawn1_ai_name1.accuracy = 100
+			local.scene6_spawn1_ai_name1.hearing = 4000
+			local.scene6_spawn1_ai_name1.interval = 128
+			//centerprint(level.scene6_spawn1_currentalive + "<" + level.scene6_spawn1_currentalivemax + "\n" + level.scene6_spawn1_deactivator + "=" + level.scene6_spawn1_deactivator+ "\n" + level.scene6_spawn1_teamvalue + "<" + level.scene6_spawn1_teamlimitmax )		
+		}
+		wait local.loopwaittime			//every local.loopwaittime seconds, resume the while loop	
+	}
+	wait local.loopwaittime				//prevent infinite loop warning
+	goto scene6_spawndetector1_control
+}end
+
+//============================================================================
+scene6_spawn1_detect_death:{
+//============================================================================
+	self waittill death
+	level.scene6_spawn1_currentalive --	//decrement the population count 
+}end
+
+//============================================================================
+scene6_spawn1_ai_navigate1:{
+//============================================================================
+	if !(isAlive self)	{end}
+	self exec global/runto.scr $scene6_spawn1_rallypoint1
+}end
+
+//============================================================================
+scene6_spawn1_terminate:{
+//============================================================================
+	level.scene6_spawn1_deactivator = 1
+}end
+
+//============================================================================
+scene6_spawner2_initialize:{
+//============================================================================
+	level.scene6_spawn2_teamvalue = 0		//initializes variable for total number spawned to date
+	level.scene6_spawn2_teamlimitmax = 12	//initializes constant for total number allowed to spawn 
+	level.scene6_spawn2_currentalive = 0	//initializes variable for number of enemies currently alive from this spawner
+	level.scene6_spawn2_currentalivemax = 2	//initializes constant for maximum number allowed to be alive at any given time from this spawner
+	level.scene6_spawn2_loopwaittime = 1	//initializes constant for time between respawns
+	level.scene6_spawn2_deactivator = 0		//initializes variable for shutting down this loop's ability to spawn when the player is past this area
+
+	thread scene6_spawndetector2_control
+}end
+
+//============================================================================
+scene6_spawndetector2_control:{
+//============================================================================
+	local.loopwaittime = 0.2
+
+	//while ($player isTouching $scene6_spawndetector2){ //chrissstrahl
+	while (exec coop_mod/replace.scr::istouching $scene6_spawndetector2){ //chrissstrahl - make coop compatible
+		//*** 3 at a time, use +3 
+		//*** Crazy fire and maneuver enemy attack, use nothing
+		if ((level.scene6_spawn2_currentalive + 2) <= level.scene6_spawn2_currentalivemax && level.scene6_spawn2_deactivator == 0 && level.scene6_spawn2_teamvalue < level.scene6_spawn2_teamlimitmax){
+		//if ((level.scene6_spawn2_currentalive) <= level.scene6_spawn2_currentalivemax && level.scene6_spawn2_deactivator == 0 && level.scene6_spawn2_teamvalue < level.scene6_spawn2_teamlimitmax)
+			//centerprint(level.scene6_spawn2_currentalive + "<" + level.scene6_spawn2_currentalivemax + "\n" + level.scene6_spawn2_deactivator + "=" + level.scene6_spawn2_deactivator+ "\n" + level.scene6_spawn2_teamvalue + "<" + level.scene6_spawn2_teamlimitmax )		
+
+			local.scene6_spawn2_ai_name1 = "scene6_spawn2_ai1_" + level.scene6_spawn2_teamvalue	//assign a name to the spawned enemy
+			local.org1 = $scene6_spawndetector2_spawner1.origin									//spawn location as a script_origin
+			local.scene6_spawn2_ai_name2 = "scene6_spawn2_ai2_" + level.scene6_spawn2_teamvalue
+			local.org2 = $scene6_spawndetector2_spawner2.origin					
+			
+			//*** Spawn 3 enemy soldiers in a wave
+			spawn models/human/german_wehrmact_soldier "targetname" (local.scene6_spawn2_ai_name1) "type_attack" "cover" 
+
+			$(local.scene6_spawn2_ai_name1).origin = local.org1					//place the guy in the correct spot						
+			level.scene6_spawn2_currentalive ++									//increment the max allowed alive at any given time			
+			level.scene6_spawn2_teamvalue ++									//track the scene's enemy population
+			$(local.scene6_spawn2_ai_name1) thread scene6_spawn2_detect_death 	//call a waittill death thread
+			$(local.scene6_spawn2_ai_name1) thread scene6_spawn2_ai_navigate1 	//call navigation thread 
+
+			local.scene6_spawn2_ai_name1.mindist = 128
+			local.scene6_spawn2_ai_name1.maxdist = 4000
+			local.scene6_spawn2_ai_name1.leash = 10000
+			local.scene6_spawn2_ai_name1.fixedleash = 0
+			local.scene6_spawn2_ai_name1.sight = 2000
+			local.scene6_spawn2_ai_name1.noticescale = 50
+			local.scene6_spawn2_ai_name1.accuracy = 100
+			local.scene6_spawn2_ai_name1.hearing = 4000
+			local.scene6_spawn2_ai_name1.interval = 128
+	
+			spawn models/human/german_wehrmact_nco "targetname" (local.scene6_spawn2_ai_name2) "type_attack" "cover" 
+			
+			$(local.scene6_spawn2_ai_name2).origin = local.org2					//place the guy in the correct spot						
+			level.scene6_spawn2_currentalive ++									//increment the max allowed alive at any given time
+			level.scene6_spawn2_teamvalue ++
+			$(local.scene6_spawn2_ai_name2) thread scene6_spawn2_detect_death 	//call a waittill death thread
+			$(local.scene6_spawn2_ai_name2) thread scene6_spawn2_ai_navigate2 	//call navigation thread 
+			$(local.scene6_spawn2_ai_name2) gun "StG44"
+
+			local.scene6_spawn2_ai_name2.mindist = 128
+			local.scene6_spawn2_ai_name2.maxdist = 4000
+			local.scene6_spawn2_ai_name2.leash = 10000
+			local.scene6_spawn2_ai_name2.fixedleash = 0
+			local.scene6_spawn2_ai_name2.sight = 2000
+			local.scene6_spawn2_ai_name2.noticescale = 1
+			local.scene6_spawn2_ai_name2.accuracy = 100
+			local.scene6_spawn2_ai_name2.hearing = 4000
+			local.scene6_spawn2_ai_name2.interval = 128
+
+			//centerprint(level.scene6_spawn2_currentalive + "<" + level.scene6_spawn2_currentalivemax + "\n" + level.scene6_spawn2_deactivator + "=" + level.scene6_spawn2_deactivator+ "\n" + level.scene6_spawn2_teamvalue + "<" + level.scene6_spawn2_teamlimitmax )		
+		}
+		wait local.loopwaittime			//every local.loopwaittime seconds, resume the while loop	
+	}	
+	wait local.loopwaittime				//prevent infinite loop warning
+	goto scene6_spawndetector2_control
+}end
+
+//============================================================================
+scene6_spawn2_detect_death:{
+//============================================================================
+	self waittill death
+	level.scene6_spawn2_currentalive --	//decrement the population count 
+}end
+
+//============================================================================
+scene6_spawn2_ai_navigate1:{
+//============================================================================
+	if !(isAlive self)	{end}
+	self exec global/runto.scr $scene6_spawn2_rallypoint1
+}end
+
+//============================================================================
+scene6_spawn2_ai_navigate2:{
+//============================================================================
+	if !(isAlive self)	{end}
+	self exec global/runto.scr $scene6_spawn2_rallypoint2
+}end
+
+//============================================================================
+scene6_spawn2_terminate:{
+//============================================================================
+	level.scene6_spawn2_deactivator = 1
+}end
+
+//============================================================================
+scene7:{
+//============================================================================
+	//*** UPDATE OBJECTIVES
+	//	waitthread global/objectives.scr::add_objectives 1 3 "Snipe the tower guards. Avoid excessive casualties." $player.origin
+	//	waitthread global/objectives.scr::add_objectives 2 3 "Unlock the cellblock doors and free the POWs."
+	//	waitthread global/objectives.scr::add_objectives 3 3 "Plant Explosives on the Fuel Flow Control Units."
+	//	waitthread global/objectives.scr::add_objectives 4 3 "Open the fuel line valves."
+	waitthread global/objectives.scr::add_objectives 5 2 "Find a way to the inner facility. Check elevators for enemy reinforcements." $scene7_elevator_switch.origin
+	thread global/objectives.scr::current_objectives 5
+
+	//*** OPEN THE ELEVATOR AND PREP IT FOR USE
+	thread scene7_elevator_initialize	
+}end
+
+//============================================================================
+scene7_spawner1_initialize:{
+//============================================================================
+	level.scene7_spawn1_teamvalue = 0		//initializes variable for total number spawned to date
+	level.scene7_spawn1_teamlimitmax = 12	//initializes constant for total number allowed to spawn 
+	level.scene7_spawn1_currentalive = 0	//initializes variable for number of enemies currently alive from this spawner
+	level.scene7_spawn1_currentalivemax = 2	//initializes constant for maximum number allowed to be alive at any given time from this spawner
+	level.scene7_spawn1_loopwaittime = 1	//initializes constant for time between respawns
+	level.scene7_spawn1_deactivator = 0		//initializes variable for shutting down this loop's ability to spawn when the player is past this area
+
+	thread scene7_spawndetector1_control
+}end
+
+//============================================================================
+scene7_spawndetector1_control:{
+//============================================================================
+	local.loopwaittime = 0.2
+
+	//while ($player isTouching $scene7_spawndetector1){ //chrissstrahl
+	while (exec coop_mod/replace.scr::istouching $scene7_spawndetector1){ //chrissstrahl - make coop compatible
+		//*** 3 at a time, use +3 
+		//*** Crazy fire and maneuver enemy attack, use nothing
+		if ((level.scene7_spawn1_currentalive + 2) <= level.scene7_spawn1_currentalivemax && level.scene7_spawn1_deactivator == 0 && level.scene7_spawn1_teamvalue < level.scene7_spawn1_teamlimitmax){
+		//if ((level.scene7_spawn1_currentalive) <= level.scene7_spawn1_currentalivemax && level.scene7_spawn1_deactivator == 0 && level.scene7_spawn1_teamvalue < level.scene7_spawn1_teamlimitmax)
+			//centerprint(level.scene7_spawn1_currentalive + "<" + level.scene7_spawn1_currentalivemax + "\n" + level.scene7_spawn1_deactivator + "=" + level.scene7_spawn1_deactivator+ "\n" + level.scene7_spawn1_teamvalue + "<" + level.scene7_spawn1_teamlimitmax )		
+
+			local.scene7_spawn1_ai_name1 = "scene7_spawn1_ai1_" + level.scene7_spawn1_teamvalue		//assign a name to the spawned enemy
+			local.org1 = $scene7_spawndetector1_spawner1.origin										//spawn location as a script_origin
+			local.scene7_spawn1_ai_name2 = "scene7_spawn1_ai2_" + level.scene7_spawn1_teamvalue
+			local.org2 = $scene7_spawndetector1_spawner2.origin					
+			
+			//*** Spawn 3 enemy soldiers in a wave
+			spawn models/human/german_wehrmact_soldier "targetname" (local.scene7_spawn1_ai_name1) "type_attack" "cover" 
+
+			$(local.scene7_spawn1_ai_name1).origin = local.org1					//place the guy in the correct spot						
+			level.scene7_spawn1_currentalive ++									//increment the max allowed alive at any given time			
+			level.scene7_spawn1_teamvalue ++									//track the scene's enemy population
+			$(local.scene7_spawn1_ai_name1) thread scene7_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene7_spawn1_ai_name1) thread scene7_spawn1_ai_navigate1 	//call navigation thread 
+
+			local.scene7_spawn1_ai_name1.mindist = 128
+			local.scene7_spawn1_ai_name1.maxdist = 4000
+			local.scene7_spawn1_ai_name1.leash = 10000
+			local.scene7_spawn1_ai_name1.fixedleash = 0
+			local.scene7_spawn1_ai_name1.sight = 2000
+			local.scene7_spawn1_ai_name1.noticescale = 50
+			local.scene7_spawn1_ai_name1.accuracy = 100
+			local.scene7_spawn1_ai_name1.hearing = 4000
+			local.scene7_spawn1_ai_name1.interval = 128
+	
+			spawn models/human/german_wehrmact_nco "targetname" (local.scene7_spawn1_ai_name2) "type_attack" "cover" 
+			
+			$(local.scene7_spawn1_ai_name2).origin = local.org2				//place the guy in the correct spot						
+			level.scene7_spawn1_currentalive ++							//increment the max allowed alive at any given time
+			level.scene7_spawn1_teamvalue ++
+			$(local.scene7_spawn1_ai_name2) thread scene7_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene7_spawn1_ai_name2) thread scene7_spawn1_ai_navigate2 	//call navigation thread 
+			$(local.scene7_spawn1_ai_name2) gun "mp40"
+
+			local.scene7_spawn1_ai_name2.mindist = 128
+			local.scene7_spawn1_ai_name2.maxdist = 4000
+			local.scene7_spawn1_ai_name2.leash = 10000
+			local.scene7_spawn1_ai_name2.fixedleash = 0
+			local.scene7_spawn1_ai_name2.sight = 2000
+			local.scene7_spawn1_ai_name2.noticescale = 1
+			local.scene7_spawn1_ai_name2.accuracy = 100
+			local.scene7_spawn1_ai_name2.hearing = 4000
+			local.scene7_spawn1_ai_name2.interval = 128
+
+			//centerprint(level.scene7_spawn1_currentalive + "<" + level.scene7_spawn1_currentalivemax + "\n" + level.scene7_spawn1_deactivator + "=" + level.scene7_spawn1_deactivator+ "\n" + level.scene7_spawn1_teamvalue + "<" + level.scene7_spawn1_teamlimitmax )		
+		}
+		wait local.loopwaittime			//every local.loopwaittime seconds, resume the while loop	
+	}
+	wait local.loopwaittime				//prevent infinite loop warning
+	goto scene7_spawndetector1_control
+}end
+
+//============================================================================
+scene7_spawn1_detect_death:{
+//============================================================================
+	self waittill death
+	level.scene7_spawn1_currentalive --	//decrement the population count 
+}end
+
+//============================================================================
+scene7_spawn1_ai_navigate1:{
+//============================================================================
+	if !(isAlive self)	{end}
+	self exec global/runto.scr $scene7_spawn1_rallypoint1
+}end
+
+//============================================================================
+scene7_spawn1_ai_navigate2:{
+//============================================================================
+	if !(isAlive self)	{end}
+	self exec global/runto.scr $scene7_spawn1_rallypoint2
+}end
+
+//============================================================================
+scene7_spawn1_terminate:{
+//============================================================================
+	level.scene7_spawn1_deactivator = 1
+}end
+
+//============================================================================
+scene7_silentalarm_terminate:{
+//============================================================================
+//*** Stop spawning the silent alarm guys
+	$alarmspawn_terminate_trigger waittill trigger
+	level.alarm_always_on = 0
+	level.alarm_on = 0
+}end
+
+//============================================================================
+scene7_missioncomplete:{
+//============================================================================
+	//*** Check to see if only 4 Rangers died in the counter and if deathlimit_medal or less, give out the medal
+	if (level.scene2_alliedspawn_teamdeaths <= level.scene2_alliedspawn_teamdeathlimit_medal){
+		setcvar g_medal0 "1"
+		println level.scene2_alliedspawn_teamdeaths level.scene2_alliedspawn_teamdeathlimit_medal
+		println "YOU GOT A MEDAL! YOU ARE A MASTER SNIPER!"
+	}
+	exec global/missioncomplete.scr m6l3b 1
+}end
+
+
+//ELEVATOR SUPPORT THREADS
+//*** MOVE ELEVATOR OBJECTS TO START POSITIONS
+//============================================================================
+scene7_elevator_initialize:{
+//============================================================================
+	$scene7_elevator_switch bind $scene7_elevator
+	$scene7_elevator_blocker notsolid
+	$scene7_elevator_gate movedown 70
+	$scene7_elevator_gate waitmove
+	level.scene7_elevator_active = 0
+}end
+
+//============================================================================
+scene7_elevator_function:{
+//============================================================================
+	//iprintlnbold_noloc("DEV: scene7_elevator_function")
+
+	//if ( !($player isTouching $scene7_elevator_tester)  && (level.scene7_elevator_active == 0) ){ //chrissstrahl
+	if ( !(exec coop_mod/replace.scr::istouching $scene7_elevator_tester)  && (level.scene7_elevator_active == 0) ){ //chrissstrahl - make coop compatible
+		level.scene7_elevator_active = 1
+
+		//*** Lock the player into the elevator, no walking out
+		$scene7_elevator_blocker solid
+
+		//	$scene7_elevator_switch anim switch_turnon
+		//	$scene7_elevator_switch waittill animdone
+		$scene7_elevator_gate playsound elevator_gate
+		$scene7_elevator_gate time 2
+		$scene7_elevator_gate moveup 70
+		$scene7_elevator_gate waitmove
+
+		//*** UPDATE OBJECTIVES
+		//waitthread global/objectives.scr::add_objectives 1 3 "Snipe the tower guards. Avoid excessive casualties." $player.origin
+		//waitthread global/objectives.scr::add_objectives 2 3 "Free the POWs."
+		//waitthread global/objectives.scr::add_objectives 3 3 "Plant Explosives on the Fuel Flow Control Units."
+		//waitthread global/objectives.scr::add_objectives 4 3 "Open the fuel line valves."
+		waitthread global/objectives.scr::add_objectives 5 3 "Find a way to the inner facility. Check elevators for enemy reinforcements." $scene7_elevator_switch.origin
+		thread global/objectives.scr::current_objectives 5
+
+		$scene7_elevator playsound elevator_run
+		for (local.i = 6 ; local.i >= 1 ; local.i --){
+			$scene7_elevator moveto $("scene7_elevator_waypoint" + local.i)
+			$scene7_elevator waitmove
+			//*** Elevator takes player through a trigger to M6L3b which sets off the completion thread
+		}	
+	}
+}end
+
+//FOG SUPPORT THREADS
+//*** These threads are can be called by trigger_multiples in the bsp, one trigger per thread. Or direct thread calls without triggers can be used.
+//============================================================================
+farplane_near:{
+//============================================================================
+	level.farplaneswitching = 1	
+	while (level.farplane > 1600 && level.farplaneswitching == 1){
+			level.farplane = level.farplane - 10
+			//println level.farplane
+			$world farplane level.farplane
+			wait .1
+		}
+}end
+
+//============================================================================
+farplane_far:{
+//============================================================================
+	level.farplaneswitching = 2
+	while (level.farplane < 4200 && level.farplaneswitching == 2){	//original 3800, then 3000
+		level.farplane = level.farplane + 10
+		//println level.farplane
+		$world farplane level.farplane
+		wait .1
+	}
+}end
+
+//SOUND AND MISC SUPPORT THREADS
+//============================================================================
+ambientsound_indoor_battle_close:{
+//============================================================================
+	//*** Called from trigger_multiple in bsp
+	forcemusic aux4
+	$ambientsound_outdoor_battle_over_trigger triggerable
+}end
+
+//============================================================================
+ambientsound_indoor_battle_far:{
+//============================================================================
+	//*** Called from trigger_multiple in bsp
+	forcemusic aux6
+}end
+
+//============================================================================
+ambientsound_outdoor_battle_over:{
+//============================================================================
+	//*** Called from trigger_multiple in bsp
+	forcemusic aux3
+}end
+
+//============================================================================
+exploding_door_locked:{
+//============================================================================
+	//$player playsound door_metal_locked //chrissstrahl
+	parm.other playsound door_metal_locked //chrissstrahl - make coop compatible
+}end
+
+//============================================================================
+captain_gate_lockedsound:{
+//============================================================================
+	//$player playsound gate_metal_locked //chrissstrahl
+	parm.other playsound gate_metal_locked //chrissstrahl - make coop compatible
+}end
+
+//============================================================================
+wheel_door_hint_text:{
+//============================================================================
+	iprintlnbold "HINT: Use the wheel to open the doors."
+}end
+
+//============================================================================
+alarmer:{
+//============================================================================
+	//*** Sets the spawned alarm reinforcement guy properties
+	//*** *DIFFICULTY* SELECTOR
+	if (level.skill == "0"){
+		self.accuracy = 10
+		self gun "Mauser KAR 98K"
+		self type_attack cover
+	}else if (level.skill == "1"){
+		self.accuracy = 25
+		self gun "MP40"
+		self.ammo_grenade = 2
+		self type_grenade grenade
+		self type_attack cover
+	}else if (level.skill == "2"){
+		self.accuracy = 80
+		self gun "StG44"
+		self.ammo_grenade = 2	
+		self type_grenade grenade
+		self type_attack cover
+	}
+}end
+
+//chrissstrahl - spawn spawnpoint origins we can bind to the moving train
+//============================================================================
+coop_createSpawningInTrain:{
+//============================================================================
+	thread coop_createAndBindObjectAt ( -6492 -6756 -492)
+	thread coop_createAndBindObjectAt ( -6452 -6756 -492)
+	thread coop_createAndBindObjectAt ( -6412 -6756 -492)
+	thread coop_createAndBindObjectAt ( -6372 -6756 -492)
+	thread coop_createAndBindObjectAt ( -6492 -6808 -492)
+	thread coop_createAndBindObjectAt ( -6452 -6808 -492)
+	thread coop_createAndBindObjectAt ( -6412 -6808 -492)
+	thread coop_createAndBindObjectAt ( -6372 -6808 -492)
+	waitframe
+	waitframe
+	thread coop_manageSpawningInTrain
+}end
+
+//chrissstrahl - spawn spawnpoint origins we can bind to the moving train
+//============================================================================
+coop_manageSpawningInTrain:{
+//============================================================================
+	level.coop_trainIsMoving = 1
+	while(level.coop_trainIsMoving == 1){
+		for(local.i=1;local.i<=$coop_playerSpawnOrigin.size;local.i++){
+			local.object = $coop_playerSpawnOrigin[local.i]
+			level.flags["coop_spawn"+(local.i)+"origin"] = (local.object.origin)
+		}
+		waitframe
+	}
+	level.coop_disableSpawnWarper = FALSE //enable spawn warper now again
+	
+}end
+
+//chrissstrahl - creates object we can "Beate Uhse" to get the origin where to spawn a player inside the moving train
+//============================================================================
+coop_createAndBindObjectAt local.origin:{
+//============================================================================
+	local.object = spawn script_origin origin (local.origin)
+	waitframe
+	local.object targetname "coop_playerSpawnOrigin"
+	local.object bind $train_boxcars
+}end
+

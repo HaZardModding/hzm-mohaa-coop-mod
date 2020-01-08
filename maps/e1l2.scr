@@ -1,0 +1,350 @@
+//chrissstrahl - relevant stuff
+/*
+$tank1 - first minesweeper, this one gets destroyed
+$tank2 - leading tank after first minesweeper gets destroyed
+$tank3 - tank following minesweeper
+$jeep - jeep commander sits in
+$commander - field commander
+e1l2/intro.scr::DoIntro - intro and camera and jeepride handling
+
+bohler: 2928 -840 482 / 2950 -807 482
+artillery: -4398 -5601 1169
+*/
+
+//chrissstrahl - this is used to handle certain debugging stuff
+//set to NIL before release
+level.coop_debugLevel = NIL
+
+//============================================================
+main:{
+//============================================================
+	fadeout 0.1 0 0 0 1	 //chrissstrahl - fade it out first
+	
+	//chrissstrahl - debug test
+	thread juck	
+	if( level.coop_debugLevel != NIL ){
+		thread juck	
+	}
+	level.music  = "e1l2"
+	level.coopPrevMap = "e1l1"				//chrissstrahl - set previouse map (for mom voteing)
+	level.coopNextMap = "e1l3"				//chrissstrahl - set next map (for mom voteing)
+	level.coop_disableSpawnWarper	= TRUE	//chrissstrahl - disable respawn warper
+	thread coop_mod/main.scr::main 			//chrissstrahl - start coop mod
+	
+	/* chrissstrahl - we don't need that
+	println "-----------------------------------------------"
+	println "-----------------------------------------------"
+	println "-----------------------------------------------"
+	println "E1L2"
+	println "-----------------------------------------------"
+	*/
+
+	exec global/auto.scr e1l2
+	exec global/ambience.scr e1l4
+	waitexec maps/e1l2/hacks.scr
+
+	//chrissstrahl - coop compatible
+	waitthread coop_mod/replace.scr::waitTillPrespawn
+
+	//chrissstrahl - coop compatible
+	waitthread coop_mod/replace.scr::waitForPlayer
+
+	waitthread maps/e1l2/Intro.scr::InitIntro
+	waitthread maps/e1l2/Artillery.scr::InitArtillery
+	waitthread maps/e1l2/Crab.scr::InitCrab
+	waitthread maps/e1l2/Hideout.scr::InitHideout
+	waitthread InitObjectives
+
+	
+	//chrissstrahl - attach a entity to tank, so that we know where to spawn a players later, once the
+	//convoy has to be guarded by player with sniper, otherwise we would need lots of spawn points and
+	//update them manually some how, which would be very messy
+	//this might need some finetunning, like some locations where fences are
+	if(level.gametype != 0){
+		local.spawnEnt = spawn script_model model "models/items/Af_P_Lantern.tik" notsolid 1 targetname "coop_tank2PlayerSpawn"
+		waitframe
+		local.spawnEnt attach $tank2 origin 1 ( 0 -150 180 )
+		local.spawnEnt hide
+	}else{
+		//chrissstrahl - overwrite mission progress - deletes e1l3 save
+		setcvar "coop_save" ""
+	}
+
+	fadein 5.0 0 0 0 1
+	
+	waitthread InitLevel
+	
+	//chrissstrahl - manage spawnpoints at mines
+	thread coop_updateSpawn2
+	thread coop_updateSpawn3
+	thread coop_updateSpawn4
+
+	thread startMusic_e1l2_main
+	waitthread maps/e1l2/Intro.scr::DoIntro
+	waitthread maps/e1l2/Artillery.scr::ObjectiveArtillery
+	waitthread global/objectives.scr::add_objectives level.ObjDestroyArtillery 3 "Destroy Enemy Artillery"
+	waitthread global/objectives.scr::add_objectives level.ObjEscortColumn 2 level.ObjEscortColumnText $commander
+	waitthread global/objectives.scr::current_objectives level.ObjEscortColumn
+	waitthread maps/e1l2/Crab.scr::ReturnToCrab
+	
+	thread startMusic_e1l2_EscortTanks	
+	waitthread maps/e1l2/Crab.scr::ObjectiveGuardCrab
+	waitthread maps/e1l2/Hideout.scr::DoHideoutIntro
+	waitthread global/objectives.scr::add_objectives level.ObjEscortColumn 3
+	waitthread global/objectives.scr::add_objectives level.ObjDestroyHideout 2 level.ObjDestroyHideoutText $bunkerentrance
+	waitthread global/objectives.scr::current_objectives level.ObjDestroyHideout
+	waitthread maps/e1l2/Hideout.scr::ObjectiveDestroyHideout
+	waitthread global/objectives.scr::add_objectives level.ObjDestroyHideout 3
+	waitthread global/objectives.scr::add_objectives level.ObjEscape 2 level.ObjEscapeText $escape1
+	waitthread global/objectives.scr::current_objectives level.ObjEscape
+	waitthread maps/e1l2/Hideout.scr::ObjectiveEscape
+	waitthread maps/e1l2/Hideout.scr::DoOutro
+	waitthread global/objectives.scr::add_objectives level.ObjEscape 3
+
+	exec global/missioncomplete.scr e1l3 1
+}end
+
+juck:{
+	//chrissstrahl - developer test - force spawn to area where we do script debugging
+	//chrissstrahl - developer test - force spawn to area where we do script debugging
+	//chrissstrahl - developer test - force spawn to area where we do script debugging
+	//chrissstrahl - developer test - force spawn to area where we do script debugging
+	//chrissstrahl - developer test - force spawn to area where we do script debugging
+	//chrissstrahl - developer test - force spawn to area where we do script debugging
+	//chrissstrahl - developer test - force spawn to area where we do script debugging
+	//chrissstrahl - developer test - force spawn to area where we do script debugging
+	//chrissstrahl - developer test - force spawn to area where we do script debugging
+	//chrissstrahl - developer test - force spawn to area where we do script debugging
+	//chrissstrahl - developer test - force spawn to area where we do script debugging
+	//chrissstrahl - developer test - force spawn to area where we do script debugging
+	
+	//spawn first at bohler trigger
+	/*
+	local.xxx = 260
+	while(local.xxx > 0){
+		local.xxx--
+		//level.flags["coop_spawn1origin"] = ( 2520 -4480 600 )
+		level.flags["coop_spawn1origin"] = ( 1112 -4360 600 )
+		waitframe
+	}
+	//spawn then at bohler
+	while(1){
+		waitframe
+		//level.flags["coop_spawn1origin"] = ( 2950 -807 482 ) //bohler1
+		level.flags["coop_spawn1origin"] = ( 2950 -807 482 ) //bohler2
+	}	
+	//spawn at artillery
+	while(1){
+		waitframe
+		level.flags["coop_spawn1origin"] = ( -4398 -5601 1169 ) //artillery
+	}
+	*/
+}end
+
+//============================================================
+startMusic_e1l2_main:{
+//============================================================
+	//chrissstrahl - make coop compatible
+	//$player stufftext "tmstop; tmstartloop sound/music/Radar_Train.mp3; tmvolume 1.6"
+	exec coop_mod/replace.scr::tmstop	
+	exec coop_mod/replace.scr::tmstartloop 	"sound/music/Radar_Train.mp3"
+	exec coop_mod/replace.scr::tmvolume 1.6
+}end
+
+//============================================================
+startMusic_e1l2_EscortTanks:{
+//============================================================
+	//chrissstrahl - make coop compatible
+	waitthread global/music.scr::StopSong 3
+	//$player stufftext "tmstartloop sound/music/mus_18a_action.mp3" 
+	exec coop_mod/replace.scr::tmstartloop 	"sound/music/mus_18a_action.mp3"
+}end
+
+//============================================================
+startMusic_e1l2_Escape:{
+//============================================================
+	//criminal - 
+	//$player stufftext "tmstop; tmstartloop sound/music/E3L1_TakingOver.mp3"
+	exec coop_mod/replace.scr::tmstop
+	exec coop_mod/replace.scr::tmstartloop 	"tmstartloop sound/music/E3L1_TakingOver.mp3"
+}end
+
+//============================================================
+InitLevel:{
+//============================================================
+	level.script = "maps/e1l2.scr"
+	if( level.gametype == 0 ){ //chrissstrahl - coop compatible
+		$player heal 1
+		setcvar g_mission 1
+	}
+	waitexec global/loadout.scr
+	level.autosave = 2 //1
+
+	//	exec global/autosave.scr level.autosave	//"In the Canyon"
+	//	level.autosave++
+}end
+
+//============================================================
+InitObjectives:{
+//============================================================
+	level.ObjDestroyArtillery = 1
+	level.ObjEscortColumn = 2
+	level.ObjDestroyHideout = 3
+	level.ObjEscape = 4
+
+	level.ObjEscortColumnText = "Escort the Minesweeper Tank"
+	level.ObjDestroyHideoutText = "Locate and Detonate German Munitions Depot"
+	level.ObjEscapeText = "Rendezvous with Tank Convoy"
+
+	thread UpdateEscortObjectiveLocation
+}end
+
+//============================================================
+UpdateEscortObjectiveLocation:{
+//============================================================
+	while (1){
+		if (level.currentobjective == level.ObjEscortColumn){
+			if (level.compassPointAtTank == 1){
+				waitthread global/objectives.scr::add_objectives level.ObjEscortColumn 2 level.ObjEscortText $tank2
+				waitthread global/objectives.scr::current_objectives level.currentobjective
+			}else{
+				waitthread global/objectives.scr::add_objectives level.ObjEscortColumn 2 level.ObjEscortText $commander
+				waitthread global/objectives.scr::current_objectives level.currentobjective
+			}
+		}
+		waitframe
+	}
+}end
+
+//============================================================
+UpdateHideoutObjective:{
+//============================================================
+	if (level.currentobjective == level.ObjDestroyHideout){
+		waitthread global/objectives.scr::add_objectives level.ObjDestroyHideout 2 level.ObjDestroyHideoutText $(self.target).origin
+		waitthread global/objectives.scr::current_objectives level.ObjDestroyHideout
+	}
+}end
+
+//============================================================
+UpdateEscapeObjective:{
+//============================================================
+	if (level.currentobjective == level.ObjEscape){
+		waitthread global/objectives.scr::add_objectives level.ObjEscape 2 level.ObjEscapeText $(self.target).origin
+		waitthread global/objectives.scr::current_objectives level.ObjEscape
+	}
+}end
+
+//chrissstrahl - set new spawnpoints for coop once a player is close to the minefield
+//============================================================
+coop_updateSpawn2:{
+//============================================================
+	local.player = NULL
+	local.origin = ( -5580 -6842 786 )
+	while( local.player == NULL || vector_length( local.player.origin-local.origin ) > 500 ){
+		wait 0.5
+		local.player = waitexec coop_mod/replace.scr::player_closestTo NIL local.origin
+	}
+	iprintlnbold_noloc("DEV: coop_updateSpawn2")
+	thread coop_mod/spawnlocations.scr::e1l2_update2
+	
+	thread coop_handleMineDetectorForPlayers
+}end
+
+//chrissstrahl - set new spawnpoints for coop once a player is close to the artillery
+//============================================================
+coop_updateSpawn3:{
+//============================================================
+	local.player = NULL
+	local.origin = ( -3464 -6128 1184 )
+	while( local.player == NULL || vector_length( local.player.origin-local.origin ) > 1000 ){
+		wait 0.5
+		local.player = waitexec coop_mod/replace.scr::player_closestTo NIL local.origin
+	}
+	iprintlnbold_noloc("DEV: coop_updateSpawn3")
+	thread coop_mod/spawnlocations.scr::e1l2_update3
+}end
+
+//near jeep (static spawn) of commander after last artillery spiral down after sniper
+//============================================================
+coop_updateSpawn4:{
+//============================================================
+	local.player = NULL
+	local.origin = ( -2264 -4536 200 )
+	while( local.player == NULL || vector_length( local.player.origin-local.origin ) > 700 ){
+		wait 0.5
+		local.player = waitexec coop_mod/replace.scr::player_closestTo NIL local.origin
+	}
+	iprintlnbold_noloc("DEV: coop_updateSpawn4")
+	
+	//chrissstrahl - set sniper as primary weapon for respawn (this is failsafe if no player picked up the sniper)
+	local.model = "models/weapons/KAR98sniper.tik"
+	level.coop_forcePrimary = local.model
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if(local.player != NULL && local.player.health > 0 ){
+			if( level.gametype == 0 || local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+				exec coop_mod/main.scr::playerForcePrimary local.player local.model
+//					local.player weapon local.model
+				iprintlnbold_noloc("You have acquired KAR98 Sniper Rifle")
+			}
+		}
+	}
+	
+	waitthread coop_mod/spawnlocations.scr::e1l2_update4
+	wait 15 //wait some time here, then start spawning near convoy leading tank
+	thread coop_updateSpawn5
+}end
+
+//spawn near convoy, updates along convoy advance
+//============================================================
+coop_updateSpawn5:{
+//============================================================
+	iprintlnbold_noloc("DEV: coop_updateSpawn5")
+	waitthread coop_mod/spawnlocations.scr::e1l2_update5
+	//632 -4412 352 barricade1 after artillery
+	//2128 -4720 544 barricade2 after artillery
+	//3760 -3248 544 barricade3 after artillery
+	// after barricade3
+}end
+
+//hideout
+//============================================================
+coop_updateSpawn6:{
+//============================================================
+	iprintlnbold_noloc("DEV: coop_updateSpawn6")
+	waitthread coop_mod/spawnlocations.scr::e1l2_update6
+}end
+
+
+//chrissstrahl - give mine detector when in minefield, and take it when leaving mine field
+//============================================================
+coop_handleMineDetectorForPlayers:{
+//============================================================
+	while(level.gametype != 0){
+		local.player = NULL
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+			if(local.player != NULL && local.player.health > 0 ){
+				if( local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+					//within minefiled
+					if(vector_length( local.player.origin-( -5160 -7072 744 )) < 550 ){
+						if(local.player.flags["coop_swapedWeaponPrimary"] == NIL){
+							//waitexec coop_mod/main.scr::playerPrimarySwap local.player "models/weapons/Gr_W_MineDetector.tik"
+							waitexec coop_mod/main.scr::playerPrimarySwap local.player "models/weapons/US_W_MineDetector.tik"
+							local.player weaponcommand "dual" "scale" 2
+						}
+					}
+					//outside of minefield
+					else{
+						if(local.player.flags["coop_swapedWeaponPrimary"] != NIL){
+							waitexec coop_mod/main.scr::playerPrimarySwap local.player NIL
+							local.player weaponcommand "dual" "scale" 1
+						}
+					}
+				}
+			}
+		}
+		waitframe
+	}
+}end
+

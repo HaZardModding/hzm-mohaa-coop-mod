@@ -1,0 +1,2147 @@
+//chrissstrahl - completed coopification on 2019.09.21
+//replaced:
+//	$player.on_roof			-> level.player_on_roof
+//	$player.entered_hotel		-> level.player_entered_hotel
+//
+//	level.player_house_loc
+//	level.player_not_on_roof_value
+
+// RoofJaunt
+init:
+
+	//chrissstrahl - should have a value to prevent error printing
+	level.player_on_roof = -2
+
+	// Dave Nash, here are some handy tunables:
+
+	level.rj_starting_chaser_accuracy =				50		// initial amount
+	level.rj_starting_chaser_accuracy_inc =			40		// amount to add for each successive generation
+	level.rj_starting_chaser_health =				50		// initial amount
+	level.rj_starting_chaser_health_inc =			60		// amount to add for each successive generation
+
+	level.rj_post_lockpick_chaser_accuracy =		50		// initial amount
+	level.rj_post_lockpick_chaser_accuracy_inc =	40		// amount to add for each successive generation
+	level.rj_post_lockpick_chaser_health =			50		// initial amount
+	level.rj_post_lockpick_chaser_health_inc =		60		// amount to add for each successive generation
+
+	level.num_lockpick_waves = 3	// a "wave" consists of one set of chasers, followed by one set of roof parade guys
+
+	level.lockpick_wave_overlap_time_delay = 6		//15
+
+	level.lockpick_wave_num_guys_min[1] = 1
+	level.lockpick_wave_num_guys_max[1] = 2
+
+	level.lockpick_wave_num_guys_min[2] = 2
+	level.lockpick_wave_num_guys_max[2] = 2
+
+	level.lockpick_wave_num_guys_min[3] = 2
+	level.lockpick_wave_num_guys_max[3] = 3
+
+
+	// init
+
+	if (level.warpTo == "roofJaunt") {
+		// hack warp section
+
+		//spawn "models/human/sc_al_us_claus" targetname "Claus"
+
+		wait 1
+
+		waitthread maps/e1l3/Objectives.scr::catchup "metKlaus"
+		
+		//chrissstrahl - keep for sp
+		if(level.gametype == 0){
+			$player.origin = ( 64 2476 208 )
+			$player.viewangles = ( 0 90 0 )		
+		}
+
+		$Claus.origin = ( 64 2776 208 )
+		$Claus.angles = ( 0 90 0 )
+
+		$Claus american
+		$Claus gun "Beretta"
+		$Claus show //chrissstrahl
+	}
+
+	// initialization
+
+	$RoofDoor lock
+	spawn trigger_relay "targetname" "ClausPickedLock_Trigger"
+	spawn trigger_relay "targetname" "RoofJauntCleanUp_Trigger"
+	spawn trigger_relay "targetname" "PlayerIsFalling_Trigger"
+	spawn trigger_relay "targetname" "LockPickParadeDone_Trigger"
+	spawn trigger_relay "targetname" "RJ_ChasersStartChasing_Trigger"
+
+	waitthread global/ManSpawnNamed.scr::Init "RJ_AlleySpawn_Outer_1"
+	waitthread global/ManSpawnNamed.scr::Init "RJ_AlleySpawn_Outer_2"
+	waitthread global/ManSpawnNamed.scr::Init "RJ_AlleySpawn_SE_1"
+	waitthread global/ManSpawnNamed.scr::Init "RJ_AlleySpawn_SE_2"
+	waitthread global/ManSpawnNamed.scr::Init "RJ_AlleySpawn_Door_1"
+	waitthread global/ManSpawnNamed.scr::Init "RJ_AlleySpawn_Door_2"
+	waitthread global/ManSpawnNamed.scr::Init "RJ_2ndFloorSpawn_1"
+	waitthread global/ManSpawnNamed.scr::Init "RJ_2ndFloorSpawn_2"
+	waitthread global/ManSpawnNamed.scr::Init "RJ_3rdFloorSpawn_1"
+	waitthread global/ManSpawnNamed.scr::Init "RJ_3rdFloorSpawn_2"
+	waitthread global/ManSpawnNamed.scr::Init "RJ_Roof0Spawn_1"
+	waitthread global/ManSpawnNamed.scr::Init "RJ_Roof0Spawn_2"
+	waitthread global/ManSpawnNamed.scr::Init "RJ_Roof2Spawn_1"
+	waitthread global/ManSpawnNamed.scr::Init "RJ_Roof2Spawn_2"
+	waitthread global/ManSpawnNamed.scr::Init "RJ_RoofParadeSpawn"
+
+	waitthread PreClean "RJ_Alley1_Guard1"
+	waitthread PreClean "RJ_Alley1_Guard2"
+	waitthread PreClean "RJ_Alley2_Guard1"
+	waitthread PreClean "RJ_Alley3_Guard1"
+	waitthread PreClean "RJ_Alley3_Guard2"
+	waitthread PreClean "RJ_Alley4_Guard1"
+	waitthread PreClean "RJ_Alley4_Guard2"
+	waitthread PreClean "RJ_Alley5_Guard1"
+	waitthread PreClean "RJ_Alley6_Guard1"
+//	waitthread global/ManSpawnNamed.scr::Init "RJ_Alley1_Guard1"
+//	waitthread global/ManSpawnNamed.scr::Init "RJ_Alley1_Guard2"
+//	waitthread global/ManSpawnNamed.scr::Init "RJ_Alley2_Guard1"
+//	waitthread global/ManSpawnNamed.scr::Init "RJ_Alley3_Guard1"
+//	waitthread global/ManSpawnNamed.scr::Init "RJ_Alley3_Guard2"
+//	waitthread global/ManSpawnNamed.scr::Init "RJ_Alley4_Guard1"
+//	waitthread global/ManSpawnNamed.scr::Init "RJ_Alley4_Guard2"
+//	waitthread global/ManSpawnNamed.scr::Init "RJ_Alley5_Guard1"
+//	waitthread global/ManSpawnNamed.scr::Init "RJ_Alley6_Guard1"
+
+
+	$playerfalldeathtrigger thread doNottriggerable
+
+	$RoofJauntBuildingDoor lock
+
+
+	// spawn work thread
+	thread DoWork
+
+	println "roofJaunt initialized"
+
+end
+
+
+doNottriggerable:
+	self nottriggerable
+end
+
+PreClean local.name:
+	if (local.name && $(local.name))
+		$(local.name) delete
+end
+
+//chrissstrahl - hotel hotel hotel hotel
+DoWork:
+	thread SectionStartTriggerThread
+
+	$sneakersGagDone waittill trigger
+	if (level.roof_jaunt_section_triggered == 0)
+		$RoofJauntStartTrigger waittill trigger
+
+	waitthread maps/e1l3.scr::Autosave4
+
+	$Claus gun "none"
+
+	thread ClausGiveUpThread
+	thread PlayerFallToDeath_Thread
+
+	level.player_house_loc = "alley"
+	level.rj_uber_alley_enemies_spawned = 0
+	$RJ_PlayerInOuterAlley_Trigger thread PlayerInOuterAlley_Thread
+	$RJ_PlayerInAlley_Trigger thread PlayerInAlley_Thread
+	$RJ_PlayerOn1stFloor_Trigger thread PlayerOn1stFloor_Thread
+	$RJ_PlayerOnTopFloor_Trigger thread PlayerOnTopFloor_Thread
+
+	$Claus exec global/disable_ai.scr
+	$Claus threatbias 100
+	$Claus health 1
+//	$Claus threatbias ignoreme			// let chasers focus on the player
+	$Claus.waiting_for_player = 0
+	$Claus.got_new_waypoint = 0
+	$Claus thread ClausMustLive
+
+	thread ChaserMaintenance_Thread
+
+
+	level.player_not_on_roof_value = -2			// -2 means not near rooves, -1 means between and/or among rooves
+	
+	//chrissstrahl - keep for sp
+	if(level.gametype == 0){
+		$player thread PlayerOnRoofChecker_Thread 0.3
+	}
+	//chrissstrahl - coop
+	else{
+		thread coop_PlayerOnRoofChecker_Thread 0.3
+	}
+	
+	$Claus thread OnRoofChecker_Thread 0.1
+
+//	level.rj_alley_guards_active = 1
+//	thread AlleyGuard_Thread 0 1 "RJ_Alley1_Guard1" "RJ_Alley1_Guard2"
+//	thread AlleyGuard_Thread 1 2 "RJ_Alley2_Guard1"
+//	thread AlleyGuard_Thread 2 3 "RJ_Alley3_Guard1"
+//	thread AlleyGuard_Thread 2 4 "RJ_Alley4_Guard1"
+//	thread AlleyGuard_Thread 3 4 "RJ_Alley5_Guard1"
+//	thread AlleyGuard_Thread 4 4 "RJ_Alley6_Guard1"
+
+
+	$Claus thread ClausThink
+
+	wait 4		//3
+
+	trigger $RJ_ChasersStartChasing_Trigger
+//	level.rj_chaser_spawning_active = 1
+//	level.rj_chaser_spawner_done = 0
+//	thread ChaserMaintenance_Thread
+
+	wait 2
+
+	local.shout[1] = "DENGM_E1L3_GS8909"
+	local.shout[2] = "DENGM_E1L3_GS8910"
+	local.shout[3] = "DENGM_E1L3_GS8911"
+
+	local.first_shout = (1 + (randomint 3))
+	local.second_shout = waitthread IndexWrapAround (local.first_shout + (1 + (randomint 2))) 3
+
+	$RoofChaser1 playsound local.shout[local.first_shout]
+	wait 1
+	$RoofChaser2 playsound local.shout[local.second_shout]
+
+
+	$ClausPickedLock_Trigger waittill trigger
+
+
+	// any guys that are still alive, run to the player, WITH FURY!
+
+	if (isalive $ParadeChaser1)
+	{
+		$ParadeChaser1.type_attack = "runandshoot"
+		$ParadeChaser1 exec coop_mod/replace.scr::runto //chrissstrahl - coop
+	}
+	if (isalive $ParadeChaser2)
+	{
+		wait (1 + (randomfloat 1))
+		$ParadeChaser2.type_attack = "runandshoot"
+		$ParadeChaser2 exec coop_mod/replace.scr::runto //chrissstrahl - coop
+	}
+	if (isalive $ParadeChaser3)
+	{
+		wait (1 + (randomfloat 1))
+		$ParadeChaser3.type_attack = "runandshoot"
+		$ParadeChaser3 exec coop_mod/replace.scr::runto //chrissstrahl - coop
+	}
+
+
+	// let chasers return, and chase me into the room until the door is barred
+	level.rj_continual_chaser_replenish = 1
+	level.rj_chaser_spawning_active = 1
+	level.rj_chaser_post_phase = 1
+	level.rj_chasers_ramp_difficulty = 1
+	level.rj_both_chasers_are_leaders = 1
+	level.rj_chaser_accuracy = level.rj_post_lockpick_chaser_accuracy
+	level.rj_chaser_accuracy_inc = level.rj_post_lockpick_chaser_accuracy_inc
+	level.rj_chaser_health = level.rj_post_lockpick_chaser_health
+	level.rj_chaser_health_inc = level.rj_post_lockpick_chaser_health_inc
+
+
+	// wait until door is barred
+
+	$playerLockedDoor waittill trigger
+
+	level.rj_chaser_spawner_done = 1
+
+
+	// once door is barred, clean these butt-heads right up...
+
+	if ($RoofChaser1)
+		$RoofChaser1 thread DelayedRemove (1 + (randomfloat 3))
+	if ($RoofChaser2)
+		$RoofChaser2 thread DelayedRemove (1 + (randomfloat 3))
+	if ($ParadeChaser1)
+		$ParadeChaser1 thread DelayedRemove (1 + (randomfloat 3))
+	if ($ParadeChaser2)
+		$ParadeChaser2 thread DelayedRemove (1 + (randomfloat 3))
+	if ($ParadeChaser3)
+		$ParadeChaser3 thread DelayedRemove (1 + (randomfloat 3))
+	if ($RJUberKiller1)
+		$RJUberKiller1 thread DelayedRemove (1 + (randomfloat 3))
+	if ($RJUberKiller2)
+		$RJUberKiller2 thread DelayedRemove (1 + (randomfloat 3))
+
+//	level.rj_alley_guards_active = 0
+
+end
+
+
+IndexWrapAround local.num local.max:
+
+end (((local.num + (local.max - 1)) % local.max) + 1)
+
+
+SectionStartTriggerThread:
+
+	level.roof_jaunt_section_triggered = 0
+	$RoofJauntStartTrigger waittill trigger
+	level.roof_jaunt_section_triggered = 1
+end
+
+
+DelayedRemove local.delay:
+
+	wait local.delay
+
+	if (self && (isalive self))
+		self remove
+
+end
+
+
+Chaser1ThinkThread local.already_on_roof local.init_movedoneradius:
+
+	self exec global/disable_ai.scr
+
+	if (1)		//local.already_on_roof == 0)
+	{
+		local.orig_movedoneradius = self.movedoneradius
+		self.movedoneradius = local.init_movedoneradius
+
+		// going up to the roof section
+
+		while (level.player_on_roof <= 1)
+		{
+			self exec global/enable_ai.scr
+
+			//chrissstrahl - make sure we do proper null checks
+			if (self == NULL || !(isalive self) || $Claus == NULL || ($Claus.gave_up == 1))
+				end
+
+			self exec coop_mod/replace.scr::turnto //chrissstrahl - coop
+			wait 0.5
+			self turnto NULL
+
+			while (vector_within self.origin $player.origin self.movedoneradius){
+				wait 0.3
+
+				//chrissstrahl - make sure we do proper null checks
+				if (self == NULL || !(isalive self) || $Claus == NULL || ($Claus.gave_up == 1))
+					end
+			}
+
+			self exec global/disable_ai.scr
+			if (level.player_on_roof <= 0)
+				self exec coop_mod/replace.scr::runto //chrissstrahl - coop
+			else
+				self runto $RJClausWaypoint_Roof0
+			self waittill movedone
+		}
+
+		self.movedoneradius = local.orig_movedoneradius
+	}
+
+	// keep up with player, from roof to roof, until we've gotten to roof #3
+
+	// get to proper roof
+	self waitthread GuyGoToRoof (level.player_on_roof - 1)
+
+	while (self.on_roof != 3)
+	{
+		wait 1
+		self exec global/enable_ai.scr
+
+		//chrissstrahl - make sure we do proper null checks
+		if (self == NULL || !(isalive self) || $Claus == NULL || ($Claus.gave_up == 1))
+			end
+
+		self exec coop_mod/replace.scr::turnto //chrissstrahl - coop
+		wait 0.5
+		self turnto NULL
+
+		// while on proper roof...
+		while (self.on_roof >= (level.player_on_roof - 1))
+		{
+			wait 1
+
+			//chrissstrahl - make sure we do proper null checks
+			if (self == NULL || !(isalive self))
+				end
+		}
+
+		self exec global/disable_ai.scr
+
+		// get to proper roof
+		self waitthread GuyGoToRoof (level.player_on_roof - 1)
+	}
+
+	self exec global/enable_ai.scr
+	self exec coop_mod/replace.scr::turnto //chrissstrahl - coop
+	wait 0.5
+	self turnto NULL
+
+	if (level.rj_chaser_post_phase == 1)
+	{
+		while (self && (isalive self))
+		{
+			self.type_attack = "runandshoot"
+			self exec coop_mod/replace.scr::runto //chrissstrahl - coop
+			wait 2
+		}
+	}
+
+end
+
+
+Chaser2ThinkThread local.already_on_roof local.leader local.init_movedoneradius local.next_movedoneradius:{
+	self exec global/disable_ai.scr
+	if (1)		//local.already_on_roof == 0)
+	{
+		local.orig_movedoneradius = self.movedoneradius
+		self.movedoneradius = local.init_movedoneradius
+
+		// going up to the roof section
+		while (local.leader.on_roof < 1 )
+		{
+			self exec global/enable_ai.scr
+
+			if (!self || !(isalive self) || ($Claus.gave_up == 1))
+				end
+
+			self exec coop_mod/replace.scr::turnto //chrissstrahl - coop
+			wait 0.5
+			self turnto NULL
+
+			while (vector_within self.origin local.leader.origin self.movedoneradius)
+			{
+				wait 0.3
+
+				//chrissstrahl - check if Klaus even exists
+				if (!self || !(isalive self) || $Claus == NULL || ($Claus.gave_up == 1))
+					{ end }
+				if !(isalive local.leader)		// leader has died
+				{
+					// now I am the leader
+
+					self.movedoneradius = local.orig_movedoneradius
+					self thread Chaser1ThinkThread 0 local.init_movedoneradius
+					end
+				}
+			}
+
+			if !(isalive local.leader)		// leader has died
+			{
+				// now I am the leader
+
+				self.movedoneradius = local.orig_movedoneradius
+				self thread Chaser1ThinkThread 0 local.init_movedoneradius
+				end
+			}
+
+			self exec global/disable_ai.scr
+			self runto local.leader
+			self waittill movedone
+		}
+
+		self.movedoneradius = local.orig_movedoneradius
+	}
+
+	// keep up with leader, from roof to roof, until we've gotten to roof #3 (or 5, if that's the treat)
+
+	// get to proper roof
+	self waitthread GuyGoToRoof local.leader.on_roof
+	
+	if(self == NULL){ end } //chrissstrahl - reduce console spam
+
+	while (self.on_roof != 3)
+	{
+		self exec global/enable_ai.scr
+
+		//chrissstrahl - check if Klaus even exists
+		if (!self || !(isalive self) || $Claus == NULL || ($Claus.gave_up == 1))
+			{ end }
+
+		self exec coop_mod/replace.scr::turnto //chrissstrahl - coop
+		wait 0.5
+		self turnto NULL
+
+		// while on proper roof...
+		while (self.on_roof >= local.leader.on_roof)
+		{
+			wait 1
+			//chrissstrahl - check if Klaus even exists
+			if (!self || !(isalive self) || $Claus == NULL || ($Claus.gave_up == 1))
+				{ end }
+			if !(isalive local.leader)		// leader has died
+			{
+				// now I am the leader
+
+				self.movedoneradius = local.orig_movedoneradius
+				self thread Chaser1ThinkThread 1 local.init_movedoneradius
+				end
+			}
+		}
+
+		//chrissstrahl - check if Klaus even exists
+		if (!self || !(isalive self) || $Claus == NULL || ($Claus.gave_up == 1))
+			end
+
+		self exec global/disable_ai.scr
+
+		// get to proper roof
+		self waitthread GuyGoToRoof local.leader.on_roof
+
+//println ("leader on roof  " + local.leader.on_roof + "    self roof  " + self.on_roof)
+		wait 1
+	}
+
+	self exec global/enable_ai.scr
+	self exec coop_mod/replace.scr::turnto //chrissstrahl - coop
+	wait 0.5
+	self turnto NULL
+
+	if (level.rj_chaser_post_phase == 1)
+	{
+		while (self && (isalive self))
+		{
+			self.type_attack = "runandshoot"
+			self exec coop_mod/replace.scr::runto //chrissstrahl - coop
+			wait 2
+		}
+	}
+}end
+
+
+///////////////////////////////////
+
+ClausNewWaypoint:
+
+	if ($Claus.gave_up == 1)
+	{
+		trigger $ClausGotNewWaypoint_Trigger
+		end
+	}
+
+	if ($Claus.waiting_for_player == 1)
+	{
+		$Claus turnto NULL
+		$Claus.waiting_for_player = 0
+	}
+
+	$Claus.dest = $(self.target)
+	$Claus thread global/SafeMoveTo.scr::SafeRunTo $Claus.dest
+
+	$Claus.got_new_waypoint = 1
+	trigger $ClausGotNewWaypoint_Trigger
+
+end
+
+
+ClausThink:
+	$Claus anim A_13_ClausTalk09
+	$Claus waittill animdone
+	$Claus playsound DFRGM_E1L3_CK4010	// "Follow me!"
+///// this animation is still problematic
+//	$Claus anim A_13_ClausTalk09A		// "Follow me!"
+//	$Claus waittill animdone
+	$RoofJauntBuildingDoor unlock
+
+	spawn trigger_relay "targetname" "ClausGotNewWaypoint_Trigger"
+
+	$Claus.dest = $RJClausWaypoint_FirstLanding
+	$Claus thread global/SafeMoveTo.scr::SafeRunTo $Claus.dest
+
+	level.rj_claus_exhortation = 1
+	while (1)
+	{
+		$Claus waitthread global/SafeMoveTo.scr::WaitMoveDone
+		//chrissstrahl - check if Klaus even exists
+		if ($Claus == NULL || $Claus.gave_up == 1){ 
+			end
+		}
+
+		$Claus exec coop_mod/replace.scr::turnto //chrissstrahl - coop
+		$Claus.waiting_for_player = 1
+
+		if ($Claus.dest == $RJClausWaypoint_Roof0){
+			break
+		}
+
+		if ($Claus.got_new_waypoint == 0)
+		{
+			$ClausGotNewWaypoint_Trigger waittill trigger
+
+			//chrissstrahl - check if Klaus even exists
+			if ($Claus == NULL || $Claus.gave_up == 1){
+				end
+			}
+
+			if (1)			//randomint 2)
+			{
+				switch (level.rj_claus_exhortation % 3)
+				{
+					case 0:
+						$Claus playsound DFRGM_E1L3_CK4011
+						break
+					case 1:
+						$Claus playsound DFRGM_E1L3_CK4049a
+						break
+					case 2:
+						$Claus playsound DFRGM_E1L3_CK4050a
+						break
+				}
+				level.rj_claus_exhortation++
+			}
+		}
+		else
+		{
+			$Claus.got_new_waypoint = 0
+		}
+	}
+
+	//chrissstrahl - check if Klaus even exists
+	if ($Claus == NULL || $Claus.gave_up == 1){
+		end
+	}
+
+//	while ((level.player_on_roof != 0) && (level.player_house_loc != "topFloor"))
+//		waitframe
+//
+//	wait 1
+
+	$Claus turnto NULL
+	
+	$Claus waitthread GuyGoToRoof1
+	if ($RJLadderBlocker){
+		$RJLadderBlocker delete
+	}
+
+	if (level.player_on_roof < 1)
+	{
+		$Claus runto $Roof1InnerSpot
+		$Claus exec coop_mod/replace.scr::turnto //chrissstrahl - coop
+
+		if (randomint 2)
+			$Claus playsound DFRGM_E1L3_CK4050a
+		while (level.player_on_roof < 1){
+			waitframe
+		}
+	}
+
+	$Claus health 100
+	$Claus threatbias 0
+
+	$Claus waitthread GuyGoToRoof2
+	$Claus waitthread GuyGoToRoof3
+
+	if (level.player_on_roof < 2)
+	{
+		$Claus runto $Roof3InnerSpot
+		$Claus exec coop_mod/replace.scr::turnto //chrissstrahl - coop
+
+		if (randomint 2)
+			$Claus playsound DFRGM_E1L3_CK4049a
+		while (level.player_on_roof < 2)
+			waitframe
+	}
+
+	$Claus turnto $RoofLockPickPoint
+	wait 0.5
+	//iprintlnbold "Claus:  Hey! There's a door over here!"		--Silly B.S.
+	//wait 1
+	$Claus turnto NULL
+	
+	$Claus waitthread GuyGoToRoof4
+
+	$Claus avoidplayer 0
+	$Claus.movedoneradius = 20
+	$Claus runto $RoofLockPickPoint
+	$Claus waittill movedone
+
+	wait 0.2
+	$Claus turnto $RoofDoor
+	//wait 2
+	$Claus gun "none"
+	//$Claus holster
+
+	while (level.player_on_roof < 4){
+		waitframe
+	}
+	
+	//chrissstrahl - handle players in coop
+	//if they are to far away, we move them to the spawn location
+	if(level.gametype != 0){
+		//activate new spawn locations
+		waitthread coop_mod/spawnlocations.scr::e1l3_update9
+		//move players that are below xxx in z axis, they are on a roof
+		waitthread coop_mod/replace.scr::playerCatchUp "below" NIL 200
+		//kills players that are outside of the hotel and on the ground floor (player jumped from roof and survived)
+		level.coop_killThread = 1
+		thread coop_killPlayerOnGroundOutsideHotel
+	
+		//we don't want players to leave the building again
+		$RoofJauntBuildingDoor close
+		$RoofJauntBuildingDoor lock
+		//move players up that are to far away
+		for (local.pl = 1;local.pl <= $player.size;local.pl++){
+			local.player =  $player[local.pl]
+			if(local.player == NULL || local.player.dmteam == "spectator" || local.player.health <= 0){
+				continue
+			}
+			local.origin = local.player.origin
+			if(local.origin[2] <= 300){ //500 lowest roof
+				thread playerPlaceAtSpawn local.pl
+			}
+		}
+	}
+
+	$Claus lookat NULL
+	$Claus turnto NULL
+	$Claus anim A_13_ClausTalk10		// "Scheisse!  Hold them off, I need 30 seconds!"	
+	wait 0.5
+	$Claus playsound door_wood_locked
+	$Claus waittill animdone
+
+	thread DoLockPickParade
+
+	//chrissstrahl - this is bullshitt in coop
+	//out of 30 attempts not a single one was succsessful
+	//this is why we are making the guy immortal here
+	//if the developers would hav been a bit more
+	//reasonable with the ai not trowing a trillion granades
+	//this might have worked but this is just to much frustration
+	//we don't want such crap in coop, especially because there is no savegame
+	if(level.gametype == 0){
+		if (level.rj_claus_nodamage != 1)
+			$Claus takedamage
+		else
+			$Claus nodamage
+	}
+	else{
+		$Claus nodamage
+	}
+		
+		
+	$Claus thread ClausLockPickAnimMaint
+
+	waitthread maps/e1l3/Objectives.scr::transition "klausStartedPickingLock"
+
+	$LockPickParadeDone_Trigger waittill trigger
+
+	if ($Claus && isalive $Claus)
+	{
+		//iprintlnbold "DFRGM_E1L3_CK4018  Claus:  Got it!"
+		$Claus playsound DFRGM_E1L3_CK4018
+		$Claus playsound lock_pick1
+		waitthread maps/e1l3/Objectives.scr::transition "klausPickedLock"
+
+		$RoofDoor unlock
+		trigger $ClausPickedLock_Trigger
+		$Claus health 100
+		$Claus nodamage
+
+		$Claus exec global/stand.scr
+	}
+end
+
+
+ClausGiveUpThread:
+	$Claus.gave_up = 0
+
+	if (!$HotelEntranceTrigger)
+		end
+
+	level.player_entered_hotel = 0
+	$Claus.entered_hotel = 0
+
+	while ((	!$Claus ||
+				!(isalive $Claus) ||
+				($Claus.entered_hotel == 0)) &&
+				(level.player_entered_hotel == 0))
+			{
+				wait 0.5
+			}
+
+	if (level.player_entered_hotel == 1)		// player entered hotel first
+	{
+		if ($Claus && (isalive $Claus))
+		{
+			$Claus gun "Beretta"
+			$Claus.gave_up = 1
+			waitframe
+			thread ChasersAttackClaus
+			$Claus.safemoveto_done = 1
+			waitframe
+			local.point = spawn script_origin origin $Claus.origin
+//			local.point = spawn script_origin origin $player.origin
+			$Claus runto local.point
+			$Claus waittill movedone
+			$Claus exec global/enable_ai.scr
+
+			if ($RoofChaser1 && (isalive $RoofChaser1))
+				$Claus favoriteenemy $RoofChaser1
+			if ($RoofChaser2 && (isalive $RoofChaser2))
+				$Claus favoriteenemy $RoofChaser2
+
+			//$Claus walkto $player
+			//$Claus exec global/stand.scr
+			//$Claus waittill animdone
+		}
+	}
+end
+
+
+ChasersAttackClaus:
+
+	$Claus threatbias 10000
+
+	if ($RoofChaser1 && (isalive $RoofChaser1))
+		$RoofChaser1 thread SingleChaserAttackClaus
+	if ($RoofChaser2 && (isalive $RoofChaser2))
+		$RoofChaser2 thread SingleChaserAttackClaus
+
+end
+
+
+SingleChaserAttackClaus:
+
+	self favoriteenemy $Claus
+	self.type_attack = "runandshoot"
+	self runto $Claus
+
+end
+
+//chrissstrahl - this is triggred once if player or actor enters the hotel
+//this is used to determin if the actor or player enetred first
+HotelEntranceThread local.culprit:{
+	if (local.culprit){
+		//chrissstrahl - handle player
+		//we can use $player.entered_hotel for obviouse reasons
+		if(local.culprit.targetname == "player"){
+			level.player_entered_hotel = 1
+		}else{
+			local.culprit.entered_hotel = 1
+		}
+	}
+}end
+
+
+
+ClausLockPickAnimMaint:
+	local.pos = $RoofLockPickPoint.origin
+	local.pos[0] = (local.pos[0] + 8)
+//	local.pos[1] = (local.pos[1] - 4)
+	local.pos[1] = (local.pos[1] - 14)
+	local.pos[2] = $Claus.origin[2]
+
+	local.yaw = 315
+	//$Claus.angles = ( 0 local.yaw 0 )
+
+	$Claus.origin = local.pos
+	$Claus thread global/LoopAnim.Scr::LoopAnim A_13_ClausTalk10_idle
+	local.tick = 0
+	while (level.lock_pick_gag_going == 1)
+	{
+		local.tick++
+		if (!(local.tick % 6))
+			$Claus playsound snd_step_equipment
+		$Claus.origin = local.pos
+		//$Claus.angles = ( 0 local.yaw 0 )
+
+		wait 0.1
+	}
+	$Claus thread global/LoopAnim.Scr::LoopAnimStop
+
+end
+
+
+ClausMustLive:
+	$Claus waittill death
+	$Claus stopsound
+
+	if (level.clausChangingUniforms != "false") {
+		level.clausChangingUniforms = false
+		// wait for the new Claus to come into existence
+		while ($Claus == NULL || $Claus == NIL)
+			waitframe
+		$Claus waittill death
+	}
+
+	iprintlnbold "Klaus died.  You failed the mission."
+	wait 3
+	//chrissstrahl - keep sp
+	if(level.gametype == 0){
+		missionfailed	
+	}else{
+		exec coop_mod/replace.scr::missionfailed
+	}
+end
+
+
+////////////////////////////////////////////////
+
+
+OnRoofChecker_Thread local.init_delay:
+	self.on_roof = -1
+	wait local.init_delay
+	
+	while (isalive self)
+	{	
+		local.prev_on_roof = self.on_roof
+		if (self isTouching $OnRoof0Trigger)
+			self.on_roof = 0
+		else if (self isTouching $OnRoof1Trigger)
+			self.on_roof = 1
+		else if (self isTouching $OnRoof2Trigger)
+			self.on_roof = 2
+		else if (self isTouching $OnRoof3Trigger)
+			self.on_roof = 3
+		else if (self isTouching $OnRoof4Trigger)
+			self.on_roof = 4
+		else
+			self.on_roof = -1
+
+//if ((self == $RoofChaser1) && (self.on_roof != local.prev_on_roof))
+//iprintlnbold ("***** leader from roof " + local.prev_on_roof + " to roof " + self.on_roof)
+
+		wait 0.5
+	}
+end
+
+
+PlayerOnRoofChecker_Thread local.init_delay:
+
+	self.on_roof = -2
+
+	wait local.init_delay
+
+	while (isalive self)
+	{
+		local.prev_on_roof = self.on_roof
+		if (self isTouching $OnRoof0Trigger)
+		{
+			self.on_roof = 0
+			level.player_not_on_roof_value = -1
+		}
+		else if (self isTouching $OnRoof1Trigger)
+		{
+			self.on_roof = 1
+			level.player_not_on_roof_value = -1
+		}
+		else if (self isTouching $OnRoof2Trigger)
+		{
+			self.on_roof = 2
+			level.player_not_on_roof_value = -1
+		}
+		else if (self isTouching $OnRoof3Trigger)
+		{
+			self.on_roof = 3
+			level.player_not_on_roof_value = -1
+		}
+		else if (self isTouching $OnRoof4Trigger)
+		{
+			self.on_roof = 4
+			level.player_not_on_roof_value = -1
+		}
+		else
+		{
+			self.on_roof = level.player_not_on_roof_value
+		}
+
+//if (self.on_roof != local.prev_on_roof)
+//iprintlnbold ("***** player from roof " + local.prev_on_roof + " to roof " + self.on_roof)
+
+
+		wait 0.5
+	}
+end
+
+
+/////////////////////////////////
+
+GuyGoToRoof local.roof_num:
+
+	if (local.roof_num <= self.on_roof)
+		end
+
+//iprintlnbold ("***** GUYGOTOROOF  from " + self.on_roof + " to " + local.roof_num)
+
+	for (local.i=self.on_roof+1; local.i<=local.roof_num; local.i++)
+		self waitthread GuyGoToRoof_FromPrev local.i
+
+end
+
+
+GuyGoToRoof_FromPrev local.roof_num:
+
+	switch (local.roof_num)
+	{
+		case 1:
+			self waitthread GuyGoToRoof1
+			break
+		case 2:
+			self waitthread GuyGoToRoof2
+			break
+		case 3:
+			self waitthread GuyGoToRoof3
+			break
+		case 4:
+			self waitthread GuyGoToRoof4
+			break
+	}
+
+end
+
+
+GuyGoToRoof1:		// assumes guy isn't on any roof
+	self thread global/SafeMoveTo.scr::SafeRunTo_Wait $RoofLadderBottom 30
+	self turnto $RoofLadderBottom_TurnTo
+	self waittill turndone
+	self turnto NULL
+	waitframe
+	if(self == NULL){ end } //chrissstrahl - reduce console spam
+	self.angles = (0 180 0)
+
+	self waitthread GuyClimbLadder $RoofLadderBottom.origin 136 2 ( -100 0 -32)
+	if(self == NULL){ end } //chrissstrahl - reduce console spam
+	self runto $Roof1InnerPoint
+end
+
+
+GuyGoToRoof2:			// assumes guy is on roof #1
+
+	self waitthread global/SafeMoveTo.scr::SafeRunTo_Wait $Roof2InnerSpot
+//	self runto $Roof2InnerPoint
+//	self waittill movedone
+
+end
+
+
+GuyGoToRoof3:		// assumes guy is on roof #2
+
+	self runto $RoofRunTo1
+	self waittill movedone
+	//self waitthread global/SafeMoveTo.scr::SafeRunTo $RoofRunTo1
+	//while (self.safemoveto_done == 0)
+	//	wait 0.2
+
+	self runto $Roof3InnerPoint
+
+end
+
+
+GuyGoToRoof4:		// assumes guy is on roof #3
+
+	self waitthread global/SafeMoveTo.scr::SafeRunTo_Wait $Roof4InnerPoint
+//	self runto $Roof4InnerPoint
+//	self waittill movedone
+
+end
+
+
+
+///////////////////////////////////////////////
+
+GuyClimbLadder local.ladder_bottom_origin local.total_rise local.in_time local.dismount_vector:
+	if(self == NULL){ end  }//chrissstrahl - just to make sure we don't get spammed
+
+	local.gun_save = self.gun
+
+	self physics_off
+	self.no_idle = 1
+
+	self.origin = ( local.ladder_bottom_origin[0] local.ladder_bottom_origin[1] self.origin[2] )
+
+	self anim_noclip ladder_up_geton
+	self waittill animdone
+	
+	if(self == NULL){ end  }//chrissstrahl - just to make sure we don't get spammed
+
+	//local.total_rise = 136
+	local.dismount_rise = 56
+	local.climb_rise = local.total_rise - local.dismount_rise
+
+	self thread HackMoveGuy (self.origin + (0 0 local.climb_rise)) local.in_time
+
+	//chrissstrahl - added check if actor is even still there
+	while (self != NULL && self.hack_move_done == 0){
+		self anim_noclip ladder_up_lefthand
+wait 0.35
+		if(self == NULL){ end  }//chrissstrahl - just to make sure we don't get spammed
+//		self waittill animdone
+		self anim_noclip ladder_up_righthand
+wait 0.35
+//		self waittill animdone
+	}
+	
+	if(self == NULL){ end  }//chrissstrahl - just to make sure we don't get spammed
+	
+	self thread HackMoveGuy (self.origin + (0 0 local.dismount_rise)) 0.5
+
+	self anim_noclip ladder_up_getoff
+	
+	//chrissstrahl - added check if actor is even still there
+	while (self != NULL && self.hack_move_done == 0){
+		waitframe
+	}
+	
+	if(self == NULL){ end }//chrissstrahl - just to make sure we don't get spammed
+	self thread HackMoveGuy (self.origin + local.dismount_vector) 0.15
+	
+	//chrissstrahl - added check if actor is even still there
+	while (self != NULL && self.hack_move_done == 0){
+		waitframe
+	}
+	self physics_on
+	self.no_idle = 0
+	self gun local.gun_save
+end
+
+
+GuyJump local.wind_up_time local.recover_time local.init_vel local.grav local.fall_z:
+	self thread JumpAnim_Thread
+//	self exec global/crouch.scr
+//	wait local.wind_up_time
+//	self exec global/stand.scr
+//	wait 0.5
+//	//self waittill animdone
+
+	self.no_idle = 1
+	self physics_off
+	self notsolid
+	
+	self waitthread HackArcGuy local.init_vel local.grav local.fall_z
+
+	if(self == NULL){ end  }//chrissstrahl - added check if actor is even still there
+	self solid
+	self physics_on
+	self.no_idle = 0
+
+	self exec global/crouch.scr
+	self waittill animdone
+	
+	wait local.recover_time
+	
+	if(self == NULL){ end  }//chrissstrahl - added check if actor is even still there
+	self exec global/stand.scr
+	self waittill animdone
+end
+
+
+JumpAnim_Thread:
+	self anim jump_takeoff
+	self waittill animdone
+	
+	if(self == NULL){ end  }//chrissstrahl - added check if actor is even still there
+	self thread global/LoopAnim.scr::LoopAnim jump_stretch_loop
+
+	//chrissstrahl - added check if actor is even still there
+	while (self.hack_move_done == 0){
+		waitframe
+	}
+
+	if(self == NULL){ end  }//chrissstrahl - added check if actor is even still there
+	self thread global/LoopAnim.scr::LoopAnimStop
+	self anim jump_land
+
+end
+
+
+////////////////////////////////////////////
+// hack move funcs
+
+HackMoveGuy local.dest local.in_time:
+	self.hack_move_done = 0
+	local.move_vec = local.dest - self.origin
+
+	local.time = level.time
+	local.time_left = local.in_time
+	//chrissstrahl - added NULL check and moved waitframe
+	while (local.time_left > 0 && self != NULL){
+		local.time_slice = level.time - local.time
+		local.time = level.time
+
+		if (local.time_slice >= local.time_left)
+			local.time_slice = local.time_left
+
+		self.origin += (local.move_vec * (local.time_slice / local.in_time))
+
+		local.time_left -= local.time_slice
+		waitframe //chrissstrahl - moved here so the NULL check will work right
+	}
+	if(self == NULL){ end  }//chrissstrahl - added check if actor is even still there
+	self.hack_move_done = 1
+end
+
+
+HackArcGuy local.init_vel local.grav local.fall_z:
+
+	self.hack_move_done = 0
+
+	local.vel = local.init_vel
+
+	local.time = level.time
+	//chrissstrahl - added NULL check and moved waitframe
+	while (self != NULL && (local.vel[2] >= 0) || (self.origin[2] > local.fall_z)){
+		local.time_slice = level.time - local.time
+		local.time = level.time
+
+		self.origin += (local.vel * local.time_slice)
+		local.vel += ((0 0 -local.grav) * local.time_slice)
+		waitframe //chrissstrahl - moved here so the NULL check will work right
+	}
+
+	self.hack_move_done = 1
+
+end
+
+
+////////////////////////////////////////////
+// player plummet
+
+PlayerFallToDeath_Thread:
+	$failtrigger thread PFTD_Single
+	$PlayerIsFalling_Trigger waittill trigger
+	$playerfalldeathtrigger thread doFallToDeathTrigger
+end
+
+doFallToDeathTrigger:
+	self triggerable
+	self waittill trigger
+	
+	//chrissstrahl - keep sp
+	if(level.gametype == 0){
+		$player damage $world 5000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	}
+	//chrissstrahl - handle coop
+	else{
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+			if( local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1){
+				if(local.player isTouching self){
+					local.player damage $world (local.player.health + 1) $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+				}
+			}
+		}
+	}
+end
+
+
+PFTD_Single:
+	self waittill trigger
+	trigger $PlayerIsFalling_Trigger
+end
+
+
+//////////////////////////////////////////////
+// player house location
+
+PlayerInOuterAlley_Thread:
+
+	self waittill trigger
+
+	if (level.rj_uber_alley_enemies_spawned == 0)
+	{
+		level.rj_uber_alley_enemies_spawned = 1
+
+		waitthread global/ManSpawnNamed.scr::Spawn "RJ_AlleySpawn_Outer_1"
+		waitthread global/ManSpawnNamed.scr::Spawn "RJ_AlleySpawn_Outer_2"
+
+		waitframe
+
+		$("RJ_AlleySpawn_Outer_1").targetname = "RJUberKiller1"
+		$("RJ_AlleySpawn_Outer_2").targetname = "RJUberKiller2"
+
+		waitframe
+
+		$RJUberKiller1 nodamage
+		$RJUberKiller1 accuracy 100
+		$RJUberKiller1 dontdropweapons
+		
+		$RJUberKiller2 nodamage
+		$RJUberKiller2 accuracy 100
+		$RJUberKiller2 dontdropweapons		
+		
+		//chrissstrahl - handle sp
+		if(level.gametype == 0){
+			$RJUberKiller1 favoriteenemy $player
+			$RJUberKiller1 runto $player
+			$RJUberKiller2 favoriteenemy $player
+			$RJUberKiller2 runto $player
+		}
+		//chrissstrahl - handle coop
+		else{
+			local.player = waitexec coop_mod/replace.scr::player_closestTo $RJUberKiller1
+			$RJUberKiller1 favoriteenemy local.player
+			$RJUberKiller1 runto local.player
+			local.player = waitexec coop_mod/replace.scr::player_closestTo $RJUberKiller2
+			$RJUberKiller2 favoriteenemy local.player
+			$RJUberKiller2 runto local.player	
+		}
+
+		
+		//chrissstrahl - keep sp
+		if(level.gametype == 0){
+			// punish player for his transgression
+			local.new_max_player_health = 10
+			local.curr_player_health_frac = $player.health / $player.max_health
+			$player.healthonly = local.curr_player_health_frac * local.new_max_player_health
+			$player.max_health = local.new_max_player_health
+		}
+	}
+
+	while (1)
+	{
+		self waittill trigger
+
+		// punish player for his transgression
+
+		//chrissstrahl - keep sp
+		if(level.gametype == 0){
+			local.new_max_player_health = 10
+			local.curr_player_health_frac = $player.health / $player.max_health
+
+			$player.healthonly = local.curr_player_health_frac * local.new_max_player_health
+			$player.max_health = local.new_max_player_health
+		}
+
+//if (level.player_house_loc != "outerAlley")
+//iprintlnbold ("***** player house loc was " + level.player_house_loc + ", is now outerAlley")
+		level.player_house_loc = "outerAlley"
+		level.player_not_on_roof_value = -2
+	}
+end
+
+
+PlayerInAlley_Thread:
+
+	while (1)
+	{
+		self waittill trigger
+
+		switch (level.skill) {
+		case 0:
+			local.newMaxHealth = 1500
+			break
+		case 1:
+			local.newMaxHealth = 750
+			break
+		case 2:
+			local.newMaxHealth = 250
+			break
+		default:
+			local.newMaxHealth = 1500
+			break
+		}
+
+		//chrissstrahl - keep sp
+		if(level.gametype == 0){
+			// scale health back up to it is proportional to what it was before
+			local.newHealth = ($player.health/$player.max_health)*local.newMaxHealth
+			$player health local.newMaxHealth
+			$player healthonly local.newHealth
+		}
+
+//if (level.player_house_loc != "alley")
+//iprintlnbold ("***** player house loc was " + level.player_house_loc + ", is now alley")
+		level.player_house_loc = "alley"
+		level.player_not_on_roof_value = -2
+	}
+
+end
+
+
+PlayerOn1stFloor_Thread:
+
+	while (1)
+	{
+		self waittill trigger
+
+//if (level.player_house_loc != "firstFloor")
+//iprintlnbold ("***** player house loc was " + level.player_house_loc + ", is now firstFloor")
+		level.player_house_loc = "firstFloor"
+		level.player_not_on_roof_value = -2
+	}
+
+end
+
+
+PlayerOnTopFloor_Thread:
+
+	while (1)
+	{
+		self waittill trigger
+
+//if (level.player_house_loc != "topFloor")
+//iprintlnbold ("***** player house loc was " + level.player_house_loc + ", is now topFloor")
+		level.player_house_loc = "topFloor"
+		level.player_not_on_roof_value = -2
+	}
+
+end
+
+
+///////////////////////////////////////
+// chaser spawn maintenance
+
+ChaserMaintenance_Thread:
+
+	if (level.rj_disable_chasers == 1)
+		end
+
+	//chrissstrahl - keep this only for sp
+	if(level.gametype == 0){
+		level.rj_chaser_fave_enemy = $player
+	}
+
+	level.rj_chaser_spawning_active = 1
+	level.rj_chaser_spawner_done = 0
+	level.rj_chaser_post_phase = 0
+
+	level.rj_num_chasers_alive = 0
+	level.rj_continual_chaser_replenish = 1
+	level.rj_chasers_ramp_difficulty = 1
+	level.rj_both_chasers_are_leaders = 0
+
+	level.rj_chaser_accuracy = level.rj_starting_chaser_accuracy
+	level.rj_chaser_accuracy_inc = level.rj_starting_chaser_accuracy_inc
+	level.rj_chaser_health = level.rj_starting_chaser_health
+	level.rj_chaser_health_inc = level.rj_starting_chaser_health_inc
+
+	local.all_dead_trig = spawn trigger_relay "targetname" "RJ_AllChasersDead_Trigger"
+
+	local.first_set_wait = 1
+
+
+	while (level.rj_chaser_spawner_done == 0)
+	{
+		local.starting_on_roof = 0
+		local.spawner_name = " "
+//		local.uber_killers = 0
+
+//iprintlnbold ("***** por " + level.player_on_roof + "   phl " + level.player_house_loc)
+		if (level.player_on_roof == 4)
+		{
+			// roof 2 spawners
+			local.spawner_name = "RJ_Roof2Spawn_"
+			local.starting_on_roof = 1
+		}
+		else if ((level.player_on_roof >= 2) && (level.player_on_roof <= 3))
+		{
+			// roof 0 spawners
+			local.spawner_name = "RJ_Roof0Spawn_"
+			local.starting_on_roof = 1
+		}
+		else if ((level.player_on_roof >= -1) && (level.player_on_roof <= 1))
+		{
+			// 3rd floor spawners
+			local.spawner_name = "RJ_3rdFloorSpawn_"
+		}
+		else if (level.player_house_loc == "topFloor")
+		{
+			// 2nd floor spawners
+			local.spawner_name = "RJ_2ndFloorSpawn_"
+		}
+		else if (level.player_house_loc == "firstFloor")
+		{
+			// alley-door spawners
+			local.spawner_name = "RJ_AlleySpawn_Door_"
+		}
+		else if (level.player_house_loc == "alley")
+		{
+			// alley-SE spawners
+			local.spawner_name = "RJ_AlleySpawn_SE_"
+		}
+		else
+		{
+			wait 0.5
+			continue
+		}
+//		else if (level.player_house_loc == "outerAlley")
+//		{
+//			// alley-outer spawners (and these must be uber-killers)
+//			local.spawner_name = "RJ_AlleySpawn_Outer_"
+//			local.uber_killers = 1
+//		}
+
+
+		local.name_1 = (local.spawner_name + "1")
+		local.name_2 = (local.spawner_name + "2")
+
+		waitthread global/ManSpawnNamed.scr::Spawn local.name_1
+		waitthread global/ManSpawnNamed.scr::Spawn local.name_2
+
+		waitframe
+
+		$(local.name_1).targetname = "RoofChaser1"
+		$(local.name_2).targetname = "RoofChaser2"
+
+		waitframe
+
+//		if (local.uber_killers == 1)
+//		{
+//			$RoofChaser1 nodamage
+//			$RoofChaser1 accuracy 100
+//
+//			$RoofChaser2 nodamage
+//			$RoofChaser2 accuracy 100
+//		}
+//		else
+		if (level.rj_chasers_ramp_difficulty == 1)
+		{
+			$RoofChaser1 health level.rj_chaser_health
+			$RoofChaser1 accuracy level.rj_chaser_accuracy
+
+			$RoofChaser2 health level.rj_chaser_health
+			$RoofChaser2 accuracy level.rj_chaser_accuracy
+
+			level.rj_chaser_accuracy += level.rj_chaser_accuracy_inc
+			level.rj_chaser_health += level.rj_chaser_health_inc
+		}
+		else
+		{
+			$RoofChaser1 health 70
+			$RoofChaser1 accuracy 60
+
+			$RoofChaser2 health 70
+			$RoofChaser2 accuracy 60
+		}
+
+		$RoofChaser1 sight 1548
+		$RoofChaser1 hearing 1548
+		$RoofChaser1 fov 360
+		$RoofChaser1 noticescale 25
+		$RoofChaser2 sight 1548
+		$RoofChaser2 hearing 1548
+		$RoofChaser2 fov 360
+		$RoofChaser2 noticescale 25
+
+		$RoofChaser1 dontdropweapons
+		$RoofChaser2 dontdropweapons
+
+		level.rj_num_chasers_alive = 2
+		$RoofChaser1 thread ChaserDeathTracker local.all_dead_trig
+		$RoofChaser2 thread ChaserDeathTracker local.all_dead_trig
+
+		$RoofChaser1 thread OnRoofChecker_Thread 0.05
+		$RoofChaser2 thread OnRoofChecker_Thread 0.22
+		wait 1
+
+
+		if (local.first_set_wait == 1)
+		{
+			//iprintlnbold "**** WAITING FOR GO-AHEAD"
+			$RJ_ChasersStartChasing_Trigger waittill trigger
+			local.first_set_wait = 0
+			//iprintlnbold "**** GOT GO-AHEAD"
+		}
+
+		//chrissstrahl - keep this only for sp
+		if(level.gametype == 0){
+			$RoofChaser1 favoriteenemy level.rj_chaser_fave_enemy
+			$RoofChaser2 favoriteenemy level.rj_chaser_fave_enemy
+		}
+
+		$RoofChaser1 thread Chaser1ThinkThread local.starting_on_roof 384		//512
+		if (level.rj_both_chasers_are_leaders == 1)
+			$RoofChaser2 thread Chaser1ThinkThread local.starting_on_roof 384		//512
+		else
+			$RoofChaser2 thread Chaser2ThinkThread local.starting_on_roof $RoofChaser1 256 512
+
+
+		// wait until they are both dead
+		local.all_dead_trig waittill trigger
+
+
+		// make sure we're clear to spawn more
+
+		if (level.rj_continual_chaser_replenish == 0)
+			level.rj_chaser_spawning_active = 0				// must wait to be signaled again
+
+		while ((level.rj_chaser_spawning_active == 0) && (level.rj_chaser_spawner_done == 0))
+			wait 0.5
+	}
+
+end
+
+
+ChaserDeathTracker local.trig:
+
+	self waittill death
+	if (self.summarily_removed == 1)
+		end
+
+	self takeall				// don't drop health
+	self.targetname = "DeadRoofJauntChaser"
+	level.rj_num_chasers_alive--
+
+	if (level.rj_num_chasers_alive <= 0)
+	{
+		trigger local.trig
+	}
+
+	wait 12
+	if (self)
+		self delete
+
+end
+
+
+///////////////////////////////////////////////
+
+DoLockPickParade:
+
+	local.all_parade_chasers_dead_trigger = spawn trigger_relay
+
+//	level.rj_chaser_spawner_done = 1
+	level.rj_continual_chaser_replenish = 0
+////	level.rj_chaser_fave_enemy = $Claus
+//	level.rj_chasers_ramp_difficulty = 0
+
+	level.rj_num_roof_parade_guys_alive = 0
+	level.lock_pick_gag_going = 1
+
+	waitframe
+
+	local.roof_guys_dead_trigger = spawn trigger_relay
+
+	thread PlayerBoundsCheckUntilLockPickDone_Thread
+
+
+	local.num_chaser_guys_left = 0
+
+	if ($RoofChaser1 && (isalive $RoofChaser1))
+	{
+		if ($RoofChaser1.on_roof < 1)
+		{
+			$RoofChaser1.summarily_removed = 1
+			$RoofChaser1 delete
+			level.rj_num_chasers_alive--
+		}
+		else
+		{
+			local.health_frac = $RoofChaser1.health / $RoofChaser1.max_health
+
+			$RoofChaser1 health 70
+			$RoofChaser1 healthonly (local.health_frac * 70)
+			$RoofChaser1 accuracy 60
+
+			local.num_chaser_guys_left++
+		}
+	}
+
+	if ($RoofChaser2 && (isalive $RoofChaser2))
+	{
+		if ($RoofChaser2.on_roof < 1)
+		{
+			$RoofChaser2.summarily_removed = 1
+			$RoofChaser2 delete
+			level.rj_num_chasers_alive--
+		}
+		else
+		{
+			local.health_frac = $RoofChaser2.health / $RoofChaser2.max_health
+
+			$RoofChaser2 health 70
+			$RoofChaser2 healthonly (local.health_frac * 70)
+			$RoofChaser2 accuracy 60
+
+			local.num_chaser_guys_left++
+		}
+	}
+
+	waitframe
+
+	level.rj_num_parade_chasers_alive = 0
+	if (local.num_chaser_guys_left <= 1)
+	{
+		waitthread SpawnChaseParadeGuys (2 - local.num_chaser_guys_left) local.all_parade_chasers_dead_trigger
+	}
+
+
+	// wait until chasers are dead
+	if (level.rj_num_chasers_alive > 0)
+		$RJ_AllChasersDead_Trigger waittill trigger
+
+	//iprintlnbold ("***** LOCKPICKING START")
+iprintlnbold ("DEV: all cheasers are fucking dead") //chrissstrahl - fixme debugme
+
+
+	for (local.i=1; local.i<=level.num_lockpick_waves; local.i++)
+	{
+iprintlnbold ("DEV: ***** LOCKPICKING 1  " + local.i) //chrissstrahl - fixme debugme
+		//iprintlnbold ("***** LOCKPICKING 1  " + local.i)
+
+		if ((local.i == level.num_lockpick_waves) && $Claus && (isalive $Claus))
+		{
+			//iprintlnbold "DFRGM_E1L3_CK4017  Claus:  I _almost_ have it!"
+			$Claus playsound DFRGM_E1L3_CK4017 
+		}
+
+
+		// make sure all previous roof parade guys are dead
+
+		//iprintlnbold ("***** LOCKPICKING 1a  " + local.i + "    nrpga = " + level.rj_num_roof_parade_guys_alive)
+
+		if (level.rj_num_roof_parade_guys_alive > 0){
+iprintlnbold ("DEV: rj_num_roof_parade_guys_alive > 0") //chrissstrahl - fixme debugme
+			local.roof_guys_dead_trigger waittill trigger
+		}
+
+		//iprintlnbold ("***** LOCKPICKING 2  " + local.i)
+
+		// wait until chaser paraders are dead or time-to-overlap elapses
+		local.start_time = level.time
+		while (((level.time - local.start_time) < level.lockpick_wave_overlap_time_delay) &&
+				(level.rj_num_parade_chasers_alive > 0))
+		{
+			waitframe
+		}
+
+
+		// now spawn some roof parade guys
+		
+iprintlnbold ("DEV: spawn 1 roof parade1 morons") //chrissstrahl - fixme debugme
+
+		local.num_new_guys = waitthread RandomIntMinMax level.lockpick_wave_num_guys_min[local.i] level.lockpick_wave_num_guys_max[local.i]
+		waitthread SpawnRoofParadeGuys local.num_new_guys local.roof_guys_dead_trigger
+
+iprintlnbold ("DEV: spawn 2 roof parade1 morons complete") //chrissstrahl - fixme debugme
+
+		//iprintlnbold ("***** LOCKPICKING 3  " + local.i)
+
+
+		// make sure all previous chaser guys are dead
+		if (level.rj_num_parade_chasers_alive > 0){
+iprintlnbold ("DEV: wait for parade chasers to be dead") //chrissstrahl - fixme debugme
+			local.all_parade_chasers_dead_trigger waittill trigger
+		}
+
+		// wait until roof parade guys are dead or time-to-overlap elapses
+		local.start_time = level.time
+iprintlnbold ("DEV: spawn 3 wait for parade2 moroans") //chrissstrahl - fixme debugme
+		
+		while (((level.time - local.start_time) < level.lockpick_wave_overlap_time_delay) &&
+				(level.rj_num_roof_parade_guys_alive > 0))
+		{
+			waitframe
+		}
+
+		//iprintlnbold ("***** LOCKPICKING 4  " + local.i)
+
+
+		// unleash a pair of Chaser guys
+		
+iprintlnbold ("DEV: spawn 4 new bastards") //chrissstrahl - fixme debugme
+
+		local.num_new_guys = waitthread RandomIntMinMax level.lockpick_wave_num_guys_min[local.i] level.lockpick_wave_num_guys_max[local.i]
+		//iprintlnbold ("***** BACON  " + local.num_new_guys)
+		waitthread SpawnChaseParadeGuys local.num_new_guys local.all_parade_chasers_dead_trigger
+
+		//iprintlnbold ("***** LOCKPICKING 5  " + local.i)
+	}
+	//iprintlnbold ("***** LOCKPICKING DOGKNUCKLES")
+
+	trigger $LockPickParadeDone_Trigger
+	level.lock_pick_gag_going = 0
+
+end
+
+
+RandomIntMinMax local.min local.max:
+
+	if (local.min >= local.max)
+		end local.min
+
+	local.rv = (local.min + (randomint (local.max - local.min + 1)))
+
+end local.rv
+
+
+SpawnRoofParadeGuys local.num_guys local.death_trigger local.uber_guys:
+
+	level.rj_num_roof_parade_guys_alive = local.num_guys
+	//iprintlnbold ("***** NUM ROOFPARADEGUYS " + local.num_guys)
+
+	for (local.i=1; local.i<=local.num_guys; local.i++)
+	{
+		waitthread global/ManSpawnNamed.scr::Spawn "RJ_RoofParadeSpawn"
+		waitframe
+		local.guy = $RJ_RoofParadeSpawn
+		local.guy.targetname = ("RoofParadeGuy" + local.i)
+		waitframe
+
+		local.guy thread RoofParadeGuyThink local.death_trigger local.uber_guys
+
+		wait (1 + (randomfloat 0.8))
+	}
+
+end
+
+
+RoofParadeGuyThink local.death_trigger local.uber_guy:
+
+//	self exec global/disable_ai.scr
+//	self.origin[0] -= 64
+	self thread RoofParadeDeathTracker local.death_trigger
+	self.movedoneradius = 64		//150
+	self exec global/enable_ai.scr
+	waitframe
+	self sight 1548
+	self hearing 1548
+	self fov 360
+	self noticescale 25
+//	self turnto $player
+	self.type_attack = "runandshoot"
+	if ($RoofParadeRallyPoint)
+		self runto $RoofParadeRallyPoint[1 + (randomint $RoofParadeRallyPoint.size)]
+	else
+		self runto $RoofParadeRallyPoint2
+	self waittill movedone
+//	self exec global/enable_ai.scr
+	self exec coop_mod/replace.scr::turnto //chrissstrahl - coop
+	wait 0.5
+	self turnto NULL
+
+	if (local.uber_guy == 1)
+	{
+		self favoriteenemy $Claus
+		self health 10000
+		self accuracy 100
+	}
+
+end
+
+
+
+PlayerBoundsCheckUntilLockPickDone_Thread:
+
+	while (level.lock_pick_gag_going == 1)
+	{
+		if (level.player_on_roof != 4)
+		{
+//			if ((!$RoofParadeGuy1 || !(isalive $RoofParadeGuy1)) &&
+//					(!$RoofParadeGuy2 || !(isalive $RoofParadeGuy2)))
+//			{
+				waitthread SpawnRoofParadeGuys 5 NIL 1			// uber-killers
+//			}
+
+			end
+		}
+
+		waitframe
+	}
+
+end
+
+
+RoofParadeDeathTracker local.trig:
+
+	self waittill death
+	self takeall				// don't drop health
+	self.targetname = "DeadRoofJauntParadeGuy"
+	level.rj_num_roof_parade_guys_alive--
+
+	if (level.rj_num_roof_parade_guys_alive <= 0)
+	{
+		if (local.trig)
+			trigger local.trig
+	}
+
+	wait 12
+	if (self)
+		self delete
+
+end
+
+
+
+SpawnChaseParadeGuys local.num_guys local.all_dead_trig:
+
+	if (level.player_on_roof != 4)
+		end						// Claus will get killed by opportunity spawn-guys up on the other roof
+
+	level.rj_num_parade_chasers_alive = local.num_guys
+	//iprintlnbold ("***** NUM CHASEPARADEGUYS " + local.num_guys)
+
+	for (local.i=1; local.i<=20; local.i++)
+	{
+		local.picked_point_array[local.i] = 0
+	}
+
+	local.counter = spawn info_notnull
+	local.counter.num_points_avail = -1
+
+	for (local.i=1; local.i<=local.num_guys; local.i++)
+	{
+		local.guy_name = ("RJ_Roof2Spawn_" + (1 + (randomint 2)))
+		waitthread global/ManSpawnNamed.scr::Spawn local.guy_name
+		waitframe
+		local.guy = $(local.guy_name)
+		local.guy.targetname = ("ParadeChaser" + local.i)
+		waitframe
+		local.guy thread ParadeChaserDeathTracker_Thread local.all_dead_trig
+
+		local.guy thread ChaseParadeGuyThink local.picked_point_array local.counter
+
+		wait (1 + (randomfloat 0.8))
+	}
+
+	wait 5
+	local.counter delete
+
+end
+
+//[200] chrissstrahl - debugme fixme - find out if they are the right ones
+coop_debugTheFuckerByBlinking:{
+	while(self != NULL&& isalive(self)){
+		self hide
+		wait 0.2
+		if(self == NULL){ end }
+		self show
+	}
+}
+ 
+
+
+
+
+ChaseParadeGuyThink local.picked_point_array local.counter:
+
+	self thread coop_debugTheFuckerByBlinking //[200] chrissstrahl - debugme fixme - find out if they are the right ones
+	
+	
+//	self exec global/disable_ai.scr
+	self sight 1548
+	self hearing 1548
+	self fov 360
+	self noticescale 25
+	self health 70
+	self accuracy 60
+	self dontdropweapons
+//	self favoriteenemy $player		// ??
+	self exec global/enable_ai.scr
+	self.movedoneradius = 32
+	waitframe
+
+	if (!$ChaserParadeRallyPoint_Roof2 && !$ChaserParadeRallyPoint_Roof3)
+	{
+		self waitthread GuyGoToRoof3
+	}
+	else
+	{
+		local.num_roof_2 = $ChaserParadeRallyPoint_Roof2.size
+		local.num_roof_3 = $ChaserParadeRallyPoint_Roof3.size
+		local.num_total = local.num_roof_2 + local.num_roof_3
+
+		if (local.counter.num_points_avail < 0)
+			local.counter.num_points_avail = local.num_total
+
+		local.pick = (1 + (randomint local.counter.num_points_avail))
+		local.pindex = 1
+		for (local.i=1; local.i<=local.num_total; local.i++)
+		{
+			if (local.picked_point_array[local.i] == 0)
+			{
+				if (local.pindex == local.pick)
+				{
+					break
+				}
+
+				local.pindex++
+			}
+		}
+		local.pick = local.i
+		local.picked_point_array[local.pick] = 1
+		local.counter.num_points_avail--
+
+		//self.type_attack = "runandshoot"
+
+		if (local.pick <= local.num_roof_2)
+		{
+			self.type_attack = "runandshoot"
+			self runto $ChaserParadeRallyPoint_Roof2[local.pick]
+		}
+		else
+		{
+			self.type_attack = "runandshoot"
+			self waitthread GuyGoToRoof3
+			self.type_attack = "runandshoot"
+			self runto $ChaserParadeRallyPoint_Roof3[local.pick - local.num_roof_2]
+		}
+
+		self waittill movedone
+	}
+
+//	local.guy exec global/enable_ai.scr
+	local.guy exec coop_mod/replace.scr::turnto //chrissstrahl - coop
+//	wait 0.5
+//	local.guy turnto NULL
+
+	wait 10			// after this, rush the player, that bastard
+
+	while (self && (isalive self))
+	{
+		self.type_attack = "runandshoot"
+		self exec coop_mod/replace.scr::runto //chrissstrahl - coop
+		wait 1
+	}
+
+end
+
+
+ParadeChaserDeathTracker_Thread local.trig:
+
+	self waittill death
+	self takeall				// don't drop health
+	self.targetname = "DeadRoofJauntParadeChaser"
+	level.rj_num_parade_chasers_alive--
+	//iprintlnbold ("***** NUM ALIVE NOW " + level.rj_num_parade_chasers_alive)
+
+	if (level.rj_num_parade_chasers_alive <= 0)
+	{
+		trigger local.trig
+	}
+
+end
+
+
+
+
+//////////////////////////////////////////
+//// Alley guard thread
+//
+//AlleyGuard_Thread local.min_roof local.max_roof local.guy1name local.guy2name:
+//
+//	local.guys_spawned = 0
+//
+//	local.guy1 = NULL
+//	local.guy2 = NULL
+//
+//	while (level.rj_alley_guards_active == 1)
+//	{
+//		while (((level.player_on_roof < local.min_roof) || (level.player_on_roof > local.max_roof)) &&
+//					(level.rj_alley_guards_active == 1))
+//			wait 0.2
+//
+//		if (level.rj_alleys_active == 0)
+//			break
+//
+//		if (local.guys_spawned == 0)
+//		{
+//			waitthread global/ManSpawnNamed.scr::Spawn local.guy1name
+//			waitframe
+//
+//			if (!$(local.guy1name))
+//				end
+//
+//			local.guy1 = $(local.guy1name)
+//			local.guy1 nodamage
+//			local.guy1 accuracy 100
+//
+//			if (local.guy2name != NIL)
+//			{
+//				waitthread global/ManSpawnNamed.scr::Spawn local.guy2name
+//				local.guy2 = $(local.guy2name)
+//				local.guy2 nodamage
+//				local.guy2 accuracy 100
+//			}
+//
+//			local.guys_spawned = 1
+//		}
+//		else
+//		{
+//			local.guy1 ai_on
+//			local.guy1 show
+//			if (local.guy2 != NULL)
+//			{
+//				local.guy2 ai_on
+//				local.guy2 show
+//			}
+//		}
+//
+//		while ((((level.player_on_roof >= local.min_roof) && (level.player_on_roof <= local.max_roof)) ||
+//						(level.player_on_roof < 0)) &&
+//					(level.rj_alley_guards_active == 1))
+//			wait 0.2
+//
+//		local.guy1 ai_off
+//		local.guy1 hide
+//		if (local.guy2 != NULL)
+//		{
+//			local.guy2 ai_off
+//			local.guy2 hide
+//		}
+//	}
+//
+//	local.guy1 delete
+//	if (local.guy2 != NULL)
+//		local.guy2 delete
+//
+//end
+
+//chrissstrahl - this kills players that are outside the hotel area
+//=========================================================================
+coop_killPlayerOnGroundOutsideHotel:{
+//=========================================================================
+	while(level.coop_killThread == 1){
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player =  $player[local.i]
+			if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 && local.player.flags["coop_isActive"] == 1){
+				local.playerOrigin = local.player.origin
+				//player is on ground level
+				if( local.playerOrigin[2] < 200){
+					//player is outside of x/y coords of hotel lobby
+					if( local.playerOrigin[0] > -64 || local.playerOrigin[0] < -712 ||  local.playerOrigin[1] < 2432 || local.playerOrigin[1] > 2816 ){
+						//terminate player
+						local.player normal_damage (local.player.health + 1)
+						//make sure player will not respawn inside killzone
+						thread coop_mod/main.scr::resetSpawn local.player
+						//iprintlnbold_noloc("DEV: player outside hotel lobby - terminating player")
+					}
+				}
+			}
+		}
+		waitframe
+	}
+}end
+
+//chrissstrahl - handels player progress in coop
+//=========================================================================
+coop_PlayerOnRoofChecker_Thread local.init_delay:{
+//=========================================================================
+	level.player_on_roof = -2
+
+	wait local.init_delay
+	level.coop_playerOnRoofChecker = 1	
+	while (level.coop_playerOnRoofChecker){
+		local.prev_on_roof = level.player_on_roof
+		//chrissstrahl - we need to change the order
+		//the roof with the most progress must be
+		//prioritised, because we could have a player on
+		//every roof, but we want the mission to progress
+		//and not to get stuck where the player hanging behind lurkes
+		
+		if(waitthread coop_mod/replace.scr::istouching $OnRoof4Trigger){
+			level.player_on_roof = 4
+			level.player_not_on_roof_value = -1			
+		}else if(waitthread coop_mod/replace.scr::istouching $OnRoof3Trigger){
+			level.player_on_roof = 3
+			level.player_not_on_roof_value = -1
+		}
+		else if(waitthread coop_mod/replace.scr::istouching $OnRoof2Trigger){
+			level.player_on_roof = 2
+			level.player_not_on_roof_value = -1		
+		}else if(waitthread coop_mod/replace.scr::istouching $OnRoof1Trigger){
+			level.player_on_roof = 1
+			level.player_not_on_roof_value = -1		
+		}else if(waitthread coop_mod/replace.scr::istouching $OnRoof0Trigger){
+			level.player_on_roof = 0
+			level.player_not_on_roof_value = -1		
+		}else{
+			level.player_on_roof = level.player_not_on_roof_value
+		}
+
+//if (self.on_roof != local.prev_on_roof)
+//iprintlnbold ("***** player from roof " + local.prev_on_roof + " to roof " + level.player_on_roof)
+
+		wait 0.5
+	}
+}end

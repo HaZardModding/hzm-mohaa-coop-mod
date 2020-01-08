@@ -1,0 +1,638 @@
+///////////////////////////////////////
+//
+//  MoH: Allied Assault Script File  
+//  Level: M6L3d
+//  Script Written By: Ned and lots of help from Nate
+//  Level Geometry By: Benson, Ned, Adam
+//
+///////////////////////////////////////
+//============================================================================
+main:{
+//============================================================================
+	level.coopNextMap = "m6l3e"			//Pasted by Criminal for coop comp. - set next map (for mom voteing)
+	level.coopPrevMap = "m6l3c"			//Pasted by Criminal for coop comp. - set previouse map (for mom voteing)
+	level.coop_aaMap = 1				//Pasted by Criminal for coop comp. - let global scripts know this is a AA level
+	thread coop_mod/main.scr::main     //Pasted by Criminal for coop comp. - start coop mod extensions
+
+	//chrissstrahl - for coop we need to run it before player spawn
+	if(level.gametype != 0){
+		thread elevator2
+	}
+	//eof chrissstrahl
+	
+	exec global/loadout.scr maps/m6l3d.scr
+
+	level waittill prespawn
+	exec global/ambient.scr m6l3d
+
+	$elevator_switch2 bind $elevator_cab2
+	$elevator_switch2 anim on
+	exec global/door_locked.scr::lock	
+
+	//level waitTill spawn //chrissstrahl
+	waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl - coop mod replacement
+
+	waitthread global/items.scr::add_item "explosives" nomessage
+	waitthread global/items.scr::add_item "gasmask" 1 //chrissstrahl -  moved here
+
+	//*** telling the AI to not drop health
+	level.nodrophealth = 1
+
+	$elevatorclip notsolid
+	//$player stufftext "tmstop"//chrissstrahl
+	//$player stufftext "tmstart sound/music/mus_Schmerzen_01f.mp3" //chrissstrahl
+	
+	exec coop_mod/replace.scr::tmstop //chrissstrahl - make coop compatible
+	exec coop_mod/replace.scr::tmstartloop "sound/music/mus_Schmerzen_01f.mp3" //chrissstrahl - make coop compatible
+	
+	thread gasmasksounds
+	$machinehum1 loopsound m6l1c_machine_loop1
+
+	//chrissstrahl - do this in sp only, we have a different handle in coop
+	if(level.gametype == 0){
+		// JBW - moved huddraw stuff out of refresh since refresh never happens
+		huddraw_shader 200 "textures/hud/gasmask_overlay"
+		huddraw_align 200 left top
+		huddraw_rect 200 0 0 640 480
+		huddraw_virtualsize 200 1
+		huddraw_color 200 1 1 1
+		huddraw_alpha 200 1
+	}
+
+	level.valvecount = 0
+	level.geek_freak = 0
+	level.valve1open = 0
+	level.valve2open = 0
+	level.gassed = $survivors.size
+
+	for(local.i = 1; local.i <= level.gassed; local.i++){
+		$survivors[local.i] thread sancho local.i
+	}
+	
+	//chrissstrahl - for coop we did run it above before player spawn
+	if(level.gametype == 0){
+		thread elevator2
+	}
+	//eof chrissstrahl
+	
+	thread pipeleaks
+	thread german_geek
+
+	level.fogplane = 10000
+	$world farplane level.fogplane
+	level.fogred = .2
+	level.foggreen = .2
+	level.fogblue = .3
+	$world farplane_color (level.fogred + " " + level.foggreen + " " + level.fogblue)
+
+	/////// objectives 
+	waitthread global/objectives.scr::add_objectives 1 2 "Open the main gas valves. [2 remaining]" $gas_valve1.origin	
+	waitthread global/objectives.scr::add_objectives 2 2 "Plant the explosives." $z_bomb_explosive.origin
+	waitthread global/objectives.scr::add_objectives 3 2 "Return to the elevator." $obj2.origin
+	waitthread global/objectives.scr::current_objectives 1
+}end
+
+//============================================================================
+sancho local.sanchonum:{
+//============================================================================
+        wait 1
+        self targetname ("sancho" + local.sanchonum)
+}end
+
+//============================================================================
+level_end_trigger:{
+//============================================================================
+	iprintlnbold "You have not completed your objectives."	
+}end
+
+//============================================================================
+end_of_level:{
+//============================================================================
+	waitthread global/objectives.scr::add_objectives 2 3
+}end
+
+//============================================================================
+gasmasksounds:{
+//============================================================================
+	local.skill = getcvar(skill)
+	println local.skill
+
+	if(local.skill == "0"){
+		local.health = 1250
+	}
+
+	if(local.skill == "1"){
+		local.health = 750
+	}
+
+	if(local.skill == "2"){
+		local.health = 250
+	}
+
+	local.twothirdshealth = ((local.health / 3.0) * 2.0)
+	local.onethirdshealth = (local.health / 3.0)
+	local.currentsound = 0
+
+	if(level.gametype==0){//Criminal - Singleplayer.
+    	while(1){
+			local.playerhealth = $player.health
+			local.playerhealth = (local.playerhealth * 1.0)
+    	 	if(local.playerhealth > local.twothirdshealth && local.currentsound != 1){
+    	 		local.currentsound = 1
+    	 		$player stopsound
+    	 		$player loopsound gasmask1
+    		 	}
+     		if (local.playerhealth > local.onethirdshealth && $player.health <= local.twothirdshealth && local.currentsound != 2){	
+     			local.currentsound = 2
+     			$player stopsound
+     			$player loopsound gasmask2
+     		}
+     		if (local.playerhealth <= local.onethirdshealth && local.currentsound != 3){
+     			local.currentsound = 3
+     			$player stopsound
+     			$player loopsound gasmask3
+     		}
+     			wait 1
+     	}
+     	end
+    }
+	//chrissstrahl - multiplayer
+	else{
+		thread coop_gasmaskSounds
+	}
+}end
+
+//chrissstrahl - handle gasmasksounds in multiplayer
+//============================================================================
+coop_gasmaskSounds:{
+//============================================================================
+	local.twothirdshealth = ((level.coop_health / 3.0) * 2.0)
+	local.onethirdshealth = (level.coop_health / 3.0)
+	local.currentsound = 0
+
+	while(1){
+    	for (local.i = 1; local.i <= $player.size; local.i++) {
+    		local.player = $player[local.i]
+			
+			if ( local.player == NULL ){ continue }
+			if ( local.player.flags["coop_gasmaskSound"] != NIL ){
+				if ( local.player.dmteam == "spectator" || local.player.health <= 0 ){
+					local.player stopsound
+					local.player.flags["coop_gasmaskSound"] = NIL
+					continue
+				}				
+			}
+			
+			local.health = (local.player.health * 1)
+			
+			if( local.health < local.twothirdshealth && local.player.flags["coop_gasmaskSound"] != 1){
+				local.player stopsound
+				local.player loopsound gasmask1
+				local.player.flags["coop_gasmaskSound"] = 1
+			}
+
+			else if( local.health > local.onethirdshealth && local.player.flags["coop_gasmaskSound"] != 2){
+				local.player stopsound
+				local.player loopsound gasmask2
+				local.player.flags["coop_gasmaskSound"] = 2
+			}
+			else if( local.health <= local.onethirdshealth && local.player.flags["coop_gasmaskSound"] != 3){
+				local.player stopsound
+				local.player loopsound gasmask3
+				local.player.flags["coop_gasmaskSound"] = 3
+			}
+		}
+		wait 1
+	}
+}end
+
+//planting z_bomb_explosive
+//============================================================================
+z_bomb_set_explosive:{
+//============================================================================
+	if (level.ok_bomb == 1){
+     	if(level.bompplanted != 1){
+     		level.bompplanted = 1
+			waitthread global/items.scr::remove_item "explosives" nomessage
+     		$z_bomb_explosive waitthread explode_controller $z_bomb_explosive
+     	}
+     	end
+	}else{
+		iprintlnbold ("You must first open the valves.")
+	}
+}end
+
+// elevator threads
+//============================================================================
+elevator2:{
+//============================================================================
+	// Elevator Speeds
+	if(level.gametype==0){ //chrissstrahl - sp
+		$elevator_cab2 time 4
+		
+		$elevator_cab2 playsound elevator_run
+		$elevator_cab2 moveto $elevator_way10
+		$elevator_cab2 waitmove
+	}else{ //chrissstrahl - mp/coop
+		$elevator_cab2 time 0.01
+		$elevator_cab2 moveto $elevator_way10
+		$elevator_cab2 waitmove
+		$elevator_cab2 moveto $elevator_way10
+	}
+	
+	$elevator_gate_2 time 0.75 //chrissstrahl - moved here
+	
+	$elevator_gate_2 playsound elevator_gate
+	$elevator_gate_2 movedown 70
+	$elevator_gate_2 waitmove
+	$elevator_switch2 anim off
+	
+	// Elevator Speeds
+	$elevator_cab2 time 4
+	$elevator_gate_2 time 0.75
+
+	//$elevator_reset1 waittill trigger
+	asdf: 
+	$elevator_top2 waittill trigger
+	if (level.objective1complete != 1){
+     	iprintlnbold ("You have not completed your objectives.")
+		
+		//chrissstrahl - make sure a player can't spam to much
+		for(local.i=0;local.i<5;local.i++){
+			if(level.objective1complete != 1){
+				wait 1 
+			}
+		}
+		//eof chrissstrahl		
+     	goto asdf
+	}
+
+	$elevatorclip solid
+	$elevator_switch2 anim turn
+	$elevator_switch2 anim waittill animdone
+	$elevator_switch2 anim on
+    level.gottoelevator = 1
+
+	$elevator_gate_2 playsound elevator_gate
+    waitthread global/objectives.scr::add_objectives 3 3 "Return to the elevator." $obj2.origin
+	waitthread global/objectives.scr::current_objectives 0	
+	$elevator_gate_2 moveup 70
+	$elevator_gate_2 waitmove
+	wait 1
+
+	$elevator_cab2 playsound elevator_start wait
+	wait .5
+
+	$elevator_cab2 playsound elevator_run
+	$elevator_cab2 moveto $elevator_way11
+	$elevator_cab2 waitmove
+}end
+
+//============================================================================
+open_gas_valve1:{
+//============================================================================
+	self time 3
+	self rotateZdown 360
+	self playsound flywheel
+	self waitmove
+	wait 2
+	self.model = animate/redvalve_nopulse.tik
+}end
+
+//============================================================================
+open_gas_valve2:{
+//============================================================================
+	self time 3
+	self rotateZdown 360
+	self playsound flywheel
+	self waitmove
+	wait 2
+	self.model = animate/redvalve_nopulse.tik
+}end
+
+//============================================================================
+gas_valve1:{
+//============================================================================
+	level.valvecount++
+	level.nextobjective = $gas_valve2
+	$gas_valve1 thread open_gas_valve1
+	thread setvalveobjective
+	wait 3
+	thread manual_gas gas_flowing1
+}end
+
+//============================================================================
+gas_valve2:{
+//============================================================================
+	level.valvecount++
+	level.nextobjective = $gas_valve1
+	$gas_valve2 thread open_gas_valve2
+	thread setvalveobjective
+	wait 3
+	thread manual_gas gas_flowing2
+}end
+
+//============================================================================
+setvalveobjective:{
+//============================================================================
+	if (level.valvecount != 2){
+        waitthread global/objectives.scr::add_objectives 1 2 "Open the main gas valves. [1 remaining]" level.nextobjective.origin	
+        waitthread global/objectives.scr::add_objectives 2 2 "Plant the explosives." $z_bomb_explosive.origin
+        waitthread global/objectives.scr::add_objectives 3 2 "Return to the elevator." $obj2.origin
+		waitthread global/objectives.scr::current_objectives 1
+	}else{
+	thread setobjective2
+	}
+}end
+
+//============================================================================
+setobjective2:{
+//============================================================================
+	level.ok_bomb = 1
+	waitthread global/objectives.scr::add_objectives 1 3 "Open the two main gas valves."  $gas_valve2.origin	
+	waitthread global/objectives.scr::add_objectives 2 2 "Plant the explosives." $z_bomb_explosive.origin
+	waitthread global/objectives.scr::add_objectives 3 2 "Return to the elevator." $obj2.origin
+	waitthread global/objectives.scr::current_objectives 2
+}end
+
+//============================================================================
+explode_controller local.target:{
+//============================================================================
+	self model animate/explosive.tik
+	self playsound plantbomb
+ 	self loopsound bombtick 
+ 	level.objective1complete = 1
+
+	waitthread global/objectives.scr::add_objectives 1 3 "Open the two main gas valves."  $gas_valve2.origin	
+	waitthread global/objectives.scr::add_objectives 2 3 "Plant the explosives." $z_bomb_explosive.origin
+	waitthread global/objectives.scr::add_objectives 3 2 "Return to the elevator." $obj2.origin
+	waitthread global/objectives.scr::current_objectives 3
+
+	iprintlnbold "30 seconds to escape to elevator."
+
+	//$player stopwatch 30 //Criminal.
+	exec coop_mod/replace.scr::stopwatch 30 //Criminal - coop comp.
+	wait 30
+
+	if(level.gottoelevator == 1){end}
+	
+	local.firespawned = spawn animate/adam-hallfire2.tik
+	//local.firespawned.origin = $player.origin //Criminal - coop comp.
+	local.firespawned.origin = exec coop_mod/replace.scr::player_origin //Criminal - cooop comp/
+	local.firespawned anim start
+	waitframe
+
+	//radiusdamage $player.origin 1500 800 
+	local.bb22 = exec coop_mod/replace.scr::player_origin 	//Criminal - coop com - added to use in radiusdamage, it's clearer that way I think.
+	radiusdamage local.bb22 1500 800 						//Criminal - coop comp.
+}end
+
+//============================================================================
+pipeleaks:{
+//============================================================================
+	for(local.i = 1;local.i <= $pipeleak.size;local.i++){
+		$pipeleak[local.i] thread pipeleak
+		local.leakingpipe = $pipeleak[local.i].target	
+		while(local.leakingpipe){
+			local.leakingpipe anim stop
+			local.leakingpipe = local.leakingpipe.target
+		}
+	}
+}end
+
+//============================================================================
+pipeleak:{
+//============================================================================
+	self waittill trigger
+	local.gas_leak = self.target
+	while (local.gas_leak){
+		local.gas_leak anim start
+		local.gas_leak = local.gas_leak.target
+	}
+
+	thread german_geek_freaks
+}end
+
+//============================================================================
+german_geek:{
+//============================================================================
+	$german_geek exec global/disable_ai.scr
+
+	$stupid1 exec global/disable_ai.scr
+	$stupid2 exec global/disable_ai.scr
+	$stupid3 exec global/disable_ai.scr
+
+	local.spottoreturnto = spawn script_origin
+	local.spottoreturnto.origin = $german_geek.origin
+
+	$german_geek_shouts waittill trigger
+	$german_geek say den_M6L3_635q 						// "No shooting!" maps "m dm obj"
+	$german_geek exec global/runto.scr $geek_spot
+	$german_geek say den_M6L3_636h 						//"Stop you'll release the gas!" maps "m dm obj"
+	wait 3
+
+	thread enableattackguys
+	//	$german_geek waittill saydone
+	$german_geek say den_M6L3_634b 						//"Stop shooting!" maps "m dm obj"
+	wait .56
+
+	$german_geek exec global/runto.scr local.spottoreturnto
+}end
+
+//============================================================================
+enableattackguys:{
+//============================================================================
+	$stupid1 exec global/enable_ai.scr
+	$stupid2 exec global/enable_ai.scr
+	$stupid3 exec global/enable_ai.scr
+	waitframe
+
+	$stupid1 attackplayer
+	$stupid2 attackplayer
+	$stupid3 attackplayer
+}end
+
+//============================================================================
+german_geek_freaks:{
+//============================================================================
+	if (level.geek_freak != 1){
+		level.geek_freak = 1
+		thread fogcolorramp .7 .6 .25 60 .025
+		thread fogramp 1600 .035
+		thread gas_all
+		$german_geek say den_M6L3_637f //"You fools! Look the gas!" maps "m dm obj"
+		$german_geek waittill saydone
+		$german_geek say den_M6L3_638r //"Get away from the vapors!" maps "m dm obj"
+		$german_geek exec global/runto.scr $geek_spot2
+		wait .2
+
+		$stupid1 thread gassy_death
+		wait .5
+
+		$stupid2 thread gassy_death
+		wait .8
+
+		$stupid3 thread gassy_death
+        wait 1
+
+		$german_geek thread gassy_death
+	}
+}end
+
+//============================================================================
+gassy_death:{
+//============================================================================
+	local.death = randomint(3)
+
+	if (local.death == 0){
+		self exec global/setdeathanim.scr "death_frontchoke"
+	}else if (local.death == 1){
+		self exec global/setdeathanim.scr "death_choke"
+	}else if (local.death == 2){
+		//self exec global/setdeathanim.scr "death_gassing"
+		println "death_gassing is bad Ned not like"
+		self exec global/setdeathanim.scr "death_choke"	
+	}
+
+	self exec global/bullethit.scr (0 0 50) 2000 0 1	
+}end
+
+//============================================================================
+manual_gas local.manual_name:{
+//============================================================================
+	for (local.i = 1;local.i <= $pipeleak.size;local.i++){
+		if ($pipeleak[local.i].manual == local.manual_name){
+			trigger $pipeleak[local.i]
+		}
+	}
+}end
+
+//*******FOGRAMP***********
+// adjusts farplane when entering and exitting buildings
+//============================================================================
+fogramp local.rampto local.ramptime:{
+//============================================================================
+	if (level.fogplane == local.rampto)	{end}
+
+	if (level.fogplane < local.rampto){
+		for (local.bleh = level.fogplane; local.bleh < local.rampto; local.bleh += 100){
+			level.fogplane = local.bleh
+			$world farplane level.fogplane
+			wait local.ramptime
+		}
+		end
+	}
+
+	if (level.fogplane > local.rampto){
+		for (local.bleh = level.fogplane; local.bleh > local.rampto; local.bleh -= 100){
+			level.fogplane = local.bleh
+			$world farplane level.fogplane
+			wait local.ramptime
+		}
+		end
+	}
+}end
+
+//============================================================================
+fogcolorramp local.red local.green local.blue local.increments local.time:{
+//============================================================================
+	local.reddif = (local.red - level.fogred)
+	local.greendif = (local.green - level.foggreen)
+	local.bluedif = (local.blue - level.fogblue)
+	local.redinc = (local.reddif / local.increments)
+	local.blueinc = (local.bluedif / local.increments)
+	local.greeninc = (local.greendif / local.increments)
+
+	for(local.i = 1; local.i <= local.increments; local.i++){
+		level.fogred  = (level.fogred + local.redinc)
+		level.foggreen = (level.foggreen + local.greeninc)
+		level.fogblue = (level.fogblue + local.blueinc)
+		$world farplane_color (level.fogred + " " + level.foggreen + " " + level.fogblue)
+		wait local.time
+	}
+}end
+
+//============================================================================
+gas_all:{
+//============================================================================
+	for (local.i = 1;local.i <= level.gassed;local.i++){
+		if ($("sancho" + local.i)){
+			$("sancho" + local.i) thread gassy_death
+		}
+	}
+}end
+
+//============================================================================
+levelbluh:{
+//============================================================================
+	exec global/missioncomplete.scr m6l3c 1
+}end
+
+//=========================================================================
+coop_playerJustSpawned local.i:{
+//=========================================================================
+//chrissstrahl - handle gasmask for player
+
+	local.player = $player[local.i]
+	if(local.player != NULL){
+		if(local.player.dmteam != "spectator" && local.player.health > 0 && local.player.flags["coop_isActive"] == 1){
+			// JBW - moved huddraw stuff out of refresh since refresh never happens
+			huddraw_shader 200 "textures/hud/gasmask_overlay"
+			huddraw_align 200 left top
+			huddraw_rect 200 0 0 640 480
+			huddraw_virtualsize 200 1
+			huddraw_color 200 1 1 1
+			huddraw_alpha 200 1
+		}
+	}
+}end
+
+//=========================================================================
+coop_playerJustSpawned1:{
+//=========================================================================
+	thread coop_playerJustSpawned 1
+}end
+
+//=========================================================================
+coop_playerJustSpawned2:{
+//=========================================================================
+	thread coop_playerJustSpawned 2
+}end
+
+//=========================================================================
+coop_playerJustSpawned3:{
+//=========================================================================
+	thread coop_playerJustSpawned 3
+}end
+
+//=========================================================================
+coop_playerJustSpawned4:{
+//=========================================================================
+	thread coop_playerJustSpawned 4
+}end
+
+//=========================================================================
+coop_playerJustSpawned5:{
+//=========================================================================
+	thread coop_playerJustSpawned 5
+}end
+
+//=========================================================================
+coop_playerJustSpawned6:{
+//=========================================================================
+	thread coop_playerJustSpawned 6
+}end
+
+//=========================================================================
+coop_playerJustSpawned7:{
+//=========================================================================
+	thread coop_playerJustSpawned 7
+}end
+
+//=========================================================================
+coop_playerJustSpawned8:{
+//=========================================================================
+	thread coop_playerJustSpawned 8
+}end
+
+

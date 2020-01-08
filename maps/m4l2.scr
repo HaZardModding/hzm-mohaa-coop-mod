@@ -1,0 +1,1451 @@
+//**************************************************************//
+//					WORLD/PLAYER SETUP							//
+//**************************************************************//
+// Initially modified for coop purposes by Criminal
+//=========================================================================
+main:{
+//=========================================================================
+	level.coopNextMap = "maps/m4l3"				//Pasted by Criminal for coop comp. - set next map (for mom voteing)
+	level.coopPrevMap = "maps/m4l1"				//Pasted by Criminal for coop comp. - set previouse map (for mom voteing)
+	level.coop_aaMap = 1						//Pasted by Criminal for coop comp. - let global scripts know this is a AA level
+	thread coop_mod/main.scr::main         		//Pasted by Criminal for coop comp. - start coop mod extensions
+	
+	level.coop_forcePrimary		= "weapons/ThompsonSMG.tik"		//chrissstrahl - force weapon on spawn
+	level.coop_forceSecondary	= "weapons/silencedpistol.tik"	//chrissstrahl - force weapon on spawn
+	
+	$engine hide		// Hide the train and make it nonsolid
+	$engine notsolid
+	
+	$car01 hide
+	$car01 notsolid
+	$car02 hide
+	$car02 notsolid
+	$car03 hide
+	$car03 notsolid
+	$car04 hide
+	$car04 notsolid
+	$car05 hide
+	$car05 notsolid
+	$car06 hide
+	$car06 notsolid
+	
+	$trainkill_trigger nottriggerable
+ 	$trainclip notsolid
+	$getawaytruckclip notsolid
+
+	exec global/exploder.scr
+	exec global/ai.scr
+	exec global/spotlight.scr
+	exec global/cardgame.scr
+	exec global/loadout.scr maps/m4l2.scr
+
+	level waittill prespawn
+	
+	//chrissstrahl - set new spawn - this was used for testing
+	//exec coop_mod/spawnlocations.scr::m4l2_update1
+
+//*********************************************
+// Global threads
+//*********************************************
+	thread global/door_locked.scr::lock
+	thread global/barrel.scr::explosive_barrel
+	 
+	exec global/ambient.scr m4l2
+ 
+	//level waittill spawn
+	waitthread coop_mod/replace.scr::waitForPlayer //Criminal
+
+//*********************************************
+// General initialization
+//*********************************************
+	thread playmusic
+
+	waitthread global/items.scr::add_item "binoculars" noprint			// Show binoculars inventory icon
+	waitthread global/items.scr::add_item "radio_explosives" noprint	// Show radio_explosives inventory icon
+ 
+	level.caught = 0
+	level.bombedtanks = 0
+	level.tank01_bombplanted = 0
+	level.tank02_bombplanted = 0
+	level.tank03_bombplanted = 0
+	level.switch1_switched = 0
+	level.switch2_switched = 0
+	level.barrier_bombed = 0
+	level.CampTruckPlayerAttached = 0
+	level.WaitingForCampTruckDone = 0
+	level.CampTruckRemoved = 0
+	level.obj1_complete = 0
+	level.obj2and3done = 0
+	level.trucklightson_activated = 0
+	level.get_kar98sniper_activated = 0
+ 
+	exec global/spotlight.scr::corona $camptruck "light left" 	// Turn on camptruck coronas
+	exec global/spotlight.scr::corona $camptruck "light right" 
+
+	$fakecamptruck_spot.origin = ( 7226 1943 -333 )      		// Criminal - Originaly (7226 1943 -323) - Prevents head of player from stucking through roof of trailer.
+
+	$fakecamptruck_collision bind $fakecamptruck				// Bind the camptruck bed collision to the fake truck
+	$fakecamptruck_collisiontop bind $fakecamptruck
+
+	//chrissstrahl - move down the spot in mp because we can't force legstate if glued
+	if(level.gametype != 0){
+		$fakecamptruck_spot origin ( 7226 1943 -345 )
+		//chrissstrahl - remove collectible weapon because we can have only 1 primary
+		$kar98sniper remove
+	}
+	
+	$fakecamptruck_spot bind $fakecamptruck
+	$fakecamptruckstep notsolid
+
+	$fakegetawaytruck_collision bind $fakegetawaytruck			// Bind the getawaytruck bed collision to the fake truck
+	$fakegetawaytruck_spot bind $fakegetawaytruck
+ 
+	$camptruck_driver exec global/disable_ai.scr				// Disable camp driver AI
+	$camptruck_driver notsolid									// Make camp driver nonsolid
+	$camptruck_driver rendereffects "-shadow"
+	$camptruck_driver anim_scripted opel_driver					// Play driver animation
+	$camptruck attachdriverslot 0 $camptruck_driver				// Attach camp driver
+	$camptruck nodamage											// Take no damage
+	$camptruck.StoppedAtEnd = 0	
+ 
+	$trainkill_trigger bind $engine
+	$sparks1 bind $engine
+	$sparks2 bind $engine
+	$sparks3 bind $engine
+ 
+	$getawaytruck_driver exec global/disable_ai.scr		// Disable getaway driver AI
+	$getawaytruck_driver notsolid						// Make getaway driver nonsolid
+	$getawaytruck_driver rendereffects "-shadow"		// No shadow
+	$getawaytruck_driver anim_scripted opel_driver		// Play driver animation
+	$getawaytruck_driver bind $fakegetawaytruck
+	$getawaytruck_driver hide
+
+	$trainswitch1 hide
+	$trainswitch2 hide
+	$leftrail01 rotateyup 1		// Position 1st left rail
+	$leftrail01 waitmove
+	$leftrail02 rotateyup 1		// Position 2nd left rail
+	$leftrail02 waitmove
+	$bunkerdoor1 lock
+	$bunkerdoor2 lock 
+	$fakecamptruck_drive_trigger nottriggerable
+	$trucklightson_trigger nottriggerable
+	$fakegetawaytruck_drive_trigger nottriggerable
+	$gatecrash_trigger nottriggerable
+	$radio1 loopsound m4l2_radio
+	$radio2 loopsound m4l2_radio
+	$radio3 loopsound m4l2_radio
+
+	////TEMP
+	//greta smoke
+	$smoke01 anim start
+	$smoke01 loopsound fire_med
+	$smoke02 anim start
+	$smoke02 loopsound fire_med
+	////TEMP
+
+//*********************************************
+// Objective threads
+//*********************************************
+	waitthread global/objectives.scr::add_objectives 1 2 "Infiltrate the tank park." $obj1_position.origin
+	waitthread global/objectives.scr::current_objectives 1
+
+	$camptruck setcollisionentity $opelmap_closed			// Opel truck brush model collision
+	$tank01 thread setup_tank
+	$tank02 thread setup_tank
+	$tank03 thread setup_tank
+
+	thread camptruck_drive
+	$guard01 thread damagecaught
+	$guard01 thread notidlecaught
+
+	// Turret threads
+	$turret1.max_range = 1024
+	$turret1.pitchcaps = ( -35 35 0)
+	$turret1 thread global/mg42_active.scr::mg42
+	$turret2.max_range = 2048
+	$turret2.pitchcaps = ( -15 13 0)
+	$turret2 thread global/mg42_active.scr::mg42
+	$turret3.max_range = 2048
+	$turret3.pitchcaps = ( -15 13 0)
+	$turret3 thread global/mg42_active.scr::mg42
+	$turret4.max_range = 1024
+	$turret4.pitchcaps = ( -10 15 0)
+	$turret4 thread global/mg42_active.scr::mg42
+
+	// Print hints at level start
+	thread printhints
+
+	// Start patrol threads
+	$patroller08 thread startpatrol $patroller08_trigger $patrolpath08
+	$patroller09 thread startpatrol $patroller09_trigger $patrolpath09
+	$patroller10 thread startpatrol $patroller10_trigger $patrolpath10
+	$patroller11 thread startpatrol $patroller11_trigger $patrolpath11
+	$patroller12 thread startpatrol $patroller12_trigger $patrolpath12
+
+	thread elevatorprep
+	thread start_electrichums
+	//chrissstrahl - manage spawns
+	thread coop_upatePlayerSpawn
+}end
+
+// Print hints // Eh, MOHAA devs. - Crim.
+//=========================================================================
+printhints:{
+//=========================================================================
+	wait 3
+	
+	if(level.gametype == 0){ //chrissstrahl - sp only
+		local.firstkey = getboundkey1 "+speed"
+		local.secondkey = getboundkey2 "+speed"
+
+		if (local.firstkey != NIL){
+			local.key = local.firstkey
+		}else if (local.secondkey != NIL){
+			local.key = local.secondkey
+		}else{
+			local.key = "NOT BOUND"
+		}
+
+		iprintlnbold_noloc (loc_convert_string "Press ( ") (loc_convert_string local.key) (loc_convert_string " ) to walk. Walk when you want to sneak up on enemies.")
+	}else{ //chrissstrahl - coop
+		wait 10
+		iprintlnbold_noloc ("Walk when you want to sneak up on enemies.")
+	}
+}end
+
+
+// Set tank collision and type
+//=========================================================================
+setup_tank:{
+//=========================================================================
+	if (self.target){
+		self.collisionent = self.target
+	}
+
+	self.type = "empty_tiger"
+	self nodamage
+	self disconnect_paths
+}end
+
+//=========================================================================
+lockedgate:{
+//=========================================================================
+	self playsound gate_metal_locked
+}end
+
+//=========================================================================
+kill_spotguy01:{
+//=========================================================================
+	if (isalive $spotguy01){
+		local.origin = $spotguy01.origin
+		local.angles = $spotguy01.angles
+		$spotguy01 remove
+		spawn models/human/german_panzer_grenadier "targetname" "newspotguy01" "type_attack" "turret" "leash" "720" "mindist" "128" "maxdist" "1024" "gun" "MP40" "hearing" "512" "sight" "1024"
+		$newspotguy01.origin = local.origin
+		$newspotguy01.angles = local.angles
+	}
+}end
+
+//=========================================================================
+kill_spotguy02:{
+//=========================================================================
+	if (isalive $spotguy02){
+		$spotguy02 remove
+	}
+}end
+
+
+// Objective 1 complete
+//=========================================================================
+obj1_complete:{
+//=========================================================================
+	if (level.obj1_complete == 1) {end}
+
+	level.obj1_complete = 1
+
+	for (local.i = 1 ; local.i <= $obj1_complete_trigger.size ; local.i ++){
+		$obj1_complete_trigger[local.i] remove
+	}
+	
+	exec coop_mod/spawnlocations.scr::m4l2_update0	//chrissstrahl - coop spawn positions
+
+	waitthread global/objectives.scr::add_objectives 1 3 "Infiltrate the tank park."						// mark 1 done
+	waitthread global/objectives.scr::add_objectives 2 2 "Bomb Tiger tanks. [3 remaining]" $bomb01.origin	// pop up 2
+	waitthread global/objectives.scr::current_objectives 2													// set 2 active
+}end
+
+
+// Objective 3 complete
+//=========================================================================
+obj3_complete:{
+//=========================================================================
+	$trainswitch1_pulsating remove
+	$trainswitch1 playsound track_switch1		// Play switch switch sound
+	$trainswitch1 show
+	thread rotateswitch
+	$rightrail01 playsound track_switching		// Play rail switch sound
+	thread switch_rail $rightrail01
+	thread switch_rail $leftrail01
+	level.switch1_switched = 1
+	waitthread global/objectives.scr::add_objectives 3 3 "Switch the tracks at the first junction."		// mark 3 done
+	thread open_bunkerdoors
+	thread obj2or4
+}end
+
+
+// Objective 4 complete
+//=========================================================================
+obj4_complete:{
+//=========================================================================
+	waitthread global/objectives.scr::add_objectives 4 3 "Find a way into the train station."							// mark 4 done
+	waitthread global/objectives.scr::add_objectives 5 2 "Plant explosives on the track barrier." $bomb04.origin 		// pop up 5
+	exec coop_mod/spawnlocations.scr::m4l2_update2 //Criminal		
+	waitthread global/objectives.scr::current_objectives 5																// set 5 active
+
+	$getawaytruck_driver show
+}end
+
+
+// Objective 5 complete
+//=========================================================================
+obj5_complete:{
+//=========================================================================
+	$bomb04 model "animate//radiobomb.tik"
+	$bomb04 playsound radiobomb
+	level.barrier_bombed = 1
+	
+	waitthread global/items.scr::remove_item "radio_explosives"		// Remove inventory bombs
+	
+	waitthread global/objectives.scr::add_objectives 5 3 "Plant explosives on the track barrier."	// mark 5 done
+	thread obj5or7
+}end
+
+
+// Objective 6 complete
+//=========================================================================
+obj6_complete:{
+//=========================================================================
+	$trainswitch2_pulsating remove
+	$trainswitch2 playsound track_switch2		// Play switch switch sound
+	$trainswitch2 show
+	$trainswitch2 anim move
+	$rightrail02 playsound track_switching		// Play rail switch sound
+	thread switch_rail $rightrail02
+	thread switch_rail $leftrail02
+	level.switch2_switched = 1
+	waitthread global/objectives.scr::add_objectives 6 3 "Get to the control tower and switch the tracks."		// mark 6 done
+	thread obj5or7
+}end
+
+
+// Objective 7 complete
+//=========================================================================
+obj7_complete:{
+//=========================================================================
+	waitthread global/objectives.scr::add_objectives 7 3 "Get into the back of the Opel truck."					// mark 7 done
+	waitthread global/objectives.scr::current_objectives 0
+	thread fakegetawaytruck_drive
+}end
+
+
+// Bomb tank 1
+//=========================================================================
+tank01_bombed:{
+//=========================================================================
+	$bomb01 model "animate//radiobomb.tik"
+	$bomb01 playsound radiobomb
+	level.tank01_bombplanted = 1
+	thread nexttank
+}end
+
+
+// Bomb tank 2
+//=========================================================================
+tank02_bombed:{
+//=========================================================================
+	$bomb02 model "animate//radiobomb.tik"
+	$bomb02 playsound radiobomb
+	level.tank02_bombplanted = 1
+	thread nexttank
+}end
+
+
+// Bomb tank 3
+//=========================================================================
+tank03_bombed:{
+//=========================================================================
+	$bomb03 model "animate//radiobomb.tik"
+	$bomb03 playsound radiobomb
+	level.tank03_bombplanted = 1
+	thread nexttank
+}end
+
+
+// Tank explosions sequence
+//=========================================================================
+tanks_explode:{
+//=========================================================================
+	//$player loopsound bombtick //Criminal
+	exec coop_mod/replace.scr::loopsound bombtick //Criminal - coop
+	//$player stopwatch 8 //Criminal
+	exec coop_mod/replace.scr::stopwatch 8 //Criminal - coop
+	wait 8
+	
+	//$player stoploopsound bombtick //Criminal
+	exec coop_mod/replace.scr::stoploopsound bombtick //Criminal - coop 
+	$bomb02 playsound explode_tank
+	$bomb02 remove
+	$tank02 thread global/vehicles_thinkers.scr::tank_killed
+	wait 3
+	
+	$bomb01 playsound explode_tank
+	$bomb01 remove
+	$tank01 thread global/vehicles_thinkers.scr::tank_killed
+	wait 1
+	
+	$bomb03 playsound explode_tank
+	$bomb03 remove
+	$tank03 thread global/vehicles_thinkers.scr::tank_killed
+}end
+
+
+// Swap tanks for damaged versions
+//=========================================================================
+spawn_model local.model:{
+//=========================================================================
+	local.model = spawn script_model model local.model
+	local.model.origin = self.origin
+	local.model.angles = self.angles
+}end local.model
+
+// Spawn damage effects
+//=========================================================================
+spawn_fx local.fx:{
+//=========================================================================
+	local.temp = spawn script_model model local.fx
+	local.temp.origin = self.origin
+	local.temp anim start
+	wait 5
+	local.temp remove
+}end
+
+
+// Determine objective # printing and compass waypoint
+//=========================================================================
+nexttank:{
+//=========================================================================
+	level.bombedtanks = (level.bombedtanks + 1)
+	
+	if (level.tank01_bombplanted != 1){	// If the 1st tank is not done, point to it. Each case covers printing the # left.
+		switch level.bombedtanks
+		{
+		case 1:
+			waitthread global/objectives.scr::add_objectives 2 2 "Bomb Tiger tanks. [2 remaining]" $bomb01.origin
+			waitthread global/objectives.scr::current_objectives 2
+			break
+		case 2:
+			waitthread global/objectives.scr::add_objectives 2 2 "Bomb Tiger tanks. [1 remaining]" $bomb01.origin
+			waitthread global/objectives.scr::current_objectives 2
+			break
+		}
+		end
+	}
+	else if (level.tank02_bombplanted != 1){	// If the 2nd tank is not done, point to it. Each case covers printing the # left.
+		switch level.bombedtanks
+		{
+		case 1:
+			waitthread global/objectives.scr::add_objectives 2 2 "Bomb Tiger tanks. [2 remaining]" $bomb02.origin
+			waitthread global/objectives.scr::current_objectives 2
+			break
+		case 2:
+			waitthread global/objectives.scr::add_objectives 2 2 "Bomb Tiger tanks. [1 remaining]" $bomb02.origin
+			waitthread global/objectives.scr::current_objectives 2
+			break
+		}
+		end
+	}
+	else if (level.tank03_bombplanted != 1)	// If the 3rd tank is not done, point to it. Each case covers printing the # left.
+	{
+		switch level.bombedtanks
+		{
+		case 1:
+			waitthread global/objectives.scr::add_objectives 2 2 "Bomb Tiger tanks. [2 remaining]" $bomb03.origin
+			waitthread global/objectives.scr::current_objectives 2
+			break
+		case 2:
+			waitthread global/objectives.scr::add_objectives 2 2 "Bomb Tiger tanks. [1 remaining]" $bomb03.origin
+			waitthread global/objectives.scr::current_objectives 2
+			break
+		}
+		end
+	}
+	waitthread global/objectives.scr::add_objectives 2 3 "Bomb Tiger tanks." // mark 2 done
+	thread open_bunkerdoors
+	thread obj2or4
+	thread tanks_explode
+}end
+
+
+// Determine next objective 2 or 4
+//=========================================================================
+obj2or4:{
+//=========================================================================
+	if (level.bombedtanks == 3 && level.switch1_switched == 0){
+		waitthread global/objectives.scr::add_objectives 3 2 "Switch the tracks at the first junction." $trainswitch1.origin		// pop up 3
+		waitthread global/objectives.scr::current_objectives 3																		// set 3 active
+	}else if (level.bombedtanks == 3 && level.switch1_switched == 1){
+		waitthread global/objectives.scr::add_objectives 4 2 "Find a way into the train station." $obj4_position.origin				// pop up 4
+		waitthread global/objectives.scr::current_objectives 4																		// set 4 active
+	}
+}end
+
+
+// Determine next objective 5 or 7
+//=========================================================================
+obj5or7:{
+//=========================================================================
+	if (level.barrier_bombed == 1 && level.switch2_switched == 0){
+		waitthread global/objectives.scr::add_objectives 6 2 "Get to the control tower and switch the tracks." $trainswitch2.origin				// pop up 6
+		waitthread global/objectives.scr::current_objectives 6																					// set 6 active
+	}else if (level.barrier_bombed == 1 && level.switch2_switched == 1){
+		waitthread global/objectives.scr::add_objectives 7 2 "Get into the back of the Opel truck." $fakegetawaytruck_drive_trigger.origin		// pop up 7
+		waitthread global/objectives.scr::current_objectives 7																					// set 7 active
+	
+		$trucklightson_trigger triggerable
+		$fakegetawaytruck_drive_trigger triggerable
+	}
+}end
+
+
+// Open bunker doors when objective 2 and 3 are done
+//=========================================================================
+open_bunkerdoors:{
+//=========================================================================
+	if (level.obj2and3done >= 1){
+		$bunkerdoor1 unlock
+		$bunkerdoor2 unlock
+	}
+	level.obj2and3done++
+}end
+
+
+// Elevator setup
+//=========================================================================
+elevatorprep:{
+//=========================================================================
+	// Gate Position
+	$elevator_gate_1 movedown 70
+	$elevator_gate_1 waitmove
+	
+	//Switch Position
+	$elevator_switch bind $elevator_cab
+	$elevator_switch anim off
+	
+	//Elevator Speeds
+	$elevator_cab time 4
+	$elevator_gate_1 time 0.75
+	$elevator_gate_2 time 0.75
+	
+	//Elevator Clips
+	$clip1 notsolid
+	$clip2 notsolid
+}end
+
+
+// Start looping electric hum sounds
+//=========================================================================
+start_electrichums:{
+//=========================================================================
+	for (local.i = 1 ; local.i <= $electrichum.size ; local.i ++){
+		$electrichum[local.i] loopsound electrical_hum2
+	}
+}end
+
+
+// Elevator move down
+//=========================================================================
+elevator_movedown:{
+//=========================================================================
+	//iprintlnbold_noloc("DEV: elevator_movedown") //chrissstrahl - give feedback
+	
+	//chrissstrahl - lift is busy, exit here
+	if(level.coop_liftManagerStatus == 2){
+		end
+	}
+	//chrissstrahl - set lift status busy
+	level.coop_liftManagerStatus = 2
+
+	/* //chrissstrahl - won't work as expected
+	//if ($clip1 istouching $player) {end} //chrissstrahl
+	//chrissstrahl - wait if any player is touching the clip
+	while (exec coop_mod/replace.scr::istouching $clip1) {
+		wait 0.25
+	}
+	*/
+		
+	$elevator_movedown_trigger nottriggerable
+	$elevator_moveup_trigger triggerable
+	if(level.gametype == 0){ //chrissstrahl - don't in mp
+		$clip1 solid
+	}
+	
+	$elevator_switch anim turn
+	$elevator_switch anim waittill animdone
+	$elevator_switch anim on
+	
+	$elevator_gate_1 playsound elevator_gate
+	$elevator_gate_1 moveup 70
+	$elevator_gate_1 waitmove
+	wait 1
+
+	$elevator_cab playsound elevator_start wait
+	wait .5
+
+	$elevator_cab playsound elevator_run
+	$elevator_cab moveto $elevator_way2
+	$elevator_cab waitmove
+	wait 1
+
+	$elevator_gate_2 playsound elevator_gate
+	$elevator_gate_2 movedown 70
+	$elevator_gate_2 waitmove
+
+	$clip2 notsolid
+	$elevator_switch anim off
+	
+	//chrissstrahl - start manager for lift in coop
+	thread coop_liftManager
+	//chrissstrahl - set lift status down
+	level.coop_liftManagerStatus = 0
+}end
+
+
+// Elevator move up
+//=========================================================================
+elevator_moveup:{
+//=========================================================================	
+	//chrissstrahl - lift is busy, exit here
+	if(level.coop_liftManagerStatus == 2){
+		end
+	}
+	//chrissstrahl - set lift status busy
+	level.coop_liftManagerStatus = 2
+	
+	/* //chrissstrahl - won't work as expected
+	//if ($clip2 istouching $player) {end} //chrissstrahl
+	//chrissstrahl - wait if any player is touching the clip
+	while (exec coop_mod/replace.scr::istouching $clip2) {
+		wait 0.25
+	}
+	*/
+
+	$elevator_moveup_trigger nottriggerable
+	$elevator_movedown_trigger triggerable
+	
+	if(level.gametype == 0){ //chrissstrahl - don't in mp
+		$clip2 solid
+	}
+	
+	$elevator_switch anim turn
+	$elevator_switch anim waittill animdone
+	$elevator_switch anim on
+		
+	$elevator_gate_2 playsound elevator_gate
+	$elevator_gate_2 moveup 70
+	$elevator_gate_2 waitmove
+	wait 1	
+
+	$elevator_cab playsound elevator_start wait
+	wait .5
+
+	$elevator_cab playsound elevator_run
+	$elevator_cab moveto $elevator_way1
+	$elevator_cab waitmove
+	wait 1
+
+	$elevator_gate_1 playsound elevator_gate
+	$elevator_gate_1 movedown 70
+	$elevator_gate_1 waitmove
+	
+	$clip1 notsolid
+	$elevator_switch anim off
+	
+	//chrissstrahl - start manager for lift in coop
+	thread coop_liftManager
+	//chrissstrahl - set lift status up
+	level.coop_liftManagerStatus = 1
+}end
+
+//chrissstrahl - manage the lift in coop
+//=========================================================================
+coop_liftManager:{
+//=========================================================================
+	if(level.gametype == 0){ //abbruch im Einzelspieler
+		end
+	}
+	//iprintlnbold_noloc("DEV: manager") //manager updated wait time
+	level.coop_liftManagerTime = 10 //set 10 sec cound down, before next loop
+	if(level.coop_liftManagerActive != NIL){//exit here if the manager is active already
+		//iprintlnbold_noloc("DEV: manager was running")
+		end
+	}
+	level.coop_liftManagerActive = 1//make it known that the manager is active
+	while(level.coop_liftManagerTime > 0 || level.coop_liftManagerStatus == 2){ //wait until the lift is allowed to go again
+		level.coop_liftManagerTime--
+		//iprintlnbold_noloc("DEV: manager waiting")
+		wait 1
+	}
+	
+	//decide what to do with the lift, based on the current staus
+	if(level.coop_liftManagerStatus == 0){
+		thread elevator_moveup
+	}else if(level.coop_liftManagerStatus == 1){
+		thread elevator_movedown
+	}else{
+		iprintlnbold_noloc("DEV: Error, Lift - bad state")
+	}
+	level.coop_liftManagerActive = 0 //make it known that the manager is no longer active
+	//iprintlnbold_noloc("DEV: manager ended")
+}
+
+// Camp truck driving thread
+//=========================================================================
+camptruck_drive:{
+//=========================================================================
+	$camptruck.FirstPathFinished = 0
+	$camptruck drive $camptruck_pathgate 270 60 200 256			// drive Vector position, speed, acceleration, reach_distance, look_ahead
+	$camptruck waittill drive
+	$camptruck.FirstPathFinished = 1
+
+	if(level.caught == 1) {end}
+	
+	$fakecamptruckstep solid
+	$fakecamptruck_drive_trigger triggerable
+	
+	thread camptruck_waitfordone
+ 	
+	//Guard-Driver dialog
+	wait 1
+	if ($camptruck){
+		local.o = $camptruck gettagposition "visa_guard"
+		local.a = $camptruck gettagangles "visa_guard"
+	}else{
+		local.o = $fakecamptruck gettagposition "visa_guard"
+		local.a = $fakecamptruck gettagangles "visa_guard"
+	}
+	
+	$guard01 walkto local.o
+	$guard01 waittill movedone
+	$guard01 turnto (6615 1948 60)
+	$guard01 waittill turndone
+			
+	//$guard01.origin = local.o
+	//$guard01.angles = local.a
+
+	if (isalive $camptruck_driver){
+		$camptruck_driver say driver_getvisa_ok
+	}
+
+	$guard01 say guard_getvisa_ok
+	$guard01 waittill saydone
+		
+	if (isalive $camptruck_driver){
+		$camptruck_driver say driver_idlevisa_ok
+	}
+
+	$guard01 say guard_idlevisa_ok
+	$guard01 waittill saydone
+	
+	if (isalive $camptruck_driver){
+		$camptruck_driver say driver_returnvisa_ok
+	}
+
+	$guard01 say guard_returnvisa_ok
+	$guard01 waittill saydone
+	$guard01 turnto NULL
+	
+	if (isalive $camptruck_driver){
+		$camptruck_driver anim_scripted opel_driver // Play driver animation
+	}
+}end
+
+//=========================================================================
+camptruck_waitfordone:{
+//=========================================================================
+	wait 19
+	level.WaitingForCampTruckDone = 1
+	if((level.caught == 0) && (level.CampTruckPlayerAttached == 0)){
+		waitthread camptruck_failed
+
+		$camptruck drive $camptruck_pathpark 270 60 200 256		// drive Vector position, speed, acceleration, reach_distance, look_ahead
+		$camptruck waittill drive
+		
+		$camptruck anim idlenolights
+		$camptruck.corona = 0
+
+		$camptruck_driver remove
+		$camptruck disconnect_paths
+		$camptruck setcollisionentity $opelmap_open				// Opel truck brush model collision
+		
+		thread spawn_camptruck_driver $fakecamptruck_driver_spot	// Spawn truck driver
+		$fakecamptruck_doorslam playsound opeltruck_snd_doorclose
+	}
+}end
+
+//=========================================================================
+camptruck_stopatend:{
+//=========================================================================
+	//println "VEHICLE TRIGGER"
+	if(level.caught == 0){
+		$camptruck stopatend
+		$camptruck.StoppedAtEnd = 1
+	}
+	$camptruck_stopatend_trigger remove
+}end
+
+//=========================================================================
+notidlecaught:{
+//=========================================================================
+	while (self.thinkstate == "idle"){
+		waitframe
+	}
+
+	if (level.CampTruckPlayerAttached == 1) {end}
+	thread caught 
+}end
+
+//=========================================================================
+damagecaught:{
+//=========================================================================
+	self waittill pain
+
+	if (level.CampTruckPlayerAttached == 1) {end}
+
+	thread caught
+}end
+
+//=========================================================================
+caught:{
+//=========================================================================
+	if (level.caught == 1) {end}
+
+	//println "CAUGHT!"	
+	level.caught = 1
+	
+	//println "CAMPWAVE SPAWNED"
+	thread generic_spawner spawned_campwave01 "MP40" $spawner_campwave01
+	thread generic_spawner spawned_campwave02 "MP40" $spawner_campwave02
+	thread generic_spawner spawned_campwave03 "MP40" $spawner_campwave03
+	
+	if(level.WaitingForCampTruckDone != 1){
+		waitthread camptruck_failed
+		
+		if($camptruck.FirstPathFinished == 1){
+			$camptruck drive $camptruck_pathpark 270 60 200 256		// drive Vector position, speed, acceleration, reach_distance, look_ahead
+			$camptruck waittill drive
+		}else if ($camptruck.StoppedAtEnd == 1){
+			$camptruck waittill drive 								// Finish Current Path
+			$camptruck drive $camptruck_pathpark 270 60 200 256		// drive Vector position, speed, acceleration, reach_distance, look_ahead
+			$camptruck waittill drive
+		}else{
+			$camptruck nextdrive $camptruck_pathpark
+			$camptruck waittill drive
+			$camptruck modifydrive 270 60 256
+			$camptruck waittill drive
+		}
+		
+		$camptruck anim idlenolights
+		$camptruck.corona = 0
+		
+		$camptruck_driver remove
+		$camptruck disconnect_paths
+		$camptruck setcollisionentity $opelmap_open			// Opel truck brush model collision
+		
+		thread spawn_camptruck_driver $fakecamptruck_driver_spot		// Spawn truck driver
+		$fakecamptruck_doorslam playsound opeltruck_snd_doorclose
+	}
+}end
+
+
+// Fake camp truck driving thread
+//=========================================================================
+fakecamptruck_drive:{
+//=========================================================================
+	//println "ATTACH!"
+	level.CampTruckPlayerAttached = 1
+	$guard01 exec global/disable_ai.scr
+	
+	//Set 1st splinepath node to position and angles of the stopped truck
+	$fakecamptruck_splinepath.origin = $camptruck.origin
+	$fakecamptruck_splinepath.angles = $camptruck.angles
+	
+	$fakecamptruck.origin = $camptruck.origin				// Swap truck with fake truck
+	$fakecamptruck.angles = $camptruck.angles
+	
+	exec global/spotlight.scr::deadcorona $fakecamptruck "light left" 	// Turn on fakecamptruck coronas
+	exec global/spotlight.scr::deadcorona $fakecamptruck "light right"
+
+	$fakecamptruck moveup 1							// Snap brush collision back to new position
+	$fakecamptruck movedown 1
+	$fakecamptruck waitmove
+	
+	$camptruck_driver remove
+	$camptruck remove
+
+	//$player forcelegsstate CROUCH_IDLE							// Force into crouch // Criminal.
+	//exec coop_mod/replace.scr::forcelegsstate CROUCH_IDLE 		// Criminal - coop comapbitility. // Doesn't work, so why to execute it.
+	waitframe
+
+	//$player forcelegsstate CROUCH_IDLE							// Force into crouch // Criminal.
+	//exec coop_mod/replace.scr::forcelegsstate CROUCH_IDLE 		// Criminal - coop comapbitility. // Doesn't work, so why to execute it.
+	
+	//$player physics_off											// Criminal.
+	//waitthread move_view $fakecamptruck_spot
+
+	//$player glue $fakecamptruck_spot 0							// Lock player position // Criminal.	
+
+	//chrissstrahl - do only in sp
+	if(level.gametype == 0){
+		$player physics_off											// Criminal.
+		waitthread move_view $fakecamptruck_spot
+		$player forcelegsstate CROUCH_IDLE							// Force into crouch // Criminal.
+		//$player glue $fakecamptruck_spot 0							// Lock player position // Criminal.
+	}
+	
+	exec coop_mod/replace.scr::glue $fakecamptruck_spot 0 			// Criminal - coop comapbitility.
+	//$player physics_off 											// Criminal - coop glue func. handles it.
+
+	$fakecamptruck_collision notsolid
+	$fakecamptruckstep remove
+	
+	$turret1 thread global/mg42_active.scr::disable					// Disable MG42 gunner
+	
+	while(level.WaitingForCampTruckDone == 0){
+		waitframe
+	}
+	
+	$fakecamptruck playsound m4l2_truck1
+	$fakecamptruck followpath $fakecamptruck_splinepath			// Move truck along path
+	$fakecamptruck waitmove
+	
+	$fakecamptruck anim idlenolights
+	$fakecamptruck.corona = 0
+	
+	$guard01 exec global/enable_ai.scr							// Re-enable the guard
+	$turret1 thread global/mg42_active.scr::enable				// Re-enable MG42 gunner
+	
+	$fakecamptruck_collision disconnect_paths
+	thread spawn_camptruck_driver $fakecamptruck_driver_spot	// Spawn truck driver
+	$fakecamptruck_doorslam playsound opeltruck_snd_doorclose
+	
+	$fakecamptruck_collision solid
+
+	//$player physics_on										// Unlock player position // Criminal.
+	//$player unglue 											//Criminal
+	exec coop_mod/replace.scr::unglue 							// Criminal - coop comapbitility.
+	exec coop_mod/replace.scr::show 							// Criminal - coop compabitility.
+	/*
+	^^^Show is used because glue func. hides player
+	but unglue func. doesn't show player, so
+	problem with invisible players and weapons
+	will be now terminated for that truck. 
+	*/
+	//chrissstrahl - yes, but this is on purpose made this way :), because the function is not just used on this map
+	
+	exec coop_mod/replace.scr::forcelegsstate CROUCH_IDLE 		// Criminal - coop comapbitility.
+
+	//$player physics_on								// Unlock player position // Criminal.
+	//$player unglue 									//Criminal
+
+	//chrissstrahl - when a player made it to the truck, respawn players inside truck
+	if(level.gametype != 0){
+		local.vecBase = $fakecamptruck.origin
+		
+		
+	//chrissstrahl - this needs to be tested, I want to have at least 3 better 4 player spwning in the truck		
+		//spawn only these 4 inside, overwrite
+		level.flags["coop_spawn1origin"] = ( 4542 4413 300 )
+		level.flags["coop_spawn2origin"] = ( 4506 4478 300 )
+		level.flags["coop_spawn3origin"] = ( 4502 4393 300 )
+		level.flags["coop_spawn4origin"] = ( 4475 4462 300 )
+		
+		for( local.i = 1;local.i<=4;local.i++){
+			level.flags["coop_spawn"+local.i+"angles"] = (0 22 0)
+			thread coop_mod/spawnlocations.scr::spawnDebug level.flags["coop_spawn"+local.i+"origin"]
+		}
+		
+		//chrissstrahl - move all players to their spawn, this will be applied as soon as theys are unglued
+		//chrissstrahl - force legstate to crouching, so that the players will fit into the truck
+		for( local.i = 1;local.i<=$player.size;local.i++){
+			local.player = $player[local.i]
+			if(local.player == NULL){
+				continue
+			}
+			thread coop_mod/main.scr::playerPlaceAtSpawn local.i
+			thread coop_mod/main.scr::playerMakeSolidAsap local.i
+			
+			if(local.i < 5){ //spawned in truck
+				local.player forcelegsstate CROUCH_IDLE
+			}
+			local.player show
+		}
+	}
+	
+	exec coop_mod/replace.scr::unglue 					// Criminal - coop comapbitility.
+	//$player safeholster 0								// Unholster weapon // Criminal.
+}end
+
+//=========================================================================
+camptruck_failed:{
+//=========================================================================
+	if (level.CampTruckRemoved == 1) {end}
+	
+	level.CampTruckRemoved = 1
+	
+	$fakecamptruckstep remove
+	$fakecamptruck_drive_trigger remove
+
+	//Unbind and remove fake truck
+	$fakecamptruck_spot unbind
+	$fakecamptruck_spot remove
+	$fakecamptruck_collision unbind
+	$fakecamptruck_collision remove
+	$fakecamptruck_collisiontop unbind
+	$fakecamptruck_collisiontop remove
+	$fakecamptruck remove
+}end
+
+
+// Fake get away truck driving thread
+//=========================================================================
+fakegetawaytruck_drive:{
+//=========================================================================
+	/// Start train crash
+	thread start_train
+	thread traincrash
+	thread spawn_getawaywave
+	
+	/// Start truck escape
+	//$getawaytruckclip solid
+	//$getawaytruckclip disconnect_paths
+	$gatecrash_trigger triggerable
+	
+	waitthread move_view $fakegetawaytruck_spot
+	
+	//$player glue $fakegetawaytruck_spot 0						// Lock player position // Criminal.
+	exec coop_mod/replace.scr::glue $fakegetawaytruck_spot 0 	//Criminal - coop comapbitility.
+
+	$fakegetawaytruck_collision notsolid
+	$fakegetawaytruck playsound m4l2_truck2
+	$getawaytruck_driver playsound dfr_m4l2_add01 
+	
+	$fakegetawaytruck followpath $fakegetawaytruck_splinepath	// Move truck along path
+	$fakegetawaytruck waitmove
+}end
+
+
+// Move player view
+//=========================================================================
+move_view local.spot:{
+//=========================================================================
+	//chrissstrahl - don't in coop
+	if(level.gametype != 0){ end }
+	
+	local.start = $player.origin
+	local.end = local.spot.origin
+
+	for (local.n = 0; local.n < 1; local.n += 0.025){
+		println("DEV: move_view local.spot: FIX ME")
+		local.origin = local.start * (1 - local.n) + local.end * local.n
+		$player.origin = local.origin
+		wait 0.05
+	}
+	
+	$player.origin = local.end
+}end
+
+
+// Switch rail
+//=========================================================================
+switch_rail local.rail:{
+//=========================================================================
+	local.rail time 2
+	local.rail rotateydown 1
+	local.rail waitmove
+}end
+
+
+// Rotate switch
+//=========================================================================
+rotateswitch:{
+//=========================================================================
+	$trainswitch1 notsolid
+	$trainswitch1 time 2
+	$trainswitch1 rotateyup 360
+	$trainswitch1 waitmove
+	
+	//while ($trainswitch1 istouching $player){ //chrissstrahl
+	while (exec coop_mod/replace.scr::istouching $trainswitch1){ // chrissstrahl - touch me baybe
+		waitframe
+	}
+
+	$trainswitch1 solid
+}end
+
+
+// Thread for moving train cars on path
+//=========================================================================
+movecar_path:{
+//=========================================================================
+	// speed, acceleration, look_ahead 
+	// self flypath $crash_path 300 160 300
+	self flypath $crash_path 325 160 300
+	self move
+}end
+
+
+// Show train and begin sequence`
+//=========================================================================
+start_train:{
+//=========================================================================
+	$leftgate01 remove
+	$rightgate01 remove
+	
+	$trainclip solid			// Clear the track
+	$trainclip disconnect_paths
+	
+	if (IsAlive $patroller7) 	{$patroller7 remove}
+	if (IsAlive $patroller10) 	{$patroller10 remove}
+	if (IsAlive $patroller11) 	{$patroller11 remove}
+		
+	$engine show				// Show the train and make it solid
+	$engine solid
+	$car01 show
+	$car01 solid
+	$car02 show
+	$car02 solid
+	$car03 show
+	$car03 solid
+	$car04 show
+	$car04 solid
+	$car05 show
+	$car05 solid
+	$car06 show
+	$car06 solid
+	
+	$engine loopsound armoredtrain_rolling
+	
+	$trainkill_trigger triggerable		// Set train kill trigger active
+	thread trainkill					// Start
+	
+	$engine thread movecar_path
+	$car01 thread movecar_path
+	$car02 thread movecar_path
+	$car03 thread movecar_path
+	$car04 thread movecar_path
+	$car05 thread movecar_path
+	$car06 thread movecar_path	
+}end
+
+
+// Stop the train on path
+//=========================================================================
+traincrash:{
+//=========================================================================
+	// FIX - Crash train stop/explosion
+	// 	wait 16
+	wait 10
+	$sparks1 anim start
+	$sparks2 anim start 
+	$sparks3 anim start 
+	
+	wait 4
+	$engine playsound armoredtrain_braking
+	$engine stoploopsound armoredtrain_rolling
+	
+	wait 5
+	//$engine modifyflypath 0 120 300
+	//$car01 modifyflypath 0 120 300
+	//$car02 modifyflypath 0 120 300
+	//$car03 modifyflypath 0 120 300
+	//$car04 modifyflypath 0 120 300
+	//$car05 modifyflypath 0 120 300
+	//$car06 modifyflypath 0 120 300
+ 
+	$sparks1 anim stop
+	$sparks2 anim stop
+	$sparks3 anim stop
+	
+	$bomb04 thread spawn_fx models/emitters/explosion_tank.tik
+	$bomb04 remove
+	
+	$engine thread train_blowup_rotate_right 128 25 
+	wait 0.15
+	$car01 thread train_blowup_rotate_left 128 20
+	wait 0.15
+	$car02 thread train_blowup_rotate_right 128 15
+	wait 0.15
+	$car03 thread train_blowup_rotate_left 128 20
+	wait 0.15
+	$car04 thread train_blowup_rotate_right 128 15
+	wait 0.15
+
+	$car05 thread train_blowup_rotate_left 128 12
+	$car06 endpath
+	
+	$train_explosion1 anim start
+	wait .5
+	$train_explosion2 anim start
+	wait .5
+	$train_explosion3 anim start
+}end
+
+//=========================================================================
+train_blowup_rotate_left local.movedist local.rotatedist:{
+//=========================================================================
+	self endpath
+	self time 1
+	self movewest local.movedist
+	self rotateYup local.rotatedist
+	self waitmove
+	self.velocity = (0 0 0)
+}end
+
+//=========================================================================
+train_blowup_rotate_right local.movedist local.rotatedist:{
+//=========================================================================
+	self endpath
+	self time 1
+	self movewest local.movedist
+	self rotateYdown local.rotatedist
+	self waitmove
+	self.velocity = (0 0 0)
+}end
+
+//=========================================================================
+gatecrash:{
+//=========================================================================
+	$leftgate02 playsound fence_crash 
+	thread crashopen_leftgate
+	thread crashopen_rightgate
+	wait 2.5
+
+	$getawaytruck_driver playsound dfr_m4l2_add02
+}end
+
+
+// Crash open the left station gate
+//=========================================================================
+crashopen_leftgate:{
+//=========================================================================
+	$leftgate02 notsolid
+	$leftgate02 time .5
+	$leftgate02 rotateyup 103
+	$leftgate02 waitmove
+	
+	$leftgate02 time .5
+	$leftgate02 rotateydown 41
+	$leftgate02 waitmove
+	
+	$leftgate02 time .25
+	$leftgate02 rotateyup 15
+	$leftgate02 waitmove
+	
+	$leftgate02 time .35
+	$leftgate02 rotateyup 10
+	$leftgate02 waitmove
+	
+	$leftgate02 time .45
+	$leftgate02 rotateyup 5
+	$leftgate02 waitmove
+}end
+
+
+// Crash open the right station gate
+//=========================================================================
+crashopen_rightgate:{
+//=========================================================================
+	$rightgate02 notsolid
+	$rightgate02 time .7
+	$rightgate02 rotateydown 130
+	$rightgate02 waitmove
+	
+	$rightgate02 time .6
+	$rightgate02 rotateyup 69
+	$rightgate02 waitmove
+	
+	$rightgate02 time .45
+	$rightgate02 rotateydown 35
+	$rightgate02 waitmove
+	
+	$rightgate02 time .55
+	$rightgate02 rotateydown 28
+	$rightgate02 waitmove
+	
+	$rightgate02 time .65
+	$rightgate02 rotateydown 17
+	$rightgate02 waitmove
+}end
+
+
+// Turn on opel truck lights and start the train
+//=========================================================================
+trucklightson:{
+//=========================================================================
+	if (level.trucklightson_activated == 1) {end}
+	
+	level.trucklightson_activated = 1
+	
+	for (local.i = 1 ; local.i <= $trucklightson_trigger.size ; local.i ++){
+		$trucklightson_trigger[local.i] remove
+	}
+	
+	$fakegetawaytruck anim idlelights
+	exec global/spotlight.scr::deadcorona $fakegetawaytruck "light left" 
+	exec global/spotlight.scr::deadcorona $fakegetawaytruck "light right"
+	wait 1
+
+	$fakegetawaytruck playsound truck_horn
+}end
+
+//=========================================================================
+trainkill:{
+//=========================================================================
+	//$trainkill_trigger waittill trigger
+	//$trainkill_trigger volumedamage 1000
+	//goto trainkill // Criminal - we don't like goto.
+
+	while(1){
+		$trainkill_trigger waitTill trigger
+		$trainkill_trigger volumedamage 1000
+	}
+}end
+
+//=========================================================================
+spawn_turretwave01:{
+//=========================================================================
+	//println "SPAWNED WAVE 1!!!"
+	thread generic_spawner spawned_turretwave01 "Mauser KAR 98K" $spawner_turretwave01
+	thread generic_spawner spawned_turretwave02 "Mauser KAR 98K" $spawner_turretwave02
+	thread generic_spawner spawned_turretwave03 "Mauser KAR 98K" $spawner_turretwave03
+	thread generic_spawner spawned_turretwave04 "Mauser KAR 98K" $spawner_turretwave04
+}end
+
+
+// Generic AI spawning that runs at the player
+//=========================================================================
+generic_spawner local.name local.gun local.spawner:{
+//=========================================================================
+	local.maxdist = (480 + randomint (600))
+	spawn models/human/german_waffenss_shutze "targetname" local.name "type_attack" "turret" "leash" "2048" "maxdist" local.maxdist "mindist" "128" "gun" local.gun
+	local.name.origin = local.spawner
+	//local.name runto $player //chrissstrahl
+	local.name exec coop_mod/replace.scr::runtoClosest	//chrissstrahl - made coop compatible
+}end
+
+//=========================================================================
+spawn_camptruck_driver local.spawner:{
+//=========================================================================
+	spawn models/human/german_waffenss_shutze "targetname" "parkedcamptruck_driver" "type_attack" "cover" "leash" "768" "maxdist" "1024" "mindist" "128" "gun" "Walter P38"
+	$parkedcamptruck_driver.origin = local.spawner
+}end
+
+//=========================================================================
+spawn_getawaywave:{
+//=========================================================================
+	//wait 4
+	//println "GETAWAYWAVE SPAWNED"
+	thread generic_spawner spawned_getawaywave01 "MP40" $spawner_getawaywave01
+	thread generic_spawner spawned_getawaywave02 "MP40" $spawner_getawaywave02
+	thread generic_spawner spawned_getawaywave03 "MP40" $spawner_getawaywave03
+	thread generic_spawner spawned_getawaywave04 "MP40" $spawner_getawaywave04
+}end
+
+//=========================================================================
+startpatrol local.trigger local.patrolpath:{
+//=========================================================================
+	local.trigger waittill trigger
+	self.patrolpath = local.patrolpath
+	self.type_idle = "patrol"
+}end
+
+//=========================================================================
+get_kar98sniper:{
+//=========================================================================
+	if (level.get_kar98sniper_activated == 1) {end}
+	level.get_kar98sniper_activated = 1
+	
+	for (local.i = 1 ; local.i <= $get_kar98sniper_trigger.size ; local.i ++){
+		$get_kar98sniper_trigger[local.i] remove
+	}
+	
+	//$player item weapons/KAR98sniper.tik 	// Criminal.
+	//$player playsound kar98_snd_pickup  	// Criminal.
+	//chrissstrahl - do not add to inventory in mp/coop
+	if(level.gametype == 0){
+		$kar98sniper remove
+		exec coop_mod/replace.scr::item weapons/KAR98sniper.tik // Criminal - coop comapbitility.
+		exec coop_mod/replace.scr::playsound kar98_snd_pickup	// Criminal - coop comapbitility.
+		iprintlnbold "You have the KAR98 Sniper Rifle."
+	}
+	
+	//chrissstrahl - set new spawn
+	exec coop_mod/spawnlocations.scr::m4l2_update1
+}end
+
+//=========================================================================
+playmusic:{
+//=========================================================================
+	waitframe
+	//$player stufftext "tmstartloop sound/music/mus_04a_suspense.mp3"	// Looping music 	// Criminal.
+	exec coop_mod/replace.scr::tmstartloop "sound/music/mus_04a_suspense.mp3" 				//Criminal - coop comapbitility.
+}end
+
+//=========================================================================
+save1:{
+//=========================================================================
+	if(level.gametype != 0){ //chrissstrahl - no mp - biatch
+		end
+	}
+	
+	while ((IsAlive $save1dog1) || (IsAlive $patroller10)){
+		wait 1
+		//println "waiting for save1 guys to die"
+	}
+	
+	wait 1
+	exec global/autosave.scr 1	//"Railroad"
+}end
+
+//=========================================================================
+endlevel:{
+//=========================================================================
+	exec global/missioncomplete.scr m4l3 transfer
+}end
+
+//chrissstrahl - update spawnpoints based upon player adcancement
+//this function only exists because there are no triggers at the places
+//where we want the script to update the spawn locations
+//this is why we check if a player is near a specific location
+//============================================================================
+coop_upatePlayerSpawn:{
+//============================================================================
+	while( 1 ){
+		if( level.coop_upatePlayerSpawn_stage == NIL ){
+			if( exec coop_mod/replace.scr::withinDistance ( -3888 -1072 0 ) 3000 ){//after bunker2
+				level.coop_upatePlayerSpawn_stage = 1
+				exec coop_mod/spawnlocations.scr::m4l2_update3
+			}
+		}
+		else{//below end bridge
+			if( exec coop_mod/replace.scr::withinDistance ( -5184 3808 16 ) 4200){
+				level.coop_upatePlayerSpawn_stage = 2
+				exec coop_mod/spawnlocations.scr::m4l2_update4
+				end
+			}
+		}
+		wait 0.5
+	}
+}
+

@@ -1,0 +1,521 @@
+// Props
+// $kfive_one  script model with model set to the k5, target of the collision ent
+// $kfive_one_explosive
+// $kfive_collide
+// $kfive_des_collide
+
+//=========================================================================
+InitScene2: {
+//=========================================================================
+	$kfive_one_explosive1 hide
+	$kfive_one_explosive2 hide
+	$kfive_one waitthread KFiveThink
+
+	$k5kill damage 0
+	$k5kill nottriggerable
+	$k5fire nottriggerable
+	level.k5checkguystrigger = waitthread global/FindTrigger.scr::FindTrigger "k5checkguys"
+
+	$kfive_one thread KFiveFire
+
+	// limit turning range on AA Gun
+	$aagun.cannon = $aagun QueryTurretSlotEntity 0
+	$aagun.cannon maxYawOffset 90.0
+	$aagun.cannon pitchCaps "-50 10 0"
+
+	local.fwd = angles_toforward( $aagun.angles )
+	local.loc = $aagun.origin + local.fwd * 200.0 + (0 0 50)
+	local.ent = spawn script_origin origin local.loc
+	local.ent.targetname = "aaguntarget"
+
+	$aagun.cannon setaimtarget local.ent
+}end
+
+//=========================================================================
+Dummy:{
+//=========================================================================
+}end
+
+//=========================================================================
+DoObjective3: {
+//=========================================================================
+	level.leavehousetrigger = waitthread global/FindTrigger.scr::FindTrigger "leavehousetrigger"
+	level.leavehousetrigger nottriggerable
+
+	$backdoorlocked2 lock
+	
+	$anziomaptrigger waittill trigger
+	$anziomap remove
+
+	$backdoorlocked2 unlock
+
+	level.leavehousetrigger triggerable
+}end
+
+//=========================================================================
+DoObjective4: {
+//=========================================================================
+	//	waitthread global/objectives.scr::current_objectives 4
+	//	thread global/objectives.scr::add_objectives 4 2 "Destroy German K-5 Railway gun" $kfive_one_explosive1.origin
+
+	// want to wait for both explosives to be placed
+	// on the k5.  don't care which one placed firstku
+	level.kfive_num_explosives = 0
+
+	thread startMusic_e3l3_scene2
+
+	// set the thread to call when boxes are placed
+	$kfive_one_explosive1 setusethread WaitForTwoExplosives
+	$kfive_one_explosive2 setusethread WaitForTwoExplosives
+
+	// set the thread that gets called when boxes blow
+	$kfive_one_explosive1 setthread Boom
+	$kfive_one_explosive2 setthread Boom
+
+	// show the Throbbibng Box
+	$kfive_one_explosive1 show
+	$kfive_one_explosive2 show
+
+	// set the stopwatch duration
+	$kfive_one_explosive1 stopwatchduration 0
+	$kfive_one_explosive2 stopwatchduration 0
+
+	thread autosave3
+	spawn trigger_relay targetname "ThreeDone"
+	$ThreeDone waittill trigger
+		
+	//when this returns, the k5 is toast
+	//$k5jumper exec global/bullethit.scr (0 0 20) 5000 0 1
+	//$k5slider  exec global/bullethit.scr (0 0 20) 5000 0 1
+
+	wait 3.0
+	trigger level.k5checkguystrigger
+	wait 0.5
+	trigger $firsttraindoor
+}end
+
+//=========================================================================
+autosave3: {
+//=========================================================================
+	$autosave3 waittill trigger
+	$autosave3 remove
+	exec global/autosave.scr 3
+}end
+
+//=========================================================================
+startMusic_e3l3_scene2: {
+//=========================================================================
+	waitthread global/music.scr::StopSong 2.0
+	thread global/music.scr::PlaySongLoop "sound/music/Halftrack.mp3"
+}end
+
+//=========================================================================
+CleanupScene2: {
+//=========================================================================
+}end
+
+//=========================================================================
+mg42guy1aion: {
+//=========================================================================
+	$mg42guy1  ai_on
+	$mg42guy1b ai_on
+}end
+
+//=========================================================================
+mg42guy2aion: {
+//=========================================================================
+	//placeholder until the setthread is removed in the map
+}end
+
+//=========================================================================
+ParadeCounter: {
+//=========================================================================
+	level.aaParadeCount++
+	self waittill death
+	level.aaParadeCount--
+}end
+
+//=========================================================================
+stopParade: {
+//=========================================================================
+	while (vector_length ($player.origin - $kfive_one.origin) > 900) {
+		waitframe
+	}
+
+	level.aaParade = 0
+}end
+
+//=========================================================================
+aaparade: {
+//=========================================================================
+	thread stopParade
+    self hide
+	self notsolid
+    self remove 
+    
+	level.aaParade = 1
+	level.aaParadeCount = 0
+	level.aaRally = 0
+	local.endtime = level.time + 35
+	local.maxcount = 6
+	local.next = 1
+	wait 1.5
+
+	local.spawnerCount = $aaparadeorigin.size
+	for ( local.i = 0; local.i < local.spawnerCount; local.i++) {
+		local.j = local.i + 1
+		local.spawner[local.i] = $aaparadeorigin[local.j]
+		local.spawner[local.i] hide
+		local.spawner[local.i] notsolid
+	}
+
+	while ( level.aaParade != 0 ) {
+		if ( level.time > local.endtime ) {
+			level.aaParade = 0
+		}
+
+		if ( level.aaParadeCount < local.maxcount ) {
+			local.where = local.next % local.spawnerCount
+			waitframe
+			thread SpawnParadeGuy local.spawner[local.where] local.next local.i
+			local.next++
+		}
+		else {
+			wait 8
+		}	
+	}
+}end
+
+//=========================================================================
+SpawnParadeGuy local.currentSpawner local.count local.i: {
+//=========================================================================	
+	local.parader_name = "aaParadeSoldier"
+	local.newname = local.parader_name + local.count
+	local.ent = spawn "models/human/german_wehrmact_soldier.tik" "targetname" local.newname "type_attack" "runandshoot" "health" "65"
+
+	local.random = randomint 100
+	if (local.random >= 60 ) {
+		local.ent gun "MP40" 
+	}
+
+	if (local.random <=30) {
+		local.ent gun "Mauser KAR 98K" 
+	}
+	else {
+		local.ent gun "walter p38"
+	}
+
+	local.ent.ammo_grenade = 2 
+	local.ent thread ParadeCounter
+	local.ent.origin = local.currentSpawner.origin
+	local.ent.angles = local.currentSpawner.angles
+	local.ent.mindist = 128
+	local.ent.maxdist = 768
+	local.ent.leash = 4096
+	local.ent.fixedleash = 0
+	local.ent.sight = 1024
+	local.ent.noticescale = 25
+	local.ent.accuracy = 90
+	local.ent.hearing = 1024
+	local.ent.enemysharerange = 100
+	local.ent.sound_awareness = 100
+	local.ent.interval = 256
+	local.ent.nosurprise = 1
+	local.ent dontdropweapons //don't drop any weapons
+	level.nodrophealth = 1    //don't drop any health
+
+	$(local.newname) thread aaRallyDirections local.random local.ent
+	$(local.newname) targetname deleteguy
+}end
+
+//=========================================================================
+aaRallyDirections local.random local.ent: {
+//=========================================================================
+	//local.random = randomint 100
+
+	if (local.random >= 20 ) {
+		self.enableEnemy = 0
+		self.destination = $aaparaderally[level.aaRally+1] 
+	}
+	else {
+		self.enableEnemy = 0
+		self.accuracy = 95
+		self.destination =  $aaparaderallyrifle 
+	}
+
+	self forceactivate
+	thread ParadeAIToggle  //turn on ai if they reach the rally point
+    thread ParadeAITimer   //turn on ai if specified time goes by
+
+	self runto $aaparaderally[level.aaRally+1]
+	level.aaRally = (level.aaRally + 1) % $aaparaderally.size
+	self thread AAMoveTo
+}end
+
+//=========================================================================
+ParadeAIToggle: {
+//=========================================================================
+    self waittill movedone
+	self.enableEnemy = 1
+}end
+
+//=========================================================================
+ParadeAITimer: {
+//=========================================================================
+	wait 6
+	self.enableEnemy = 1
+}end
+
+//=========================================================================
+AAMoveTo: {
+//=========================================================================	
+	if(self.destination != NIL && self.destination != NULL && self != NIL) {
+		while ( vector_length( self.origin  - self.destination.origin) >  256 ) {
+			self runto self.destination
+			self waittill movedone
+		}
+	}
+
+	self.enemyEnable = 1
+	self favoriteenemy $player
+	self aimat $player
+	self type_attack "cover"
+}end
+
+//=========================================================================
+KFiveThink local.ram: {
+//=========================================================================
+	self thread KFiveInit local.ram
+	//load passengers
+}end
+
+//=========================================================================
+KFiveInit local.ram: {
+//=========================================================================
+	local.newK5 = spawn script_model "model" "/weapons/It_W_K5.tik"
+	local.newK5.origin = self.origin + (0 0 -17)
+	local.newK5.angles = self.angles
+	local.newK5.targetname = self.targetname
+
+	//	local.newK5 physics_off // This command will make the damn thing solid	for some reason
+	local.newK5 notsolid
+	local.newK5 nodamage
+	local.newK5 rendereffects "-shadow"
+	
+	//	local.newK5.collision = spawn script_object model $kfive_collide.brushmodel
+	local.newK5.collision = $kfive_collide
+	local.newK5.collision safesolid
+	local.newK5.collision.origin = self.origin + (0 0 -17)
+	local.newK5.collision.angles = self.angles
+
+	if ( local.ram == "ram" ) {
+		local.newK5.ram = 1
+	}
+	else {
+		local.newK5.ram = 0
+	}
+
+	self remove
+}end
+
+//=========================================================================
+KFiveShutDown: {
+//=========================================================================
+	$kfive_one.shutdown = 1
+	$kfive_one.kfivefiring = 0
+}end
+
+//=========================================================================
+KFiveStopFiring: {
+//=========================================================================
+	$kfive_one.kfivefiring = 0
+}end
+
+//=========================================================================
+KFiveStartFiring: {
+//=========================================================================
+	$kfive_one.kfivefiring = 1
+
+	// start pushing the fog out
+	if ( (level.fogging == NIL) || (level.fogging == 0) ) {
+		if ( $world.farplane < (level.defaultfogplane + 100) ) {
+			thread maps/e3l3/fog.scr::moveFog level.defaultfogplane level.k4fogplane 3 level.fogbias level.fogcolor
+		}
+	}
+}end
+
+//=========================================================================
+KFiveFire: {
+//=========================================================================
+	self.kfivefiring = 0
+	self.shutdown = 0
+
+	while (self.shutdown == 0) {
+		if (self.kfivefiring == 1) {
+			self anim raise
+			self waittill animdone
+			wait 0.2
+
+			self anim fire
+			wait 0.4
+
+			local.dist = vector_length($player.origin - self.origin) + 1
+			local.mag = 2000.0 / local.dist
+
+			if (local.mag > 4) {
+				local.mag = 4
+			}
+
+			exec global/earthquake.scr 0.5 local.mag 0 0	
+			self waittill animdone
+			wait 1
+
+			self anim lower
+			self waittill animdone
+			wait 2
+		}
+		waitframe
+	}
+}end
+
+//=========================================================================
+KFiveKilled: {
+//=========================================================================
+	self playsound explode_kfive
+	
+	if ( self.ram != 1 ) {
+		//local.explosion1 = spawn script_model model models/fx/fx_truck_explosion.tik
+		//local.explosion1.origin = self.origin
+		//local.explosion1.angles = self.angles
+		//local.explosion1 anim start
+		//local.explosion1 notsolid
+		//wait .4
+	}
+
+	exec global/earthquake.scr 1 4 0 0	
+	$kfive_one_explosive1 remove
+	$kfive_one_explosive2 remove
+	
+	if($player istouching self.collision) {
+		$player normal_damage 100
+	}
+
+	radiusdamage self.origin 500 500
+
+	self.collision unglue
+	self.collision remove
+
+	local.angles = self.angles
+	local.origin = self.origin
+	self remove
+
+	local.damaged = spawn script_model model "models/weapons/It_W_K5des.tik" angles local.angles origin local.origin
+	local.damaged notsolid
+
+	local.damaged.fixdamaged = spawn script_model model "models/weapons/It_W_K5des_Pieces.tik" targetname "k5damagedfix"
+	local.damaged.fixdamaged.angles = self.angles 
+	local.damaged.fixdamaged.origin = self.origin
+	local.damaged.fixdamaged.angle = self.angle	
+	local.damaged.fixdamaged notsolid
+
+	// pull the fog back in
+	if ( (level.fogging == NIL) || (level.fogging == 0) ) {
+		thread maps/e3l3/fog.scr::moveFog level.k4fogplane level.defaultfogplane 3 level.fogbias level.fogcolor
+	}
+	
+	if ( self.ram != 1 ) {
+		$k5boom thread ExtraK5Damage
+		$k5kill thread k5tunneltrigger
+		$k5fire triggerable
+		trigger $k5fire
+
+		local.damaged.collision = $kfive_des_collide
+		local.damaged.collision safesolid
+		local.damaged.collision.origin = local.damaged.origin
+		local.damaged.collision.angles = local.damaged.angles
+	}
+	else {
+		$k5boom2 thread ExtraK5Damage
+		$k5kill2 triggerable
+		$k5kill2 damage 100000
+
+		local.damaged.collision = $kfive_des_collide2
+		local.damaged.collision safesolid
+		local.damaged.collision.origin = local.damaged.origin
+		local.damaged.collision.angles = local.damaged.angles
+	}
+
+	if($player istouching local.damaged.collision) {
+		$player normal_damage 100
+	}
+
+	if ( self.ram == 1 ) {
+		local.damaged anim ram
+	}
+	else {
+		local.damaged anim collapse
+		local.damaged waittill animdone
+		local.damaged anim collapse_idle
+	}
+
+	// need to explicitly remove this ????????????????
+	if ($k5crate == NULL) {
+	  	// println "ERROR: $k5crate not found!!!!!!!!!!!!"
+	}
+	else {
+	  	$k5crate remove
+	}
+
+	local.damaged.fixdamaged solid
+	local.damaged.fixdamaged show
+	wait 10
+	//local.explosion1 remove
+}end
+
+//=========================================================================
+k5tunneltrigger: {
+//=========================================================================
+	self damage 10000
+	self triggerable
+	wait 2.0
+	self nottriggerable
+}end
+
+//=========================================================================
+ExtraK5Damage: {
+//=========================================================================
+	radiusdamage self.origin 1000 128
+}end
+
+//=========================================================================
+WaitForTwoExplosives: {
+//=========================================================================
+	level.kfive_num_explosives ++
+	if (level.kfive_num_explosives == 1) {
+		//iprintln "Place second explosive on German K-5 Railway gun."  //leave this one in to help the player
+
+	    // set the other explosive timer to global setting
+		if (self == $kfive_one_explosive1) {
+			$kfive_one_explosive2 stopwatchduration 5
+			waitthread global/objectives.scr::add_objectives 4 2 NIL $kfive_one_explosive2.origin
+			waitthread global/objectives.scr::current_objectives 4
+		}
+		else {
+			$kfive_one_explosive1 stopwatchduration 7
+			//waitthread global/objectives.scr::add_objectives 4 2 NIL $kfive_one_explosive1.origin
+			//waitthread global/objectives.scr::current_objectives 4
+		}
+	}
+    else {
+		// this is the second explosive placement
+		// take away players explosive
+		waitthread global/items.scr::remove_item "explosives" noprint
+	}
+}end
+
+//=========================================================================
+Boom: {
+//=========================================================================
+	trigger ThreeDone
+	$kfive_one thread KFiveKilled
+}end

@@ -1,0 +1,3522 @@
+//==========================================================================================================//
+// LEVEL: 			M3L2														//
+// CAMPAIGN: 		Normandy - Operation Overlord										//			
+// TITLE:			"Battle in the Bocage"											//
+// GEOMETRY/DESIGN: 	Steve Fukuda, Zied Rieke										//	
+// SCRIPTING:		Zied Rieke, Steve Fukuda										//		
+//==========================================================================================================//
+	level.coop_aaMap = 1				//chrissstrahl - let global scripts know this is a AA level
+	level.coopPrevMap = "m3l1b"			//chrissstrahl - set previouse map (for mom voteing)
+	level.coopNextMap = "m3l3"			//chrissstrahl - set next map (for mom voteing)
+	thread coop_mod/main.scr::main 		//chrissstrahl - start coop mod extensions
+	
+	exec global/loadout.scr maps/m3l2.scr //chrissstrahl - not used in coop
+
+	thread global/exploder.scr::main
+
+
+	$fake_jeep_brush notsolid
+	$fake_jeep notsolid
+	$cobb_door notsolid
+	$scene2_airborne_door notsolid	
+	$s2_playerclip notsolid
+
+//-------------------------------------------------------
+level waittill prespawn
+println "z:        prespawn marker"
+//-------------------------------------------------------
+
+	$world northyaw 90
+	//$world northyaw 270
+
+	level.temp = 0
+	level.clickitem_time = 0
+
+	level.found_flak88 = 0		//first flak is not found
+	level.scene6_enroute = 2   	//first flak is intact. 1 means bomb is on the way. 3 means destroyed
+	level.scene13_enroute = 2   	//final flak is intact. 1 means bomb is on the way. 3 means destroyed
+	level.got_radio = 0		//don't have radio at start
+	level.flak20dead = 0		//the AA gun is intact
+
+	level.scene4_complete = 0	//check for scene4 completion since it would potentially be called by two separate situations 
+	level.scene6_alreadyseen = 0	//initialize if the first flak 88 detection situation has been satisfied
+	
+	level.script = maps/m3l2.scr
+
+
+	exec global/cabinet.scr
+
+
+//	$scene4_halftrack hide
+//	$scene4_halftrack notsolid
+	$fake_jeep_brush solid
+	$fake_jeep_brush disconnect_paths
+	$fake_jeep_brush hide
+	$fake_jeep glue $fake_jeep_brush
+	$cobb_door solid
+	$cobb_door disconnect_paths	
+	$scene11_mg1 pitchCaps ( -10 10 0)
+	$level_end_blocker hide
+
+	$scene2_airborne_door solid
+	$scene2_airborne_door disconnect_paths
+
+
+	thread global/bomber.scr::main
+//	thread global/bomber.scr::repeat
+
+	exec global/ambient.scr m3l2
+	
+	thread global/door_locked.scr::lock
+
+	$bunker_hum exec global/loopsound.scr m3l2_electrical_hum
+
+//*** BIND PLAYERTARGET DEVICES FOR MG TRACKING
+
+	$playertarget_center glue $player
+	$playertarget_north bind $playertarget_center
+	$playertarget_northeast bind $playertarget_center
+	$playertarget_east bind $playertarget_center
+	$playertarget_southeast bind $playertarget_center
+	$playertarget_south bind $playertarget_center
+	$playertarget_southwest bind $playertarget_center
+	$playertarget_west bind $playertarget_center
+	$playertarget_northwest bind $playertarget_center
+
+//*** SET FRIENDLY SCRIPT
+
+	thread global/friendly.scr::friendlygen
+
+//*** SET FRIENDLY BARNEY AI NAMES
+
+	level.ramsey = level.friendly1
+	level.durden = level.friendly2
+	level.paulsen = level.friendly3
+	level.cobb = level.friendly4
+	
+	level.durden thread durden_death
+	level.cobb thread cobb_death
+
+//*** SET CAPTAIN RAMSEY TO FOLLOW RIGHT AWAY AND MAKE HIM INVULNERABLE
+
+	level.ramsey.friendtype = 1
+	level.ramsey nodamage
+
+//*** SET AIRBORNE BARNEYS TO NOT FOLLOW AT START
+
+	level.paulsen.friendtype = -1
+	level.durden.friendtype = -1
+
+//*** SETUP THE FARPLANE
+
+// moved to world spawn
+
+//*** SETUP THE COLLISION MASK ON THE DEAD PANZER BY POSITION MATCHING
+	$scene5_dead_panzer thread setup_dead_panzer
+
+//*** SETUP THE COLLISION MASK ON THE DEAD SECOND PANZER BY POSITION MATCHING
+	$scene5_dead_panzer2 thread setup_dead_panzer
+
+//*** DEACTIVATE ANY PREVIOUSLY PLAYING MUSIC
+
+
+//*** SET THE BACKGROUND AMBIENT SOUNDTRACK
+
+//	soundtrack music/m3l2.mus
+
+//*** START THE TARGETING FOR THE FLAK 88s
+
+	//*** Aim at player
+
+		$scene10_flak88_gun setAimTarget $player
+
+		thread flak88_thinker $player 16 400 $scene6_flak88_trigger1 "flak1" $scene10_flak88_gun
+		level.scene6_thread1 = parm.previousthread
+
+		thread flak88_thinker $player 32 48 $scene6_flak88_killzone "flak1" $scene10_flak88_gun
+		level.scene6_thread2 = parm.previousthread 
+
+	//*** Aim at player
+
+		$scene13_flak88_gun setaimtarget $player
+
+		thread flak88_thinker $player 16 400 $scene13_flak88_trigger1 "flak2" $scene13_flak88_gun
+		level.scene13_thread1 = parm.previousthread
+
+		thread flak88_thinker $player 32 48 $scene13_flak88_killzone "flak2" $scene13_flak88_gun
+		level.scene13_thread2 = parm.previousthread
+
+
+//-------------------------------------------------------
+
+	level waittill spawn
+println "z:        level waittill spawn marker"
+
+//-------------------------------------------------------
+
+	$barn_enemy2	exec global/bullethit.scr (0 0 250) 500 0 1
+//*** GIVE THE BINOCULARS AND EXPLOSIVES
+
+	waitthread global/items.scr::add_item "binoculars"
+	waitthread global/items.scr::add_item "explosives"
+
+
+//*** START THE THREADS
+
+	thread scene1
+
+//*** RADIO SOUND THREAD
+
+	thread scene7_radio_sound
+	level.scene7_radio_thread = parm.previousthread
+
+	wait 1
+
+	exec coop_mod/replace.scr::tmstop
+	exec coop_mod/replace.scr::tmstartloop sound/music/mus_17a_mystery.mp3
+	
+//*** SET OBJECTIVES
+
+	//*** TEMP reset the Objectives portion of the HUD
+//	waitthread global/objectives.scr::reset_objectives
+//	waitthread global/objectives.scr::blank_objectives
+
+	waitthread global/objectives.scr::add_objectives 1 2 "Search the house." level.durden.origin
+//	waitthread global/objectives.scr::add_objectives 1 2 "Clear the house of all hostiles and rendezvous with any Airborne troops in the area." level.durden.origin
+	thread global/objectives.scr::current_objectives 1
+end
+
+
+//==============================================================================================================================================//
+//																								//
+//			*SCENE 1* SUPPORT THREADS - CQB									//
+//																								//
+//==============================================================================================================================================//
+
+scene1:
+
+//*** DEACTIVATE THE FRIENDLY AIRBORNE AI
+
+	level.durden exec global/disable_ai.scr
+	level.paulsen exec global/disable_ai.scr
+	level.cobb exec global/disable_ai.scr
+
+//*** DEACTIVATE THE PREPLACED SCENE 1 HOUSE AI
+	
+	$scene1_german_defender1 exec global/disable_ai.scr	
+	$scene1_german_defender2 exec global/disable_ai.scr	
+	$scene1_german_defender3 exec global/disable_ai.scr	
+	$scene1_german_defender4 exec global/disable_ai.scr	
+	$scene1_german_defender5 exec global/disable_ai.scr
+	$scene1_german_defender6 exec global/disable_ai.scr	
+	$scene1_german_defender7 exec global/disable_ai.scr	//upstairs
+	$scene1_german_defender8 exec global/disable_ai.scr	//upstairs
+	$scene1_german_defender9 exec global/disable_ai.scr	//upstairs, camping behind a door
+
+//*** INITIALIZE CHECK FOR DEATH OF ALL SCENE 1 PREPLACED DEFENDERS
+
+	level.scene1_german_defender_death = 0
+	
+	
+	//*** Ramsey gives some initial instructions to the player
+
+		level.ramsey exec coop_mod/replace.scr::lookat
+		level.ramsey exec coop_mod/replace.scr::turnto
+
+		level.ramsey.accuracy		= 70		//marksmanship
+		level.ramsey.mindist		= 128		//range to stop closing in
+		level.ramsey.maxdist		= 4000	//range to close to on enemy for longest range shot
+		level.ramsey nodamage				//invulnerability
+		level.ramsey.leash		= 640
+		//level.ramsey tether $player //chrissstrahl
+		level.ramsey exec coop_mod/main.scr::tether //chrissstrahl - coop compatible
+		level.ramsey.sight		= 4000
+		level.ramsey.noticescale	= 1
+		level.ramsey.waittime		= 0.1		//respond as fast as possible to player movement
+
+		level.ramsey thread global/friendly.scr::friendlythink
+		level.ramsey.friendtype = 1 //toggle this to -1 to shut down following	
+		//level.ramsey.destination = $player //chrissstrahl
+		level.ramsey exec coop_mod/main.scr::destination //chrissstrahl - coop compatible
+		level.ramsey.distance = 192
+	//	level.ramsey.mood = nervous
+
+		wait 0.5				
+		level.ramsey say dfr_M3L2_add01	//"Let's check out this house. There could be some boys from the 101st trapped inside."	
+		wait 5.5
+		level.ramsey say dfr_before_102j_1	//"The enemy's close so expect it."
+		wait 1
+		level.ramsey lookat $scene4_mg42
+	//	level.ramsey turnto $scene4_mg42		
+		wait 3
+		level.ramsey lookat NULL
+		level.ramsey turnto NULL			
+end
+
+//============================================================//
+
+scene1_german_presence:	
+
+	//*** Called from a bsp trigger_once in front of the house
+
+	//*** Player is taking off on the Captain, get the Captain to close up the distance and commence Barney behavior
+
+	level.ramsey thread global/friendly.scr::friendlythink
+	level.ramsey exec coop_mod/main.scr::destination //chrissstrahl - coop compatible
+	level.ramsey.distance = 192
+	level.ramsey.friendtype = 1 //toggle this to -1 to shut down following		
+
+	level.scene1_german_defender_deathlimit = 9	//Specify how many enemies are initially around
+
+	$scene1_german_defender1 exec global/enable_ai.scr	
+	$scene1_german_defender2 exec global/enable_ai.scr	
+	$scene1_german_defender3 exec global/enable_ai.scr	
+	$scene1_german_defender4 exec global/enable_ai.scr	
+	$scene1_german_defender5 exec global/enable_ai.scr
+	$scene1_german_defender6 exec global/enable_ai.scr	
+
+
+	thread scene1_german_defender_deathtracker
+
+end
+
+//============================================================//
+
+scene1_upstairs_ai_activate:
+
+	$scene1_german_defender7 exec global/enable_ai.scr	//upstairs
+	$scene1_german_defender8 exec global/enable_ai.scr	//upstairs
+
+
+end
+
+//============================================================//
+
+scene1_upstairs_ai_activate2:
+
+	$scene1_german_defender9 exec global/enable_ai.scr	//upstairs behind a door, camping
+
+end
+
+//=========================================
+s1_waittill_death:
+	if (isAlive self)
+		self waittill death
+	println "z:       s1_waittill death: " self
+end
+
+//============================================================//
+
+scene1_german_defender_deathtracker:
+	if (isAlive $scene1_german_defender1)
+		$scene1_german_defender1 waittill death
+	println "z:       s1_waittill death: " $scene1_german_defender1
+	
+	if (isAlive $scene1_german_defender2)
+		$scene1_german_defender2 waittill death
+	println "z:       s1_waittill death: " $scene1_german_defender2
+	
+	if (isAlive $scene1_german_defender3)
+		$scene1_german_defender3 waittill death
+	println "z:       s1_waittill death: " $scene1_german_defender3
+	
+	if (isAlive $scene1_german_defender4)
+		$scene1_german_defender4 waittill death
+	println "z:       s1_waittill death: " $scene1_german_defender4
+	
+	if (isAlive $scene1_german_defender5)
+		$scene1_german_defender5 waittill death
+	println "z:       s1_waittill death: " $scene1_german_defender5
+	
+	if (isAlive $scene1_german_defender6)
+		$scene1_german_defender6 waittill death
+	println "z:       s1_waittill death: " $scene1_german_defender6
+	
+	if (isAlive $scene1_german_defender7)
+		$scene1_german_defender7 waittill death
+	println "z:       s1_waittill death: " $scene1_german_defender7
+	
+	if (isAlive $scene1_german_defender8)
+		$scene1_german_defender8 waittill death
+	println "z:       s1_waittill death: " $scene1_german_defender8
+	
+	if (isAlive $scene1_german_defender9)
+		$scene1_german_defender9 waittill death
+	println "z:       s1_waittill death: " $scene1_german_defender9
+	
+	if (isAlive $scene1_german_defender10)
+		$scene1_german_defender10 waittill death
+	println "z:       s1_waittill death: " $scene1_german_defender10
+	
+	if (isAlive $scene1_german_defender11)
+		$scene1_german_defender11 waittill death
+	println "z:       s1_waittill death: " $scene1_german_defender11
+	
+
+
+/*
+		if (level.time <= (local.starttime + 120))
+		{
+			println "z:       kicking in time out failsafe"
+			thread scene2
+			end
+		}
+*/
+	thread scene2
+end
+
+friendly_message1:
+	if (level.s1_finished == 1)
+	{
+		println "Z:       not saying friendly_message1"
+		end
+	}
+	println "Z:        saying friendly_message1"
+	level.ramsey say dfr_directive_001j_2	// Stay there!
+	end
+
+friendly_message2:
+	if (level.s1_finished == 1)
+	{
+		println "Z:       not saying friendly_message2"
+		end
+	}
+	if (level.fm2_finished == 1)
+	{
+		println "Z:       not saying friendly_message2"
+		end
+	}
+	level.fm2_finished = 1
+	println "Z:       saying friendly_message2"
+	level.ramsey say dfr_directive_150j_1	// Use a grenade!
+	end
+
+friendly_message3:
+	if (level.s1_finished == 1)
+	{
+		println "Z:       not saying friendly_message3"
+		end
+	}
+	println "Z:       saying friendly_message3"
+	level.ramsey say dfr_cover_01j_1		// Take cover!
+	end
+
+friendly_message4:
+	if (level.s1_finished == 1)
+	{
+		println "Z:       not saying friendly_message4"
+		end
+	}
+	println "Z:       saying friendly_message4"
+	level.ramsey say dfr_cover_01j_Find	// Find cover!
+	end
+
+
+//==============================================================================================================================================//
+//																								//
+//		*SCENE 2* SUPPORT THREADS - CONVERSATION CUTSCENE AND ASSASSINATION					//
+//																								//
+//==============================================================================================================================================//
+
+scene2:
+level.s1_finished = 1
+
+	//*** Called from thread scene1_german_defender_deathtracker
+
+	//*** Captain Ramsey goes to the unopenable mystery door
+
+		level.ramsey.friendtype = -1
+		level.ramsey exec global/disable_ai.scr
+		
+		while !(vector_within level.ramsey $scene2_captain_thunder_node 32 )
+		{
+			wait 0.5
+			//wait 2 //chrissstrahl - I can't wait that long!!!
+			level.ramsey runto $scene2_captain_thunder_node
+		}
+		
+iprintlnbold_noloc ( "DEVELOPER: skipping touch check and entity solid" )
+		
+		//while (exec coop_mod/replace.scr::istouching $s2_playerclip)
+		//{
+			//println "z:       player is touching $s2_playerclip"
+			//waitframe
+		//}
+
+		//println "z:       making $s2_playerclip solid"
+		//$s2_playerclip solid
+		//end chrissstrahl
+		
+	//	level.ramsey exec global/stand.scr
+		level.ramsey lookAt $scene2_airborne_door
+		level.ramsey turnto $scene2_airborne_door
+
+	//*** Captain Ramsey gives the code signal
+	
+		level.ramsey say dfr_scripted_M5L3_07f	//"Thunder!"
+		level.ramsey waittill saydone
+		wait 1.4
+	
+	//*** Private Durden replies with the correct response from the other side 
+
+		level.durden say dfr_scripted_M5L3_08c	//"Flash!"
+		level.durden waittill saydone
+		wait 2.4
+		
+//start chrissstrahl - make sure he can't be killed by any player
+		level.paulsen nodamage
+//end chrissstrahl
+
+
+//		level.ramsey playsound m3l2_commotion wait	//Sound of Private Durden moving furniture from his makeshift barricade
+//		level.ramsey waittill sounddone
+
+
+//		$scene2_cutscene_speaker playsound m3l2_commotion wait	//Sound of Private Durden moving furniture from his makeshift barricade
+//		$scene2_cutscene_speaker waittill sounddone
+
+		$scene2_cutscene_speaker playsound m3l2_commotion
+		wait 6
+		println "z:       commotion sound done"
+
+	//*** Durden and Paulsen are crouched and aiming at the door, ready to fire in case Powell and Ramsey are actually Germans
+	
+		level.durden crouchto $scene2_durden_ready_node
+		level.durden aimat level.ramsey
+		level.paulsen crouchto $scene2_paulsen_ready_node
+		level.paulsen exec coop_mod/replace.scr::aimat
+
+		wait 1.5
+
+	//*** Remove the 'locked sound' usable trigger, Open the door automatically, presume that Paulsen opened it since he's closest to it
+
+		$scene2_airborne_door time 0.8
+		$scene2_airborne_door rotateYdown 90
+		$scene2_cutscene_speaker playsound door_wood_open_move
+		$scene2_airborne_door waitmove
+
+		$scene2_airborne_door disconnect_paths	//reestablish pathnode contact for AI navigation
+
+//		$scene2_airborne_door remove
+
+	//*** OBJECTIVE ONE COMPLETE - LOCATE AIRBORNE GUYS 
+
+		waitthread global/objectives.scr::add_objectives 1 3
+
+	//*** Paulsen and Durden lower their weapons when they see that it really is a bunch of friendlies
+
+		level.ramsey turnto level.paulsen
+		level.ramsey lookat level.paulsen
+		level.ramsey say dfr_m3l3_310jnew	//"Hey, all right, some airborne boys."
+		wait 2.8
+
+		level.paulsen aimat NULL
+	//	level.paulsen exec global/stand.scr
+
+		level.durden aimat NULL
+	//	level.durden exec global/stand.scr
+	
+	//*** Ramsey and Paulsen look at each other and converse
+		
+		level.paulsen exec coop_mod/replace.scr::lookat
+		level.paulsen turnto level.ramsey
+		level.ramsey lookat level.paulsen
+		level.ramsey turnto level.paulsen
+
+		level.paulsen say dfr_M3L3_308f 	//"Boy I'm glad to see you."
+		level.paulsen waittill saydone
+		wait 0.25
+
+		level.paulsen lookat level.paulsen
+		level.paulsen say dfr_M3L3_309f	//"We landed way off target sir...we've been trying to get back...blah blah blah.
+		wait 0.5 
+		level.paulsen lookat level.ramsey
+		wait 3.8	//original 4.09
+		level.paulsen exec coop_mod/replace.scr::lookat		
+
+	//*** Private Paulsen is shot in the head by a sniper and the window gets holed by a 'magic bullet'. His name was Private Paulsen.
+	
+	//*** Play the sounds artificially, a window penetration and flesh hit, followed by the gunshot sound catching up a split second later
+
+		$scene2_cutscene_speaker playsound snd_bh_glass5
+		wait 0.05
+		$scene2_cutscene_speaker playsound snd_bh_flesh7
+		
+//start chrissstrahl - allow him to be killed
+		level.paulsen takedamage
+//end chrissstrahl
+		
+		level.paulsen damage $world 15000 $world (0 0 0) (0 270 0) (0 0 0) 0 5 0 0	//hit the head - location designation #5
+		wait 0.15	
+		
+		$scene2_sniper_speaker playsound kar98sniper_snd_fire1
+
+		wait 0.5
+
+		level.paulsen stopsound 8	
+		level.durden exec global/crouch.scr	
+		level.ramsey exec global/crouch.scr
+		wait 0.15		
+		
+	//*** Private Durden screams, everyone stops looking at each other, and Durden and runs for cover and a sniper position looking out front
+
+		level.durden say warn_player_cover	//"GET DOWN!"
+		level.durden lookat NULL
+		level.durden turnto NULL
+		level.durden crouchto $scene2_durden_cover_node
+
+//*** Go to the next thread
+		
+		$s2_playerclip remove
+		println "z:    $s2_playerclip removed"
+
+		thread scene3
+
+	//*** Captain Ramsey instructs the player and heads for the downstairs front room
+		wait 3
+		level.ramsey exec coop_mod/replace.scr::lookat
+		level.ramsey exec coop_mod/replace.scr::turnto	
+		level.ramsey say dfr_M3L3_311j	//"Powell, stay here and watch the back."    								
+		level.ramsey waittill saydone
+		level.ramsey lookat NULL
+		level.ramsey turnto NULL
+
+		thread m3l2_quicksave1	//*quicksave*
+
+	//*** Waittill movedone on Captain Ramsey so he looks like he's checking the front yard, then reactivate his AI as well as Private Durden
+
+		level.ramsey runto $scene2_captain_cover_node
+		level.ramsey waittill movedone
+
+		thread ramsey_setup
+		thread durden_setup
+
+end
+
+//============================================================//
+
+scene2_locked_sound:
+
+	$scene2_airborne_door playsound m3l2_blocked_door1 wait	//Door is blocked, not necessarily locked, and is not openable at this time
+	$scene2_airborne_door waittill sounddone
+
+end
+
+//==============================================================================================================================================//
+//																								//
+//		*SCENE 3* SUPPORT THREADS - SNIPING THE BACKYARD							//
+//																								//
+//==============================================================================================================================================//
+
+scene3:	
+
+	//*** Called from thread scene2
+
+	//*** UPDATE OBJECTIVES TO DEFEND THE BACK OF THE HOUSE
+
+//		waitthread global/objectives.scr::add_objectives 2 2 "Defend your position - snipe the enemies approaching from the field." $scene3_objectivemarker.origin
+		waitthread global/objectives.scr::add_objectives 2 2 "Defend the back of the house." $scene3_objectivemarker.origin
+		thread global/objectives.scr::current_objectives 2
+
+	//*** Start spawning the guys at the back of the house
+	
+		thread scene3_spawner1_initialize
+
+	//*** Monitor for completion of this situation
+
+		thread scene3_spawn1_cleared
+
+end
+
+//============================================================//
+
+scene3_spawner1_initialize:
+
+	level.scene3_spawn1_teamvalue = 0		//initializes variable for total number spawned to date
+	level.scene3_spawn1_teamlimitmax = 16	//initializes constant for total number allowed to spawn 
+	level.scene3_spawn1_currentalive = 0	//initializes variable for number of enemies currently alive from this spawner
+	level.scene3_spawn1_currentalivemax = 4	//initializes constant for maximum number allowed to be alive at any given time from this spawner
+	level.scene3_spawn1_loopwaittime = 1	//initializes constant for time between respawns
+	level.scene3_spawn1_deactivator = 0		//initializes variable for shutting down this loop's ability to spawn when the player is past this area
+
+	thread scene3_spawndetector1_control
+
+end
+
+//============================================================//
+
+scene3_spawndetector1_control:
+
+	if (level.scene3_spawn1_deactivator == 1)
+	{
+		end
+	}
+
+	local.loopwaittime = 0.2
+
+	while (exec coop_mod/replace.scr::istouching $scene3_spawndetector1)
+	{
+		//*** one wave at a time use +currentalivemax 
+		//*** Crazy fire and maneuver enemy attack, use less, nothing, or negative numbers instead
+		
+		if ((level.scene3_spawn1_currentalive + 2) <= level.scene3_spawn1_currentalivemax && level.scene3_spawn1_deactivator == 0 && level.scene3_spawn1_teamvalue < level.scene3_spawn1_teamlimitmax)
+
+		{
+//			centerprint(level.scene3_spawn1_currentalive + "<" + level.scene3_spawn1_currentalivemax + "\n" + level.scene3_spawn1_deactivator + "=" + level.scene3_spawn1_deactivator+ "\n" + level.scene3_spawn1_teamvalue + "<" + level.scene3_spawn1_teamlimitmax )		
+		
+			local.scene3_spawn1_ai_name1 = "scene3_spawn1_ai1_" + level.scene3_spawn1_teamvalue	//assign a name to the spawned enemy
+			local.org1 = $scene3_spawndetector1_spawner1.origin						//spawn location as a script_origin
+
+			local.scene3_spawn1_ai_name2 = "scene3_spawn1_ai2_" + level.scene3_spawn1_teamvalue
+			local.org2 = $scene3_spawndetector1_spawner2.origin					
+
+			local.scene3_spawn1_ai_name3 = "scene3_spawn1_ai3_" + level.scene3_spawn1_teamvalue
+			local.org3 = $scene3_spawndetector1_spawner2.origin	
+
+			local.scene3_spawn1_ai_name4 = "scene3_spawn1_ai4_" + level.scene3_spawn1_teamvalue
+			local.org4 = $scene3_spawndetector1_spawner2.origin	
+
+		//*** Spawn 3 enemy soldiers in a wave
+	
+			spawn models/human/german_waffenss_shutze "targetname" (local.scene3_spawn1_ai_name1) "type_attack" "cover" 
+
+			$(local.scene3_spawn1_ai_name1).origin = local.org1				//place the guy in the correct spot						
+			level.scene3_spawn1_currentalive ++							//increment the max allowed alive at any given time			
+			level.scene3_spawn1_teamvalue ++							//track the scene's enemy population
+			$(local.scene3_spawn1_ai_name1) thread scene3_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene3_spawn1_ai_name1) thread scene3_spawn1_ai_navigate1 	//call navigation thread 
+
+				local.scene3_spawn1_ai_name1.mindist = 128
+				local.scene3_spawn1_ai_name1.maxdist = 2400
+				local.scene3_spawn1_ai_name1.leash = 6400
+				local.scene3_spawn1_ai_name1.fixedleash = 0
+				local.scene3_spawn1_ai_name1.sight = 2400
+				local.scene3_spawn1_ai_name1.noticescale = 5
+				local.scene3_spawn1_ai_name1.accuracy = 80
+				local.scene3_spawn1_ai_name1.hearing = 4000
+				local.scene3_spawn1_ai_name1.interval = 128
+	
+			spawn models/human/german_waffenss_nco "targetname" (local.scene3_spawn1_ai_name2) "type_attack" "cover" 
+			
+			$(local.scene3_spawn1_ai_name2).origin = local.org2				//place the guy in the correct spot						
+			level.scene3_spawn1_currentalive ++							//increment the max allowed alive at any given time
+			level.scene3_spawn1_teamvalue ++
+			$(local.scene3_spawn1_ai_name2) thread scene3_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene3_spawn1_ai_name2) thread scene3_spawn1_ai_navigate2 	//call navigation thread 
+			
+			$(local.scene3_spawn1_ai_name2) gun "mp40"
+
+				local.scene3_spawn1_ai_name2.mindist = 128
+				local.scene3_spawn1_ai_name2.maxdist = 2400
+				local.scene3_spawn1_ai_name2.leash = 6400
+				local.scene3_spawn1_ai_name2.fixedleash = 0
+				local.scene3_spawn1_ai_name2.sight = 2000
+				local.scene3_spawn1_ai_name2.noticescale = 5
+				local.scene3_spawn1_ai_name2.accuracy = 80
+				local.scene3_spawn1_ai_name2.hearing = 4000
+				local.scene3_spawn1_ai_name2.interval = 128
+
+			spawn models/human/german_waffenss_shutze "targetname" (local.scene3_spawn1_ai_name3) "type_attack" "cover" 
+			
+			$(local.scene3_spawn1_ai_name3).origin = local.org3				//place the guy in the correct spot						
+			level.scene3_spawn1_currentalive ++							//increment the max allowed alive at any given time
+			level.scene3_spawn1_teamvalue ++
+			$(local.scene3_spawn1_ai_name3) thread scene3_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene3_spawn1_ai_name3) thread scene3_spawn1_ai_navigate3 	//call navigation thread 
+			
+			$(local.scene3_spawn1_ai_name3) gun "Mauser KAR 98K"
+
+				local.scene3_spawn1_ai_name3.mindist = 128
+				local.scene3_spawn1_ai_name3.maxdist = 2400
+				local.scene3_spawn1_ai_name3.leash = 6400
+				local.scene3_spawn1_ai_name3.fixedleash = 0
+				local.scene3_spawn1_ai_name3.sight = 2000
+				local.scene3_spawn1_ai_name3.noticescale = 5
+				local.scene3_spawn1_ai_name3.accuracy = 80
+				local.scene3_spawn1_ai_name3.hearing = 4000
+				local.scene3_spawn1_ai_name3.interval = 128
+
+			spawn models/human/german_waffenss_shutze "targetname" (local.scene3_spawn1_ai_name4) "type_attack" "cover" 
+			
+			$(local.scene3_spawn1_ai_name4).origin = local.org4				//place the guy in the correct spot						
+			level.scene3_spawn1_currentalive ++							//increment the max allowed alive at any given time
+			level.scene3_spawn1_teamvalue ++
+			$(local.scene3_spawn1_ai_name4) thread scene3_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene3_spawn1_ai_name4) thread scene3_spawn1_ai_navigate4 	//call navigation thread 
+			
+			$(local.scene3_spawn1_ai_name4) gun "Mauser KAR 98D Sniper"
+
+				local.scene3_spawn1_ai_name4.mindist = 128
+				local.scene3_spawn1_ai_name4.maxdist = 2400
+				local.scene3_spawn1_ai_name4.leash = 2400
+				local.scene3_spawn1_ai_name4.fixedleash = 0
+				local.scene3_spawn1_ai_name4.sight = 2000
+				local.scene3_spawn1_ai_name4.noticescale = 5
+				local.scene3_spawn1_ai_name4.accuracy = 70
+				local.scene3_spawn1_ai_name4.hearing = 4000
+				local.scene3_spawn1_ai_name4.interval = 128
+
+		}
+
+		wait local.loopwaittime			//every local.loopwaittime seconds, resume the while loop	
+	}
+		
+	wait local.loopwaittime				//prevent infinite loop warning
+	goto scene3_spawndetector1_control
+
+end
+
+//============================================================//
+
+scene3_spawn1_detect_death:
+
+	self waittill death
+	level.scene3_spawn1_currentalive --	//decrement the population count 
+
+end
+
+//============================================================//
+
+scene3_spawn1_ai_navigate1:
+
+	self exec global/disable_ai.scr
+	
+	//*** Launch him on a standard initial course
+
+	self exec global/runto.scr $scene3_basepath1
+	self waittill movedone
+
+	local.r = randomint (100)
+	local.pathname = 1
+
+	self thread scene3_random_course_selection local.r local.pathname
+end
+
+//============================================================//
+
+scene3_spawn1_ai_navigate2:
+
+	self exec global/disable_ai.scr
+
+	//*** Launch him on a standard initial course
+
+	self exec global/runto.scr $scene3_basepath2
+	self waittill movedone
+
+	local.r = randomint (100)
+	local.pathname = 2
+
+	self thread scene3_random_course_selection local.r local.pathname
+
+end
+
+//============================================================//
+
+scene3_spawn1_ai_navigate3:
+
+	self exec global/disable_ai.scr
+
+	//*** Launch him on a standard initial course
+
+	self exec global/runto.scr $scene3_basepath3
+	self waittill movedone
+
+	local.r = randomint (100)
+	local.pathname = 3
+
+	self thread scene3_random_course_selection local.r local.pathname
+
+end
+
+//============================================================//
+
+scene3_spawn1_ai_navigate4:
+
+	self exec global/disable_ai.scr
+
+	//*** Launch him on a standard initial course
+
+	self exec global/runto.scr $scene3_basepath4
+	self waittill movedone
+
+	local.r = randomint (100)
+	local.pathname = 4
+
+	self thread scene3_random_course_selection local.r local.pathname
+
+end
+
+//============================================================//
+
+scene3_random_course_selection local.r local.pathname:
+
+	if (local.r < 30)
+	{
+		//*** Broken field running, not stopping to shoot at the player
+
+			self exec global/runto.scr $("scene3_path" + local.pathname + "_" + "1a")	//e.g. scene3_path1_1a
+			self waittill movedone
+
+		//*** Rest briefly for a random time
+			
+			wait randomint (1)
+	}
+	else
+	if ((local.r >= 30) && (local.r < 60))
+	{
+		//*** Broken field running, not stopping to shoot at the player
+
+			self exec global/runto.scr $("scene3_path" + local.pathname + "_" + "1b")	//e.g. scene3_path1_1b
+			self waittill movedone
+
+		//*** Rest briefly for a random time
+
+			wait (randomint (1))
+	}
+	else
+	if (local.r >= 60)
+	{
+		//*** Go to a sniper position and shoot at the player before continuing
+
+			self exec global/runto.scr $("scene3_path" + local.pathname + "_" + "1c")	//e.g. scene3_path1_1c
+			self waittill movedone
+			self exec global/crouch.scr 
+
+		//*** Take a couple of shots at the player
+
+			wait ((randomint (20)) * .1)
+
+			self exec global/headaim.scr::main 20 0
+			wait .1
+			self exec global/shoot.scr
+
+			wait 3
+			self forceactivate
+	}
+
+	//*** Select the second path to get even closer to the house
+
+		local.r = (randomint (50))
+
+		if (local.r < 25)
+		{
+			//*** Broken field running, not stopping to shoot at the player
+
+				self exec global/runto.scr $("scene3_path" + local.pathname + "_" + "2a")	//e.g. scene3_path1_2a
+				self waittill movedone
+				self exec global/crouch.scr
+
+			//*** Rest briefly for a random time
+
+				wait (randomint (1))
+		}
+		else
+		if (local.r >= 25)
+		{
+			//*** Go to a sniper position and shoot at the player before continuing
+
+				self exec global/runto.scr $("scene3_path" + local.pathname + "_" + "2b")	//e.g. scene3_path1_2b
+				self waittill movedone
+				self exec global/crouch.scr 
+
+			//*** Take a couple of shots at the player
+
+				wait ((randomint (20)) * .1)
+
+				self exec global/headaim.scr::main 20 0
+				wait .1
+				self exec global/shoot.scr
+
+				wait 3
+				self forceactivate
+		}
+	
+	//*** Make a clean run for the house now, once inside, activate AI and hunt for player
+
+		self exec global/runto.scr $("scene3_escapepath" + local.pathname)	//e.g. scene3_escapepath1
+		self waittill movedone
+		self exec global/enable_ai.scr
+		self attackplayer
+	
+end
+
+//============================================================//
+
+scene3_spawn1_terminate:
+
+	level.scene3_spawn1_deactivator = 1
+
+end
+
+//============================================================//
+
+scene3_spawn1_cleared:
+
+	//*** If the player kills off all the enemies
+
+	while ((level.scene3_spawn1_teamvalue < level.scene3_spawn1_teamlimitmax) || (level.scene3_spawn1_currentalive != 0))
+
+	{	
+		wait 1
+	}
+
+	thread scene3_spawn1_terminate
+	thread scene4
+
+end
+
+//============================================================//
+
+//==============================================================================================================================================//
+//																								//
+//		*SCENE 4* SUPPORT THREADS - FORWARD DEFENSE								//
+//																								//
+//==============================================================================================================================================//
+
+scene4:
+	
+	//*** UPDATE OBJECTIVES, DEFENSE SNIPING COMPLETE, GO TO MACHINE GUN
+
+		waitthread global/objectives.scr::add_objectives 2 3
+//		waitthread global/objectives.scr::add_objectives 3 2 "Defend your position - use the mounted machine gun to hold off the enemy." $scene4_mg42.origin
+		waitthread global/objectives.scr::add_objectives 3 2 "Defend the front of the house." $scene4_mg42.origin
+		thread global/objectives.scr::current_objectives 3
+
+		thread m3l2_quicksave2	//*quicksave*
+
+	level.ramsey.friendtype = -1		//Detach from player following routine
+//	level.ramsey exec global/disable_ai.scr 
+	level.ramsey exec global/runto.scr $scene4_captain_ready_node
+	level.ramsey turnto $s4_impact_point
+
+//	level.ramsey waittill movedone
+//	level.ramsey exec global/crouch.scr
+
+//	$scene4_halftrack show
+
+	thread scene4_action_trigger_detect
+
+	//*** Keep reminding the player to rejoin the Captain up front, also makes Captain appear more alive and believable
+
+
+	level.playerposition = 0
+
+	while (level.playerposition == 0)
+	{
+		level.ramsey say dfr_M3L3_315j_2	//"Powell, help me cover the front!"
+		level.ramsey waittill saydone
+		wait 30
+	}
+	wait 4
+	level.ramsey turnto NULL
+end
+
+//============================================================//
+
+scene4_action_trigger_detect:
+	
+	$scene4_action_trigger waittill trigger
+
+		level.playerposition = 1	//Shut off the Captain's 'help me cover the front' routine 
+
+	//*** Blow up the jeep
+
+	local.temp = spawn script_model
+	local.temp.origin = $s4_impact_point.origin
+	local.temp model "fx/fx_tank_explosion.tik"
+	local.temp anim start
+	local.temp playsound explode_jeep
+	$fake_jeep_brush connect_paths
+	local.vec = $fake_jeep_brush.origin
+	local.vec[0] = 100
+	local.vec[1] = 0
+	local.vec[2] = 400
+	$fake_jeep_brush physics_velocity ( local.vec )
+	$fake_jeep_brush rotatex 90
+	$fake_jeep_brush rotatey 0
+	$fake_jeep_brush rotatez 90
+	wait 0.2
+	$fake_jeep_brush physics_on 1
+	$fake_jeep_brush physics_velocity ( local.vec )
+
+	thread scene4_spawner1_initialize
+	
+	//*** Get the friendly NPCs back in the action
+
+//	thread ramsey_setup   //ramsey should not start following the player again right before the attack
+	thread durden_setup
+
+end
+
+//============================================================//
+
+scene4_spawner1_initialize:
+
+	level.scene4_spawn1_teamvalue = 0		//initializes variable for total number spawned to date
+	level.scene4_spawn1_teamlimitmax = 24	//initializes constant for total number allowed to spawn
+	level.scene4_spawn1_currentalive = 0	//initializes variable for number of enemies currently alive from this spawner
+	level.scene4_spawn1_currentalivemax = 6	//initializes constant for maximum number allowed to be alive at any given time from this spawner
+	level.scene4_spawn1_loopwaittime = 1	//initializes constant for time between respawns
+	level.scene4_spawn1_deactivator = 0		//initializes variable for shutting down this loop's ability to spawn when the player is past this area
+
+	thread scene4_spawndetector1_control
+
+	//*** Monitor for completion of this situation
+
+		thread scene4_spawn1_cleared
+
+end
+
+//============================================================//
+
+scene4_spawndetector1_control:
+
+	if (level.scene4_spawn1_deactivator == 1)
+	{
+		end
+	}
+
+	local.loopwaittime = 0.2
+
+	while (exec coop_mod/replace.scr::istouching $scene4_spawndetector1)
+	{
+//iprintlnbold_noloc ( "scene4_spawndetector1_control istouching" )
+		if (level.scene4_spawn1_deactivator == 1)
+			end
+		//*** 3 at a time, use +3
+		//*** Crazy fire and maneuver enemy attack, use nothing
+
+		if ( (level.scene4_spawn1_currentalive <= 1) && (level.scene4_spawn1_teamvalue < level.scene4_spawn1_teamlimitmax) )
+
+		{
+//			centerprint(level.scene4_spawn1_currentalive + "<" + level.scene4_spawn1_currentalivemax + "\n" + level.scene4_spawn1_deactivator + "=" + level.scene4_spawn1_deactivator+ "\n" + level.scene4_spawn1_teamvalue + "<" + level.scene4_spawn1_teamlimitmax )
+
+			local.scene4_spawn1_ai_name1 = "scene4_spawn1_ai1_" + level.scene4_spawn1_teamvalue	//assign a name to the spawned enemy
+			local.org1 = $scene4_spawndetector1_spawner1.origin						//spawn location as a script_origin
+
+			local.scene4_spawn1_ai_name2 = "scene4_spawn1_ai2_" + level.scene4_spawn1_teamvalue
+			local.org2 = $scene4_spawndetector1_spawner2.origin
+
+			local.scene4_spawn1_ai_name3 = "scene4_spawn1_ai3_" + level.scene4_spawn1_teamvalue
+			local.org3 = $scene4_spawndetector1_spawner3.origin
+
+		//*** Spawn 3 enemy soldiers in a wave
+
+			spawn models/human/german_waffenss_shutze "targetname" (local.scene4_spawn1_ai_name1) "type_attack" "cover"
+
+			$(local.scene4_spawn1_ai_name1).origin = local.org1				//place the guy in the correct spot
+			level.scene4_spawn1_currentalive ++							//increment the max allowed alive at any given time
+			level.scene4_spawn1_teamvalue ++							//track the scene's enemy population
+			$(local.scene4_spawn1_ai_name1) thread scene4_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene4_spawn1_ai_name1) thread scene4_spawn1_ai_navigate1 	//call navigation thread
+
+				local.scene4_spawn1_ai_name1.mindist = 128
+				local.scene4_spawn1_ai_name1.maxdist = 600
+				local.scene4_spawn1_ai_name1.leash = 10000
+				local.scene4_spawn1_ai_name1.fixedleash = 0
+				local.scene4_spawn1_ai_name1.sight = 800
+				local.scene4_spawn1_ai_name1.noticescale = 100
+				local.scene4_spawn1_ai_name1.accuracy = 20
+				local.scene4_spawn1_ai_name1.hearing = 4000
+				local.scene4_spawn1_ai_name1.interval = 128
+
+			spawn models/human/german_waffenss_nco "targetname" (local.scene4_spawn1_ai_name2) "type_attack" "cover"
+
+			$(local.scene4_spawn1_ai_name2).origin = local.org2				//place the guy in the correct spot
+			level.scene4_spawn1_currentalive ++							//increment the max allowed alive at any given time
+			level.scene4_spawn1_teamvalue ++
+			$(local.scene4_spawn1_ai_name2) thread scene4_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene4_spawn1_ai_name2) thread scene4_spawn1_ai_navigate2 	//call navigation thread
+
+			$(local.scene4_spawn1_ai_name2) gun "mp40"
+
+				local.scene4_spawn1_ai_name2.mindist = 128
+				local.scene4_spawn1_ai_name2.maxdist = 600
+				local.scene4_spawn1_ai_name2.leash = 10000
+				local.scene4_spawn1_ai_name2.fixedleash = 0
+				local.scene4_spawn1_ai_name2.sight = 800
+				local.scene4_spawn1_ai_name2.noticescale = 100
+				local.scene4_spawn1_ai_name2.accuracy = 20
+				local.scene4_spawn1_ai_name2.hearing = 4000
+				local.scene4_spawn1_ai_name2.interval = 128
+
+			spawn models/human/german_waffenss_shutze "targetname" (local.scene4_spawn1_ai_name3) "type_attack" "cover"
+
+			$(local.scene4_spawn1_ai_name3).origin = local.org3				//place the guy in the correct spot
+			level.scene4_spawn1_currentalive ++							//increment the max allowed alive at any given time
+			level.scene4_spawn1_teamvalue ++
+			$(local.scene4_spawn1_ai_name3) thread scene4_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene4_spawn1_ai_name3) thread scene4_spawn1_ai_navigate3  	//call navigation thread
+
+				local.scene4_spawn1_ai_name3.mindist = 128
+				local.scene4_spawn1_ai_name3.maxdist = 600
+				local.scene4_spawn1_ai_name3.leash = 10000
+				local.scene4_spawn1_ai_name3.fixedleash = 0
+				local.scene4_spawn1_ai_name3.sight = 800
+				local.scene4_spawn1_ai_name3.noticescale = 100
+				local.scene4_spawn1_ai_name3.accuracy = 20
+				local.scene4_spawn1_ai_name3.hearing = 4000
+				local.scene4_spawn1_ai_name3.interval = 128
+		}
+
+		wait local.loopwaittime			//every local.loopwaittime seconds, resume the while loop
+	}
+
+	if (level.scene4_spawn1_deactivator == 1)
+		end
+	wait local.loopwaittime				//prevent infinite loop warning
+	goto scene4_spawndetector1_control
+
+end
+
+//============================================================//
+
+scene4_spawn1_detect_death:
+
+	self waittill death
+	level.scene4_spawn1_currentalive --	//decrement the population count
+
+end
+
+//============================================================//
+
+scene4_spawn1_ai_navigate1:
+
+	self forceactivate
+	self exec global/runto.scr $scene4_spawn1_rallypoint1
+
+end
+
+//============================================================//
+
+scene4_spawn1_ai_navigate2:
+
+	self forceactivate
+	self exec global/runto.scr $scene4_spawn1_rallypoint2
+
+end
+
+//============================================================//
+
+scene4_spawn1_ai_navigate3:
+
+	self forceactivate
+	self exec global/runto.scr $scene4_spawn1_rallypoint3
+
+end
+
+//============================================================//
+
+scene4_spawn1_terminate:
+
+	//*** Called from a BSP trigger_once at the other side of the footbridge if the player makes it there, to prevent seeing spawn spots 
+
+		if (level.scene4_complete == 1)
+		{
+			end
+		}
+
+		level.scene4_complete = 1
+		level.scene4_spawn1_deactivator = 1
+
+		thread scene5
+	
+end
+
+//============================================================//
+
+scene4_spawn1_cleared:
+
+	//*** If the player kills off all the enemies the fight is over, keep checking to see when all are deployed and killed
+
+		while ((level.scene4_spawn1_teamvalue < level.scene4_spawn1_teamlimitmax) || (level.scene4_spawn1_currentalive != 0))
+		{	
+			wait 1
+		}
+
+	//*** Check to see if the scene is already terminated by the first condition, that the player runs out and hits the termination trigger
+
+		if (level.scene4_complete == 1)
+		{
+			end
+		}
+
+		level.scene4_complete = 1
+
+	//*** Pause briefly before providing victory feedback dialogue for better effect
+
+		thread scene5
+
+	println ("+++++++++++SCENE4 TEAMVALUE IS" + level.scene4_spawn1_teamvalue)
+	println ("+++++++++++SCENE4 TEAMLIMIT IS" + level.scene4_spawn1_teamlimitmax)
+	println ("+++++++++++SCENE4 TERMINATE IS" + level.scene4_spawn1_deactivator)
+
+end
+
+//==============================================================================================================================================//
+//																								//
+//		*SCENE 5* SUPPORT THREADS - ROAD SKIRMISH									//
+//																								//
+//==============================================================================================================================================//
+
+scene5:
+
+	//*** Potentially called from either thread scene4_spawn1_terminate (trigger_once activated) or thread scene4_spawn1_cleared
+
+	while (level.scene4_spawn1_currentalive != 0)
+	{
+		wait 1
+	}
+
+		thread scene5_captain_speech
+
+end
+
+//============================================================//
+
+scene5_captain_speech:
+
+	//*** UPDATE OBJECTIVES, MG DEFENSE COMPLETE, NOW FIND THE FLAK 88s	
+
+
+	waitthread global/objectives.scr::add_objectives 1 1
+	waitthread global/objectives.scr::add_objectives 3 3
+	waitthread global/objectives.scr::add_objectives 4 2 "Locate any Flak 88's guarding the road." $scene6_objectivemarker.origin
+	thread global/objectives.scr::current_objectives 4
+
+	wait 4
+
+	thread ramsey_setup
+	
+	wait 3
+
+	level.ramsey turnto NULL
+	level.ramsey exec coop_mod/replace.scr::lookat
+	
+	level.ramsey say dfr_m3l3_318j_2	//"Okay, I think that's the last of them."
+	wait 4
+
+	level.ramsey say dfr_over_10j_1new	//"Everyone check your ammo."
+	wait 4
+	
+	
+	level.ramsey say dfr_M3L3_319j 	//"Well, so much for our transport."
+	wait 2.5
+	
+	level.ramsey say dfr_m3l3_303j 	//"Well, it looks like we'll have to finish this mission on foot Powell."
+	wait 5
+
+	level.ramsey say dfr_follow_04j_2	//"You're on point."
+	wait 2
+
+	level.ramsey lookat NULL
+
+end
+
+//============================================================//
+
+//***	Call from BSP trigger on the road after the house
+
+scene5_spawner1_initialize:
+
+	level.scene5_spawn1_teamvalue = 0		//initializes variable for total number spawned to date
+	level.scene5_spawn1_teamlimitmax = 12	//initializes constant for total number allowed to spawn
+	level.scene5_spawn1_currentalive = 0	//initializes variable for number of enemies currently alive from this spawner
+	level.scene5_spawn1_currentalivemax = 3	//initializes constant for maximum number allowed to be alive at any given time from this spawner
+	level.scene5_spawn1_loopwaittime = 1	//initializes constant for time between respawns
+	level.scene5_spawn1_deactivator = 0		//initializes variable for shutting down this loop's ability to spawn when the player is past this area
+
+	thread scene5_spawndetector1_control
+
+end
+
+//============================================================//
+
+scene5_spawndetector1_control:
+
+	if (level.scene5_spawn1_deactivator == 1)
+	{
+		end
+	}
+
+	local.loopwaittime = 0.2
+
+	while (exec coop_mod/replace.scr::istouching $scene5_spawndetector1)
+	{
+//iprintlnbold_noloc ( "scene5_spawndetector1_control istouching" )
+		//*** 3 at a time, use +3
+		//*** Crazy fire and maneuver enemy attack, use nothing
+
+		if ((level.scene5_spawn1_currentalive + 2) <= level.scene5_spawn1_currentalivemax && level.scene5_spawn1_deactivator == 0 && level.scene5_spawn1_teamvalue < level.scene5_spawn1_teamlimitmax)
+//		if ((level.scene5_spawn1_currentalive) <= level.scene5_spawn1_currentalivemax && level.scene5_spawn1_deactivator == 0 && level.scene5_spawn1_teamvalue < level.scene5_spawn1_teamlimitmax)
+
+		{
+//			centerprint(level.scene5_spawn1_currentalive + "<" + level.scene5_spawn1_currentalivemax + "\n" + level.scene5_spawn1_deactivator + "=" + level.scene5_spawn1_deactivator+ "\n" + level.scene5_spawn1_teamvalue + "<" + level.scene5_spawn1_teamlimitmax )
+
+			local.scene5_spawn1_ai_name1 = "scene5_spawn1_ai1_" + level.scene5_spawn1_teamvalue	//assign a name to the spawned enemy
+			local.org1 = $scene5_spawndetector1_spawner1.origin						//spawn location as a script_origin
+
+			local.scene5_spawn1_ai_name2 = "scene5_spawn1_ai2_" + level.scene5_spawn1_teamvalue
+			local.org2 = $scene5_spawndetector1_spawner2.origin
+
+			local.scene5_spawn1_ai_name3 = "scene5_spawn1_ai3_" + level.scene5_spawn1_teamvalue
+			local.org3 = $scene5_spawndetector1_spawner3.origin
+
+		//*** Spawn 3 enemy soldiers in a wave
+
+			spawn models/human/german_panzer_shutze "targetname" (local.scene5_spawn1_ai_name1) "type_attack" "cover"
+
+			$(local.scene5_spawn1_ai_name1).origin = local.org1				//place the guy in the correct spot
+			level.scene5_spawn1_currentalive ++							//increment the max allowed alive at any given time
+			level.scene5_spawn1_teamvalue ++							//track the scene's enemy population
+			$(local.scene5_spawn1_ai_name1) thread scene5_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene5_spawn1_ai_name1) thread scene5_spawn1_ai_navigate1 	//call navigation thread
+
+				local.scene5_spawn1_ai_name1.mindist = 128
+				local.scene5_spawn1_ai_name1.maxdist = 4000
+				local.scene5_spawn1_ai_name1.leash = 10000
+				local.scene5_spawn1_ai_name1.fixedleash = 0
+				local.scene5_spawn1_ai_name1.sight = 2000
+				local.scene5_spawn1_ai_name1.noticescale = 50
+				local.scene5_spawn1_ai_name1.accuracy = 30
+				local.scene5_spawn1_ai_name1.hearing = 4000
+				local.scene5_spawn1_ai_name1.interval = 128
+
+			spawn models/human/german_waffenss_nco "targetname" (local.scene5_spawn1_ai_name2) "type_attack" "cover"
+
+			$(local.scene5_spawn1_ai_name2).origin = local.org2				//place the guy in the correct spot
+			level.scene5_spawn1_currentalive ++							//increment the max allowed alive at any given time
+			level.scene5_spawn1_teamvalue ++
+			$(local.scene5_spawn1_ai_name2) thread scene5_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene5_spawn1_ai_name2) thread scene5_spawn1_ai_navigate2 	//call navigation thread
+
+			$(local.scene5_spawn1_ai_name2) gun "mp40"
+
+				local.scene5_spawn1_ai_name2.mindist = 128
+				local.scene5_spawn1_ai_name2.maxdist = 4000
+				local.scene5_spawn1_ai_name2.leash = 10000
+				local.scene5_spawn1_ai_name2.fixedleash = 0
+				local.scene5_spawn1_ai_name2.sight = 2000
+				local.scene5_spawn1_ai_name2.noticescale = 1
+				local.scene5_spawn1_ai_name2.accuracy = 30
+				local.scene5_spawn1_ai_name2.hearing = 4000
+				local.scene5_spawn1_ai_name2.interval = 128
+
+			spawn models/human/german_panzer_shutze "targetname" (local.scene5_spawn1_ai_name3) "type_attack" "cover"
+
+			$(local.scene5_spawn1_ai_name3).origin = local.org3				//place the guy in the correct spot
+			level.scene5_spawn1_currentalive ++							//increment the max allowed alive at any given time
+			level.scene5_spawn1_teamvalue ++
+			$(local.scene5_spawn1_ai_name3) thread scene5_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene5_spawn1_ai_name3) thread scene5_spawn1_ai_navigate3  	//call navigation thread
+
+				local.scene5_spawn1_ai_name3.mindist = 128
+				local.scene5_spawn1_ai_name3.maxdist = 4000
+				local.scene5_spawn1_ai_name3.leash = 10000
+				local.scene5_spawn1_ai_name3.fixedleash = 0
+				local.scene5_spawn1_ai_name3.sight = 2000
+				local.scene5_spawn1_ai_name3.noticescale = 1
+				local.scene5_spawn1_ai_name3.accuracy = 30
+				local.scene5_spawn1_ai_name3.hearing = 4000
+				local.scene5_spawn1_ai_name3.interval = 128
+
+//			centerprint(level.scene5_spawn1_currentalive + "<" + level.scene5_spawn1_currentalivemax + "\n" + level.scene5_spawn1_deactivator + "=" + level.scene5_spawn1_deactivator+ "\n" + level.scene5_spawn1_teamvalue + "<" + level.scene5_spawn1_teamlimitmax )
+
+		}
+
+		wait local.loopwaittime			//every local.loopwaittime seconds, resume the while loop
+	}
+
+	wait local.loopwaittime				//prevent infinite loop warning
+	goto scene5_spawndetector1_control
+
+end
+
+//============================================================//
+
+scene5_spawn1_detect_death:
+
+	self waittill death
+	level.scene5_spawn1_currentalive --	//decrement the population count
+
+end
+
+//============================================================//
+
+scene5_spawn1_ai_navigate1:
+
+	self forceactivate
+	self exec global/runto.scr $scene5_spawn1_rallypoint1
+
+end
+
+//============================================================//
+
+scene5_spawn1_ai_navigate2:
+
+	self forceactivate
+	self exec global/runto.scr $scene5_spawn1_rallypoint2
+
+end
+
+//============================================================//
+
+scene5_spawn1_ai_navigate3:
+
+	self forceactivate
+	self exec global/runto.scr $scene5_spawn1_rallypoint3
+
+end
+
+//============================================================//
+
+scene5_spawn1_terminate:
+
+	level.scene5_spawn1_deactivator = 1
+	thread scene6
+end
+
+//============================================================//
+
+//==============================================================================================================================================//
+//																								//
+//		*SCENE 6* SUPPORT THREADS - FLAK ALLEY									//
+//																								//
+//==============================================================================================================================================//
+
+scene6:
+
+	thread scene7_barn_enemy_deathtrack
+	thread scene7_machinegun_waiter
+
+	$scene6_flak88_trigger1 waittill trigger
+
+	if (level.got_radio == 0) //If player doesn't have the radio, then give the normal hint as usual
+	{
+		level.scene6_alreadyseen = 1
+
+		//*** UPDATE OBJECTIVES
+	
+			waitthread global/objectives.scr::add_objectives 2 1
+			waitthread global/objectives.scr::add_objectives 4 3
+			waitthread global/objectives.scr::add_objectives 5 2 "Find a radio to call an airstrike on the Flak 88 cannon." $scene7_radio.origin
+			thread global/objectives.scr::current_objectives 5
+
+		//*** Captain Ramsey gives a hint
+			
+			wait 3
+
+			level.ramsey exec coop_mod/replace.scr::lookat
+			level.ramsey say dfr_M3L3_330j //"That 88 has this road locked down!"
+			wait 4
+			level.ramsey say dfr_M3L3_331j //"We could call in some air support if we had a radio. We have to find another way around."
+			wait 6
+			level.ramsey lookat NULL			
+	}
+	else if (level.got_radio == 1)	//If player got the radio but never saw the flak 88 first
+	{
+			//*** UPDATE OBJECTIVES
+			waitthread global/objectives.scr::add_objectives 3 1
+			waitthread global/objectives.scr::add_objectives 4 3
+			waitthread global/objectives.scr::add_objectives 5 3
+			waitthread global/objectives.scr::add_objectives 6 2 "Call an airstrike on the Flak 88." $scene10_flak88_gun.origin
+			thread global/objectives.scr::current_objectives 6
+	}
+
+		
+	//second level of hints. only occurs the second time the player hits the trigger
+	
+	while (1)
+	{
+		$scene6_flak88_trigger1 waittill trigger
+	
+		if ( (level.scene6_enroute == 3) || (level.scene6_enroute == 1) )
+			end
+		if (level.got_radio == 1)
+		{
+			local.binoculars = getboundkey1 "toggleitem"
+			local.fire = getboundkey1 "+attackprimary"
+			iprintlnbold_noloc (loc_convert_string "To call in air support switch to the binoculars. ( ") (loc_convert_string local.binoculars) (loc_convert_string " ) Then look at the target and press your Fire key. ( ") (loc_convert_string local.fire) (loc_convert_string " )")
+
+	//		iprintlnbold "To call in air support switch to the binoculars. Then look at the target and press your Fire key."
+		}
+		wait 12
+	}
+end
+	
+//==============================================================================================================================================//
+//																								//
+//		*SCENE 7* SUPPORT THREADS - SNIPER AT THE SILO								//
+//																								//
+//==============================================================================================================================================//
+
+scene7_barn_enemy_deathtrack:
+
+	while ((isAlive $barn_enemy1) || (isAlive $barn_enemy2) || (isAlive $barn_enemy3) || (isAlive $barn_enemy4))
+	{
+		wait 1
+	}
+
+	println "++++++++++++++MEET COBB NOW"
+	
+	thread scene7_cutscene
+	thread scene7_sniper_bushguys
+
+end
+
+
+//============================================================//
+
+scene7_machinegun_waiter:
+
+	$barn_enemy2 forceactivate
+
+	while !($barn_enemy2 exec coop_mod/replace.scr::cansee)
+	{
+		waitframe
+	}
+
+	$scene7_mg1 thread scene7_machinegun
+
+end
+
+//============================================================//
+
+scene7_machinegun:
+
+	if (isAlive $barn_enemy2)
+	{
+		self maxyawoffset 45
+		self startfiring
+		self setaimtarget $playertarget_south
+		wait 0.5
+		self setaimtarget $playertarget_southeast
+		wait 0.5
+		self setaimtarget $player
+		wait 4
+		self stopfiring
+	}
+
+	//*** Give the player some breathing time here
+
+		wait 1.5
+
+	//*** Resume scanning
+
+		if (isAlive $barn_enemy2)
+		{
+			goto scene7_machinegun
+		}
+	
+end
+
+//============================================================//
+
+scene7_cutscene:
+		level.ramsey exec global/disable_ai.scr
+		level.cobb exec global/disable_ai.scr
+		
+		level.ramsey.avoidplayer = 0
+		level.cobb.avoidplayer = 0
+		
+		level.ramsey.friendtype = -1
+		wait 2
+	//	$cobb_door notsolid
+		$cobb_door time 1
+		$cobb_door rotateYup 90
+		$cobb_door waitmove
+		$cobb_door disconnect_paths
+		
+		level.ramsey runto $s7_ramsey_node
+		level.ramsey waittill movedone
+
+		level.ramsey lookAt $s7_cobb_node
+		wait 1
+		level.ramsey turnto $s7_cobb_node
+		wait 1
+		
+		level.ramsey say dfr_scripted_M5L3_07f	// "Thunder!"
+		wait 1.2
+
+		level.cobb forceactivate
+	//	level.cobb playsound dfr_scripted_M5L3_08c	// "Flash!"
+		level.cobb say dfr_scripted_M5L3_08c	// "Flash!"
+		wait 1
+		
+//	ramsey runs to cover from sniper
+
+		wait 3
+
+//	open the door
+
+		level.cobb.movedoneradius = 150
+		level.cobb runto $s7_cobb_node
+		level.cobb waittill movedone
+//		level.cobb exec global/stand.scr
+		level.cobb.movedoneradius = 10
+
+		thread scene7_dialogue
+end
+
+//============================================================//
+
+scene7_dialogue:
+
+	//*** Scene7 Dialog - Snipers in the Silo
+
+
+
+		level.cobb turnto level.ramsey
+		level.cobb lookAt level.ramsey
+		level.cobb say dfr_M3L3_332i 		
+		// "Private Cobb, 3rd of the five-oh-sixth, sir." 
+		level.cobb waittill saydone
+		wait 1
+
+		level.ramsey turnto level.cobb
+		level.ramsey lookAt level.cobb
+		level.ramsey say dfr_m3l3_333j	
+		// "Private Cobb do you have a radio?"
+		level.ramsey waittill saydone
+		wait 1
+
+		level.cobb turnto level.ramsey
+		level.cobb lookAt level.ramsey
+		level.cobb say dfr_M3L3_334i		
+		// "Our squad's radioman...blah blah blah..."
+		level.cobb waittill saydone
+		wait 1
+
+		level.ramsey exec coop_mod/replace.scr::turnto
+		level.ramsey exec coop_mod/replace.scr::lookat
+		level.ramsey say dfr_m3l3_336j_1.new	
+		// "Powell, you’re the only sniper here. Head for the farm house and flank that sniper.
+		level.ramsey waittill saydone
+		wait 1
+
+		level.ramsey turnto NULL
+		level.ramsey lookAt NULL
+		level.cobb turnto NULL
+		level.cobb lookAt NULL
+		
+		
+		waitthread global/objectives.scr::add_objectives 5 2 "Find the radio near the silo and use it to call an airstrike on the Flak 88 cannon." $scene7_radio.origin
+		thread global/objectives.scr::current_objectives 5
+
+	//*** Make Ramsey and Cobb run to the safety of the barn and make them invulnerable until they get there so they don't get sniped
+
+//		level.ramsey nodamage
+//		level.cobb nodamage
+
+		level.ramsey runto $scene7_ramsey_covernode		
+		level.cobb runto $scene7_cobb_covernode
+		
+		level.ramsey waittill movedone
+		level.ramsey exec global/crouch.scr
+		level.ramsey turnto $scene7_staretarget
+		
+		level.cobb waittill movedone
+//		level.cobb exec global/crouch.scr
+		level.cobb turnto $scene7_staretarget
+end
+
+//============================================================//
+
+scene7_sniper_bushguys:
+
+	$scene7_bushguy1 exec global/disable_ai.scr
+	$scene7_bushguy2 exec global/disable_ai.scr
+	$scene7_bushguy3 exec global/disable_ai.scr
+
+	$scene7_bushguy_ai_trigger waittill trigger
+
+	$scene7_bushguy1 exec global/enable_ai.scr
+	$scene7_bushguy2 exec global/enable_ai.scr
+	$scene7_bushguy3 exec global/enable_ai.scr
+
+	$scene7_bushguy1 exec global/crouch.scr
+	$scene7_bushguy2 exec global/crouch.scr
+	$scene7_bushguy3 exec global/crouch.scr
+
+end
+
+//============================================================//
+
+scene7_radio_pickup:
+
+	//*** Engage the wall explosive trigger and the second flank spawner
+		thread scene8_flank_attack
+
+	//*** Player gets the SCR Handy Talkie, model is removed
+	if ($scene7_radio)
+		$scene7_radio remove
+
+	//*** Set variable
+		level.got_radio = 1
+
+	//*** Stop looping the radio's idle chatter sounds
+	//	level.scene7_radio_thread delete
+
+	//*** Play the pickup sound
+		exec coop_mod/replace.scr::playsound m3l2_radio_pickup
+
+	//*** Add the radio to the player's inventory
+		waitthread global/items.scr::add_item "radio"
+
+	//*** UPDATE OBJECTIVES - GOT RADIO, NOW DESTROY THE FIRST FLAK 88 OR GOT RADIO, NEVER SEEN A FLAK 88 
+	if (level.scene6_alreadyseen == 1)
+	{
+		waitthread global/objectives.scr::add_objectives 3 1
+		waitthread global/objectives.scr::add_objectives 5 3
+		waitthread global/objectives.scr::add_objectives 6 2 "Call an airstrike on the Flak 88." $scene10_flak88_gun.origin
+		thread global/objectives.scr::current_objectives 6
+	}
+	else
+	if (level.scene6_alreadyseen == 0)
+	{
+		waitthread global/objectives.scr::add_objectives 5 3
+		thread global/objectives.scr::current_objectives 4
+	}
+
+	level.ramsey thread global/say_to.scr::main dfr_M3L2_add08 $player	//"Okay, let's get back to those 88's!"
+end
+
+//============================================================//
+
+scene7_team_regroup:
+
+		//*** Setup for Private Cobb
+
+		level.cobb.accuracy		= 30		//marksmanship
+		level.cobb.mindist		= 128		//range to stop closing in
+		level.cobb.maxdist		= 4000	//range to close to on enemy for longest range shot
+		level.cobb.health			= 100		//must die before M3L3		
+		level.cobb.leash			= 640
+		//level.cobb tether $player //chrissstrahl
+		level.cobb exec coop_mod/main.scr::tether //chrissstrahl - coop compatible
+		level.cobb.sight			= 4000
+		level.cobb.noticescale		= 1
+		level.cobb.waittime		= 0.1		//respond as fast as possible to player movement
+
+	//*** Cobb follows the player
+
+		level.cobb thread global/friendly.scr::friendlythink
+		level.cobb.friendtype = 1 //toggle this to -1 to shut down following
+		//level.cobb.destination = $player //chrissstrahl
+		level.cobb exec coop_mod/main.scr::destination //chrissstrahl - coop compatible
+		level.cobb.distance = 192
+		level.cobb exec global/enable_ai.scr
+
+	//*** Launch Scene 8
+
+		thread scene8
+		
+	//*** Ramsey follows the player
+
+		level.ramsey.friendtype = 1
+		level.ramsey exec global/enable_ai.scr 
+		//level.ramsey $player //chrissstrahl
+		level.ramsey exec coop_mod/replace.scr::runto //chrissstrahl - coop compatible
+		
+		level.ramsey.avoidplayer = 1
+		level.cobb.avoidplayer = 1
+
+//		while !(vector_within level.ramsey $player 320)
+//		{
+//			waitframe
+//		}
+end
+
+//scene7_friendly_message_radio:
+
+	//***Called by the bsp
+
+//	level.ramsey thread global/say_to.scr::main dfr_M3L2_add07 $player	//"Powell, pick up that radio."
+//	local.thread = parm.previousthread
+	
+//	while (level.got_radio != 1)
+//	{
+//		wait 1
+//	}
+//
+//	if (local.thread)
+//		local.thread delete
+
+
+//end
+
+
+
+//===============================================================================================================================//
+
+//==============================================================================================================================================//
+//																								//
+//		*SCENE 9* SUPPORT THREADS - QUICK FIGHT RETURNING TO FLAK ALLEY							//
+//																								//
+//==============================================================================================================================================//
+
+
+//==============================================================================================================================================//
+//																								//
+//		*SCENE 10* SUPPORT THREADS - DESTROYING THE FIRST FLAK 88 GUN							//
+//																								//
+//==============================================================================================================================================//
+
+scene10_flak88_clickitem:
+
+	//*** Called from a trigger_clickitem entity in the bsp covering the Flak 88. 
+
+	if (level.got_radio == 0)
+	{	
+		iprintlnbold "Once you find a radio you will be able to call in air support."
+		end
+	}
+
+	if (level.scene6_enroute == 3)
+		end   //already done
+
+	if (level.scene6_enroute == 1)
+	{
+		if (level.time <= level.clickitem_time + 4 )
+			end
+		level.clickitem_time = level.time
+		exec coop_mod/replace.scr::playsound airstrike_already_enroute	//"Target already acquired. Over."
+		end
+	}
+
+	level.scene6_enroute = 1
+
+	exec coop_mod/replace.scr::playsound airstrike_valid_target	//"Roger. Target acquired." 
+
+	//*** Slight delay for realism...he is flying in!
+
+	wait 10
+
+	thread global/bomber.scr::bomb 1
+	wait 1
+	$bomberplane1 playsound m3l2_first_airstrike
+
+end
+
+//============================================================//
+
+scene10_bomb_explodes:
+	if (level.scene6_enroute == 3)
+		end
+
+	level.scene6_enroute = 3   //indicates the flak88 is destroyed
+	$scene6_flak88_trigger1 remove
+	$scene6_flak88_killzone remove
+//	if (level.scene6_thread1)
+//		level.scene6_thread1 delete
+//	if (level.scene6_thread2)
+//		level.scene6_thread2 delete
+
+	$scene10_flak88_gun thread explode_flak $scene10_bomb_smoke1
+	
+	level.ramsey thread global/say_to.scr::main dfr_m3l3_350j_2 $player
+	// Beautiful, that’s the way to win a war.
+	
+	//*** UPDATE OBJECTIVES - 1ST FLAK 88 DESTROYED, NOW FIND THE FLAK 20 AAA BEFORE DESTROYING THE 2ND FLAK 88
+
+		waitthread global/objectives.scr::add_objectives 4 1
+		waitthread global/objectives.scr::add_objectives 6 3 "Call an airstrike on the Flak 88."
+		// $scene10_flak88_gun.origin
+//		waitthread global/objectives.scr::add_objectives 7 2 "Destroy a Flak 20 Anti-Aircraft Gun to allow air support to return." $scene11_explosive1.origin
+		waitthread global/objectives.scr::add_objectives 7 2 "Destroy the anti-aircraft gun so air support can return." $scene11_explosive1.origin
+		thread global/objectives.scr::current_objectives 7
+end
+
+
+
+
+//==============================================================================================================================================//
+//																								//
+//		*SCENE 13* SUPPORT THREADS - FINAL 88 AND EXIT PILLBOX							//
+//																								//
+//==============================================================================================================================================//
+
+scene13_flak88_init:
+
+	$scene13_flak88_trigger1 waittill trigger
+
+	if ( (level.scene13_enroute != 1) && (level.scene13_enroute != 3) )
+	{
+		level.ramsey waitthread global/say_to.scr::main dfr_M3L3_351j_1 $player	//"Another 88 Powell. Call Fighter Command."
+	}	
+
+
+	local.i = -1
+
+	while (1)
+	{
+		$scene13_flak88_trigger1 waittill trigger
+
+
+		if ( (level.scene13_enroute == 1) || (level.scene13_enroute == 3) )
+			end
+
+
+		if (local.i == -1)
+			level.ramsey waitthread global/say_to.scr::main dfr_m3l3_325j_1 $player		
+			//"Powell, get us some air support."	
+
+		if (local.i == 0)
+			level.ramsey waitthread global/say_to.scr::main dfr_m3l3_326j_1 $player		
+			//"Powell, hit that 88 with air support."    	
+
+		if ((local.i != 0) && (local.i != -1))
+		{
+			if (local.i % 2) //test for odd
+				level.ramsey waitthread global/say_to.scr::main dfr_m3l3_325j_2 $player	
+				//"POWELL, GET US SOME AIR SUPPORT!"	
+
+			else //test for even
+				level.ramsey waitthread global/say_to.scr::main dfr_m3l3_326j_2 $player	
+				//"POWELL, HIT THAT 88 WITH AIR SUPPORT."	
+		}
+		wait 12
+		local.i++
+	}
+	
+	
+end
+
+//============================================================//
+
+scene13_flak88_clickitem:
+		
+	//*** Called from a trigger_clickitem entity in the bsp covering the Flak 88. 
+
+		if (level.got_radio == 0)
+		{
+			end
+		}
+
+		if (level.flak20dead == 0)
+		{		
+			iprintlnbold "Once you destroy the anti-aircraft gun, you will be able to call in air support."
+			end
+		}
+
+		if (level.scene13_enroute == 3)
+			end   //already done
+
+		if (level.scene13_enroute == 1)
+		{
+			if (level.time <= level.clickitem_time + 4 )
+				end
+			level.clickitem_time = level.time
+			exec coop_mod/replace.scr::playsound airstrike_already_enroute	//"Target already acquired. Over."
+			end
+		}
+
+		level.scene13_enroute = 1
+		exec coop_mod/replace.scr::playsound airstrike_valid_target	//"Roger. Target acquired." 
+
+
+		//*** Slight delay for realism...he is flying in!
+
+		wait 10
+	
+		thread global/bomber.scr::bomb 2
+		wait 1
+		$bomberplane2 playsound m3l2_second_airstrike
+end
+
+//============================================================//
+
+scene13_bomb_explodes:
+
+	level.scene13_enroute = 3
+	$scene13_flak88_trigger1 remove
+	$scene13_flak88_killzone remove
+//	level.scene13_thread1 delete
+//	level.scene13_thread2 delete
+
+	$scene13_flak88_gun thread explode_flak $scene13_bomb_smoke2
+
+	//*** UPDATE OBJECTIVES - 2ND FLAK 88 DESTROYED, NOW GET PAST THE ROADBLOCK AND FINISH THE LEVEL
+
+		waitthread global/objectives.scr::add_objectives 6 1
+		waitthread global/objectives.scr::add_objectives 8 3
+		// "Call an Airstrike on the second Flak 88" $scene13_flak88_gun.origin
+		waitthread global/objectives.scr::add_objectives 9 2 "Bypass the roadblock." $level_end.origin
+		thread global/objectives.scr::current_objectives 9
+
+end
+
+//==============================================================================================================================================//
+//																								//
+//			*MISCELLANEOUS* SUPPORT THREADS									//
+//																								//
+//==============================================================================================================================================//
+//thread flak88_thinker $player 16 400 $scene6_flak88_trigger1 "flak1" $scene10_flak88_gun
+flak88_thinker local.target local.range local.offset local.trigger local.variable local.gun_name:
+	local.gunorigin = local.gun_name.origin
+//start chrissstrahl - modified for coop
+	while (1){
+		if (local.trigger == NULL){
+			end
+		}
+		local.trigger waittill trigger
+		
+		local.gun_name anim fire_scripted	
+		
+		wait (0.7 + ((randomint 6) * .1))  //fakes delay between firing and hitting
+		
+		//chrissstrahl - get closest player
+		if( level.gametype != 0 ){
+			if( local.target == NULL ){
+				local.target = exec coop_mod/replace.scr::player_closestTo local.gun_name
+			}
+		}
+		
+		println "z:    flak88 parms " local.target local.range local.offset local.trigger local.gun_name
+
+		local.vec = vector_normalize (local.gunorigin - (local.target.origin))
+		local.a = vector_scale local.vec local.offset
+		local.a =  local.a + local.target.origin + (0 0 32)
+
+		for (local.i=0;local.i<2;local.i++){
+			if ((randomint 2) == 1){
+				local.a[local.i] = local.a[local.i] + randomint(local.range)
+			}
+			else{
+				local.a[local.i] = local.a[local.i] - randomint(local.range)
+			}
+		}
+		
+		local.temp = spawn "fx/scriptbazookaexplosion.tik"
+//		"emitters/mortar_dirt.tik"
+
+		exec global/earthquake.scr .23 4 0 0
+
+		local.temp playsound flak88_hit
+		local.temp.origin = local.a
+		local.temp anim start
+		if ( (local.trigger == $scene13_flak88_killzone) || (local.trigger == $scene6_flak88_killzone) )
+		{
+			//println "z:          killing the player using normal_damage" //chrissstrahl - no, one, cares, dude!
+			local.trigger exec coop_mod/replace.scr::killzone		
+		}
+		wait 1
+		local.temp remove
+		wait 4
+	}
+end
+
+//============================================================//
+
+explode_flak local.bomb_smoke:
+	//self stopFiring
+	self setaimtarget NULL
+	self show
+	self playsound explode_flak88
+	//radiusdamage self.origin level.bomb_damage level.bomb_explosion_radius
+	radiusdamage self.origin 200 200
+	self thread spawn_fx models/fx/fx_tank_explosion.tik
+	local.damaged = thread spawn_damaged models/statweapons/flak88_d.tik
+	
+//	local.bomb_smoke thread spawn_fx models/emitters/smoke_airstrike_crater.tik
+
+	self remove
+end
+
+
+spawn_damaged local.model:
+	local.damaged = spawn script_model model local.model
+	local.damaged.origin = self.origin
+	local.damaged.angles = self.angles
+end local.damaged
+
+damaged_collision local.angles local.origin local.brushmodel:
+	local.collision = spawn script_object model local.brushmodel
+	local.collision.origin = local.origin
+	local.collision.angles = local.angles
+end local.collision
+
+spawn_fx local.fx:
+	local.temp = spawn script_model model local.fx
+	local.temp.origin = self.origin
+	local.temp anim start
+	wait 5
+	local.temp remove
+end
+
+//============================================================//
+
+//*** This is a global thread name that's called when the clickitem is fired and misses
+
+clickitem_fail:
+	if (level.got_radio != 1)
+	{	
+		iprintlnbold "Once you find a radio, you will be able to call in air support."
+		end
+	}
+	else
+	{
+		if (level.time <= level.clickitem_time + 4 )
+			end
+		level.clickitem_time = level.time
+		exec coop_mod/replace.scr::playsound airstrike_invalid_target
+	}
+end
+
+//============================================================//
+
+explode_controller local.target:
+	local.activated = thread spawn_damaged items/explosive.tik
+	local.activated playsound plantbomb
+	local.activated loopsound bombtick
+	self remove
+	exec coop_mod/replace.scr::stopwatch 8
+	
+	wait 8
+
+	local.temp = spawn script_model
+	local.temp.origin = local.activated.origin
+	local.temp model "fx/fx_flak88_explosion.tik"
+	local.temp anim start
+	local.temp playsound explode_aagun
+	local.temp notsolid
+
+	local.target model models/statweapons/20mmflak_d.tik
+	radiusdamage (local.target.origin + (0 0 200)) 600 1000
+	local.activated remove
+end
+
+
+//============================================================//
+
+scene7_radio_sound:
+	while ($scene7_radio)
+	{
+		$scene7_radio playsound dfr_m3l3_radio
+		wait 12
+	}
+end
+
+//	$scene7_radio playsound  dfr_m3l3_337k	// "Echo Charlie standing by. Awaiting orders to commence close air support ,over."   
+//	$scene7_radio playsound  dfr_m3l3_338k	// "Echo Charlie standing by."  
+//	$scene7_radio playsound  dfr_m3l3_339k	// "This is Echo Charlie. I'm ready."  
+//	$scene7_radio playsound  dfr_m3l3_340k	// "Anyone there? Over." 
+//	$scene7_radio playsound  dfr_m3l3_341k	// "I repeat, is anyone there? Over." 
+//	$scene7_radio playsound  dfr_m3l3_342k	// "Is anyone there? Please respond. Over."  
+//	$scene7_radio playsound  dfr_m3l3_343k	// "This is Echo Charlie.  Please respond.  Over."    	
+
+
+//============================================================//
+
+ramsey_setup:									
+
+	level.ramsey.accuracy		= 50		//marksmanship
+	//level.ramsey.mindist		= 64		//range to stop closing in
+	level.ramsey.mindist		= 96		//chrissstrahl - he gets to close far to often
+	level.ramsey.maxdist		= 4000	//range to close to on enemy for longest range shot
+	level.ramsey nodamage				//invulnerability
+	level.ramsey.leash		= 640
+	//level.ramsey tether $player //chrissstrahl
+	level.ramsey exec coop_mod/main.scr::tether //chrissstrahl - coop compatible
+	level.ramsey.sight		= 4000
+	level.ramsey.noticescale	= 1
+	level.ramsey.waittime		= 0.1		//respond as fast as possible to player movement
+
+	level.ramsey thread global/friendly.scr::friendlythink
+	//level.ramsey.destination = $player //chrissstrahl
+	level.ramsey exec coop_mod/main.scr::destination //chrissstrahl - coop compatible
+	level.ramsey.distance = 192
+	level.ramsey.friendtype = 1 //toggle this to 1 to enable following
+	level.ramsey exec global/enable_ai.scr
+
+end
+
+//============================================================//
+
+durden_setup:
+
+	if (isAlive level.durden)
+	{
+	//	level.durden thread durden_death 	//Monitor for Durden's death
+
+		level.durden.health = 200
+		level.durden exec global/enable_ai.scr
+		level.durden.accuracy		= 20		//marksmanship
+		level.durden.mindist		= 256		//range to stop closing in
+		level.durden.maxdist		= 4000	//range to close to on enemy for longest range shot
+		level.durden.leash		= 600		//original 800
+		//level.durden tether $player //chrissstrahl
+		level.durden exec coop_mod/main.scr::tether //chrissstrahl - coop compatible
+		level.durden.sight		= 4000
+		level.durden.noticescale	= 1
+		level.durden.waittime		= 0.1
+		level.durden.distance		= 256
+		level.durden.interval		= 256
+
+		level.durden.friendtype = 1
+		level.durden thread global/friendly.scr::friendlythink
+		//level.durden.destination = $player //chrissstrahl
+		level.durden exec coop_mod/main.scr::destination //chrissstrahl - coop compatible
+		level.durden.distance = 200		
+	}
+end
+
+
+
+//============================================================//
+
+cobb_setup:
+
+	if (isAlive level.cobb)
+	{
+	//	level.cobb thread cobb_death 	//Monitor for Cobb's death
+
+		level.cobb.health = 200
+		level.cobb exec global/enable_ai.scr
+		level.cobb.accuracy		= 20		//marksmanship
+		level.cobb.mindist		= 256		//range to stop closing in
+		level.cobb.maxdist		= 4000	//range to close to on enemy for longest range shot
+		level.cobb.leash		= 600		//original 800
+		//level.cobb tether $player //chrissstrahl
+		level.cobb exec coop_mod/main.scr::tether //chrissstrahl - coop compatible
+		level.cobb.sight		= 4000
+		level.cobb.noticescale	= 1
+		level.cobb.waittime		= 0.1
+		level.cobb.distance		= 256
+		level.cobb.interval		= 256
+
+		level.cobb.friendtype = 1
+		level.cobb thread global/friendly.scr::friendlythink
+		//level.cobb.destination = $player //chrissstrahl
+		level.cobb exec coop_mod/main.scr::destination //chrissstrahl - coop compatible
+		level.cobb.distance = 200		
+	}
+end
+
+
+
+//============================================================//
+
+m3l2_quicksave1:
+	exec global/autosave.scr 1	//"Defending the rear"
+	end
+
+m3l2_quicksave2:
+	if ( (getcvar skill) != "0" )
+		end
+	exec global/autosave.scr 2	//"Defending the front"
+	end
+
+m3l2_quicksave3:
+	exec global/autosave.scr 3	//"Leaving the house"
+	end
+
+autosave_sherman:
+	if ( (getcvar skill) != "0" )
+		end
+	exec global/autosave.scr 4	//"Flak alley"
+	end
+
+autosave_barn:
+	exec global/autosave.scr 5	//"In the barn"
+	end
+
+autosave_radio:
+	exec global/autosave.scr 6	//"At the radio"
+	end
+
+autosave_first_flak:
+	exec global/autosave.scr 7	//"Near the first Flak 88"
+	end
+
+autosave_aa_gun:
+	exec global/autosave.scr 8	//"Anti-aircraft gun"
+	end
+
+//============================================================//
+
+m3l2_changelevel:
+
+	waitthread global/objectives.scr::add_objectives 9 3
+	// "Bypass the roadblock." $level_end.origin
+	wait 1
+	exec global/missioncomplete.scr m3l3
+
+end
+
+
+
+
+setup_dead_panzer:
+	self notsolid
+	self.target.origin = self.origin
+	self.target.angles = self.angles
+	println "z:      " self " anim idle_silent"
+	self anim idle_silent
+end
+
+
+//============================================================//
+
+durden_death:
+
+	self waittill death
+
+	self playsound dfr_panic_35c_13	//"Medic!"
+	iprintlnbold "Private Durden has been killed in action."
+end
+
+//============================================================//
+
+cobb_death:
+
+	self waittill death
+
+	self playsound dfr_panic_35c_13 //"Medic!"
+	iprintlnbold "Private Cobb has been killed in action."
+end
+
+
+//==============================================================================================================================================//
+//																								//
+//	*SCENE 8* SUPPORT THREADS - DOUBLE ENVELOPMENT AT THE SILO							//
+//																								//
+//==============================================================================================================================================//
+
+scene8:
+
+	//*** Called from thread scene7_team_regroup
+
+	//*** Give Ramsey and Cobb a few seconds to get to the player before spawning
+
+	wait 8
+
+	thread scene8_spawner1_initialize
+
+end
+
+//============================================================//
+
+scene8_flank_attack:
+
+	//*** Called from thread scene7_radio_pickup
+
+	$scene8_spawndetector2_init_trigger waittill trigger
+
+	//*** Start spawning the second spawner
+
+		thread scene8_spawner2_initialize
+	
+		wait 3.8
+
+	//*** Blow the wall, AI recalculates path and comes through like a squad of stormtroopers
+
+		thread global/exploder.scr::explode 1
+		
+	//*** Shake the world hard	
+
+		exec global/earthquake.scr .23 4 0 0	
+
+end
+
+//============================================================//
+
+scene8_spawner1_initialize:
+
+	level.scene8_spawn1_teamvalue = 0		//initializes variable for total number spawned to date
+	level.scene8_spawn1_teamlimitmax = 12	//initializes constant for total number allowed to spawn
+	level.scene8_spawn1_currentalive = 0	//initializes variable for number of enemies currently alive from this spawner
+	level.scene8_spawn1_currentalivemax = 3	//initializes constant for maximum number allowed to be alive at any given time from this spawner
+	level.scene8_spawn1_loopwaittime = 1	//initializes constant for time between respawns
+	level.scene8_spawn1_deactivator = 0		//initializes variable for shutting down this loop's ability to spawn when the player is past this area
+
+	thread scene8_spawndetector1_control
+
+	//*** Handle some termination triggers here, two trigger multiples have to be prepped
+
+	thread scene8_terminate_trigger2
+
+	$scene8_spawndetector1_termination_trigger waittill trigger
+
+	thread scene8_spawn1_terminate
+
+end
+
+//============================================================//
+
+scene8_terminate_trigger2:
+
+	//*** Cover the other possible route the player can take
+
+		$scene8_spawndetector1_termination_trigger2 waittill trigger
+	
+		thread scene8_spawn1_terminate
+
+end
+
+//============================================================//
+
+scene8_spawndetector1_control:
+
+	if (level.scene8_spawn1_deactivator == 1)
+	{
+		end
+	}
+
+	local.loopwaittime = 0.2
+
+	while (	exec coop_mod/replace.scr::istouching $scene8_spawndetector1 ||
+			exec coop_mod/replace.scr::istouching $scene8_spawndetector1a ||
+			exec coop_mod/replace.scr::istouching $scene8_spawndetector1b )
+	{
+//iprintlnbold_noloc ( "scene8_spawndetector1_control istouching" )
+		//*** 3 at a time, use +3
+		//*** Crazy fire and maneuver enemy attack, use nothing
+
+//		if ((level.scene8_spawn1_currentalive + 3) <= level.scene8_spawn1_currentalivemax && level.scene8_spawn1_deactivator == 0 && level.scene8_spawn1_teamvalue < level.scene8_spawn1_teamlimitmax)
+		if ((level.scene8_spawn1_currentalive + 1) <= level.scene8_spawn1_currentalivemax && level.scene8_spawn1_deactivator == 0 && level.scene8_spawn1_teamvalue < level.scene8_spawn1_teamlimitmax)
+
+		{
+//			centerprint(level.scene8_spawn1_currentalive + "<" + level.scene8_spawn1_currentalivemax + "\n" + level.scene8_spawn1_deactivator + "=" + level.scene8_spawn1_deactivator+ "\n" + level.scene8_spawn1_teamvalue + "<" + level.scene8_spawn1_teamlimitmax )
+
+			local.scene8_spawn1_ai_name1 = "scene8_spawn1_ai1_" + level.scene8_spawn1_teamvalue	//assign a name to the spawned enemy
+			local.org1 = $scene8_spawndetector1_spawner1.origin						//spawn location as a script_origin
+
+			local.scene8_spawn1_ai_name2 = "scene8_spawn1_ai2_" + level.scene8_spawn1_teamvalue
+			local.org2 = $scene8_spawndetector1_spawner2.origin
+
+			local.scene8_spawn1_ai_name3 = "scene8_spawn1_ai3_" + level.scene8_spawn1_teamvalue
+			local.org3 = $scene8_spawndetector1_spawner3.origin
+
+		//*** Spawn 3 enemy soldiers in a wave
+
+			spawn models/human/german_waffenss_nco "targetname" (local.scene8_spawn1_ai_name1) "type_attack" "cover"
+
+			$(local.scene8_spawn1_ai_name1).origin = local.org1				//place the guy in the correct spot
+			level.scene8_spawn1_currentalive ++							//increment the max allowed alive at any given time
+			level.scene8_spawn1_teamvalue ++							//track the scene's enemy population
+			$(local.scene8_spawn1_ai_name1) thread scene8_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene8_spawn1_ai_name1) thread scene8_spawn1_ai_navigate1 	//call navigation thread
+
+			$(local.scene8_spawn1_ai_name1) gun "mp40"
+
+				local.scene8_spawn1_ai_name1.mindist = 128
+				local.scene8_spawn1_ai_name1.maxdist = 4000
+				local.scene8_spawn1_ai_name1.leash = 100000
+				local.scene8_spawn1_ai_name1.fixedleash = 1
+				local.scene8_spawn1_ai_name1.sight = 6000
+				local.scene8_spawn1_ai_name1.noticescale = 5
+				local.scene8_spawn1_ai_name1.accuracy = 45
+				local.scene8_spawn1_ai_name1.hearing = 14000
+				local.scene8_spawn1_ai_name1.interval = 128
+
+			spawn models/human/german_panzer_shutze "targetname" (local.scene8_spawn1_ai_name2) "type_attack" "cover"
+
+			$(local.scene8_spawn1_ai_name2).origin = local.org2				//place the guy in the correct spot
+			level.scene8_spawn1_currentalive ++							//increment the max allowed alive at any given time
+			level.scene8_spawn1_teamvalue ++
+			$(local.scene8_spawn1_ai_name2) thread scene8_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene8_spawn1_ai_name2) thread scene8_spawn1_ai_navigate2 	//call navigation thread
+
+				local.scene8_spawn1_ai_name2.mindist = 128
+				local.scene8_spawn1_ai_name2.maxdist = 4000
+				local.scene8_spawn1_ai_name2.leash = 100000
+				local.scene8_spawn1_ai_name2.fixedleash = 1
+				local.scene8_spawn1_ai_name2.sight = 6000
+				local.scene8_spawn1_ai_name2.noticescale = 1
+				local.scene8_spawn1_ai_name2.accuracy = 70
+				local.scene8_spawn1_ai_name2.hearing = 14000
+				local.scene8_spawn1_ai_name2.interval = 128
+
+			spawn models/human/german_panzer_shutze "targetname" (local.scene8_spawn1_ai_name3) "type_attack" "cover"
+
+			$(local.scene8_spawn1_ai_name3).origin = local.org3				//place the guy in the correct spot
+			level.scene8_spawn1_currentalive ++							//increment the max allowed alive at any given time
+			level.scene8_spawn1_teamvalue ++
+			$(local.scene8_spawn1_ai_name3) thread scene8_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene8_spawn1_ai_name3) thread scene8_spawn1_ai_navigate3  	//call navigation thread
+
+				local.scene8_spawn1_ai_name3.mindist = 128
+				local.scene8_spawn1_ai_name3.maxdist = 4000
+				local.scene8_spawn1_ai_name3.leash = 100000
+				local.scene8_spawn1_ai_name3.fixedleash = 1
+				local.scene8_spawn1_ai_name3.sight = 6000
+				local.scene8_spawn1_ai_name3.noticescale = 1
+				local.scene8_spawn1_ai_name3.accuracy = 70
+				local.scene8_spawn1_ai_name3.hearing = 14000
+				local.scene8_spawn1_ai_name3.interval = 128
+		}
+
+		wait local.loopwaittime			//every local.loopwaittime seconds, resume the while loop
+	}
+
+	wait local.loopwaittime				//prevent infinite loop warning
+	goto scene8_spawndetector1_control
+
+end
+
+//============================================================//
+
+scene8_spawn1_detect_death:
+
+	self waittill death
+	level.scene8_spawn1_currentalive --	//decrement the population count
+
+end
+
+//============================================================//
+
+scene8_spawn1_ai_navigate1:
+
+	self forceactivate
+	self exec global/runto.scr $scene8_spawn1_rallypoint1
+
+end
+
+//============================================================//
+
+scene8_spawn1_ai_navigate2:
+
+	self forceactivate
+	self exec global/runto.scr $scene8_spawn1_rallypoint2
+
+end
+
+//============================================================//
+
+scene8_spawn1_ai_navigate3:
+
+	self forceactivate
+	self exec global/runto.scr $scene8_spawn1_rallypoint3
+
+end
+
+//============================================================//
+
+scene8_spawn1_terminate:
+
+	level.scene8_spawn1_deactivator = 1
+	
+end
+
+//===============================================================================================================================//
+
+scene8_spawner2_initialize:
+
+	level.scene8_spawn2_teamvalue = 0		//initializes variable for total number spawned to date
+	level.scene8_spawn2_teamlimitmax = 12	//initializes constant for total number allowed to spawn
+	level.scene8_spawn2_currentalive = 0	//initializes variable for number of enemies currently alive from this spawner
+	level.scene8_spawn2_currentalivemax = 3	//initializes constant for maximum number allowed to be alive at any given time from this spawner
+	level.scene8_spawn2_loopwaittime = 1	//initializes constant for time between respawns
+	level.scene8_spawn2_deactivator = 0		//initializes variable for shutting down this loop's ability to spawn when the player is past this area
+
+	thread scene8_spawndetector2_control
+
+	//*** Handle some termination triggers here, two trigger multiples have to be prepped
+
+	thread scene8_spawner2_terminate_trigger2
+
+	$scene8_spawndetector2_termination_trigger waittill trigger
+
+	thread scene8_spawn2_terminate
+
+end
+
+//============================================================//
+
+scene8_spawner2_terminate_trigger2:
+
+	//*** Cover the other possible route the player can take
+
+		$scene8_spawndetector2_termination_trigger2 waittill trigger
+	
+		thread scene8_spawn2_terminate
+
+end
+
+//============================================================//
+
+scene8_spawndetector2_control:
+
+	if (level.scene8_spawn2_deactivator == 1)
+	{
+		end
+	}
+
+	local.loopwaittime = 0.2
+
+	while (	exec coop_mod/replace.scr::istouching $scene8_spawndetector2 ||
+			exec coop_mod/replace.scr::istouching $scene8_spawndetector2a ||
+			exec coop_mod/replace.scr::istouching $scene8_spawndetector2b )
+	{
+//iprintlnbold_noloc ( "scene8_spawndetector2_control istouching" )
+		//*** 3 at a time, use +3
+		//*** Crazy fire and maneuver enemy attack, use nothing
+
+//		if ((level.scene8_spawn2_currentalive + 3) <= level.scene8_spawn2_currentalivemax && level.scene8_spawn2_deactivator == 0 && level.scene8_spawn2_teamvalue < level.scene8_spawn2_teamlimitmax)
+		if ((level.scene8_spawn2_currentalive + 1) <= level.scene8_spawn2_currentalivemax && level.scene8_spawn2_deactivator == 0 && level.scene8_spawn2_teamvalue < level.scene8_spawn2_teamlimitmax)
+
+		{
+//			centerprint(level.scene8_spawn2_currentalive + "<" + level.scene8_spawn2_currentalivemax + "\n" + level.scene8_spawn2_deactivator + "=" + level.scene8_spawn2_deactivator+ "\n" + level.scene8_spawn2_teamvalue + "<" + level.scene8_spawn2_teamlimitmax )
+
+			local.scene8_spawn2_ai_name1 = "scene8_spawn2_ai1_" + level.scene8_spawn2_teamvalue	//assign a name to the spawned enemy
+			local.org1 = $scene8_spawndetector2_spawner1.origin						//spawn location as a script_origin
+
+			local.scene8_spawn2_ai_name2 = "scene8_spawn2_ai2_" + level.scene8_spawn2_teamvalue
+			local.org2 = $scene8_spawndetector2_spawner2.origin
+
+			local.scene8_spawn2_ai_name3 = "scene8_spawn2_ai3_" + level.scene8_spawn2_teamvalue
+			local.org3 = $scene8_spawndetector2_spawner3.origin
+
+		//*** Spawn 3 enemy soldiers in a wave
+
+			spawn models/human/german_waffenss_nco "targetname" (local.scene8_spawn2_ai_name1) "type_attack" "cover"
+
+			$(local.scene8_spawn2_ai_name1).origin = local.org1				//place the guy in the correct spot
+			level.scene8_spawn2_currentalive ++							//increment the max allowed alive at any given time
+			level.scene8_spawn2_teamvalue ++							//track the scene's enemy population
+			$(local.scene8_spawn2_ai_name1) thread scene8_spawn2_detect_death 	//call a waittill death thread
+			$(local.scene8_spawn2_ai_name1) thread scene8_spawn2_ai_navigate1 	//call navigation thread
+
+			$(local.scene8_spawn2_ai_name1) gun "mp40"
+
+				local.scene8_spawn2_ai_name1.mindist = 128
+				local.scene8_spawn2_ai_name1.maxdist = 4000
+				local.scene8_spawn2_ai_name1.leash = 100000
+				local.scene8_spawn2_ai_name1.fixedleash = 1
+				local.scene8_spawn2_ai_name1.sight = 6000
+				local.scene8_spawn2_ai_name1.noticescale = 5
+				local.scene8_spawn2_ai_name1.accuracy = 45
+				local.scene8_spawn2_ai_name1.hearing = 14000
+				local.scene8_spawn2_ai_name1.interval = 128
+
+			spawn models/human/german_panzer_shutze "targetname" (local.scene8_spawn2_ai_name2) "type_attack" "cover"
+
+			$(local.scene8_spawn2_ai_name2).origin = local.org2				//place the guy in the correct spot
+			level.scene8_spawn2_currentalive ++							//increment the max allowed alive at any given time
+			level.scene8_spawn2_teamvalue ++
+			$(local.scene8_spawn2_ai_name2) thread scene8_spawn2_detect_death 	//call a waittill death thread
+			$(local.scene8_spawn2_ai_name2) thread scene8_spawn2_ai_navigate2 	//call navigation thread
+
+			$(local.scene8_spawn2_ai_name2) gun "mp40"
+
+				local.scene8_spawn2_ai_name2.mindist = 128
+				local.scene8_spawn2_ai_name2.maxdist = 14000
+				local.scene8_spawn2_ai_name2.leash = 100000
+				local.scene8_spawn2_ai_name2.fixedleash = 1
+				local.scene8_spawn2_ai_name2.sight = 6000
+				local.scene8_spawn2_ai_name2.noticescale = 1
+				local.scene8_spawn2_ai_name2.accuracy = 70
+				local.scene8_spawn2_ai_name2.hearing = 4000
+				local.scene8_spawn2_ai_name2.interval = 128
+
+			spawn models/human/german_panzer_shutze "targetname" (local.scene8_spawn2_ai_name3) "type_attack" "cover"
+
+			$(local.scene8_spawn2_ai_name3).origin = local.org3				//place the guy in the correct spot
+			level.scene8_spawn2_currentalive ++							//increment the max allowed alive at any given time
+			level.scene8_spawn2_teamvalue ++
+			$(local.scene8_spawn2_ai_name3) thread scene8_spawn2_detect_death 	//call a waittill death thread
+			$(local.scene8_spawn2_ai_name3) thread scene8_spawn2_ai_navigate3  	//call navigation thread
+
+				local.scene8_spawn2_ai_name3.mindist = 128
+				local.scene8_spawn2_ai_name3.maxdist = 14000
+				local.scene8_spawn2_ai_name3.leash = 100000
+				local.scene8_spawn2_ai_name3.fixedleash = 1
+				local.scene8_spawn2_ai_name3.sight = 6000
+				local.scene8_spawn2_ai_name3.noticescale = 1
+				local.scene8_spawn2_ai_name3.accuracy = 70
+				local.scene8_spawn2_ai_name3.hearing = 4000
+				local.scene8_spawn2_ai_name3.interval = 128
+		}
+
+		wait local.loopwaittime			//every local.loopwaittime seconds, resume the while loop
+	}
+
+	wait local.loopwaittime				//prevent infinite loop warning
+	goto scene8_spawndetector2_control
+
+end
+
+//============================================================//
+
+scene8_spawn2_detect_death:
+
+	self waittill death
+	level.scene8_spawn2_currentalive --	//decrement the population count
+
+end
+
+//============================================================//
+
+scene8_spawn2_ai_navigate1:
+
+	self forceactivate
+	self exec global/runto.scr $scene8_spawn2_rallypoint1
+
+end
+
+//============================================================//
+
+scene8_spawn2_ai_navigate2:
+
+	self forceactivate
+	self exec global/runto.scr $scene8_spawn2_rallypoint2
+
+end
+
+//============================================================//
+
+scene8_spawn2_ai_navigate3:
+
+	self forceactivate
+	self exec global/runto.scr $scene8_spawn2_rallypoint3
+
+end
+
+//============================================================//
+
+scene8_spawn2_terminate:
+
+	level.scene8_spawn2_deactivator = 1
+	
+end
+
+
+//==============================================================================================================================================//
+//																								//
+//		*SCENE 11* SUPPORT THREADS - ATTACKING THE FLAK 20MM AA GUN							//
+//																								//
+//==============================================================================================================================================//
+
+scene11_flak20_destruction:
+
+	//called by the BSP
+
+		level.flak20dead = 1	//Set to 1 so that the final airstrike can happen
+	
+		$scene11_explosive1 waitthread explode_controller $scene11_AA_gun
+
+	//*** Remove the end of level physical blockade now that this was the last objective other than the final Flak 88
+
+		$level_end_blocker remove
+		$level_end_trigger remove
+	
+	//*** UPDATE OBJECTIVES - FLAK 20 MM AAA DESTROYED, NOW DESTROY THE 2ND FLAK 88
+
+		waitthread global/objectives.scr::add_objectives 5 1
+		waitthread global/objectives.scr::add_objectives 7 3
+		waitthread global/objectives.scr::add_objectives 8 2 "Call an airstrike on the second Flak 88." $scene13_flak88_gun.origin
+		thread global/objectives.scr::current_objectives 8
+
+	//*** BRING IN THE REINFORCEMENTS
+
+		thread scene12_spawner1_initialize
+
+end
+
+//==============================================================================================================================================//
+//																								//
+//								*SCENE 11* SUPPORT THREADS - FLAK 20MM COUNTERATTACK								//
+//																								//
+//==============================================================================================================================================//
+
+//===============================================================================================================================//
+
+scene11_mgspawner1_initialize:
+
+	level.scene11_mgspawn1_teamvalue = 0		//initializes variable for total number spawned to date
+	level.scene11_mgspawn1_teamlimitmax = 4	//initializes constant for total number allowed to spawn
+	level.scene11_mgspawn1_currentalive = 0	//initializes variable for number of enemies currently alive from this spawner
+	level.scene11_mgspawn1_currentalivemax = 1	//initializes constant for maximum number allowed to be alive at any given time from this spawner
+	level.scene11_mgspawn1_loopwaittime = 3	//initializes constant for time between respawns
+	level.scene11_mgspawn1_deactivator = 0	//initializes variable for shutting down this loop's ability to spawn when the player is past this area
+
+	thread scene11_mgspawndetector1_control
+
+end
+
+//============================================================//
+
+scene11_mgspawndetector1_control:
+
+	if (level.scene11_mgspawn1_deactivator == 1)
+	{
+		end
+	}
+
+	local.loopwaittime = 0.2
+
+	while (exec coop_mod/replace.scr::istouching $scene11_mgspawndetector1)
+	{
+//iprintlnbold_noloc ( "scene11_mgspawndetector1_control istouching" )
+		if ((level.scene11_mgspawn1_currentalive + 1) <= level.scene11_mgspawn1_currentalivemax && level.scene11_mgspawn1_deactivator == 0 && level.scene11_mgspawn1_teamvalue < level.scene11_mgspawn1_teamlimitmax)
+
+		{
+			local.scene11_mgspawn1_ai_name1 = "scene11_mgspawn1_ai1_" + level.scene11_mgspawn1_teamvalue	//assign a name to the spawned enemy
+			local.org1 = $scene11_mgspawndetector1_spawner1.origin						//spawn location as a script_origin
+
+		//*** Spawn 1 enemy gunner
+
+			spawn models/human/german_panzer_grenadier "targetname" (local.scene11_mgspawn1_ai_name1) "type_attack" "cover"
+
+			$(local.scene11_mgspawn1_ai_name1).origin = local.org1				//place the guy in the correct spot
+			level.scene11_mgspawn1_currentalive ++						//increment the max allowed alive at any given time
+			level.scene11_mgspawn1_teamvalue ++							//track the scene's enemy population
+			$(local.scene11_mgspawn1_ai_name1) thread scene11_mgspawn1_detect_death 	//call a waittill death thread
+			$(local.scene11_mgspawn1_ai_name1) thread scene11_mgspawn1_ai_navigate1 	//call navigation thread
+//			$(local.scene11_mgspawn1_ai_name1) thread scene11_mgspawn_gunner_escape $scene11_gunner_escape_trigger $scene11_gunner1_escape_node
+		}
+
+		wait local.loopwaittime	//every local.loopwaittime seconds, resume the while loop
+	}
+
+	wait local.loopwaittime				//prevent infinite loop warning
+	goto scene11_mgspawndetector1_control
+
+end
+
+//============================================================//
+
+scene11_mgspawn1_detect_death:
+
+	self waittill death
+	level.scene11_mgspawn1_currentalive --	//decrement the population count
+
+end
+
+//============================================================//
+
+scene11_mgspawn1_ai_navigate1:
+
+	self exec global/disable_ai.scr
+
+	wait level.scene11_mgspawn1_loopwaittime
+
+println "z:        gunner starting to run"
+
+	self runto $scene11_mg1_gunner_path
+	self waittill movedone
+	
+	
+println "z:        gunner done running"
+
+	//*** Set properties of machinegunner
+
+	self type_idle machinegunner
+	self type_attack machinegunner
+	self type_disguise machinegunner
+	self type_grenade machinegunner
+	self gun "mp40"
+	self holster
+	self health 100
+	self sight 4000
+
+	self turret $scene11_mg1
+
+	self exec global/enable_ai.scr
+
+	//*** Activate targeting computer for machine gun - guy doesn't actually do anything
+
+	self thread scene11_mgspawn_targeting $scene11_mg1
+
+end
+
+//============================================================//
+
+scene11_mgspawn1_terminate:
+
+	level.scene11_mgspawn1_deactivator = 1
+
+end
+
+//===============================================================================================================================//
+
+scene11_mgspawner2_initialize:
+
+	level.scene11_mgspawn2_teamvalue = 0		//initializes variable for total number spawned to date
+	level.scene11_mgspawn2_teamlimitmax = 3	//initializes constant for total number allowed to spawn
+	level.scene11_mgspawn2_currentalive = 0	//initializes variable for number of enemies currently alive from this spawner
+	level.scene11_mgspawn2_currentalivemax = 1	//initializes constant for maximum number allowed to be alive at any given time from this spawner
+	level.scene11_mgspawn2_loopwaittime = 3	//initializes constant for time between respawns
+	level.scene11_mgspawn2_deactivator = 0	//initializes variable for shutting down this loop's ability to spawn when the player is past this area
+
+	thread scene11_mgspawndetector2_control
+
+end
+
+//============================================================//
+
+scene11_mgspawndetector2_control:
+
+	if (level.scene11_mgspawn2_deactivator == 1)
+	{
+		end
+	}
+
+	local.loopwaittime = 0.2
+
+	while (exec coop_mod/replace.scr::istouching $scene11_mgspawndetector2)
+	{
+//iprintlnbold_noloc ( "scene11_mgspawndetector2_control istouching" )
+		if ((level.scene11_mgspawn2_currentalive + 1) <= level.scene11_mgspawn2_currentalivemax && level.scene11_mgspawn2_deactivator == 0 && level.scene11_mgspawn2_teamvalue < level.scene11_mgspawn2_teamlimitmax)
+
+		{
+			local.scene11_mgspawn2_ai_name1 = "scene11_mgspawn2_ai1_" + level.scene11_mgspawn2_teamvalue	//assign a name to the spawned enemy
+			local.org1 = $scene11_mgspawndetector2_spawner1.origin						//spawn location as a script_origin
+
+		//*** Spawn 1 enemy gunner
+
+			spawn models/human/german_panzer_grenadier "targetname" (local.scene11_mgspawn2_ai_name1) "type_attack" "cover"
+
+			$(local.scene11_mgspawn2_ai_name1).origin = local.org1				//place the guy in the correct spot
+			level.scene11_mgspawn2_currentalive ++						//increment the max allowed alive at any given time
+			level.scene11_mgspawn2_teamvalue ++							//track the scene's enemy population
+			$(local.scene11_mgspawn2_ai_name1) thread scene11_mgspawn2_detect_death 	//call a waittill death thread
+			$(local.scene11_mgspawn2_ai_name1) thread scene11_mgspawn2_ai_navigate1 	//call navigation thread
+//			$(local.scene11_mgspawn2_ai_name1) thread scene11_mgspawn_gunner_escape $scene11_gunner_escape_trigger $scene11_gunner1_escape_node
+		}
+
+		wait local.loopwaittime	//every local.loopwaittime seconds, resume the while loop
+	}
+
+	wait local.loopwaittime				//prevent infinite loop warning
+	goto scene11_mgspawndetector2_control
+
+end
+
+//============================================================//
+
+scene11_mgspawn2_detect_death:
+
+	self waittill death
+	level.scene11_mgspawn2_currentalive --	//decrement the population count
+
+end
+
+//============================================================//
+
+scene11_mgspawn2_ai_navigate1:
+
+	self exec global/disable_ai.scr
+
+	wait level.scene11_mgspawn2_loopwaittime
+
+
+
+	self exec global/runto.scr $scene11_mg2_gunner_path
+	self waittill movedone
+
+
+	//*** Set properties of machinegunner
+	
+	if !(isAlive self)
+		end
+
+	self type_idle machinegunner
+	self type_attack machinegunner
+	self type_disguise machinegunner
+	self type_grenade machinegunner
+	self gun "mp40"
+	self holster
+	self health 100
+	self sight 4000
+
+	self turret $scene11_mg2
+
+	self exec global/enable_ai.scr
+
+	//*** Activate targeting computer for machine gun - guy doesn't actually do anything
+
+	self thread scene11_mgspawn_targeting $scene11_mg2
+
+end
+
+//============================================================//
+
+scene11_mgspawn2_terminate:
+
+	level.scene11_mgspawn2_deactivator = 1
+
+end
+
+//===============================================================================================================================//
+
+scene11_mgspawn_targeting local.machinegun:
+
+println "z:        at scene11_mgspawn_targeting"
+
+	local.machinegun burstFireSettings 0.5 1 0.25 0.5
+	local.machinegun maxYawOffset 65
+	local.machinegun bulletdamage 20
+
+	while (!(self cansee $player) && (isAlive self))
+	{
+		wait 0.5
+	}
+
+	wait 1
+
+	while (isAlive self)
+	{
+
+		local.misstime = 1.5	//1 hit duration on player, specify how long per miss incident 0.525 original
+
+			local.machinegun setaimtarget $playertarget_northeast
+			local.machinegun startfiring
+			wait local.misstime
+			local.machinegun setaimtarget $playertarget_north
+			wait local.misstime
+			local.machinegun setaimtarget $playertarget_northwest
+			wait local.misstime
+			local.machinegun setaimtarget $playertarget_northeast
+			wait local.misstime
+			local.machinegun setaimtarget $playertarget_southeast
+			wait local.misstime
+			local.machinegun setaimtarget $playertarget_south
+			wait local.misstime
+			local.machinegun setaimtarget $playertarget_southwest
+			wait local.misstime
+			local.machinegun setaimtarget $player
+			wait 5
+			local.machinegun stopfiring
+
+		if (isAlive level.ramsey && self cansee level.ramsey)
+		{
+			local.machinegun setaimtarget level.ramsey
+			local.machinegun startfiring
+			wait 0.5
+			local.machinegun stopfiring
+		}
+
+		if (isAlive level.cobb && self cansee level.cobb)
+		{
+			local.machinegun setaimtarget level.cobb
+			local.machinegun startfiring
+			wait 5
+			local.machinegun stopfiring
+		}
+
+		if (isAlive level.durden && self cansee level.durden)
+		{
+			local.machinegun setaimtarget level.durden
+			local.machinegun startfiring
+			wait 5
+			local.machinegun stopfiring
+		}
+
+		wait 2	//gives the player a few free seconds to get to cover in case AI buddies are dead
+
+	}
+
+end
+
+
+//==============================================================================================================================================//
+//																								//
+//	*SCENE 12* SUPPORT THREADS - FLAK 20MM COUNTERATTACK								//
+//																								//
+//==============================================================================================================================================//
+
+//============================================================//
+
+scene12_spawner1_initialize:
+
+	//*** Called from where the Flak 20 is blown up
+
+		level.scene12_spawn1_teamvalue = 0		//initializes variable for total number spawned to date
+		level.scene12_spawn1_teamlimitmax = 16	//initializes constant for total number allowed to spawn
+		level.scene12_spawn1_currentalive = 0	//initializes variable for number of enemies currently alive from this spawner
+		level.scene12_spawn1_currentalivemax = 8	//initializes constant for maximum number allowed to be alive at any given time from this spawner
+		level.scene12_spawn1_loopwaittime = 1	//initializes constant for time between respawns
+		level.scene12_spawn1_deactivator = 0		//initializes variable for shutting down this loop's ability to spawn when the player is past this area
+
+		thread scene12_spawndetector1_control
+
+	//*** This is another reverse activated trigger, since the player goes past this point earlier on
+
+		$scene12_spawn1_terminate_trigger waittill trigger
+
+		thread scene12_spawn1_terminate
+
+end
+
+//============================================================//
+
+scene12_spawndetector1_control:
+
+	if (level.scene12_spawn1_deactivator == 1)
+	{
+		end
+	}
+
+	local.loopwaittime = 0.2
+
+	while (exec coop_mod/replace.scr::istouching $scene12_spawndetector1)
+	{
+//iprintlnbold_noloc ( "scene12_spawndetector1_control istouching" )
+		//*** 3 at a time, use +3
+		//*** Crazy fire and maneuver enemy attack, use nothing
+
+//		if ((level.scene12_spawn1_currentalive + 3) <= level.scene12_spawn1_currentalivemax && level.scene12_spawn1_deactivator == 0 && level.scene12_spawn1_teamvalue < level.scene12_spawn1_teamlimitmax)
+		if ((level.scene12_spawn1_currentalive + 4) <= level.scene12_spawn1_currentalivemax && level.scene12_spawn1_deactivator == 0 && level.scene12_spawn1_teamvalue < level.scene12_spawn1_teamlimitmax)
+
+		{
+//			centerprint(level.scene12_spawn1_currentalive + "<" + level.scene12_spawn1_currentalivemax + "\n" + level.scene12_spawn1_deactivator + "=" + level.scene12_spawn1_deactivator+ "\n" + level.scene12_spawn1_teamvalue + "<" + level.scene12_spawn1_teamlimitmax )
+
+			local.scene12_spawn1_ai_name1 = "scene12_spawn1_ai1_" + level.scene12_spawn1_teamvalue	//assign a name to the spawned enemy
+			local.org1 = $scene12_spawndetector1_spawner1.origin						//spawn location as a script_origin
+
+			local.scene12_spawn1_ai_name2 = "scene12_spawn1_ai2_" + level.scene12_spawn1_teamvalue
+			local.org2 = $scene12_spawndetector1_spawner2.origin
+
+			local.scene12_spawn1_ai_name3 = "scene12_spawn1_ai3_" + level.scene12_spawn1_teamvalue
+			local.org3 = $scene12_spawndetector1_spawner3.origin
+
+		//*** Spawn 3 enemy soldiers in a wave
+
+			spawn models/human/german_waffenss_nco "targetname" (local.scene12_spawn1_ai_name1) "type_attack" "cover"
+
+			$(local.scene12_spawn1_ai_name1).origin = local.org1				//place the guy in the correct spot
+			level.scene12_spawn1_currentalive ++							//increment the max allowed alive at any given time
+			level.scene12_spawn1_teamvalue ++							//track the scene's enemy population
+			$(local.scene12_spawn1_ai_name1) thread scene12_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene12_spawn1_ai_name1) thread scene12_spawn1_ai_navigate1 	//call navigation thread
+
+			$(local.scene12_spawn1_ai_name1) gun "mp40"
+
+				local.scene12_spawn1_ai_name1.mindist = 128
+				local.scene12_spawn1_ai_name1.maxdist = 4000
+				local.scene12_spawn1_ai_name1.leash = 1800
+		//		local.scene12_spawn1_ai_name1.fixedleash = 1
+				local.scene12_spawn1_ai_name1.sight = 6000
+				local.scene12_spawn1_ai_name1.noticescale = 5
+				local.scene12_spawn1_ai_name1.accuracy = 45
+				local.scene12_spawn1_ai_name1.hearing = 4000
+				local.scene12_spawn1_ai_name1.interval = 128
+
+			spawn models/human/german_panzer_shutze "targetname" (local.scene12_spawn1_ai_name2) "type_attack" "cover"
+
+			$(local.scene12_spawn1_ai_name2).origin = local.org2				//place the guy in the correct spot
+			level.scene12_spawn1_currentalive ++							//increment the max allowed alive at any given time
+			level.scene12_spawn1_teamvalue ++
+			$(local.scene12_spawn1_ai_name2) thread scene12_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene12_spawn1_ai_name2) thread scene12_spawn1_ai_navigate2 	//call navigation thread
+
+				local.scene12_spawn1_ai_name2.mindist = 128
+				local.scene12_spawn1_ai_name2.maxdist = 4000
+				local.scene12_spawn1_ai_name2.leash = 1800
+		//		local.scene12_spawn1_ai_name2.fixedleash = 1
+				local.scene12_spawn1_ai_name2.sight = 6000
+				local.scene12_spawn1_ai_name2.noticescale = 1
+				local.scene12_spawn1_ai_name2.accuracy = 70
+				local.scene12_spawn1_ai_name2.hearing = 4000
+				local.scene12_spawn1_ai_name2.interval = 128
+
+			spawn models/human/german_panzer_shutze "targetname" (local.scene12_spawn1_ai_name3) "type_attack" "cover"
+
+			$(local.scene12_spawn1_ai_name3).origin = local.org3				//place the guy in the correct spot
+			level.scene12_spawn1_currentalive ++							//increment the max allowed alive at any given time
+			level.scene12_spawn1_teamvalue ++
+			$(local.scene12_spawn1_ai_name3) thread scene12_spawn1_detect_death 	//call a waittill death thread
+			$(local.scene12_spawn1_ai_name3) thread scene12_spawn1_ai_navigate3  	//call navigation thread
+
+				local.scene12_spawn1_ai_name3.mindist = 128
+				local.scene12_spawn1_ai_name3.maxdist = 4000
+				local.scene12_spawn1_ai_name3.leash = 1800
+		//		local.scene12_spawn1_ai_name3.fixedleash = 1
+				local.scene12_spawn1_ai_name3.sight = 6000
+				local.scene12_spawn1_ai_name3.noticescale = 1
+				local.scene12_spawn1_ai_name3.accuracy = 70
+				local.scene12_spawn1_ai_name3.hearing = 4000
+				local.scene12_spawn1_ai_name3.interval = 128
+		}
+
+		wait local.loopwaittime			//every local.loopwaittime seconds, resume the while loop
+	}
+
+	wait local.loopwaittime				//prevent infinite loop warning
+	goto scene12_spawndetector1_control
+
+end
+
+//============================================================//
+
+scene12_spawn1_detect_death:
+
+	self waittill death
+	level.scene12_spawn1_currentalive --	//decrement the population count
+
+end
+
+//============================================================//
+
+scene12_spawn1_ai_navigate1:
+
+	self forceactivate
+	self exec global/runto.scr $scene12_spawn1_rallypoint1
+
+end
+
+//============================================================//
+
+scene12_spawn1_ai_navigate2:
+
+	self forceactivate
+	self exec global/runto.scr $scene12_spawn1_rallypoint2
+
+end
+
+//============================================================//
+
+scene12_spawn1_ai_navigate3:
+
+	self forceactivate
+	self exec global/runto.scr $scene12_spawn1_rallypoint3
+
+end
+
+//============================================================//
+
+scene12_spawn1_terminate:
+
+	level.scene12_spawn1_deactivator = 1
+	
+end
+
+
+//*** REFERENCE LIST DIALOG for Captain Ramsey 
+
+	//*** Scene1 Dialog - Close Quarters Battle
+
+		//"Let's check out this house."										dfr_M3L2_add01
+		//"Expect close contact."											dfr_before_102j_1
+
+	//*** Scene2 Dialog - Meeting the Airborne
+
+		//"Thunder!"													dfr_scripted_M5L3_07f
+		//"Hey, all right, some airborne boys."									dfr_m3l3_310jnew
+
+	//*** Scene3 Dialog - Defending the Rear
+
+		//"Powell, stay here and watch the back."    								dfr_M3L3_311j
+
+	//*** Scene4 Dialog - Forward Reinforcements 
+
+		//"Powell, help me cover the front!"    									dfr_M3L3_315j_2
+
+	//*** Scene5 Dialog - Road Skirmish
+
+		//"Okay I think that’s the last of them."    								dfr_m3l3_318j_2
+		//"Everyone check your ammo."											dfr_over_10j_1new		
+		//"Well, so much for our transport."    									dfr_M3L3_319j
+		//"Well, it looks like we'll have to finish this mission on foot Powell."    			dfr_m3l3_303j
+		//"You're on point."												dfr_follow_04j_2
+
+	//*** Scene6 Dialog - 88 Alley
+
+		//"That 88 has this road locked down!"    								dfr_M3L3_330j
+		//"We could call in some air support if we had a radio. Have to find another way around."	dfr_m3l3_331j
+
+	//*** Scene7 Dialog - Sniper in the Silo
+
+		//"Private Cobb do you have a radio?"    									dfr_m3l3_333j
+
+		//"Powell, you’re the only sniper here. Head for the farm house and flank that sniper. 
+		//"Take him out and get back with the radio.								dfr_m3l3_336j_1new
+
+		//"We'll cover you."												dfr_follow_01j_1_m3l2
+
+	//*** Scene8 Dialog - Double Envelopment
+
+		//"We gotta press on their positions!"									dfr_before_004j_2
+
+	//*** Scene10 Dialog - Angels on our Shoulders
+
+		//"Powell, get us some air support."    									dfr_m3l3_325j_1
+		
+	//*** Scene13 Dialog - The Pillbox
+
+		//"Powell, hit that 88 with air support."    								dfr_m3l3_326j_1
+
+//-------------------------------------------------------
+
+//*** REFERENCE LIST DIALOG for Private Durden
+
+	//*** Scene2 Dialog - Meeting the Airborne
+
+		//"Flash!"														dfr_scripted_M5L3_08c
+		//"Boy I'm glad to see you."    										dfr_M3L3_308f
+		//"We landed way off target sir…we’ve been trying to get back to friendly 
+		//"territory ever since. There are Krauts everywhere. 	   					dfr_M3L3_309f
+
+		//"GET DOWN!!"													warn_player_arty18
+
+	//*** Death Dialog 
+		
+		//"Medic!"														dfr_panic_35c_13
+
+//-------------------------------------------------------
+
+//*** REFERENCE LIST DIALOG for Private Cobb
+
+	//*** Scene7 Dialog - Sniper in the Silo
+
+		//"Private Cobb, 3rd of the five-oh-sixth, sir.	"    							dfr_M3L3_332i 
+
+		//"Our squad’s radioman was killed in the clearing to the southeast of this house. 
+		//"But there’s a sniper in the silo out there. We can't get anywhere near it, sir."    	dfr_M3L3_334i
+
+	//*** Death Dialog 
+		
+		//"Medic!"														dfr_panic_35c_13
+
+//-------------------------------------------------------
+
+//*** REFERENCE LIST DIALOG for the P-47 Thunderbolt
+
+	//Scene 10 and Scene 11
+
+		//"Echo Charlie standing by. Awaiting orders to commence close air support, over."    	dfr_m3l3_337k
+		//"Echo Charlie standing by."    										dfr_m3l3_338k 
+		//"This is Echo Charlie. I'm ready."    									dfr_m3l3_339k
+		//"Anyone there? over."    											dfr_m3l3_340k
+		//"I repeat, is anyone there? over."   									dfr_m3l3_341k
+		//"Is anyone there? Please respond.  Over."    								dfr_m3l3_342k
+		//"This is Echo Charlie.  Please respond.  Over." 	   						dfr_m3l3_343k
+		//"That’s not a target. Over."										dfr_m3l3_344k	
+		//"Give me a target over."											dfr_m3l3_345k	
+		//"Roger. Target acquired."											dfr_m3l3_346k	
+		//"Roger. Consider it done."											dfr_m3l3_347k	
+		//"Target already acquired. Over."										dfr_m3l3_348k	 
+		//"Already enroute to a target. Over."									dfr_m3l3_349k	
+
+//-------------------------------------------------------
+
+//*** REFERENCE LIST GENERIC DIALOG for German Soldiers
+
+//"Secure positions!"										den_fear_30b 
+//"I'm low on ammo!"										den_fear_28a 
+//"I've seen French farm girls shoot better!"						den_attack_022e 
+//"Call for reinforcements!"									den_alarm_09a 
+//"Signal the others!"										den_alarm_11b 
+//"I need some more ammo over here!"							den_amb_M3L1_83b 	
+//"Hold the flank! Hold the flank!"								den_amb_M3L1_85d 
+//"Medic!"												den_amb_M3L1_86b 
+//"Regroup! Regroup!"										den_amb_M3L1_88d 
+//"Displace!"											den_amb_M3L1_89b 
+//"The right flank is falling! Get over there and patch it up!"			den_amb_M3L1_90d 
+//"We're pinned down! We need reinforcements!"						den_amb_M3L1_91b 
+
+//*** REFERENCE LIST GENERIC AMBIENT BACKGROUND NOISES
+
+//MG42s firing in distance sporadically							streamed_Amb_MMGFire_01 
+//Temp track of chaotic urban combat ambience, lots of ricochets			streamed_Amb_BattleBeach_01.mp3
+
+
+
+//KEYWORDS FOR SEARCHING THIS FILE
+
+//*Update* = update objectives 
+//*scene#* = go to scene2, scene3, etc. 
+//*Miscellaneous* = go to the misc technical threads
+
+//****************************************************//
+//				STORY					//
+//****************************************************//
+
+/*
+
+	Scene 1: Close Quarters Battle
+	
+		Our heroes, Captain Ramsey and Lieutenant Powell, have arrived at a house in Normandy, about 12 miles from Carentan.
+		Ramsey decides they should search the house for friendlies and hostiles, before moving on. A German presence is revealed
+		and a brutal fight at close quarters inside the house ensues.
+
+	Scene 2: Meeting the Airborne
+
+		With the elimination of the German troops in the immediate vicinity, Captain Ramsey tries to open a door that won't budge.
+		A voice yells from the other side of the door the verification phrase, "Thunder!" To which Ramsey replies, "Flash!" The 
+		sound of furniture being moved from a barricade is heard, and the door is opened. Private Paulsen on the other side of the door
+		has his Garand trained on the door as Ramsey and Powell enter, before going back to a normal posture. The meeting is interrupted 
+		by the sound of a sniper rifle firing through the window, and Private Durden is shot through the head and killed. Ramsey and 
+		Paulsen head for the front, while Powell is ordered to cover the back and snipe the German reinforcements.
+
+	Scene 3: Defending the Rear
+
+		Lieutenant Powell defends the rear of the house with a Springfield 1903 Sniper Model Rifle. Should he disobey his Captain's orders,
+		the enemy will start to spawn in the house at logical positions at the rear as well as conduct flanking attacks from the side of 
+		the house, as though they were climbing the wall from the backyard. The swarm will be very tough to beat if Powell decides to be foolish. 
+
+	Scene 4: Forward Reinforcements
+		
+		At this point, an elite Panzer squad will destroy the jeep with a Panzerschreck and start attacking and sniping from across the bridge.
+		Lieutenant Powell can counter-snipe, or man the machine gun depending on the level of opposition. 
+
+	Scene 5: Road Skirmish
+
+		As the party departs the house, they encounter additional enemy patrols on the road towards the T junction. 
+
+	Scene 6: 88 Alley
+
+		At the site of a destroyed Panzer IV tank, a Flak 88 and machinegun will lock down the approach, forcing the party to take an alternate route.
+		Captain Ramsey suggests seeking out some way to get some air support. 
+
+	Scene 7: Sniper in the Silo
+
+		The radio is in a clearing defended by a small contingent of enemy troops and a particularly talented sniper and his spotter. Enemy forces
+		have control of a farmhouse and barn and are holding out here. 
+
+	Scene 8: Double Envelopment
+		
+		Another German patrol attacks from the reverse angle, pinning down our heroes in the clearing. From here, a massive incursion takes place as 
+		the ad-hoc Ranger/Airborne squad must fight their way out as the enemy does a brutal double envelopment, using explosives to destroy a wall on 
+		a previously inaccessible flank. German base of fire is at the fence/destroyed car. 		
+
+	Scene 9: Skirmish to the T-Junction 
+
+		CUT
+
+	Scene 10: Angels on our Shoulders
+
+		Using the binoculars to pinpoint the bombing coordinates, Lieutenant Powell calls in the strike on the radio. Technically, this was not a 
+		method used in World War 2 but is used to enhance gameplay and player involvement. A P-47 Thunderbolt swoops down a few moments later and
+		delivers ordnance on target, obliterating the Flak 88. 
+
+	Scene 11: The Radar Site
+
+		Ramsey and Powell must destroy a Flak 20mm Anti Aircraft Cannon which prevents further airstrikes. 
+
+	Scene 12: The Radar Site Counterattack
+
+		Yup, more guys to shoot.
+	
+	Scene 13: The Pillbox
+	
+		After destroying the final Flak 88, a final set of German sentries in a pillbox hidden in the hedgerows must be defeated.
+
+stroy a wall on 
+		a previously inaccessible flank. German base of fire is at the fence/destroyed car. 		
+
+	Scene 9: Skirmish to the T-Junction 
+
+		CUT
+
+	Scene 10: Angels on our Shoulders
+
+		Using the binoculars to pinpoint the bombing coordinates, Lieutenant Powell calls in the strike on the radio. Technically, this was not a 
+		method used in World War 2 but is used to enhance gameplay and player involvement. A P-47 Thunderbolt swoops down a few moments later and
+		delivers ordnance on target, obliterating the Flak 88. 
+
+	Scene 11: The Radar Site
+
+		Ramsey and Powell must destroy a Flak 20mm Anti Aircraft Cannon which prevents further airstrikes. 
+
+	Scene 12: The Radar Site Counterattack
+
+		Yup, more guys to shoot.
+	
+	Scene 13: The Pillbox
+	
+		After destroying the final Flak 88, a final set of German sentries in a pillbox hidden in the hedgerows must be defeated.
+
+*/

@@ -1,0 +1,280 @@
+//
+// Glider.scr
+//
+// Gag for e2l3, by ccaron 6/18/2003
+// ---------------------------------------------------
+
+
+// THE WORKER THREAD 
+//============================================================================
+Init: {
+//============================================================================
+	if (level.skipglider == 1) {
+		$driver delete
+
+		if ($summonTrucks) {
+			$summonTrucks delete
+		}
+		$player.origin = (500 3200 100)
+		$player.angles += ( 0 180 0 )
+		end
+	}
+
+	level.glider_done = 0
+
+	// Number of seconds for driver to plant explosive on glider
+	level.bomb_plant_time = 5 // seconds 
+
+	// initialization
+	spawn trigger_relay targetname "GliderFightOverTrigger"
+	spawn trigger_relay targetname "GliderFightOverTrigger2"
+
+	$glidertruck waitthread global/autotruck.scr::init
+	$glidertruck2 waitthread global/autotruck.scr::init
+
+	$glidertruck projectilevulnerable
+	$glidertruck2 projectilevulnerable
+
+	if (!$gliderammotrigger) {
+		dprintln "GLIDER ERROR >>> $gliderammotrigger not found!"
+	}
+
+	if (!$driverhidespot) {
+		dprintln "GLIDER ERROR >>> $driverhidespot not found!"
+	}
+
+	// start worker thread
+	thread DoWork
+	level.GliderSummonTrucks = 0
+	$summonTrucks setthread SummonTrucks
+	$gliderammotrigger setthread PlayerGotAmmo
+	level.pickedupammo = 0
+}end
+
+// THE WORKER THREAD ///////////////////////////////////////
+//============================================================================
+DoWork: {
+//============================================================================
+	// work
+	$GliderSceneTrigger waittill trigger
+
+	// give the driver some ai
+	if(isalive $driver) {
+		$driver waitthread DriverThinkThread
+	}
+	else {
+		thread WatchSummonTruck
+		End
+	}
+
+	// wait for player to get to glider ammo
+	$gliderammotrigger waittill trigger
+
+	// get the first truck driving
+	thread WatchSummonTruck
+	$gliderammotrigger waittill trigger
+	thread SummonTrucks
+
+	level.glider_done = 1
+}end
+
+//============================================================================
+DriverThinkThread: {
+//============================================================================
+	self gun "vickers"
+	self ammo mg 200
+	self takedamage
+	
+	// fight with the player
+	if (level.warpTo == "glider") {
+		self exec global/enable_ai.scr
+		self waitthread maps/e2l3/Paratrooper.scr::JoinSquad
+	}
+	
+	// Make the driver run to the glider
+	self exec global/enable_ai.scr
+	thread WatchSummonTruck
+	self waitthread DriverLeadCode
+
+	// Wait for the player to get there
+	if(level.GliderSummonTrucks != 1) {
+		$gliderammotrigger waittill trigger
+	}
+
+	if(level.GliderSummonTrucks == 1 && isalive self) {
+		self.destination = $player
+		self.distance = 250
+		self.friendtype = 1
+		self fixedleash 1
+		self leash 0
+		self thread global/friendly.scr::friendlythink
+		End
+	}
+
+	if!(isalive self){
+		End
+	}
+
+	wait 2.0
+	waitthread PickUpAmmo
+	
+	// gag over, go back to friendly state
+	self.destination = $player
+	self.distance = 250
+	self.friendtype = 1
+	self thread global/friendly.scr::friendlythink
+	self takedamage	
+}End
+
+//============================================================================
+PlayerGotAmmo: {
+//============================================================================
+	if ($driver == NULL) {
+		end
+	}
+
+	$driver thread global/friendly.scr::friendlystop
+	$driver thread PickUpAmmo
+}End
+
+//============================================================================
+PickUpAmmo: {
+//============================================================================
+	if(level.pickedupammo == 1) {
+		End
+	}
+
+	level.pickedupammo = 1 
+
+	self exec global/enable_ai.scr
+	self runto $player
+	self turnto $player
+	self lookat $player
+	self waittill movedone
+	self exec global/disable_ai.scr
+	wait 1.0
+
+	self exec global/enable_ai.scr
+	self turnto NULL
+	self lookat NULL
+	waitthread SummonTrucks
+	self unholster
+	wait 2.0
+
+	self lookat $glidertruck
+	self turnto $glidertruck
+	wait 1.0
+
+	self lookat NULL
+	self.destination = $player
+	self.distance = 250
+	self.friendtype = 1
+	self thread global/friendly.scr::friendlythink
+	self health 25
+}End
+
+//============================================================================
+DriverLeadCode: {
+//============================================================================
+	self leash 120
+	self.leader = spawn self.model origin self.origin "scale" "0.3" targetname "DriverLeadCode"
+	self.leader rendereffects "+dontdraw"
+	self tether $DriverLeadCode
+	self.leader exec global/disable_ai.scr
+	self.destination = $DriverLeadCode
+	$DriverLeadCode notsolid
+	self.distance = 120
+	self.friendtype = 1
+	self thread global/friendly.scr::friendlythink
+	self tether self.leader
+	self lookat $gliderammotrigger
+	
+	local.beginning = $player.origin 
+	local.pathvector = (1828 3606 72)
+	local.pathvector2 = (807 3500 50)
+	local.alpha = 0
+	
+	self waitthread LinearInterpolationMotion local.pathvector $player.origin 0.1
+	self waitthread LinearInterpolationMotion local.pathvector2 local.pathvector 0.2
+	self waitthread LinearInterpolationMotion $gliderammotrigger.origin local.pathvector2 0.2
+	self runto $gliderammotrigger.origin
+
+	while(vector_length(self.origin - $gliderammotrigger.origin) > 270) {
+		waitframe
+	}
+
+	self.destination = $player
+	waitframe
+	$DriverLeadCode remove
+}End
+
+//============================================================================ 
+LinearInterpolationMotion local.pathvector local.startlocation local.step: {
+//============================================================================
+	local.alpha = 0	
+	while(local.alpha < 1 && level.GliderSummonTrucks != 1) {
+		local.first = local.alpha * local.pathvector
+		local.second = (1 - local.alpha) * local.startlocation
+		self.leader.origin = vector_add local.first local.second
+		self.leader.origin = self.leader.origin + (0 0 50)
+		wait 1.0
+		
+		while(vector_length(self.origin - $player.origin) > 300 &&
+			(vector_length(self.origin - $gliderammotrigger.origin) <
+			 vector_length($player.origin - $gliderammotrigger.origin)) && 
+			 level.GliderSummonTrucks != 1) {
+			waitframe
+		}
+
+		if(vector_length(self.origin - $gliderammotrigger.origin) <
+			 vector_length($player.origin - $gliderammotrigger.origin)) {
+			 local.step += 0.01
+		}
+		local.alpha += local.step
+	}
+}End
+
+//============================================================================
+WatchSummonTruck: {
+//============================================================================
+	$summonTrucks waittill trigger
+	trigger $gliderammotrigger
+	thread SummonTrucks
+}End
+
+//============================================================================
+SummonTrucks: {
+//============================================================================
+	if(level.GliderSummonTrucks == 1) {
+		End	
+	}
+
+	level.GliderSummonTrucks = 1
+
+	$glidertruck waitthread global/autotruck.scr::StartTruck
+
+	for(local.i = 1; local.i <= $gliderenemy.size; local.i++) {
+		$gliderenemy[local.i] thread EnemyCount
+	}
+	
+	wait 3.0
+	$glidertruck2 waitthread global/autotruck.scr::StartTruck
+
+	for(local.i = 1; local.i <= $gliderenemy2.size; local.i++) {
+		$gliderenemy2[local.i] thread EnemyCount
+	}
+
+	level.numgliderenemies = $gliderenemy2.size + $gliderenemy.size	
+	level.GliderSummonTrucks = 1
+	
+	if($summonTrucks) {
+		$summonTrucks remove
+	}	
+}End
+
+//============================================================================
+EnemyCount: {
+//============================================================================
+	self waittill death
+	level.numgliderenemies--
+}End

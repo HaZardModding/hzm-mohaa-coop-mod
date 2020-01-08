@@ -1,0 +1,328 @@
+main:
+
+	if ($eater_trigger) level.eater_triggers = $eater_trigger.size
+		
+	if (level.eater_triggers)
+	{
+		level.eater_trigger = exec global/makearray.scr $eater_trigger
+
+		for (local.i = 1; local.i <= level.eater_triggers; local.i++)
+		{
+			if !(level.eater_trigger[local.i].set)
+			{
+				exec global/error.scr ("Error, eater_trigger at " + level.eater_trigger[local.i].origin + " has no #set") 1
+				continue
+			}
+			level.eater_trigger[local.i] thread EaterTrigger
+		}
+		println "**********************************"
+		println "there are " level.eater_triggers " eater triggers in the level"
+		println "**********************************"
+	}
+	else
+		end
+
+	///////////////////////////////////////
+	level waittill prespawn
+	///////////////////////////////////////
+
+	if ($eater) level.eaters = $eater.size
+
+	if (level.eaters)
+	{
+		level.eater = exec global/makearray.scr $eater
+
+		for (local.i = 1; local.i <= level.eaters; local.i++)
+		{
+			if !(level.eater[local.i].set)
+				exec global/error.scr ("Error, eater at " + level.eater[local.i].origin + " has no #set") 1
+
+			level.eater[local.i] = waitthread TransformEater level.eater[local.i]
+		}
+		println "**********************************"
+		println "there are " level.eaters " eaters in the level"
+		println "**********************************"
+	}
+end
+
+EaterTrigger:
+
+	level waittill spawn
+
+	self waittill trigger
+
+	thread ActivateEater self.set
+
+	if (self)
+		self delete
+end
+
+// *!* convert AI and target to local array
+// *!* so no entities exist in level until they are needed
+// *!* (apart from the trigger of course)
+TransformEater local.dude:
+
+	local.eater[type_idle] = local.dude.type_idle
+	local.eater[type_attack] = local.dude.type_attack
+	local.eater[type_disguise] = local.dude.type_disguise
+	local.eater[type_grenade] = local.dude.type_grenade
+	local.eater[hearing] = local.dude.hearing
+	local.eater[sight] = local.dude.sight
+	local.eater[fov] = local.dude.fov
+	local.eater[leash] = local.dude.leash
+	local.eater[mindist] = local.dude.mindist
+	local.eater[maxdist] = local.dude.maxdist
+	local.eater[health] = local.dude.health
+	local.eater[sound_awareness] = local.dude.sound_awareness
+	local.eater[noticescale] = local.dude.noticescale
+	local.eater[fixedleash] = local.dude.fixedleash
+	local.eater[enemysharerange] = local.dude.enemysharerange
+	local.eater[voicetype] = local.dude.voicetype
+	local.eater[accuracy] = local.dude.accuracy
+	local.eater[ammo_grenade] = local.dude.ammo_grenade
+	local.eater[gren_awareness] = local.dude.gren_awareness
+	local.eater[nosurprise] = local.dude.nosurprise
+	local.eater[disguise_range] = local.dude.disguise_range
+	local.eater[disguise_period] = local.dude.disguise_period
+	local.eater[disguise_accept_thread] = local.dude.disguise_accept_thread
+	local.eater[disguise_level] = local.dude.disguise_level
+	local.eater[patrolpath] = local.dude.patrolpath
+	local.eater[waittrigger] = local.dude.waittrigger
+	local.eater[turret] = local.dude.turret
+	local.eater[alarmnode] = local.dude.alarmnode
+	local.eater[alarmthread] = local.dude.alarmthread
+	local.eater[spawn_angle] = local.dude.angle
+	local.eater[spawn_weapon] = local.dude.weapon
+	local.eater[set] = local.dude.set
+	local.eater[healthchance] = local.dude.healthchance
+	local.eater[turndoneerror] = local.dude.turndoneerror
+	local.eater[threatbias] = local.dude.threatbias
+	local.eater[radnum] = local.dude.radnum
+	local.eater[balconyheight] = local.dude.balconyheight
+	local.eater[dropgun] = local.dude.dropgun
+	local.eater[tablepos] = local.dude.tablepos
+	local.eater[location] = local.dude.target.origin
+	local.eater[spawn_model] = local.dude.model
+	local.eater[targetname] = local.dude.enemyname
+
+	local.dude.target remove
+	local.dude remove
+
+end local.eater
+
+ActivateEater local.set:
+	for (local.i = 1; local.i <= level.eaters; local.i++)
+	{
+		if (level.eater[local.i][set] == local.set)
+		{
+			local.eater = waitthread SpawnEater level.eater[local.i]
+
+			if (local.eater.dropgun == 0)
+				local.eater dontdropweapons
+
+			if (local.eater.location)
+				local.eater.origin = local.eater.location
+			
+			local.eater forceactivate
+			local.eater thread Eating
+
+			println "spawned eater " local.eater.targetname 
+		}
+	}
+end
+
+// *!* spawns AI from local array
+SpawnEater local.eater:
+
+	local.dude = spawn local.eater[spawn_model] angle local.eater[spawn_angle] targetname local.eater[targetname] 
+
+	// *!* set the values into the AI from the eater
+	local.dude.type_idle = local.eater[type_idle]
+	local.dude.type_attack = local.eater[type_attack]
+	local.dude.type_disguise = local.eater[type_disguise]
+	local.dude.type_grenade = local.eater[type_grenade]
+	local.dude.hearing = local.eater[hearing]
+	local.dude.sight = local.eater[sight]
+	local.dude.fov = local.eater[fov]
+	local.dude.leash = local.eater[leash]
+	local.dude.mindist = local.eater[mindist]
+	local.dude.maxdist = local.eater[maxdist]
+	local.dude.health = local.eater[health]
+	local.dude.sound_awareness = local.eater[sound_awareness]
+	local.dude.noticescale = local.eater[noticescale]
+	local.dude.fixedleash = local.eater[fixedleash]
+	local.dude.enemysharerange = local.eater[enemysharerange]
+	local.dude.voicetype = local.eater[voicetype]
+	local.dude.accuracy = local.eater[accuracy]
+	local.dude.ammo_grenade = local.eater[ammo_grenade]
+	local.dude.gren_awareness = local.eater[gren_awareness]
+	local.dude.nosurprise = local.eater[nosurprise]
+	local.dude.disguise_range = local.eater[disguise_range]
+	local.dude.disguise_period = local.eater[disguise_period]
+	local.dude.disguise_accept_thread = local.eater[disguise_accept_thread]
+	local.dude.disguise_level = local.eater[disguise_level]
+	local.dude.patrolpath = local.eater[patrolpath]
+	local.dude.waittrigger = local.eater[waittrigger]
+	local.dude.turret = local.eater[turret]
+	local.dude.alarmnode = local.eater[alarmnode]
+	local.dude.alarmthread = local.eater[alarmthread]
+	local.dude.weapon = local.eater[spawn_weapon]
+	local.dude.set = local.eater[set]
+	local.dude.healthchance = local.eater[healthchance]
+	local.dude.enemyname = local.eater[enemyname]
+	local.dude.turndoneerror = local.eater[turndoneerror]
+	local.dude.threatbias = local.eater[threatbias]
+	local.dude.radnum = local.eater[radnum]
+	local.dude.balconyheight = local.eater[balconyheight]
+	local.dude.dropgun = local.eater[dropgun]
+	local.dude.tablepos = local.eater[tablepos]
+	local.dude.location = local.eater[location]
+
+end local.dude
+
+Eating:
+	
+	self.eating_thread = local
+
+	thread EaterThinker
+	thread EaterDeath
+
+	//---------------------//
+	// *!* start animations
+	//---------------------//
+	local.pos = self.tablepos
+
+	self anim_noclip ("dinner_top" + local.pos + "_resting")
+
+	wait (randomfloat(6) + 1)
+
+	while (1)
+	{
+		self anim_noclip ("dinner_top" + local.pos + "_eating")
+		self waittill animdone
+
+		self anim_noclip ("dinner_top" + local.pos + "_resting")
+		self waittill animdone
+
+		wait (randomfloat(6) + 2)
+	}
+
+end
+
+EaterThinker:
+
+	//--------------------------//
+	//	set intial properties
+	//--------------------------//
+	self holster
+	self.no_idle = 1
+	self.fighting = 0
+	self.originalhealth = self.health
+	self.health = 1
+
+	if (randomint (100) > 50)
+		self.chairdeath = "chair_death_forwards"
+	else
+		self.chairdeath = "chair_death_backwards"
+
+	self exec global/setdeathanim.scr self.chairdeath
+
+	wait .2
+
+	//--------------------------//
+	//	fit actor to table
+	//--------------------------//
+	local.vec = self.origin 	// *!* lower him down a bit
+	local.vec[2] -= 7
+	self.origin = local.vec
+
+	//--------------------------//
+	//	spawn chair
+	//--------------------------//
+	local.chair = spawn script_model model "furniture/cardchair.tik"
+	local.chair notsolid
+	local.chair.origin = self.origin
+	local.chair.angle = self.angle
+
+	if (self.tablepos == "left")
+		local.chair.angle += 90
+	else
+		local.chair.angle -= 90
+
+	self.chair = local.chair
+
+	//--------------------------//
+	//	wait for interruption
+	//--------------------------//
+	while (self.thinkstate == "idle")
+		waitframe
+
+	//--------------------------//
+	//	stop eating
+	//--------------------------//
+	if (self.eating_thread)
+		self.eating_thread delete
+
+	//--------------------------//
+	//	get up and attack
+	//--------------------------//
+	if (isAlive self)
+	{	
+		self.no_idle = 0
+		self lookat $player
+		self exec global/disable_ai.scr
+		self anim chair_alert_stand
+		self.chair anim chair_alert_stand
+		self unholster
+
+		wait .5
+		
+		if (isAlive self)
+		{
+			self.fighting = 1
+			self exec global/stand.scr
+			self exec global/enable_ai.scr
+			self.health = self.originalhealth
+			self exec global/setdeathanim.scr NIL
+			self runto $player
+			wait 1
+			self.chair anim chair_alert_stand_end
+		}
+	}		
+end
+
+EaterDeath:
+
+	self waittill death
+
+	if (self.fighting == 0)
+	{
+		if (self.tablepos == "left")
+			self.angle += 90
+		else
+			self.angle -= 90
+
+		self.chair delete
+		
+		local.chair = spawn script_model
+		local.chair model "furniture/cardchair.tik"
+		local.chair.origin = self.origin
+		local.chair.angles = self.angles
+
+		if (self.chairdeath == "chair_death_forwards")
+			local.chair solid
+		else
+			local.chair notsolid
+
+		waitframe
+
+		local.chair anim self.chairdeath
+
+		wait 3
+
+		local.chair anim (self.chairdeath + "_end")
+
+		waitframe
+	}
+
+end

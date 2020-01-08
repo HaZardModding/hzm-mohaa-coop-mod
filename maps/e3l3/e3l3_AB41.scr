@@ -1,0 +1,532 @@
+//=========================================================================
+GetOnPathVehicle: {
+//=========================================================================
+	level.AB41Ready = 1
+	if ( level.AB41Ready ==  1 ){
+		thread maps/e3l3/cleanup.scr::cleanup1
+		thread maps/e3l3/cleanup.scr::cleanup2
+		thread fixspawnersandexploders
+                
+		$kfive_one remove
+		thread do2ndK5Sound
+		thread DoMiscCleanup
+
+		//*** *Autosave*
+		// println "AUTOSAVING NOW FOR THE AB41"
+		exec global/autosave.scr 4	//"AB41"
+		thread checkthrobstop
+
+		//get the entities so we can unlock them...
+		$AB41.mg42 = $AB41 queryturretslotentity 0
+		$AB41.minigun = $AB41 queryturretslotentity 1
+
+		//unlock the turret, mini turret, and the base-to-turret connection
+		$AB41 unlock
+		$AB41.mg42 unlock
+
+		// Dont unlock the minigun, or we will get in it first
+		$AB41.minigun unlock
+
+		//prep to move the AB41
+		$AB41.mg42 setusable 1
+		$AB41 douse $player
+		$AB41.mg42 setusable 0
+
+		//$AB41 attachturretslot 0 $player
+
+		$AB41 lock
+		$AB41.mg42 lock
+		$AB41.minigun lock
+		$AB41.minigun psetviewangles $AB41.angles
+		$AB41.mg42 psetviewangles $AB41.angles
+
+		//CR This has to be a longish wait because the vehicle gets several mysterious stop messages
+		wait 0.5
+		$AB41 drive $AB41_Path 400 200 256
+		$AB41.minigun maxYawOffset 82
+		level.ab41yawFix = 1
+		thread AB41MaintainYawlimits
+
+		// Wait till we are ON the path before we give the player control
+		wait 0.5
+		$AB41 pathDrivable 1
+
+		//CR A bit hacky, to get people to shoot the player in the ab41 minigun
+		$AB41 setcollisionentity ab41topless
+		$AB41.mg42 notsolid
+		$AB41.minigun notsolid
+
+        //turn on the ai for the ab41 mg42 gunners
+		$mg42guy2 ai_on
+		$mg42guy3 ai_on
+		//thread StartJumpThread
+	}
+	else {
+		// println "AB41 Was not ready"
+	}
+}end
+
+//HACK
+//=========================================================================
+AB41MaintainYawlimits: {
+//=========================================================================
+	while ( level.ab41yawFix == 1) {
+		if ( IsAlive $AB41 ) {
+			$AB41.minigun yawCenter $AB41.angles[1]
+		}
+		waitframe
+	}
+}end
+
+//=========================================================================
+AB41Downhill: {
+//=========================================================================
+	self remove
+	$AB41 pathDrivable 0
+	$AB41 modifydrive 1000 80 256
+	
+	thread stop2ndK5Sound
+	thread AdjustFogPlane
+	thread 2ndK5Fire
+}end
+
+//=========================================================================
+2ndK5Fire: {
+//=========================================================================
+	local.k5 = spawn script_model model "models/weapons/It_W_K5.tik"
+	local.k5 origin $kfive_two.origin
+	local.k5 angles $kfive_two.angles
+	local.k5 notsolid
+
+	$kfive_two remove
+	local.k5.targetname = "kfive_two"
+	wait 1.8
+
+	local.k5 anim fire
+	exec global/earthquake.scr 0.5 4 0 0
+	local.k5 waittill animdone
+	local.k5 anim lower
+	local.k5 waittill animdone
+}end
+
+//=========================================================================
+HitBarricade: {
+//=========================================================================
+	$AB41 BounceBackwardsVelocity
+
+	/*
+    self.smashed = 1
+    local.bench = $(self.target)
+    local.thing = spawn script_model model "animate/fx_cratedebris_0.tik"
+    local.thing2 = spawn script_model model "animate/fx_cratedebris_0.tik"
+    local.org = angles_toforward ((local.bench.angles) + ( 0 90 0 ))
+    local.org = ((local.org * 35) + ((local.bench.origin)) + ( 0 0 45 ))	
+    local.thing.origin = local.org
+    local.thing anim start
+    local.org = angles_toforward ((local.bench.angles) + ( 0 -90 0 ) )
+    local.org = ((local.org * 35) + ((local.bench.origin)) + ( 0 0 45 ) )
+    local.thing2.origin = local.org
+    local.thing2 anim start
+	local.bench remove
+
+	self remove
+	*/
+}end
+
+//=========================================================================
+StartJumpThread: {
+//=========================================================================
+	self remove
+	level.playerjumped = 0
+
+	// Init set this one to solid, reset it to not solid so the ab41 runs into it correctly
+	$kfive_two notsolid
+	$kfive_two setcollisionentity NULL
+
+	local.usekey = getboundkey1 "+use"
+	local.msg = loc_convert_string ("Press " + local.usekey + " to jump from the AB41.")
+	thread global/throbtext.scr::throbtext_off
+	thread global/throbtext.scr::throbtext local.msg 0
+
+	while ( $player.useheld == 0 ){
+		waitframe
+	}
+
+	thread global/throbtext.scr::throbtext_off
+
+	if ( $player.health <= 0 ){
+		End
+	}
+
+	level.playerjumped = 1
+	$AB41 notsolid
+
+	// Unlock AB41 and turrets
+	$AB41.mg42 = $AB41 queryturretslotentity 0
+	$AB41.minigun = $AB41 queryturretslotentity 1
+	$AB41.mg42 setusable 1
+	$AB41.minigun setusable 1
+	$AB41 unlock
+	$AB41.mg42 unlock
+	$AB41.minigun unlock
+
+	// Get out
+	$AB41 douse $player
+
+	// Relock them so we can't get back in
+	$AB41.mg42 setusable 0
+	$AB41.minigun setusable 0
+	$AB41 lock
+	$AB41.mg42 lock
+	$AB41.minigun lock
+	waitframe
+
+	// Set location and orientation above the AB
+	$player.origin = $AB41.origin + ( 0 100 150 )
+	$player.viewangles = "0 270 0"
+
+	thread EndCrates
+	thread MoveTruck
+}end
+
+//=========================================================================
+FinishJumpThread: {
+//=========================================================================
+	waitthread ExplosionInit
+
+	// iprintln "FInishJumpThread"
+	self remove
+	wait 0.3
+	$AB41 stop
+
+	// Explode AB41
+	local.destroyedAB41 = spawn drivableVehicle model models/vehicles/It_V_AB41des.tik
+	local.destroyedAB41.origin = $AB41.origin
+	local.destroyedAB41.angles = $AB41.angles
+	local.destroyedAB41 nodamage
+	local.destroyedAB41.health = 60000
+	local.destroyedAB41 solid
+	local.destroyedAB41 removeondeath 0
+	local.destroyedAB41 setcollisionentity $ab41_collide
+	waitframe
+
+	local.destroyedAB41 anim idle
+
+	// Cause damage to nearby ents
+	radiusdamage $AB41.origin 500 500
+	waitframe
+	
+	//if($player istouching $AB41.collisionent)
+	if( level.playerjumped == 0 ){
+		//	$player normal_damage 100
+		$player damage $world 5000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	}
+
+	// Show the destroyed, animating AB41
+	local.destroyedAB41 show
+
+	// Hide the AB41 and its turrets
+	level.ab41yawFix = 0 //HACK
+	$AB41.mg42 = $AB41 queryturretslotentity 0
+	$AB41.minigun = $AB41 queryturretslotentity 1
+	$AB41 hide
+	$AB41.mg42 hide
+	$AB41.minigun hide
+	wait 0.1
+
+	$kfive_two.ram = 1
+	$kfive_two thread maps/e3l3/scene2.scr::KFiveKilled
+	level.secondKFiveDead = 1
+
+	$endguyk51 exec global/bullethit.scr (0 -1 90) 1000 50 1
+	$endguyk52 exec global/bullethit.scr (0 -1 90) 1000 50 1
+	$endguyk53 exec global/bullethit.scr (0 -1 90) 1000 50 1
+
+	$endguystrack[1] exec global/setdeathanim.scr "death_mortar_twist"
+	$endguystrack[2] exec global/setdeathanim.scr "death_mortar_high"
+	$endguystrack[3] exec global/setdeathanim.scr "death_mortar_medium"
+
+	for (local.i=1;local.i<=$endguystrack.size;local.i++) {
+		$endguystrack[local.i] exec global/bullethit.scr (0 -1 90) 1000 50 1
+	}
+
+	thread LeftSideExplosion
+	thread RightSideExplosion
+	$player nodamage
+}end
+
+//=========================================================================
+ExplosionInit: {
+//=========================================================================
+	$k5trees0 nodamage
+	$k5trees1 nodamage
+	$k5trees2 nodamage
+	$k5trees3 nodamage
+	$k5trees4 nodamage
+	$k5trees5 nodamage
+
+	for (local.i=1;local.i<=$barrelgroup1.size;local.i++) {
+		$barrelgroup1[local.i] nodamage
+	}
+
+	for (local.i=1;local.i<=$barrelgroup2.size;local.i++) {
+		$barrelgroup2[local.i] nodamage
+	}
+
+	for (local.i=1;local.i<=$barrelgroup3.size;local.i++) {
+		$barrelgroup3[local.i] nodamage
+	}
+
+	for (local.i=1;local.i<=$barrelgroup4.size;local.i++) {
+		$barrelgroup4[local.i] nodamage
+	}
+
+	//$endguyrighttower thread balconyGuy
+	$endguylefttower nodamage
+	$endguylefttower.accuracy = 100
+	$endguylefttower exec global/disable_ai.scr
+	$endguylefttower turnto $player
+	$endguylefttower exec global/aimat.scr ($player.origin + ( 0 0 100 ))
+
+	$endguyrighttower exec global/setdeathanim.scr "death_mortar_flip"
+	$endguyrighttower nodamage
+	$endguyrighttower.accuracy = 100
+	$endguyrighttower exec global/disable_ai.scr
+	$endguyrighttower turnto $player
+	$endguyrighttower exec global/aimat.scr ($player.origin + ( 0 0 100 ))
+
+	$endguyk51 exec global/setdeathanim.scr "death_mortar_twist"
+	$endguyk52 exec global/setdeathanim.scr "death_mortar_high"
+	$endguyk53 exec global/setdeathanim.scr "death_mortar_medium"
+}end
+
+//=========================================================================
+BarrelGroupExplode local.barrel1 local.barrel2: {
+//=========================================================================
+	local.barrel1 takedamage
+	local.barrel1 exec global/bullethit.scr (0 -1 90) 1000 50 1
+	wait 0.3
+
+	local.barrel2 takedamage
+	local.barrel2 exec global/bullethit.scr (0 -1 90) 1000 50 1
+}end
+	
+//=========================================================================
+LeftSideExplosion: {
+//=========================================================================
+	$endguylefttower exec global/shoot.scr
+	wait 0.7
+
+	$k5trees0 takedamage
+	$k5trees0 anim death
+
+	$endguylefttower takedamage
+	$endguylefttower exec global/bullethit.scr (0 -1 90) 1000 50 1
+	wait 0.4
+
+	$k5trees1[2] takedamage
+	$k5trees1[2] anim death
+	wait 1.4
+
+	$k5truckstay thread global/vehicles_thinkers.scr::truck_killed
+	wait 0.8
+
+	thread BarrelGroupExplode $barrelgroup1[1] $barrelgroup1[2]
+	wait 0.5
+
+	local.lefttower = waitthread global/FindTrigger.scr::FindTrigger "lefttower"
+	trigger local.lefttower
+	wait 1.5
+
+	$k5tank.type = panzerwerfer
+	$k5tank thread global/vehicles_thinkers.scr::tank_killed
+	wait 0.2
+
+	$k5trees3 takedamage
+	$k5trees3 anim death
+	wait 1.2
+
+	thread BarrelGroupExplode $barrelgroup4[1] $barrelgroup4[2]
+
+	$endguytree exec global/bullethit.scr (0 -1 90) 1000 50 1
+	$endguytreerunner1 exec global/bullethit.scr (0 -1 90) 1000 50 1
+	$endguytreerunner2 exec global/bullethit.scr (0 -1 90) 1000 50 1
+}end
+
+//=========================================================================
+RightSideExplosion: {
+//=========================================================================
+	wait 0.2
+	$k5trees1[1] takedamage
+	$k5trees1[1] anim death
+
+	wait 0.4
+	$k5trees2 takedamage
+	$k5trees2 anim death
+
+	wait 0.9
+	thread BarrelGroupExplode $barrelgroup2[1] $barrelgroup2[2]
+	$k5trees4 takedamage
+	$k5trees4 anim death
+
+	wait 1
+	$k5truckmove fullstop
+	$k5truckmove thread global/vehicles_thinkers.scr::truck_killed
+
+	wait 0.5
+	$endguyrighttower exec global/shoot.scr
+	thread BarrelGroupExplode $barrelgroup3[1] $barrelgroup3[2]
+
+	wait 0.7
+	$endguyrighttower takedamage
+	$endguyrighttower exec global/bullethit.scr (0 -1 90) 1000 50 1
+	$k5trees5 takedamage
+	$k5trees5 anim death
+
+	wait 0.7
+	local.righttower = waitthread global/FindTrigger.scr::FindTrigger "righttower"
+	trigger local.righttower
+}end
+
+//=========================================================================
+do2ndK5Sound: {
+//=========================================================================
+	level.stop2dK5sound = 0
+	while (level.stop2dK5sound != 1) {
+		$kfive_two playsound 2nd_k5_snd_fire weapon
+		wait 5
+	}
+}end
+
+//=========================================================================
+stop2ndK5Sound: {
+//=========================================================================
+	level.stop2dK5sound = 1
+}end
+
+//=========================================================================
+AdjustFogPlane: {
+//=========================================================================
+	local.startfogdist = 2400
+	local.destfogdist = 4000
+	local.fadetime = 5
+
+	level.starttime = level.time
+	while (level.time - level.starttime < local.fadetime){
+		local.newfogdist = local.startfogdist + ((local.destfogdist - local.startfogdist) * (level.time - level.starttime) / local.fadetime)
+		// println local.newfogdist
+
+		waitthread maps/e3l3/fog.scr::setFog local.newfogdist
+		waitframe
+	}
+	waitthread maps/e3l3/fog.scr::setFog local.destfogdist
+}end
+
+//=========================================================================
+DoMiscCleanup: {
+//=========================================================================
+	thread maps/e3l3/cleanup.scr::Delete_deleteguy
+	$explodertrigger triggerable
+	trigger level.firsttunnelguystrigger
+}end
+
+//=========================================================================
+EndCrates: {
+//=========================================================================
+	local.cratesleft = 1
+	while (local.cratesleft == 1) {
+		local.cratesleft = 0
+
+		for (local.i=1;local.i<=$endcrates.size;local.i++) {
+			if ($endcrates[local.i]) {
+				local.cratesleft = 1
+				// println (vector_length($AB41.origin-$endcrates[local.i].origin))
+
+				if (vector_length($AB41.origin-$endcrates[local.i].origin) < 400) {
+					local.cratedebris = spawn script_model model "animate/fx_cratedebris_0.tik" origin $endcrates[local.i].origin
+					local.cratedebris anim start
+					$endcrates[local.i] remove
+				}
+			}
+		}
+		waitframe
+	}
+]end
+
+//=========================================================================
+MoveTruck:{
+//=========================================================================
+	$k5truckmove drive $k5truckmove.target 200 200 256 256  													//path speed accel ??  
+	$k5truckmove thread maps/e3l3/scene1.scr::MyTruckThink 1000 4 "models/human/Sc_AX_Ital_Inf.tik" 
+
+	exec global/spotlight.scr::corona $k5truckmove "light left" 												// Turn on headlight coronas
+	exec global/spotlight.scr::corona $k5truckmove "light right"
+	$k5truckmove waittill drive 																				//detect when truck stops
+}end
+
+// check for secondary fire button, stop throbbing text when pressed
+//=========================================================================
+checkthrobstop: {
+//=========================================================================
+	wait 1.0
+	local.usekey = getboundkey1 "+attacksecondary"
+	local.msg = loc_convert_string( "Press " + local.usekey + " to switch weapons.")
+	thread global/throbtext.scr::throbtext local.msg 5
+
+	while ( $player.secondaryfireheld == 0 ) {
+		waitframe
+	}
+
+	wait 2.0
+	thread global/throbtext.scr::throbtext_off
+}end
+
+// fix exploder triggers to not explode until relevant spawner has been tripped
+//=========================================================================
+fixspawnersandexploders: {
+//=========================================================================
+	//	local.spawner = waitthread global/FindTrigger.scr::FindTrigger "1stcave"
+	//	local.exploder = waitthread findexploder 124	// first house after first tunnel
+	//	local.spawner thread postspawnenable local.exploder
+
+	local.spawner = waitthread global/FindTrigger.scr::FindTrigger "necorner"
+	local.exploder = waitthread findexploder 126	// first tower
+	local.spawner thread postspawnenable local.exploder
+
+	local.spawner = waitthread global/FindTrigger.scr::FindTrigger "1strun"
+	local.exploder = waitthread findexploder 127	// second tower
+	local.spawner thread postspawnenable local.exploder
+
+	local.exploder = waitthread findexploder 130	// first house next to second tower
+	local.spawner thread postspawnenable local.exploder
+
+	local.exploder = waitthread findexploder 131	// second house next to second tower
+	local.spawner thread postspawnenable local.exploder
+}end
+
+// spawntrigger waits until tripped, then enables relevant exploder trigger
+//=========================================================================
+postspawnenable local.exploder: {
+//=========================================================================
+	local.exploder nottriggerable
+	self waittill trigger
+	local.exploder triggerable
+}end
+
+// find the explodertrigger with the desired set number
+//=========================================================================
+findexploder local.set: {
+//=========================================================================
+	local.returntrigger = NULL
+
+	if($explodertrigger != NIL && $explodertrigger != NULL) {
+		for (local.i=1;local.i<$explodertrigger.size+1;local.i++) {
+			if ($explodertrigger[local.i].set == local.set) {
+				local.returntrigger = $explodertrigger[local.i]
+				goto findexploderend
+			}
+		}
+	}
+
+	findexploderend:
+}end local.returntrigger

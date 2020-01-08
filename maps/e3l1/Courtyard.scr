@@ -1,0 +1,564 @@
+//=========================================================================
+InitCourtyard: {
+//=========================================================================
+	level.stoopUp = 0
+	level.medicGo = 0
+	level.numSnipersAlive = 3
+	level.savedBrits = 0
+
+	$piatdoor lock
+	$britsfollowtrigger nottriggerable
+	$pinnedbrit01 nodamage
+	$pinnedbrit02 nodamage
+	$pinnedbrit03 nodamage
+	$pinnedbrit04 nodamage
+
+	$pinnedbrit01 physics_off
+	$pinnedbrit02 physics_off
+	$pinnedbrit03 physics_off
+	$pinnedbrit04 physics_off
+
+	$pinnedbrit01 exec global/disable_ai.scr
+	$pinnedbrit02 exec global/disable_ai.scr
+	$pinnedbrit03 exec global/disable_ai.scr
+	$pinnedbrit04 exec global/disable_ai.scr
+
+	$pinnedbrit01 ai_off
+	$pinnedbrit02 ai_off
+	$pinnedbrit03 ai_off
+	$pinnedbrit04 ai_off
+	
+	$pinnedbrit01 threatbias ignoreme
+	$pinnedbrit02 threatbias ignoreme
+	$pinnedbrit03 threatbias ignoreme
+	$pinnedbrit04 threatbias ignoreme
+	
+	$piatdoorguys[1] ai_off
+	$piatdoorguys[2] ai_off
+	
+	$pinnedbrit01 hide
+	$pinnedbrit02 hide
+	$pinnedbrit03 hide
+	$pinnedbrit04 hide
+	
+	$piatdoorguys[1] hide
+	$piatdoorguys[2] hide
+	
+	$pinnedbrit03 thread global/LoopAnim.scr::LoopAnim AA_huddle1
+	$pinnedbrit01 thread global/LoopAnim.scr::LoopAnim AA_huddle2
+	$pinnedbrit02 thread global/LoopAnim.scr::LoopAnim AA_huddle3_idleA
+	$pinnedbrit04 thread global/LoopAnim.scr::LoopAnim A_31_Cooper_idle
+	$pinnedbrit04 gun "sten"
+
+	$sniper1.ainoprone = 1
+	$sniper1.ainocrouch = 1
+
+	$sniper2 ai_off
+	$sniper3 ai_off
+	$sniper1 ai_off
+	
+	$sniper1 hide
+	$sniper2 hide
+	$sniper3 hide
+	$sniper3.origin = (350.00 5054.00 448.00)
+	$sniper1 physics_off
+	$sniper2 physics_off
+	$sniper3 physics_off
+	
+	/*
+	$sniper1.accuracy = 40
+	$sniper2.type_idle = "machinegunner"
+	$sniper2.type_attack = "machinegunner"
+	$sniper2.accuracy = 50
+	$sniper3.type_idle = "machinegunner"
+	$sniper3.type_attack = "machinegunner"
+	$sniper3.accuracy = 50
+	*/
+
+	// start thread for each sniper waiting till they die
+	thread WaitForSniperDeath $sniper1
+	thread WaitForSniperDeath $sniper2
+	thread WaitForSniperDeath $sniper3
+	$sniper3 thread DoBalconyDeath
+	
+	$cabinet.scale = 1.25
+	$cabinettrigger thread cabinetDoorCollision
+	
+	level.fakeshooting = 1
+	$endguysfiretrigger setthread StopTheFakeShooting
+}end
+
+//=========================================================================
+StopTheFakeShooting: {
+//=========================================================================
+	level.fakeshooting = 0
+	$endguysfire TurnOff
+	
+	if($chasetruckpassenger) {
+		for(local.i = 1; local.i <= $chasetruckpassenger.size; local.i++) {
+			$chasetruckpassenger[local.i] runto $player
+			$chasetruckpassenger[local.i] favoriteenemy $player
+		}
+	}
+
+	if($guybehindcar) {
+		for(local.i = 1; local.i <= $guybehindcar.size; local.i++) {
+			$guybehindcar[local.i] runto $player
+			$guybehindcar[local.i] favoriteenemy $player
+		}	
+	}
+
+	if($precourtyardguys) {
+		for(local.i = 1; local.i <= $precourtyardguys.size; local.i++) {
+			$precourtyardguys[local.i] runto $player
+			$precourtyardguys[local.i] favoriteenemy $player
+		}
+	}
+	
+	$sniper1 maxdist 100000	
+}end
+
+//=========================================================================
+CleanUpJeepStuckAndWhatever: {
+//=========================================================================
+	if($RightGuysBoss) {
+		for(local.i = 1; local.i <= $RightGuysBoss.size; local.i++) {
+			$RightGuysBoss[local.i] delete
+		}
+	}
+
+	if($paradetruck_passenger) {
+		for(local.i = 1; local.i <= $paradetruck_passenger.size; local.i++) {
+			$paradetruck_passenger[local.i] delete
+		}
+	}
+}end
+
+//=========================================================================
+DoBalconyDeath: {
+//=========================================================================
+	if (isalive self) {
+		self.health += 500
+	}
+	else {
+		end
+	}
+
+	self.nolongpain = 1
+	self.ainocrouch = 1
+	self.ainoprone = 1
+	self.ainododge = 1
+	self.ainohopforward = 1
+	self.ainohopbackward = 1
+	self.ainointerval = 1
+	self.fixedleash = 1
+	self.mindist = 0
+	self.leash = 0
+
+	// wait to get hurt  
+	self waittill pain
+	self physics_on
+
+	local.angle = ($sniperdive.origin - self.origin)
+	local.angle[2] = 0
+	local.angle = vector_normalize (local.angle)
+
+	self.fallDir = local.angle
+	//self.fallDir = angles_toforward(self.angles)
+	self.fallDir = vector_scale self.fallDir 100
+
+	self.jumpType = 0
+
+	self.jumpDir = local.angle
+	//self.jumpDir = angles_toforward(local.angle)  
+	self.jumpDir = vector_scale self.jumpDir 100
+
+	self.velocity += self.jumpDir
+	self.velocity += self.jumpDir
+	
+	self nodamage
+	self notsolid
+	self waitexec global/disable_ai.scr
+
+	local.ent = spawn script_origin origin (self.fallDir + self.origin)
+	self turnto local.ent
+	self waittill turndone
+	local.ent remove
+	
+	self anim_noclip death_balcony_intro
+	self waittill animdone
+
+	local.prevOrigin = self.origin
+	self notsolid
+	wait 0.1
+
+	while (vector_length( self.velocity ) > 30)  {
+		local.d = vector_length(local.prevOrigin - self.origin)
+		local.prevOrigin = self.origin
+
+		if (local.d < 2) {
+			break
+		}
+
+		self anim death_balcony_loop
+		wait 0.1
+	}
+
+	self anim death_balcony_outtro
+	self waittill animdone
+	self playsound snd_bodyfall_stone
+	self notsolid
+	self bedead
+	self thread keepgoingdown
+}end
+
+//=========================================================================
+keepgoingdown: {
+//=========================================================================
+	local.count = 0
+	local.catchorigin = self.origin
+
+	while(local.count != 30  &&  $pinnedbrit04) {
+		self droptofloor
+		wait 0.5
+
+		if(self.origin == local.catchorigin && self.origin[2] == $pinnedbrit04.origin[2]) {
+			local.count++
+		}
+
+		local.catchorigin = self.origin
+	}
+}end
+
+//=========================================================================
+CleanupCourtyard: {
+//=========================================================================
+}end
+
+//=========================================================================
+DoObjectiveSnipers: {
+//=========================================================================
+	waitthread UpdateSniperObjective
+	$player threatbias 1000
+
+	while (level.numSnipersAlive > 0) {
+		waitframe
+	}
+
+	thread CleanUpJeepStuckAndWhatever
+}end
+
+//=========================================================================
+TurnOnSnipers: {
+//=========================================================================
+	//	iprintln "TurnOnSnipers"
+	$sniper1 ai_on
+	$sniper2 ai_on
+	$sniper3 ai_on
+
+	$sniper1 show
+	$sniper2 show
+	$sniper3 show
+
+	/*	
+	$world farplane 1000000
+	waitframe
+	$sniper1 maxdist 10000
+	waitframe
+	$world farplane 2800
+	*/
+	
+	$sniper1.enableEnemy = 1
+	$sniper2.enableEnemy = 1
+	$sniper3.enableEnemy = 1
+	$sniper1.attack_type = "turret"
+	$sniper2.attack_type = "turret"
+	$sniper3.attack_type = "turret"
+
+	$sniper1 favoriteenemy $player
+	$sniper2 favoriteenemy $player
+	$sniper3 favoriteenemy $player
+		
+	$sniper1 thread AimAtSniperTarget
+	$sniper2 thread AimAtSniperTarget
+	$sniper3 favoriteenemy $player
+
+	//      Done to fix Yogi's bug
+	//	$sniper3 thread AimAtSniperTarget
+}end
+
+
+// Used to make the Snipers shoot at specific script_origin's in the map, give simulation of guys underfire
+//=========================================================================
+AimAtSniperTarget: {
+//=========================================================================
+	//	println "AimAtSniperTarget"
+	self exec global/disable_ai.scr
+
+	while(isalive self && level.fakeshooting == 1) {
+		local.target = $snipertarget[randomint($snipertarget.size) + 1]
+		self turnto local.target
+		self aimat local.target
+		self setaimtarget local.target 1
+		self exec global/shoot.scr
+		wait (randomfloat(1) + 0.1)
+	}
+
+   self exec global/enable_ai.scr
+   self favoriteenemy $player 
+}end
+
+//=========================================================================
+DoObjectiveMedicReachGoal: {
+//=========================================================================
+	if (level.skipobjMedicReachGoal) {
+		$medic.origin = $pinnedbrit04.origin + ( -30 0 0 )
+		$medic thread global/loopanim.scr::LoopAnimStop
+		$medic solid
+		$medic physics_on
+		$player.origin = $medic.origin + ( 100 0 0 )
+		end
+	}
+	
+	while (level.medicGo == 0) {
+		waitframe
+	}
+	
+	$medic exec global/disable_ai.scr
+	$medic exec global/crouch.scr
+	$medic runto $medicwaitpoint
+	
+	//$woundedguy runto $woundedguywaitpoint
+	$medicruntrigger waittill trigger
+	$medic turnto $pinnedbrit02
+	//$medic waittill turndone
+
+	//TEMP VO
+	//iprintln "(DFRUK_E3L1_PC2703) I can see the British troops.  Looks like they're in a tight spot.  Keep us covered, we're going to make a break for it."
+	$medic anim A_31_MedTalk_09
+	$medic waittill animdone
+	thread MedicRun
+	thread SniperAlert
+}end
+
+//=========================================================================
+MedicRun: {
+//=========================================================================
+	//$medic runto $medicworkrunto
+	//$medic.movedoneradius = 50
+	//$medic nodamage
+
+	local.lastspot = $medicsniperrun
+	while($(local.lastspot.target) != NULL) {
+		local.lastspot = $(local.lastspot.target)	
+	}
+
+	$medic waitexec global/stand.scr
+	local.distance = 1000
+	$medic exec global/disable_ai.scr
+	$medic exec global/moveto.scr anim/crouch_run.scr $medicsniperrun
+	
+	local.nextspot = $medicsniperrun.target
+
+	for(local.i = 1; local.i <= 4; local.i++) {
+		local.distance = 1000
+		
+		while (local.distance > 25) {
+			wait 0.1  // added to make this not go a billion times in the first second
+			local.distance = vector_length ($(local.nextspot).origin - $medic.origin)
+		}
+
+		$medic turnto $pinnedbrit01
+		$medic exec global/crouch.scr
+		$medic exec global/disable_ai.scr
+
+		if(local.i == 1) {
+			local.nextspot = $medicduck1
+			wait 1
+			//thread KillWoundedGuy local.lastspot
+		}
+		else if (local.i == 2) {
+			local.nextspot = $medicduck2
+			wait 4.0
+		}
+		else if (local.i == 3) {
+			local.nextspot = $medicduck3 // local.lastspot
+			wait 1.5
+		}
+		else if (local.i == 4) {
+			local.nextspot = local.lastspot
+			wait 1.5
+		}
+
+		//if(local.i == 0)
+		$medic exec global/moveto.scr anim/crouch_run.scr $(local.nextspot)
+		//else if (local.i == 1)
+		//	$medic crouchto $medicduck2
+	}
+
+	/*
+	while (local.distance > 50)
+	{
+		//$medic runto $medicsniperrun
+		wait 1.0  // added to make this not go a billion times in the first second	
+
+		local.distance = vector_length ($(local.nextspot).origin - $medic.origin)
+	}
+	*/
+}end
+
+//=========================================================================	
+handlePiatDoorGuys: {
+//=========================================================================
+	$piatdoor unlock
+	$piatdoorguys[1] show
+	$piatdoorguys[2] show
+	$piatdoorguys[1] ai_on
+	$piatdoorguys[2] ai_on
+	waitframe
+
+	$piatdoor open $piatdoorguys[1]
+	//$piatdoorguys[1] exec global/disable_ai.scr
+	//$piatdoorguys[2] exec global/disable_ai.scr
+	wait 1
+
+	$piatdoorguys[1] thread RunOut
+	$piatdoorguys[2] thread RunOut
+}end
+
+//=========================================================================
+RunOut: {
+//=========================================================================
+	self runto self.target
+	self waittill movedone
+	self exec global/enable_ai.scr
+}end
+
+//=========================================================================	
+BritsFollowPlayer: {
+//=========================================================================
+	self remove
+	
+	$pinnedbrit04.movedoneradius = 150
+	$pinnedbrit04 physics_on
+	$pinnedbrit04 runto $player
+	$pinnedbrit04 waittill movedone
+	$pinnedbrit04 turnto $player
+	$pinnedbrit04 lookat $player
+
+	//TEMP VO
+	//iprintln "(VO) Smashing!  We're all stocked up and ready to go. We'll move down this main road to where the heaviest fighting took place."
+	//iprintln "(VO) Our chaps are holed up around that area.  If they're still alive, they could use our help."
+
+	thread maps/e3l1/AfterSnipers.scr::StartPreCourtyardParade
+	$pinnedbrit04 anim A_31_Cooper_2
+	$pinnedbrit04 waittill animdone	
+	$pinnedbrit04 turnto NULL
+	$pinnedbrit04 lookat NULL
+	level.gotocity = 1
+}end
+
+//=========================================================================
+SniperAlert: {
+//=========================================================================
+	if(level.SniperAlert == 1) {
+		end
+	}
+
+	level.SniperAlert = 1
+
+	//TEMP VO
+	//iprintln "(DFRUK_E3L1_BS6001) Snipers!"  
+	//iprintln "(DFRUK_E3L1_BS6002) Get down, get down!" 
+	$pinnedbrit01 playsound DFRUK_E3L1_BS5002
+	$pinnedbrit01 waittill sounddone
+	$pinnedbrit01 playsound DFRUK_E3L1_BS5003
+	$pinnedbrit01 waittill sounddone
+}end
+
+//=========================================================================
+WaitForSniperDeath local.sniper: {
+//=========================================================================
+	local.sniper waittill death
+	waitthread UpdateSniperObjective
+}end
+
+//=========================================================================
+UpdateSniperObjective: {
+//=========================================================================
+	level.numSnipersAlive = 0
+	local.target = $sniper1
+
+	if (isalive $sniper2) {
+		local.target = $sniper2
+		level.numSnipersAlive++
+	}
+
+	if (isalive $sniper1) {
+		local.target = $sniper1
+		level.numSnipersAlive++
+	}
+
+	if (isalive $sniper3) {
+		local.target = $sniper3
+		level.numSnipersAlive++
+	}
+
+	if (level.numSnipersAlive > 0) {
+		local.objectiveString = "Eliminate Snipers [" + (level.numSnipersAlive) + " Remaining]"
+	}
+	else {
+		local.objectiveString = "Eliminate Snipers"
+	}
+	
+	waitthread global/objectives.scr::add_objectives level.objSnipers 2 local.objectiveString local.target
+	waitthread global/objectives.scr::current_objectives level.objSnipers
+}end
+
+//=========================================================================
+BringInMedic: {
+//=========================================================================
+	if (level.numSnipersAlive == 0) {
+		self remove
+		// thread PinnedBritStandUp
+
+		// FIXME: There was no Uber sound for Brits requesting help when I wrote this
+		// between this comment and FIXME will probably be taken out, when we have some real Uber dialogue
+		$medic turnto $pinnedbrit04.origin
+		$pinnedbrit04 thread global/LoopAnim.scr::LoopAnimStop
+
+		$pinnedbrit04 anim A_31_Cooper_1       // Just in time, lads.  There's some ammo in that building to the left.  
+		                                       // Run in there and load up so we can get out of here. 
+		$pinnedbrit04 waittill animdone
+		$pinnedbrit04 thread global/LoopAnim.scr::LoopAnim A_31_Cooper_idle
+
+		waitthread global/objectives.scr::add_objectives level.objPIAT 2 level.piatstring $piat.origin
+		level.savedBrits = 1
+
+		thread handlePiatDoorGuys
+	}	
+}end
+
+//=========================================================================
+PinnedBritStandUp: {
+//=========================================================================
+	$pinnedbrit01 thread global/LoopAnim.scr::LoopAnimStop
+	waitframe
+	$pinnedbrit01 anim AA_huddle3_getup
+	$pinnedbrit01 waittill animdone
+	$pinnedbrit01 thread global/LoopAnim.scr::LoopAnim AA_huddle3_idleB
+}end
+
+//make collision 
+//=========================================================================
+cabinetDoorCollision: {
+//=========================================================================
+	$cabinetdoor notsolid
+	self waittill trigger
+	
+	while (self isTouching $player) {
+		waitframe
+	}
+	
+	$cabinetdoor safesolid
+}end

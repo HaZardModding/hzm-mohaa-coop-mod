@@ -1,0 +1,327 @@
+//
+// MountGunOrPlantCharge
+//
+
+/*
+
+(See maps/e3l2/Cannons.scr for usage example)
+
+
+Variables used on "self" (the gun):
+
+	self.player_status						- records player's current relationship in the "gun-throbber system"
+												possible values:
+													"away"
+													"nearGun"
+													"onGun"
+													"nearThrobber"
+													"didSetThrobber"
+	self.noexplode							- set to 1 if throbber is invisible, to 0 if throbber can be used
+
+
+
+Parameters:
+
+	local.turret							- entity that is allowed to swivel when player turns gun
+	local.throbber							- throbbing-box attached to gun
+	local.gun_use_range						- max dist from player to gun, to allow gun use
+	local.throbber_use_range				- max dist from player to throbber, to allow charge placement
+	local.gun_name							- if NIL or 0 or NULL, then throbbing help text will not display;
+												otherwise it's the string used in, e.g., "Press q to get on Modello"
+	local.script_file_name					- for example, "maps/e3l2/Cannons.scr"
+	local.get_on_gun_thread_name			- name of thread in above file, called like "self waitthread thread_name"
+	local.get_off_gun_thread_name			-		"		"
+	local.place_explosives_thread_name		-		"		"
+
+	local.usable_cannon			- optional parameter, in case "usable" version of gun is a separate entity from self
+										(as in 3-2 with the modello)
+
+*/
+
+
+MountGunOrPlantCharge local.turret local.throbber local.gun_use_range local.throbber_use_range local.gun_name local.script_file_name local.get_on_gun_thread_name local.get_off_gun_thread_name local.place_explosives_thread_name local.usable_cannon:
+
+	if (level.mgopc_init == NIL)
+	{
+		if (level.mgopc_help_text_only_first_time == NIL)
+			level.mgopc_help_text_only_first_time = 0
+
+		level.mgopc_did_set_throbber = 0
+		level.mgopc_did_mount_gun = 0
+
+		level.mgopc_init = 1
+	}
+
+	if (local.usable_cannon == NIL)
+		local.usable_cannon = self
+
+
+	self.player_status = "away"
+	local.help_text_active = "none"
+			// possible values:
+			//		"none"
+			//		"throbber"
+			//		"gun"
+
+
+	local.player_holding_use = 0
+	local.player_just_pressed_use = 0
+	local.player_just_released_use = 0
+
+
+	local.orig_gun_to_throbber = (local.throbber.origin - local.turret.origin)
+	local.orig_gun_to_throbber[2] = 0
+	local.gun_forward = (angles_toforward local.turret.angles)
+	local.gun_forward[2] = 0
+	local.gun_forward = (vector_normalize local.gun_forward)
+	local.gun_leftward = (angles_toleft local.turret.angles)
+	local.gun_leftward[2] = 0
+	local.gun_leftward = (vector_normalize local.gun_leftward)
+
+	local.throbber_forward_component =
+			(vector_dot local.gun_forward local.orig_gun_to_throbber)
+	local.throbber_leftward_component =
+			(vector_dot local.gun_leftward local.orig_gun_to_throbber)
+
+
+
+	local.takes_precedence = "gun"			// I figure it's more okay to accidentally get on the gun than 
+											//		to accidentally plant the charge
+//	local.takes_precedence = "throbber"
+
+
+	local.prev_time = level.time
+	while (self && local.turret && local.usable_cannon)
+	{
+		// maint player-press-use state:
+
+		if ($player.useheld != local.player_holding_use)
+		{
+			if ($player.useheld)
+			{
+				//if (self == $Cannon1)
+				//iprintlnbold "***** PLAYER PRESSED USE"
+				local.player_just_pressed_use = 1
+				local.player_just_released_use = 0
+			}
+			else
+			{
+				//if (self == $Cannon1)
+				//iprintlnbold "***** PLAYER RELEASED USE"
+				local.player_just_pressed_use = 0
+				local.player_just_released_use = 1
+			}
+
+			local.player_holding_use = $player.useheld
+		}
+		else
+		{
+			local.player_just_pressed_use = 0
+			local.player_just_released_use = 0
+		}
+
+
+		// maint player-with-gun-and-throbber state:
+
+		local.player_forward = (angles_toforward $player.angles)
+		local.gun_forward = (angles_toforward local.turret.angles)
+		local.gun_forward[2] = 0
+		local.gun_forward = (vector_normalize local.gun_forward)
+		local.gun_leftward = (angles_toleft local.turret.angles)
+		local.gun_leftward[2] = 0
+		local.gun_leftward = (vector_normalize local.gun_leftward)
+
+		local.gun_to_throbber =
+			((local.gun_forward * local.throbber_forward_component) +
+				(local.gun_leftward * local.throbber_leftward_component))
+		local.gun_to_throbber[2] = 0
+
+		local.throbber_origin = local.turret.origin + local.gun_to_throbber
+		local.throbber_origin[2] = $player.origin[2]
+
+		local.gun_to_player = ($player.origin - local.turret.origin)
+		local.throbber_to_player = ($player.origin - local.throbber_origin)
+
+
+// Debug printer
+//		if ((self == $Cannon1) && ((level.time - local.prev_time) > 2))
+//		{
+//			iprintlnbold ("***** player_forward = " + local.player_forward)
+//			iprintlnbold ("***** gun_forward = " + local.gun_forward)
+//			iprintlnbold ("***** gun_to_throbber = " + local.gun_to_throbber)
+//			iprintlnbold ("***** gun_to_player = " + local.gun_to_player)
+//			iprintlnbold ("***** throbber_to_player = " + local.throbber_to_player)
+//			local.prev_time = level.time
+//		}
+
+		local.gun_says_use_me = (local.usable_cannon canuse $player)
+		local.player_facing_gun = ((vector_dot local.player_forward local.gun_forward) > 0)
+		local.can_use_gun = ((local.gun_says_use_me == 1) &&
+								local.player_facing_gun &&
+								(vector_within $player.origin self.origin local.gun_use_range))
+
+
+		local.player_on_side_of_throbber = ((vector_dot local.gun_to_throbber local.gun_to_player) > 0)
+		local.player_facing_throbber = ((vector_dot local.throbber_to_player local.player_forward) < 0)
+		local.can_use_throbber = ((self.noexplode == 0) &&
+									local.player_on_side_of_throbber &&
+									local.player_facing_throbber &&
+									(vector_within $player.origin local.throbber_origin local.throbber_use_range))
+
+		local.help_text_requested = local.help_text_active		// by default, same as before
+
+		switch (self.player_status)
+		{
+			case "away":
+				if (local.can_use_gun)
+				{
+					self.player_status = "nearGun"
+					local.help_text_requested = "gun"
+				}
+				else if (local.can_use_throbber)
+				{
+					self.player_status = "nearThrobber"
+					local.help_text_requested = "throbber"
+				}
+				else
+				{
+					local.help_text_requested = "none"
+				}
+				break
+
+			case "nearGun":
+				if ((local.takes_precedence == "throbber") && local.can_use_throbber)
+				{
+					self.player_status = "nearThrobber"
+					local.help_text_requested = "throbber"
+				}
+				else if (!(local.can_use_gun))
+				{
+					if (local.can_use_throbber)
+					{
+						self.player_status = "nearThrobber"
+						local.help_text_requested = "throbber"
+					}
+					else
+					{
+						self.player_status = "away"
+						local.help_text_requested = "none"
+					}
+				}
+				else if (local.player_just_pressed_use)
+				{
+					// get on the damn gun
+
+					//if (self == $Cannon1)
+					//iprintlnbold "***** PLAYER MOUNTED GUN"
+					self waitthread local.script_file_name::local.get_on_gun_thread_name
+
+					level.mgopc_did_mount_gun = 1
+
+					self.player_status = "onGun"
+					local.help_text_requested = "none"
+				}
+				else
+				{
+					local.help_text_requested = "gun"
+				}
+				break
+
+			case "onGun":
+				if (local.player_just_pressed_use)
+				{
+					// get off the damn gun
+
+					self waitthread local.script_file_name::local.get_off_gun_thread_name
+
+					self.player_status = "away"
+				}
+				local.help_text_requested = "none"
+				break
+
+			case "nearThrobber":
+				if ((local.takes_precedence == "gun") && local.can_use_gun)
+				{
+					self.player_status = "nearGun"
+					local.help_text_requested = "gun"
+				}
+				else if (!(local.can_use_throbber))
+				{
+					if (local.can_use_gun)
+					{
+						self.player_status = "nearGun"
+						local.help_text_requested = "gun"
+					}
+					else
+					{
+						self.player_status = "away"
+						local.help_text_requested = "none"
+					}
+				}
+				else if (local.player_just_pressed_use)
+				{
+					// set the damn explosives
+
+					//if (self == $Cannon1)
+					//iprintlnbold "***** PLAYER SET EXPLOSIVES"
+					self waitthread local.script_file_name::local.place_explosives_thread_name
+
+					self.player_status = "didSetThrobber"
+					level.mgopc_did_set_throbber = 1
+					local.help_text_requested = "none"
+				}
+				else
+				{
+					local.help_text_requested = "throbber"
+				}
+				break
+
+			case "didSetThrobber":
+				// no further interactions are allowed
+
+				local.help_text_requested = "none"
+				break
+		}
+
+
+		if (local.gun_name)
+		{
+			// update help text situation
+
+			if (level.mgopc_help_text_only_first_time)
+			{
+				if ((((local.help_text_requested == "throbber") && level.mgopc_did_set_throbber)) ||
+						(((local.help_text_requested == "gun") && level.mgopc_did_mount_gun)))
+					local.help_text_requested = "none"
+			}
+
+			if (local.help_text_requested != local.help_text_active)
+			{
+				switch (local.help_text_requested)
+				{
+					case "none":
+						thread global/throbtext.scr::throbtext_off
+						break
+					case "throbber":
+						local.usekey = getboundkey1 "+use"
+						local.msg = ( loc_convert_string ( "Press " + local.usekey + " to plant the explosive." ) )
+						thread global/throbtext.scr::throbtext local.msg 1000
+						break
+					case "gun":
+						local.usekey = getboundkey1 "+use"
+						local.msg = ( loc_convert_string ( "Press " + local.usekey + " to use the " + local.gun_name + "." ) )
+						thread global/throbtext.scr::throbtext local.msg 1000
+						break
+				}
+
+				local.help_text_active = local.help_text_requested
+			}
+		}
+
+		waitframe
+	}
+
+end
+
+
+

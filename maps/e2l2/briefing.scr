@@ -1,0 +1,97 @@
+// briefing
+
+//============================================================================
+init: {
+//============================================================================
+	drawhud 0 
+	thread doBriefing	
+}end
+
+//============================================================================
+doBriefing: {
+//============================================================================
+	spawn trigger_once targetname "briefingOverTrigger"
+	
+	$player thread doplayer
+	$lyndon thread golyndon
+}end	
+
+//============================================================================
+doplayer: {
+//============================================================================
+	// lock the player to a script origin
+    self physics_off
+	self notsolid
+	self glue $playerstartspot
+	$playerstartspot time 0.001
+
+ 	// move the script object, to get the player to squat
+	wait 1
+	$playerstartspot movedown 20
+	$playerstartspot move
+	
+	// wait for the briefing to be over
+	$briefingOverTrigger waittill trigger	
+
+	// move the script origin again and unglue the player
+	$playerstartspot moveup 30	
+	$playerstartspot move
+
+	//$player useweaponclass rifle
+	waitthread maps/e2l2/saves.scr::DoAutoSave "afterBriefing"
+}end
+
+//============================================================================
+golyndon: {
+//============================================================================
+	self.friendtype = 1
+	self.destination = $player
+	self.distance = 225
+	self exec global/disable_ai.scr	
+	
+	//Run cappy up to the player
+	self holster
+	self nodamage
+	self runto $lyndonstop
+	self waittill movedone	
+	wait .5
+
+	//spawn in the map attach it and hide it for a second	
+	local.map = spawn script_model model "models/items/It_P_Anziomap.tik"	
+	local.map attach self ORIGIN
+	local.map hide
+	
+	//do cappy's briefing
+	self anim A_22_Lt_Talk01A
+	local.map anim A_22_MapAnimation
+	wait .4
+
+	local.map show	
+	local.map waittill animdone
+	local.map remove	
+
+	//Briefing Over
+	trigger $briefingOverTrigger
+	
+	//Switch over the music		
+	thread maps/e2l2.scr::DoMusic "start"
+
+	wait 1
+	self unholster
+	self unglue $lyndonstop
+	self thread global/friendly.scr::friendlythink
+	self exec global/enable_ai.scr
+	
+	drawhud 1
+	wait 1
+	
+	self solid
+	$player solid
+	
+	self angles (0 180 0)
+	$player unglue $playerstartspot
+	$player physics_on
+
+	self lookat NULL
+	self turnto NULL	
+}end

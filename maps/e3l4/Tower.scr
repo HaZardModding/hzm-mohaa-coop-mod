@@ -1,0 +1,724 @@
+//=========================================================================
+InitTower:
+//=========================================================================
+{
+	level.towerFightDuration = 20.0
+
+	$radioguy nodamage
+	$radioguy exec global/disable_ai.scr
+
+	$radiotower connect_paths
+	$radiotower notsolid
+
+	$radioguy gun "colt 45"
+	$radioguy takeall
+	$radioguy ai_off
+	$radioguy notsolid
+	$radiomgguy1 ai_off
+	$radiomgguy1 notsolid
+	$radioguy hide
+	$radiomgguy1 hide
+	$radiomg1 waitthread maps/e3l4/Bunker1.scr::SetupMG
+		
+	$towerexplosive hide
+	$towerthrob hide
+	
+	level.TowerBomb 	 = 0
+	level.careabouttower = 0
+
+	$towerexplosive.origin = $towerthrob.origin
+	$hideroomgermandoor lock
+
+	//	local.towerdoor = waitthread global/FindTrigger.scr::FindTrigger "towerdoorlockedtrigger"
+	//	local.towerdoor nottriggerable
+	//	$defendtowerfailuretrigger nottriggerable
+
+	level.towerfalling 			= 0
+	level.airstrikeconfirmed  	= 0
+	level.towerfailuremessage 	= "You failed to protect the Communications Tower."
+
+	$towertank1.sighttrace = 0
+	$towertank2.sighttrace = 0
+}end
+
+//=========================================================================
+ObjectiveGoToRadio:
+//=========================================================================
+{
+	if (level.hackskiptower == 1){ // Hack actually referenced in our hack.scr file as of June 27, 2003: JP
+		waitthread InitRadioTowerBattle
+		$player.origin = $snipetrigger.origin + (0 -50 0)
+		end
+	}
+
+	thread maps/e3l4/Castle.scr::bookBurners
+	thread maps/e3l4/Castle.scr::cabinetGag
+	thread maps/e3l4/Castle.scr::chapel2guys
+	thread maps/e3l4/Castle.scr::castle2dguys
+
+	$starttowertrigger waittill trigger
+	waitthread InitRadioTowerBattle
+
+	$snipetrigger waittill trigger
+	thread maps/e3l4/castle.scr::CleanupSceneCastle
+	thread maps/e3l4.scr::startMusic_e3l4_tower
+
+	//local.towerdoor = waitthread global/FindTrigger.scr::FindTrigger "towerdoorlockedtrigger"
+	//local.towerdoor triggerable
+	//Set the door to NOT PLAYERS
+	//$radiotowerdoor.spawnflags = 8
+	$towerparade.activeguys = 0
+
+	/*
+	thread RadioLoop
+	$deskradio loopsound m1l2b_radio2 20 1000
+	*/
+
+	$radioguy say A_34_Commtalk_01
+	$radioguy waittill saydone
+	wait 1
+
+	$deskradio playsound DFRUS_E3L4_NC1516
+	wait 4
+
+	$radioguy say A_34_Commtalk_02
+	$radioguy waittill saydone
+	$radioguy say A_34_Commtalk_03
+	$radioguy waittill saydone
+	wait 1
+
+	$radioguy thread global/LoopAnim.scr::LoopAnimStop
+	thread SlamHand
+
+	$radioguy say A_34_Commtalk_04
+	$radioguy waittill saydone
+	$radioguy say A_34_Commtalk_05
+	$radioguy waittill saydone	
+	$radioguy thread global/LoopAnim.scr::LoopAnimStop
+}end
+
+//=========================================================================
+SlamHand:
+//=========================================================================
+{
+	$radioguy anim A_34_Commtalk_turnaround
+	$radioguy waittill animdone
+	$radioguy thread global/LoopAnim.scr::LoopAnim A_34_Commtalk_breathing
+}end
+
+//=========================================================================
+InitRadioTowerBattle:
+//=========================================================================
+{
+	$radiomgguy1 ai_on
+	$radiomgguy1 solid
+	$radiomgguy1 show
+	$radiomgguy1 threatbias 10000
+	$radiomgguy1 nodamage
+	$radiomg1 thread global/mg42init.scr::AttachGuyToMG42 $radiomgguy1 NIL 1
+
+	// Outside parade starts
+	$radioguy ai_on
+	$radioguy solid
+	$radioguy show
+	$radioguy avoidplayer 0
+	$radioguy thread global/LoopAnim.scr::LoopAnim A_34_Commtalk_radio_idle
+	//$radioguy turnto $player
+	//$radioguy lookat $player
+}end
+
+//=========================================================================
+ObjectiveDefendTower:
+//=========================================================================
+{
+	if(level.hackskipdefendtower == 1){
+		end
+	}
+		
+	exec global/autosave.scr 8 // The Radio Tower
+	waitframe
+
+	thread TowerBattle
+	waitthread RadioGuyFixTower
+	//	$player stopwatch 0
+}end
+
+/*
+LeaveFailure:
+
+	$defendtowerfailuretrigger triggerable
+	$defendtowerfailuretrigger waittill trigger
+
+	if (level.currentobjective == level.ObjDefendTower)
+	{
+		iprintlnbold level.towerfailuremessage
+		missionfailed
+	}
+
+end
+*/
+
+//=========================================================================
+RadioGuyFixTower:
+//=========================================================================
+{
+	//Radioguy runs down stairs
+	//while (vector_length($radioguy.origin - $t529.origin) > 100)
+
+	while (vector_length($radioguy.origin - $radioguyruntotowerend.origin) > 100){
+		$radioguy runto $radioguyruntotower
+		$radioguy waittill movedone
+		waitframe
+	}
+
+	if ($player cansee $radioguy){
+		iprintlnbold level.towerfailuremessage
+		missionfailed
+		wait 5
+	}
+
+	// Teleport outside
+	$radioguy.origin = $radioguyruntotower2.origin
+	$radioguy threatbias ignoreme
+
+	// Radioguy runs to tower
+	$radioguy runto $radioguyruntotower2
+	$radioguy waittill movedone
+		
+	// Hangs out inside
+	$radioguy turnto $generator
+	$radioguy thread global/LoopAnim.scr::LoopAnim A_13_ClausTalk10_idle
+
+	while (level.towerbattledone == 0){
+		waitframe
+	}
+
+	//dprintln "DEBUG: Music"
+	//noises start
+	//waitthread RadioSound
+
+	$radioguy turnto $player
+	$radioguy lookat $player
+	wait 1
+
+	$radioguy anim A_34_Commtalk_armlift
+	$radioguy waittill animdone
+	$radioguy thread global/LoopAnim.scr::LoopAnim A_34_Commtalk_idle
+
+	$radioguy say A_34_Commtalk_06
+	$radioguy waittill saydone
+}end
+
+//=========================================================================
+TowerBattleManager:
+//=========================================================================
+{
+	level.towerbattledone = 0
+	$towerparade thread global/parade.scr::RunParade
+
+	// 4 active guys for 15 seconds
+	$towerparade.activeguys = 4
+	wait 15
+
+	local.bazookaguytrigger = waitthread global/FindTrigger.scr::FindTrigger "towerspawnerwave1"
+	trigger local.bazookaguytrigger
+
+	// 5 second cleanup time
+	$towerparade.activeguys = 0
+	wait 5
+
+	// 5 active guys for 15 seconds
+	$towerparade.activeguys = 5
+	wait 15
+
+	local.bazookaguytrigger = waitthread global/FindTrigger.scr::FindTrigger "towerspawnerwave2"
+	trigger local.bazookaguytrigger
+
+	// 10 second cleanup time
+	$towerparade.activeguys = 0
+	wait 10
+
+	// 6 active guys for 15 seconds
+	$towerparade.activeguys = 6
+	wait 15
+
+	local.bazookaguytrigger = waitthread global/FindTrigger.scr::FindTrigger "towerspawnerwave3"
+	trigger local.bazookaguytrigger
+
+	// 10 second cleanup time
+	$towerparade.activeguys = 0
+	wait 10
+
+	// 6 active guys for 15 seconds
+	$towerparade.activeguys = 6
+	wait 15
+
+	local.bazookaguytrigger = waitthread global/FindTrigger.scr::FindTrigger "towerspawnerwave4"
+	trigger local.bazookaguytrigger
+
+	// 10 second cleanup time
+	$towerparade.activeguys = 0
+	wait 10
+
+	thread TowerTank1
+	thread TowerTank2
+
+	// 7 active guys for 15 seconds
+	$towerparade.activeguys = 7
+	wait 15
+
+	level.towerbattledone = 1
+
+	while (level.airstrikeconfirmed == 0){
+		waitframe
+	}
+	$towertank.myenemy = $player
+
+	// Stop the parade!
+	$towerparade thread global/parade.scr::DeleteParade 2000
+	//$towerbomber thread global/parade.scr::DeleteParade
+
+	$towerthrob remove
+	$towerexplosive remove
+}end
+
+//=========================================================================
+TowerTank1:
+//=========================================================================
+{
+	wait 5
+	local.towertanktrigger = waitthread global/FindTrigger.scr::FindTrigger "towertanktrigger1"
+	trigger local.towertanktrigger
+	$towertank1.myenemy = NULL
+	wait 5
+
+	$towertank1.myenemy = $radiomgguy1
+	while ($radiomgguy1 && (isalive radiomgguy1)){
+		wait 1
+	}
+	wait 3
+
+	//$towertank1.myenemy = $player
+}end
+
+//=========================================================================
+TowerTank2:
+//=========================================================================
+{
+	wait 10
+
+	local.towertanktrigger = waitthread global/FindTrigger.scr::FindTrigger "towertanktrigger2"
+	trigger local.towertanktrigger
+	//	$towertank2.myenemy = NULL
+	wait 10
+
+	//	$towertank2.myenemy = $player
+}end
+
+// TOWER BATTLE
+//=========================================================================
+TowerBattle:
+//=========================================================================
+{
+	thread TowerBattleManager
+	$towerexplosive.origin = $towerthrob.origin
+
+	// Reset the parade
+	for(local.i = 1; local.i <= $towerparade_paradeguy.size; local.i++){
+		$towerparade_paradeguy[local.i] exec global/bullethit.scr (0 0 20) 5000 0 1		
+	}
+
+	$radiomgguy1 takedamage
+	$towerthrob show
+
+	/*
+	// Waittill they have killed the mg guys
+	if ($radiomgguy1 && isalive $radiomgguy1)
+		$radiomgguy1 waittill death
+
+	if ($radiomgguy2 && isalive $radiomgguy2)
+		$radiomgguy2 waittill death
+
+	if ($radiomgguy3 && isalive $radiomgguy3)
+		$radiomgguy3 waittill death
+	*/
+
+	// Once the mg guys are dead, have them occassionally make a run for the tower
+	waitthread TowerBombAttempts
+}end
+
+//=========================================================================
+TowerBombAttempts:
+//=========================================================================
+{
+	while(level.towerfalling == 0 && level.airstrikeconfirmed == 0){
+		local.bomber = waitthread ChooseRandomParadeGuy
+
+		if (local.bomber){
+			local.bomber holster
+			local.bomber.health = 10
+			local.bomber.nolongpain = 1
+			local.bomber thread TakeoutTower
+
+			while ((isalive local.bomber) && (local.bomber.aborttower != 1)){
+				waitframe
+			}
+
+			//local.bomber waittill death
+			//Reset the stopwatch if this guy dies and show the throbbing box
+			//$player stopwatch 0
+
+			$towerthrob show
+			$towerexplosive hide
+		}
+		wait 1
+	}
+}end
+
+//=========================================================================
+ChooseRandomParadeGuy:
+//=========================================================================
+{
+	/*
+	local.bomber = NULL
+	for (local.i=$towerparade_paradeguy.size;local.i>=1;local.i--)
+	{
+		if ($towerparade_paradeguy[local.i] && isalive $towerparade_paradeguy[local.i])
+		{
+			end $towerparade_paradeguy[local.i]
+		}
+	}
+
+
+	end NULL
+	*/
+
+	if (!$towerparade_paradeguy){
+		end
+	}
+
+	local.farthestguy  = NULL
+	local.farthestdist = 0
+
+	for (local.i=1;local.i<=$towerparade_paradeguy.size;local.i++){
+		if ($towerparade_paradeguy[local.i] && isalive $towerparade_paradeguy[local.i]){
+			local.dist = vector_length($towerparade_paradeguy[local.i].origin - $towerexplosive.origin)
+
+			if (local.dist > local.farthestdist){
+				local.farthestdist = local.dist
+				local.farthestguy  = $towerparade_paradeguy[local.i]
+			}
+		}
+	}
+}end local.farthestguy
+
+//=========================================================================
+TakeoutTower:
+//=========================================================================
+{
+	//	self.type_attack = "runandshoot"
+	self.type_attack = "turret"
+	self exec global/disable_ai.scr
+	self runto $axisdestroytower.origin
+	//	self.movedoneradius = 80
+
+	//	iprintln "TAKEOUTTOWER"
+	while (self && vector_length(self.origin - $axisdestroytower.origin) > 80){
+		self runto $axisdestroytower.origin
+		wait 1
+	}
+
+	// waittill we've gotten to the explosive or we die
+	//self waittill movedone
+
+	if (self && vector_length(self.origin - $axisdestroytower.origin) > 80){
+		//dprintln "ABORT!"
+		self.aborttower = 1
+		self exec global/enable_ai.scr
+		end
+	}
+
+	/*
+	while (self && isalive self && vector_length(self.origin - $axisdestroytower.origin) > 50)
+	{
+		waitframe
+	}
+	*/
+	//	iprintln "GOT HERE"
+
+	// if  we are dead, get out of here
+	if (!self || !(isalive self)){
+		end
+	}
+
+	// put away our gun, turn to the explosive, and play the bomb animation
+	self holster
+	//self exec global/disable_ai.scr
+	self turnto $towerexplosive
+	self waittill turndone
+	self thread global/LoopAnim.scr::LoopAnim A_13_ClausTalk10_idle
+
+	// Show the explosive and start the stopwatch
+	if($towerthrob && level.airstrikeconfirmed == 0){
+		$towerthrob hide
+		$towerexplosive show
+		local.bombtime = 2
+		//$player stopwatch local.bombtime
+		wait local.bombtime
+	}
+	
+	// If he is still alive after the time is up, blow the tower
+	if (isalive self && level.airstrikeconfirmed == 0){
+		$towerthrob remove
+		$towerexplosive remove
+		level.towerfalling = 1
+	   	waitthread TowerExplosion
+
+		//$player stopwatch 0
+		self remove
+
+		iprintlnbold level.towerfailuremessage
+		missionfailed
+	}
+}end
+
+// RADIO SOUNDS
+//=========================================================================
+RadioLoop:
+//=========================================================================
+{
+	while(level.RadioLoop == 1){
+		$deskradio playsound  m1l2b_radio2 20 1000// m2l1_radio3 
+		wait 3.0
+		$deskradio stopsound
+	}
+	$deskradio stopsound
+}end
+
+//=========================================================================
+SecondRadioLoop:
+//=========================================================================
+{
+	while(level.RadioLoop == 1){
+		$deskradio playsound  m1l2b_radio1 20 1000 // m2l1_radio3
+		wait 3.0
+		$deskradio stopsound
+	}
+}end
+
+//=========================================================================
+RadioSound:
+//=========================================================================
+{
+	level.RadioLoop = 0
+	$player stufftext "tmstop" 
+	//$deskradio playsound  m1l2b_radio2 // m2l1_radio3 
+	//wait 3.0
+
+	$deskradio loopsound
+	//$deskradio stopsound
+	
+	$deskradio playsound m2l1_radio3 20 1000
+	wait 3.0
+
+	$deskradio stopsound
+	$deskradio loopsound e1l1_radio_loopA2 20 1000
+	wait 10.0
+
+	$deskradio stoploopsound
+	$deskradio loopsound radio_loop2 20 1000
+	wait 5.0
+
+	$deskradio stoploopsound
+	$deskradio loopsound e1l1_radio_loopA2 30 1000
+	wait 3.0
+
+	$deskradio stoploopsound
+	$deskradio playsound  m1l2b_radio2 20 1000 // m2l1_radio3
+	wait 3.0
+
+	$deskradio stopsound
+	level.RadioLoop = 1
+	thread SecondRadioLoop
+	$player stufftext "tmstartloop sound/music/medicdance.mp3"
+}end
+
+// TOWER EXPLOSION
+//=========================================================================
+TowerExplosion:
+//=========================================================================
+{
+		local.o = $radiotower.origin
+		local.a = $radiotower.angles
+		$radiotower hide
+
+		radiusdamage $towerexplosive.origin 1000 1000
+		thread Earthquake $radiotower.origin 2000
+		$towerexplosive hide
+		$towerexplosive playsound explode_truck
+
+		local.explosion2 = spawn script_model model models/fx/fx_truck_explosion.tik
+		local.explosion2.origin = $towerexplosive.origin + (0 0 100)
+		local.explosion2.angles = $towerexplosive.angles
+		local.explosion2 anim start
+		local.explosion2 notsolid
+
+		thread pocketFlashFx models/fx/fx_pocketflash.tik $towerexplosive.origin
+
+		local.falling = spawn "animate/sc_p_radiotowerleg.tik" 
+		local.falling notsolid
+		local.falling.origin = local.o					
+		local.falling.angles = local.a
+		local.falling anim fall			
+		local.falling waittill animdone	
+		thread DoTowerDust
+		wait 3.0
+
+		$towerexplosive delete
+		$radiotower delete
+}end
+
+//=========================================================================
+DoTowerDust:
+//=========================================================================
+{
+	for (local.i=1; local.i<=$axisdestroytower.size; local.i++){
+		thread DustMiteThread $axisdestroytower[local.i].origin "models/emitters/tehao_explosionDust.tik"
+	}
+	thread DustMiteThread $radiotowerdust.origin "models/emitters/tehao_explosionDust.tik"
+}end
+
+// Spawns effect of the Dust Cloud, Huge though
+//=========================================================================
+DustMiteThread local.origin local.model:
+//=========================================================================
+{
+	local.ent = spawn local.model
+	local.ent scale 1.5
+	local.ent.origin = local.origin
+	local.ent anim start
+	local.ent notsolid
+	wait 1.5
+
+	local.ent anim stop
+	local.ent delete
+}end
+
+// camera shake prooporitional to distance of local.origin
+// Default for maxShakeDist is 600 
+//=========================================================================
+Earthquake local.origin local.maxShakeDist:
+//=========================================================================
+{
+	if (!local.maxShakeDist){
+		local.maxShakeDist = 600
+	}
+
+	local.dir  = $player.origin
+	local.dir -= local.origin
+	local.dist = vector_length local.dir
+	
+	if (local.dist < local.maxShakeDist) {
+		local.t 	= local.dist/local.maxShakeDist
+		local.mag 	= (2*local.t) + (6*(1.0 - local.t))
+		earthquake 0.5 local.mag 1 0
+	}
+}end
+
+//=========================================================================
+pocketFlashFx local.fx local.origin:
+//=========================================================================
+{
+	local.temp = spawn script_model model local.fx
+	local.temp notsolid
+	local.temp.origin = local.origin  
+	local.temp anim start
+	local.temp notsolid
+	waitframe
+
+	local.temp remove
+}end
+
+//=========================================================================
+ObjectiveConfirmAirstrike:
+//=========================================================================
+{
+	if(level.hackskipcallinairstrike == 1){
+		end
+	}
+	thread RadioGuyKeepYelling
+
+	// dprintln "DEBUG: Call in AirStrike"
+	waitthread PlayerUseRadio
+
+	//	level.RadioLoop = 0
+	//	wait 1.0
+	// waitthread TowerExplosion
+	//	$player threatbias 10000
+}end
+
+//=========================================================================
+RadioGuyKeepYelling:
+//=========================================================================
+{
+	thread RunBackToCastle
+	wait 5
+
+	if (level.airstrikeconfirmed == 0){
+		$radioguy say A_34_Commtalk_07
+		$radioguy waittill saydone
+	}
+}end
+
+//=========================================================================
+RunBackToCastle:
+//=========================================================================
+{
+	while (level.currentobjective == level.ObjConfirmAirstrike){
+		waitframe
+	}
+
+	// Runs out back to castle
+	$radioguy thread global/LoopAnim.scr::LoopAnimStop
+	$radioguy runto $radioguyrunback1
+	$radioguy waittill movedone
+	$radioguy remove
+}end
+
+//=========================================================================
+PlayerUseRadio:
+//=========================================================================
+{
+	local.usekey = getboundkey1 "+use"
+	local.msg = (loc_convert_string ("Press " + local.usekey + " to confirm the airstrike."))
+	waitexec global/DistanceUse.scr $deskradio 100 local.msg
+
+	$deskradio playsound radio_on
+	level.airstrikeconfirmed = 1
+
+	while (level.towerfalling == 1){
+		waitframe
+	}
+	wait 1
+
+	$deskradio playsound DFRUS_E3L4_NC1521_02
+	wait 8
+
+	$player holster
+	waitframe
+}end
+
+//=========================================================================
+CleanupSceneTower:
+//=========================================================================
+{
+	$towerparade thread global/parade.scr::DeleteParade 0
+	$radiomgguy1 delete
+	$radiomg1 delete
+	$radioguy delete
+
+	$towertank1 delete
+	$towertank2 delete
+}end
+
+

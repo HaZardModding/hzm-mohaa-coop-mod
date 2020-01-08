@@ -1,0 +1,74 @@
+//
+// final_section.scr
+//
+
+// InitSection
+//=========================================================================
+InitSection: {
+//=========================================================================
+	level.started_airstrike = 0
+	level.camp_disturbed = 0
+	level.clicked_in_intro = 0
+
+	//$aagun.current_target = NULL
+	//$aagun.target_mode = 0
+
+	waitthread global/ManSpawnNamed.scr::Init "aagun_gunner"
+	waitthread global/ManSpawnNamed.scr::Init "CampAxisGuy1"
+	waitthread global/ManSpawnNamed.scr::Init "CampAxisGuy2"
+	waitthread global/ManSpawnNamed.scr::Init "CampAxisGuy3"
+	waitthread global/ManSpawnNamed.scr::Init "Cannon3GuyA"
+	waitthread global/ManSpawnNamed.scr::Init "Cannon3GuyB"
+
+	thread maps/e3l2/final_section_pows.scr::InitSection
+	thread DoSection
+}end
+
+// DoSection
+//=========================================================================
+DoSection: {
+//=========================================================================
+	$FinalSectionTrigger waittill trigger
+	thread SparkyNumberTwo
+
+	if (level.warp_to_section == "FinalScene" || level.warp_to_section == "FinalSceneGetaway") {
+		waitthread global/ManSpawnNamed.scr::Spawn "prisoner"
+	}
+
+	waitexec global/autosave.scr 3
+
+	waitthread global/ManSpawnNamed.scr::Spawn "aagun_gunner"
+	waitthread global/ManSpawnNamed.scr::Spawn "CampAxisGuy1"
+	waitthread global/ManSpawnNamed.scr::Spawn "CampAxisGuy2"
+	waitthread global/ManSpawnNamed.scr::Spawn "CampAxisGuy3"
+	waitthread global/ManSpawnNamed.scr::Spawn "Cannon3GuyA"
+	waitthread global/ManSpawnNamed.scr::Spawn "Cannon3GuyB"
+	waitframe
+
+	$CampAxisGuy1 thread ZigZagUponAlert
+	$CampAxisGuy2 thread ZigZagUponAlert
+	$CampAxisGuy3 thread ZigZagUponAlert
+}end
+
+//=========================================================================
+ZigZagUponAlert: {
+//=========================================================================
+	self waittill hasenemy
+
+	if (self && (isalive self) && self.target && $(self.target)) {
+		self exec global/RunChainWhileShooting.scr $(self.target)
+	}
+}end
+
+//=========================================================================
+SparkyNumberTwo: {
+//=========================================================================
+	if (!$spark2) {
+		end
+	}
+
+	while ($spark2) {
+		wait (1 + (randomfloat 3))
+		$spark2 playsound e3l2_spark
+	}
+}end

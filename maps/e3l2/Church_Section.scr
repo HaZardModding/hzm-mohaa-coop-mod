@@ -1,0 +1,50 @@
+//
+// Church Section
+//
+
+// InitSection
+//=========================================================================
+InitSection: {
+//=========================================================================
+	if (!$ChurchSectionTrigger && $WoundedGuy1SectionTrigger) {
+		$WoundedGuy1SectionTrigger.targetname = "ChurchSectionTrigger"
+	}
+
+	waitframe
+	waitthread global/ManSpawnNamed.scr::Init "mgGuy1"
+	thread DoSection
+}end
+
+// DoSection
+//=========================================================================
+DoSection: {
+//=========================================================================
+	if (!$ChurchSectionTrigger) {
+		end
+	}
+
+	// wait until the section is triggered
+	$ChurchSectionTrigger waittill trigger
+
+	// setup the badguys
+	waitthread global/ManSpawnNamed.scr::Spawn "mgGuy1"
+	waitframe
+
+	$mgGuy1 favoriteenemy $player
+	waitthread global/ai.scr::spawnset 400 ChurchEnemy
+	waitframe
+
+	waitframe
+	$ChurchEnemy thread ChurchEnemyThink
+
+	// cleanup
+	exec global/EntityRemoveOnTrigger.scr $startMarchingTrigger "mgGuy1" "ChurchEnemy"
+}end
+
+//=========================================================================
+ChurchEnemyThink: {
+//=========================================================================
+	if (self.target && $(self.target)) {
+		self exec global/RunChainWhileShooting.scr $(self.target)
+	}
+}end

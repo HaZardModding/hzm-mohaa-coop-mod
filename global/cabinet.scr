@@ -1,0 +1,243 @@
+//	Cabinet Guy system created by Mackey McCandlish
+//	
+//	Before level waittill spawn "exec global/cabinet.scr".
+//	
+//	Used in m5l1a, m5l1b, and m3l2 or m3l3, or maybe both.
+//	
+//	Make a animate/furniture_hidden-cabinet (there are 3 possible kinds). Targetname it "cabinet".
+//
+//	Create an AI guy nearby. Give him classname "ai_actor" (doesn't effect anything except make his bounding box blue in the
+//	editor, makes him stand out as a "not real guy"). Target the cabinet to the guy.
+//
+//	Create a trigger_multiple with targetname "cabinettrigger". Give it and the cabinet the same #set value. The way it works
+//	is that entering the cabinettrigger arms the cabinet and leaving the cabinettrigger fires the cabinet (unleashing the AI
+//	guy). 
+//
+//	The default chance of a guy jumping out of a cabinet is 40%. You can change this by giving the cabinet a new #chance value.
+
+
+//chrissstrahl modified for multiplayer use
+//2018.07.23
+
+//=========================================================================
+main:{
+//=========================================================================
+	if ($cabinettrigger == NULL){
+		level.cabinettriggers = 0
+	}
+	else{
+		level.cabinettriggers = $cabinettrigger.size
+	}
+
+	if (level.cabinettriggers > 0){
+		level.cabinettrigger = exec global/makearray.scr $cabinettrigger
+
+		for (local.i=1;local.i<level.cabinettriggers+1;local.i++){
+			if (level.cabinettrigger[local.i].set == NIL){
+				exec global/error.scr ("Error, cabinettrigger at " + level.cabinettrigger[local.i].origin + " has no #set") 1
+			}
+			else{
+				level.cabinettrigger[local.i] thread cabinettrigger
+			}
+		}
+
+		println ("Spawned " + level.cabinettriggers + " cabinettriggers")
+	}
+
+
+	if ($cabinet == NULL){
+ 		level.cabinets = 0
+	}
+	else{
+		level.cabinets = $cabinet.size
+	}
+
+	if (level.cabinets > 0){
+		level.cabinet = exec global/makearray.scr $cabinet
+
+		for (local.i=1;local.i<level.cabinets+1;local.i++){
+			if (level.cabinet[local.i].set == NIL){
+				exec global/error.scr ("Error, cabinet at " + level.cabinet[local.i].origin + " has no #set") 1
+			}
+			else{
+				if (level.cabinet[local.i].target){
+					level.cabinet[local.i].spawner = waitthread global/spawner.scr::spawner_create level.cabinet[local.i].target
+				}
+
+				level.cabinet[local.i] thread checkdeath
+				level.cabinet[local.i] thread checkuse
+			}
+		}
+		println ("Spawned " + level.cabinets + " cabinets")
+	}
+}end
+
+
+//=========================================================================
+cabinettrigger:{
+//=========================================================================
+	level waittill spawn
+	if (game.medic != NIL){
+		self delete
+		end
+	}
+
+	self waittill trigger
+	while (exec coop_mod/replace.scr::istouching self){
+		waitframe
+	}
+
+	for (local.i=1;local.i<level.cabinets+1;local.i++){
+		if ((level.cabinet[local.i].set == self.set) && (isalive level.cabinet[local.i])){
+			thread cabinetgo local.i
+		}
+	}
+}end
+
+//=========================================================================
+cabinetgo local.i:{
+//=========================================================================
+
+//	if (level.cabinet[local.i].dontfire == NIL)
+	local.num = randomint (100) 
+	level.cabinet[local.i].dontfire = 1
+
+	if (local.num < level.cabinet[local.i].chance){
+		if (level.cabinet[local.i].pause){
+			wait (level.cabinet[local.i].pause)
+		}
+
+		if (level.cabinet[local.i].target){
+			local.target = level.cabinet[local.i].target
+		}
+
+		
+		if (level.cabinet[local.i].spawner != NIL){
+			local.ent = waitthread global/spawner.scr::spawner_activate level.cabinet[local.i].spawner
+		}
+		else{
+			local.ent = spawn human/german_wehrmact_soldier
+		}
+
+		level.cabinet[local.i] damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+
+		if (local.target){
+			local.ent.creator = local.target
+		}
+
+		local.ent.nosurprise = 1
+		local.ent.angles = level.cabinet[local.i].angles
+		local.ent noticescale 1
+		local.ent mindist 64
+		local.ent maxdist 2048
+		local.ent accuracy 100
+		local.o = level.cabinet[local.i] gettagposition "tag_origin"
+		local.ent.origin = local.o
+		local.ent exec global/disable_ai.scr
+		local.ent notsolid
+		level.cabinet[local.i] playsound cabinetopen
+		level.cabinet[local.i] anim open
+		local.ent anim_scripted cabinet_hiding_attack
+		local.ent waittill animdone
+		
+//chrissstrahl - get closest player
+		local.player = NULL
+		while( local.player == NULL ){
+			wait 2
+			local.player = exec coop_mod/replace.scr::player_closestTo local.ent
+		}
+
+		local.angles = vector_toangles (local.ent.origin - local.player.origin)
+		local.ent.angles = ( 0 (local.angles[1] - 180) 0)
+
+		local.ent exec global/enable_ai.scr
+		local.ent solid
+		wait 3
+		
+//chrissstrahl - get closest player
+		while( local.player == NULL ){
+			wait 2
+			local.player = exec coop_mod/replace.scr::player_closestTo local.ent
+		}
+		
+		local.ent runto local.player
+	}
+}end
+
+//=========================================================================
+checkuse:{
+//=========================================================================
+	level waittill spawn
+	if (game.medic == NIL){
+		self.rotatedbbox = 1
+	}
+}end
+
+
+//=========================================================================
+checkdeath:	{
+//=========================================================================
+	self solid
+	
+	if !(self.chance){
+		self.chance = 40
+	}
+
+	level waittill spawn
+
+	self solid
+
+	if (game.medic != NIL){
+		self delete
+		end
+	}
+
+	self takedamage
+	self.health = randomint(100) + 50
+
+	while (self.health > 1){
+		wait 0.2
+	}
+
+	if (randomint (100) < self.chance){
+		end
+	}
+
+	if (self.dontfire != NIL){
+		end
+	}
+
+	if (self.spawner != NIL){
+		local.ent = waitthread global/spawner.scr::spawner_activate self.spawner
+	}
+	else{
+		local.ent = spawn human/german_wehrmact_soldier
+	}
+
+	local.ent nodamage
+	local.ent dontdropweapons
+	local.ent hide
+	local.ent.creator = local.target
+
+	local.ent.angles = self.angles
+	local.ent noticescale 1
+	local.ent accuracy 100
+	local.o = self gettagposition "tag_origin"
+	local.ent.origin = local.o
+	local.ent exec global/disable_ai.scr
+	local.ent notsolid
+
+	local.ent exec global/setdeathanim.scr "cabinet_hiding_death"
+
+	local.ent.no_idle = 1
+	local.ent dropitems
+	local.ent anim_scripted cabinet_hiding_death
+
+	wait 0.35
+	local.ent show
+	self playsound cabinetopen
+	self anim open
+
+	local.ent waittill animdone
+	local.ent bedead
+}end

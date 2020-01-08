@@ -1,0 +1,352 @@
+// Parachutist Battle
+//
+// When player triggers the StartParachuteBattleTrigger
+// 1> start the 3 ilalian solgers firing their weapons
+// 2> intially the near 2 are vulneable and the far
+
+/* --------------------------------------------------------
+
+The following stuff needs to be added to the map
+
+3 enemies
+2 allies (hudson and michaels)
+2 triggers
+
+enemies 1 & 2
+-------------
+
+  $targetname paraBattleSpawners
+  $enemyname paraPinVulner1 & 2
+
+enemy 3
+-------
+
+  $targetname paraBattleSpawners
+  $enemyname paraPinImmune
+
+allies
+------
+
+- one guy gets:
+  $targetname hudson
+
+- and the other:
+  $targetname michaels
+
+trigger1
+--------
+
+  Starts the battle sequence
+
+  setthread startParachuteBattleTrigger
+  $targetname enemyspawnertrigger
+  target paraBattleSpawners
+
+trigger2
+--------
+
+  Disables Immunity of the paraPinImmune
+
+  setthread disableImmunityPBattleTrigger
+
+   --------------------------------------------------------
+   
+*/
+// soldier is immune.
+
+//============================================================================
+initParachuteBattle: {
+//============================================================================
+	// println "init parachute battle entities"
+	// HACK!!!!!! change this in the map
+	$leroy.targetname = "hudson"
+	level.bad_guy_count = 0
+	$hudson nodamage
+  
+	// turn these guys off until triggered
+	$hudson ai_off
+	$michaels ai_off
+	$hudson nodamage
+
+	// attach to the telephone pole
+	$mcmartin holster 0
+	$mcmartin physics_off
+	$mcmartin.origin = $playerspot_pole.origin
+	$mcmartin glue $playerspot_pole 0
+	$mcmartin.alreadyHit = 0
+	$mcmartin exec global/disable_ai.scr
+
+	$mg42_guy_300 ai_off
+}end
+
+// this is called directly by the trigger
+//============================================================================
+startParachuteBattleTrigger: {
+//============================================================================
+	thread startMusic_e2l1_paraBattle
+	waitthread maps/e2l1/aaguns.scr::TurnOnAAGun4Guys
+	waitthread global/ai.scr::spawnset 300 spawn300
+	thread TrackParaBattle
+
+	$mg42_guy_300 ai_on
+	waitframe
+	//wait .3
+
+	$hudson thread FriendlyFight
+	$michaels thread FriendlyFight
+
+	$mcmartin ai_on
+	$mcmartin thread global/loopanim.scr::LoopAnim AA_para_loosen
+}end
+
+//============================================================================
+FriendlyFight: {
+//============================================================================
+	self ai_on
+	self sight 6000
+	self hearing 6000
+	self.nosurprise = 1
+
+	if ( self.target ) {
+		self type_attack runandshoot
+		self runto self.target
+		self waittill movedone
+		self type_attack cover
+	}
+}end
+
+// this is activated directly by the second trigger
+//============================================================================
+disableImmunityPBattleTrigger: {
+//============================================================================ 
+	$mcmartin thread ParachuteHang
+	thread maps/e2l1/aaguns.scr::CancelGag $aagun4
+
+	// hook in the fact that we've met up with these guys...
+	waitthread maps/e2l1/objectives.scr::transition "rendezvou_done"
+
+	//self remove
+}end
+
+//============================================================================
+startMusic_e2l1_paraBattle: {
+//============================================================================
+	$player stufftext "tmstop; tmstart sound/music/mus_09a_action.mp3"
+	//	waitthread global/music.scr::StopSong 1.0
+	//	thread global/music.scr::PlaySong "sound/music/mus_09a_action.mp3"
+}end
+
+//============================================================================
+deathCheck: {
+//============================================================================
+	if ( self.death_check_thread!=NIL ) {
+		end
+	}
+
+	self.death_check_thread = local
+
+	if ( !isAlive self ) {
+		end
+	}
+
+	level.bad_guy_count++
+
+	println self.targetname " -- Parabattle guys counted:" level.bad_guy_count
+	self waittill death
+	level.bad_guy_count--
+
+	dprintln "Parabattle guys left:" level.bad_guy_count
+	if ( level.bad_guy_count==1 ) {
+		thread seekLoneGunman
+	}
+
+	// when all these bad guys are gone, we're done..
+	if ( level.bad_guy_count==0 ) {
+		thread paraBattleOver
+	}
+}end
+
+//============================================================================
+TrackParaBattle: {
+//============================================================================
+	$mg42_guy_300   thread deathCheck
+	$paraPinVulner1 thread deathCheck
+	$paraPinVulner2 thread deathCheck
+	$paraPinImmune  thread deathCheck
+	$aagun4guy1     thread deathCheck
+	$aagun4guy2     thread deathCheck
+	$aagun4guy3     thread deathCheck
+	$spawn300		thread deathCheck
+
+	wait 5
+	thread BeFriendly
+}end
+
+//============================================================================
+BeFriendly: {
+//============================================================================
+	$hudson thread JoinPlayer 175
+	$michaels thread JoinPlayer 200
+}end
+
+//============================================================================
+JoinPlayer local.dist: {
+//============================================================================
+	self.friendtype = 1
+	self.destination = $player
+	self thread global/friendly.scr::friendlythink
+	self.distance = local.dist
+}end
+
+//============================================================================
+seekLoneGunman: {
+//============================================================================
+	if ( isAlive $michaels ) {
+		$michaels waitthread global/friendly.scr::friendlystop
+		$michaels runto $michaels_death
+	}
+
+	if ( isAlive $mcmartin && ($mcmartin.hangingout != NIL) && ($mcmartin.hangingout == 0) ) {
+		$mcmartin waitthread global/friendly.scr::friendlystop
+		$mcmartin runto $mcmartin_death
+	}
+
+	if ( isAlive $hudson ) {
+		$hudson waitthread global/friendly.scr::friendlystop
+		$hudson runto $leroy_death
+	}
+}end
+
+//============================================================================
+mcmartinrun: {
+//============================================================================
+	// in case he's still hanging from the 'chute
+	while ( ($mcmartin.hangingout == NIL) || ($mcmartin.hangingout == 1) ) {
+		waitframe
+	}
+
+	$mcmartin waitthread global/friendly.scr::friendlystop
+	$mcmartin runto $mcmartin_death
+}end
+
+//============================================================================
+paraBattleOver: {
+//============================================================================
+	dprintln "PARA BATTLE IS OVER"
+
+	if ( level.started_ab==0 ) {
+		$hudson waitthread global/friendly.scr::friendlystop
+
+		if ( isAlive $michaels ) {
+			$michaels waitthread global/friendly.scr::friendlystop
+			$michaels runto $michaels_death
+		}
+		
+		if ( isAlive $mcmartin ) {
+			thread mcmartinrun
+		}
+
+		$hudson.movedoneradius = 250
+		$hudson waitthread global/SafeMoveTo.scr::reach $player
+
+		if ( level.started_ab==0 ) {
+			$hudson turnto $player
+			$hudson lookat $player 
+			thread maps/e2l1/ab41_scene.scr::AB41_motion
+
+			$hudson say A_21_Hudson_1A		// "Something's comin' down that track, Baker!" maps "e2l1 "
+			$hudson waittill saydone
+			wait .4
+
+			$hudson say A_21_Hudson_1B		// "Get on that cannon and take it out!" maps "e2l1 "
+			$hudson waittill saydone
+			$hudson turnto NULL
+			$hudson lookat NULL
+
+			thread maps/e2l1/objectives.scr::DoAB41Objective
+		}
+	}
+
+	// remove hudson's immunity
+	$hudson takedamage
+}end
+
+//============================================================================
+ParachuteHang: {
+//============================================================================
+	// change pain handlers
+	self.oldPainhandler = self.painhandler
+	self.oldDeathhandler = self.deathhandler
+	self.painhandler = maps/e2l1/paraBattle.scr::paraPain
+	self.deathhandler = maps/e2l1/paraBattle.scr::paraDeath
+	self.hangingout = 1
+
+	// release from the parachute in a few seconds...
+	//	wait 15
+
+	local.wait = 15
+	while ( local.wait > 0 ) {
+		if ( level.bad_guy_count > 0 ) {
+			wait 1.0
+			local.wait--
+		}
+		else {
+			local.wait = 0
+		}
+	}
+
+	// drop to the ground, start fighting
+	self thread global/loopanim.scr::LoopAnimStop 
+	if ( isAlive self ) {
+		self unglue
+		$playerspot_pole.origin += ( 0 0 10000 )
+
+		self nodamage
+		self anim AA_para_drop
+		wait 0.5
+
+		self physics_on
+		wait 1.5
+
+		self.painhandler = self.oldPainhandler
+		self.deathhandler = self.oldDeathhandler
+		self unholster 0
+	
+		// wait a sec before turning his damage back on
+		wait 1
+		self takedamage
+		self exec global/enable_ai.scr
+
+		// become a friendly only after we've come down from the parachute...
+		self thread JoinPlayer 150
+	}
+	self.hangingout = 0
+}end
+
+//============================================================================
+paraPain: {
+//============================================================================
+	waitexec anim/smoking.scr::SmokeRemoveCigarette
+	local.curpos = self.origin
+
+	if (self.alreadyHit > 0) {
+		self setmotionanim AA_para_loosen
+	}
+	else {
+		self setmotionanim AA_para_pain
+	}
+
+	self.alreadyHit++
+	self waittill flaggedanimdone
+	self.origin = local.curpos
+}end
+
+//============================================================================
+paraDeath: {
+//============================================================================
+	waitexec anim/smoking.scr::SmokeRemoveCigarette
+	self waitthread global/loopanim.scr::LoopAnimStop 
+	self setmotionanim AA_AL_DeadParaHanging
+	self waittill flaggedanimdone
+	self.position="dead"
+}end

@@ -1,0 +1,103 @@
+//chrissstrahl - completed coopification on 2019.09.18
+
+//
+// hacks.scr
+//
+
+level.flythrough = 0  // player not attached to tank during tankride
+
+level.warpTo = "None"
+//level.warpTo = "tankRide"
+//level.warpTo = "briefing"
+//level.warpTo = "boating"
+//level.warpTo = "jailBreak"
+//level.warpTo = "conquest"
+//level.warpTo = "sneakers"
+//level.warpTo = "roofJaunt"
+//level.warpTo = "lockPicking"
+//level.warpTo = "finalEscape"
+//level.warpTo = "courtyard"
+
+//chrissstrahl - have a sort of save game feature
+//=========================================================================
+coop_hacks:{
+//=========================================================================
+
+//note - this might be needed
+//thread maps/e1l3/courtyard.scr::enableEnemyOnAll
+//thread maps/e1l3/courtyard.scr::enableEnemyOnAll
+//thread maps/e1l3/courtyard.scr::enableEnemyOnAll
+//thread maps/e1l3/courtyard.scr::enableEnemyOnAll
+	if(level.gametype != 0){
+		local.save = getcvar("coop_save")
+		if(local.save == "e1l3_sneakers"){ 
+			//set level scripts
+			level.warpTo = "sneakers"
+			//spawn players at the right spot
+			waitthread coop_mod/spawnlocations.scr::e1l3_sneakers
+			//prevent players from going back
+			thread coop_mod/replace.scr::spawnclip ( 2846 -2110 112 ) ( -20 -128 0 ) ( 20 128 256 ) coop_sneakersSaveClip1 0.65 180 "You can't go back." NIL NIL
+			thread coop_mod/replace.scr::spawnclip ( 2846 -2240 112 ) ( -20 -128 0 ) ( 20 128 256 ) coop_sneakersSaveClip2 0.65 180 "You can't go back." NIL NIL
+		}
+		else if(local.save == "e1l3_lockPicking"){
+			//some how this does not work, claus is missing and the sequence does not start, so screw this
+			//some how this does not work, claus is missing and the sequence does not start, so screw this
+			//some how this does not work, claus is missing and the sequence does not start, so screw this
+
+			$Claus show
+			$Claus.enableEnemy = 1
+			$Claus gun "beretta"
+			$Claus solid
+			$Claus nodamage
+			$Claus physics_on
+			$Claus unglue
+			$Claus origin ( -1811 3061 620 )
+			$Claus angles ( 0 55 0 )
+			//$Claus.origin = ( -1811 3061 620 )
+			//$Claus.angles = ( 0 55 0 )
+			
+			//set level scripts
+			level.warpTo = "lockPicking"
+			//kills players that are outside of the hotel and on the ground floor (player jumped from roof and survived)
+			level.coop_killThread = thread maps/e1l3/RoofJaunt.scr::coop_killPlayerOnGroundOutsideHotel
+			//spawn players at the right spot
+			waitthread coop_mod/spawnlocations.scr::e1l3_lockPicking
+			//allow players using the ladder
+			$RJLadderBlocker delete
+		}
+		else if(local.save == "e1l3_finalEscape"){
+			//set level scripts
+			level.warpTo = "finalEscape"
+			
+			fadeout .001 0 0 0 1
+			//spawn players at the right spot
+			waitthread coop_mod/spawnlocations.scr::e1l3_finalEscape
+			//disable triggers killing klaus or messing up otherwise, removing it will kill him - yay, stupid way of coding for the win
+			$uniformRoomTrigger nottriggerable
+			
+			//remove items we don't need no more
+			$uniformUseTrigger nottriggerable
+			$papers delete
+			$uniforms delete
+			$bar delete //bar locking hotel roof door
+			$bar2 delete //bar locking hotel roof door
+			
+			//force papers to inventory
+			level.coop_forcePrimary = "models/items/papers.tik"
+			level.coop_forceInventory = "models/items/papers.tik"
+			level.coop_forceSecondary = "models/items/papers.tik"
+			
+			level.playerHasDisguise = 1
+			level.playerHasPapers = 1
+			level.playerHasUniform = 1
+			
+			//prevent players from going back
+			thread coop_mod/replace.scr::spawnclip ( -1256 3424 540 ) ( -10 -64 0 ) ( 10 64 128) coop_sneakersSaveClip1 0.45 90 "You can't go back." NIL NIL
+		}
+	}
+}end
+
+
+
+
+

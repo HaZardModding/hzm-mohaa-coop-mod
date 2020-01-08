@@ -1,0 +1,470 @@
+//////////////////////////////////////////////
+// created by chrissstrahl on 2019.09.12
+//
+// This contains functions to manage and cleanup
+// maps that are to heavy for multiplayer they
+// disconnect clients or servers
+//
+// other services might also be added
+//
+// this is in a seperate file, because this way
+// we have a good overview and good control
+// we can also find all issues quickly
+//
+//////////////////////////////////////////////
+
+//removes a entity
+//if local.moving is set to 1 it will wait until the object has stopped moving before removing
+//if local.time is set it will wait that ammount of time before removing
+//=========================================================================
+remove local.ent local.time local.moving:{
+//=========================================================================
+	if(level.gametype == 0 ){ end }
+	
+	if(local.ent == NIL){ end }
+	
+	//we have a 0.25 delay before we actually start comparing, ON PURPOSE - the object might only be set in motion at the next frame in the scripts
+	if(local.moving != NIL){
+		local.lastpos = (0 0 0)
+		while(local.ent != NULL && local.lastpos != local.ent.origin){
+			local.lastpos = local.ent.origin
+			wait 0.25 //if we only wait a frame we can't detect slow movement
+		}
+	}
+	if(local.time != NIL){
+		wait local.time
+	}
+	if(local.ent != NIL && local.ent != NULL){
+		local.ent remove
+	}
+}end
+
+//removes a path
+//local.ent is the path to remove local.ent2 is the object checked for moving
+//if local.moving is set to 1 it will wait until the object has stopped moving before removing
+//if local.time is set it will wait that ammount of time before removing
+//=========================================================================
+removePath local.ent local.time local.moving local.ent2:{
+//=========================================================================
+	if(level.gametype == 0 ){ end }
+	
+	if(local.ent == NIL){ end }
+	
+	//we have a 0.25 delay before we actually start comparing, ON PURPOSE - the object might only be set in motion at the next frame in the scripts
+	if(local.moving != NIL){
+		local.lastpos = (0 0 0)
+		while(local.ent2 != NULL && local.lastpos != local.ent2.origin){
+			local.lastpos = local.ent2.origin
+			wait 0.25 //if we only wait a frame we can't detect slow movement
+		}
+	}
+	if(local.time != NIL){
+		wait local.time
+	}
+	
+	local.targetname = local.ent.targetname
+	local.itemsDeleted = 0
+	//remove all connected entities (remove each node of the path)
+	while(local.ent != NIL && local.ent != NULL){
+		local.entOld = local.ent
+		local.ent = $(local.entOld.target)
+		local.entOld remove
+		local.itemsDeleted++
+	}
+	println("path "+local.targetname+" with "+local.itemsDeleted+"nodes removed")
+}end
+
+//cleanup stuff on mapstart
+//this map is way way way way to much overloadad with stuff
+//if we don't clean stuff proper we will get clients disconnected with a error
+//this is really sitty work, but it will go a long way towards mod reliability
+//=========================================================================
+e1l3_start:{
+//=========================================================================
+	//don't delete things in sp
+	if(level.gametype == 0){ end }
+	
+	local.deletedWaterBarrels = 0
+	
+	local.maxentities = int(getcvar("maxentities"))
+	//check every entity
+	for (local.i = 0; local.i < local.maxentities; local.i++) {
+		local.ent = getentbyentnum local.i
+		//exists and has a model (is a tiki)
+		if(local.ent != NULL){
+			if ( local.ent.model != NIL ){
+				local.model = local.ent.model
+				if(local.model == "models/items/item_rifle_ammobox.tik"){
+					local.ent remove
+//println("e1l3_start removed 1 ammo box")
+				}
+				else if(local.model == "models/items/item_smg_ammobox.tik"){
+					local.ent remove
+//println("e1l3_start removed 1 ammo box")
+				}
+				else if(local.model == "models/items/item_25_healthbox.tik"){
+					local.ent remove
+//println("e1l3_start removed 1 health item")
+				}
+				else if(local.model == "models/items/item_50_healthbox.tik"){
+					local.ent remove
+//println("e1l3_start removed 1 health item")
+				}
+				else if(local.model == "models/items/item_100_healthbox.tik"){
+					local.ent remove
+//println("e1l3_start removed 1 health item")
+				}
+			}
+			else{
+				//remove water barrels in the shelf, they are not vital to the mission
+				//and they cost us networktraffic
+				local.origin = local.ent.origin
+				if(	local.origin == ( 946 -2260 168 ) ||
+					local.origin == ( 960 -2254 168 ) ||
+					local.origin == ( 988 -2260 168 ) ||
+					local.origin == ( 970 -2260 192 ) ||
+					local.origin == ( 978 -2260 216 ) ||
+					local.origin == ( 954 -2264 216 ) ||
+					local.origin == ( 834 -2264 216 ) ||
+					local.origin == ( 786 -2264 192 ) ||
+					local.origin == ( 798 -2256 168 ) ||
+					local.origin == ( 810 -2252 168 ) ||
+					local.origin == ( 830 -2264 168 ) ||
+					local.origin == ( -630 -2176 624 ) ||
+					local.origin == ( -1014 -2160 600 ) ||
+					local.origin == ( -1014 -2128 576 ) ||
+					local.origin == ( -1014 -2112 576 ) ||
+					local.origin == ( -1014 -2152 552 ) ||
+					local.origin == ( -1006 -1984 576 )
+				){
+					local.deletedWaterBarrels++
+					local.ent remove
+				}
+				//remove unused script origin
+				else if(local.origin == ( 1128 -1344 282 )){
+//println("e1l3_start removed 1 unused script_origin")
+					local.ent remove
+				}
+			}
+		}
+	}
+//println("e1l3_start removed "+local.deletedWaterBarrels+" water barrels")
+	
+	//remove the locked door triggers, because this map is way to overloaded
+	//we don't really need locked doors triggers in coop that much
+	local.deletedItems = 0
+	for (local.i = 0; local.i < local.maxentities; local.i++) {
+		local.ent = getentbyentnum local.i
+		if ( local.ent != NULL && local.ent.type != NIL){
+			if(local.ent.type == "wood1"){
+				local.deletedItems++
+				local.ent remove
+			}
+		}
+	}
+//println("e1l3_start removed "+local.deletedItems+" locked door triggers")	
+}end
+
+//cleansing after briefing
+//=========================================================================
+e1l3_watermotarBriefingClensing:{
+//=========================================================================
+	if(level.gametype == 0 ){ end }
+	
+	for (local.i = 0; local.i <= $watermortarbriefingfx.size; local.i++) {
+		//remove in next frame (using delete here might cause issues)
+		if($watermortarbriefingfx[local.i] != NULL){
+			$watermortarbriefingfx[local.i] remove
+		}
+		println("e1l3_watermotarBriefingClensing removed 1 water motar")
+	}
+}end
+
+//clensing after briefing wall exploded
+//=========================================================================
+e1l3_briefingWallExplodeClensing:{
+//=========================================================================
+	if(level.gametype == 0 ){ end }
+	
+	wait 1 //wait a moment just to be sure
+	local.deletedItems = 0
+	for (local.i = 98002; local.i < 98015; local.i++) {
+		//remove in next frame (using delete here might cause issues)
+		local.ent = $("t"+local.i)
+		if(local.ent != NULL){
+			local.ent remove
+			local.deletedItems++
+		}
+	}
+	println("e1l3_briefingWallExplodeClensing removed "+local.i+" script_origins")
+}end
+
+//first tank paths
+//=========================================================================
+e1l3_tankPath1Clensing:{
+//=========================================================================
+	if(level.gametype == 0 ){ end }
+	
+	//remove first time tanks stop
+	$t9786 delete
+	$t9785 delete
+
+	/*
+	LeaderTankPath2
+	t751
+	t97891
+	t97892
+	t97893
+	t97895
+
+	//remove when that tank has stopped moving (not sure)
+	LeaderTankPath3
+	LeaderTankPath3_node2
+	*/
+}end
+
+//second tank paths
+//=========================================================================
+e1l3_tankPath2Clensing:{
+//=========================================================================
+	if(level.gametype == 0 ){ end }
+	
+	wait 10 //wait to be sure the path is no longer used
+	$player_tank_path remove
+	$t730 remove
+	$t741 remove
+	$t746 remove
+
+	$leader_tank_path remove
+	$t732 remove
+	$t733 remove
+	$t750 remove
+	$t97897 remove
+	
+	$LeaderTankPath2 remove
+	$t751 remove
+	$t97891 remove
+	$t97892 remove
+	$t97893 remove
+	$t97895 remove
+}end
+
+//third tank paths
+//=========================================================================
+e1l3_tankPath3Clensing:{
+//=========================================================================
+	wait 1
+	//remove when that tank has stopped moving (not sure when this is)
+	//$LeaderTankPath3
+	//$LeaderTankPath3_node2
+}end
+
+//cleansing after blowing the wall towards the jail up
+//why oh why you guys had to use so many entities that
+//create networktraffic ???!
+//=========================================================================
+e1l3_jailbreakClensing:{
+//=========================================================================
+	if(level.gametype == 0 ){ end }
+	
+	wait 1 //wait a moment just to be sure
+	
+	local.deletedItems = 0
+	//remove script_origins used for directing the exploder chunks
+	for (local.i = 41; local.i < 60; local.i++) {
+		//remove in next frame (using delete here might cause issues)
+		local.ent = $("t979"+local.i)
+		if(local.ent != NULL){
+			local.ent remove
+			
+		}
+	}
+//println("e1l3_jailbreakClensing removed "+local.deletedItems+" script_origins")
+	
+	//remove explosive stuff 
+	if($JailWallThrobber!=NULL){$JailWallThrobber remove}
+	$BoatGuySplodeHuddlePoint remove
+	//ai spawn area door lock trigger - why the fuck did you guys not use trigger_once for fucks shake
+	$lockwalldoortrigger remove
+//println("e1l3_jailbreakClensing removed 3 useless objects")
+	
+	//remove other no longer needed objects
+	local.ItemsDeleted = 0
+	local.maxentities = int(getcvar("maxentities"))
+	//check every entity
+	for (local.i = 0; local.i < local.maxentities; local.i++) {
+		local.ent = getentbyentnum local.i
+		//exists
+		if ( local.ent != NULL ){
+			local.origin = local.ent.origin
+			if(	
+			//jailwall explode effect
+				local.origin == ( 664 -2567 128 ) ||
+			//ai spawn trigger
+				local.origin == ( -464 -2688 192 ) ||
+			//aispawn origin
+				local.origin == ( -448 -2448 144 ) ||
+			//ai spawn controller
+				local.origin == ( -416 -2448 168 )
+			){
+				local.ItemsDeleted++
+				local.ent remove
+			}
+		}
+	}
+	println("e1l3_boatRideStarts removed "+local.ItemsDeleted+" useless objects")
+}end
+
+//cleansing after bridge blow up
+//=========================================================================
+e1l3_bridgeBlowupClensing:{
+//=========================================================================
+	if(level.gametype == 0 ){ end }
+	
+	wait 1 //wait a moment just to be sure
+	for (local.i = 15; local.i < 31; local.i++) {
+		//remove in next frame (using delete here might cause issues)
+		local.ent = $("t980"+local.i)
+		if(local.ent != NULL){
+			local.ent remove
+//println("e1l3_bridgeBlowupClensing removed 1 script_origin")
+		}
+	}
+}end
+
+//these are the boat guys that try to cross first and die
+//=========================================================================
+e1l3_boatDieFastClensing:{
+//=========================================================================
+	if(level.gametype == 0 ){ end }
+	
+	if( level.coopButlerBoatFastCleanupDone != NIL ){ end }
+	level.coopButlerBoatFastCleanupDone = 1
+	
+	wait 10 //wait because I am unsure how much delay they have
+	if($boatAPath !=NULL){$boatAPath delete}
+	if($boatAPath_node2 !=NULL){$boatAPath_node2 delete}
+	if($boatAPath_node3 !=NULL){$boatAPath_node3 delete}
+	
+	if($boatBPath !=NULL){$boatBPath delete}
+	if($boatBPath_node2 !=NULL){$boatBPath_node2 delete}
+	if($boatBPath_node3 !=NULL){$boatBPath_node3 delete}
+}end
+
+//remove stuff that is no longer needed once the boat ride (player) starts
+//we leave this area and don't return to it, so we can remove stuff for good
+//=========================================================================
+e1l3_boatRideStarts:{
+//=========================================================================
+	if(level.gametype == 0 ){ end }
+	
+	local.ItemsDeleted = 0
+	local.maxentities = int(getcvar("maxentities"))
+	//check every entity
+	for (local.i = 0; local.i < local.maxentities; local.i++) {
+		local.ent = getentbyentnum local.i
+		//exists
+		if ( local.ent != NULL ){
+			local.origin = local.ent.origin
+			if(	
+			//oil barrels
+				local.origin == ( 896 -5984 128 ) ||
+				local.origin == ( 944 -6000 128 ) ||
+			//explosion effect briefing
+				local.origin == ( 1460.00 -5564.00 148.00 ) ||
+			//explosion trigger briefing
+				local.origin == ( 1440 -5536 192 )
+				){
+				local.ItemsDeleted++
+				local.ent remove
+			}
+		}
+	}
+	println("e1l3_boatRideStarts removed "+local.ItemsDeleted+" useless objects")
+	
+	thread removePath $boat_guy_2_path
+	thread removePath $follow_tank_path
+	thread removePath $player_tank_path
+	thread removePath $leader_tank_path
+	thread removePath $LeaderTankPath2
+	
+	//artillery origins of tank ride
+	local.ItemsDeleted = 0
+	for (local.i = 1; local.i < $tank_ride_artillery.size; local.i++) {
+		local.ent = $tank_ride_artillery[local.i]
+		if(local.ent != NULL){
+			local.ItemsDeleted++
+			local.ent remove
+		}
+	}
+	println("e1l3_boatRideStarts removed "+local.ItemsDeleted+" $tank_ride_artillery script_origins")
+	
+	//waterimpact effects of briefing
+	local.ItemsDeleted = 0
+	for (local.i = 1; local.i < $watermortarbriefingfx.size; local.i++) {
+		local.ent = $watermortarbriefingfx[local.i]
+		if(local.ent != NULL){
+			local.ItemsDeleted++
+			local.ent remove
+		}
+	}
+	println("e1l3_boatRideStarts removed "+local.ItemsDeleted+" $watermortarbriefingfx objects")
+}end
+
+//remove stuff that is no longer needed once the boat is gone (deleted some where in the scripts)
+//=========================================================================
+e1l3_boatClensing:{
+//=========================================================================
+	if(level.gametype == 0 ){ end }
+	
+	wait 3 //not sure how much delay this needs, give it 5
+	
+	for (local.i = 1; local.i <= $BoatMortarEffect.size; local.i++) {
+		//remove in next frame (using delete here might cause issues)
+		if($BoatMortarEffect[local.i] != NULL){
+			$BoatMortarEffect[local.i] remove
+		}
+//println("e1l3_start removed 1 water motar")
+	}
+	
+	//boat paths
+	//this is the boat with player and next to the player, oh ya they blow up too
+	//$boat1path delete //NULL
+	$Boat1Path_node2 delete
+	$Boat1Path_node3 delete
+	$Boat1Path_node4 delete
+	$Boat1Path_node5 delete
+	$Boat1Path_node6 delete
+	$Boat1Path_node7 delete
+	
+	//$boat2path delete //NULL
+	$Boat2Path_node2 delete
+	$Boat2Path_node3 delete
+	
+	$BoatMortarEffect_KillerA delete
+	$BoatMortarEffect_KillerB delete
+	$BoatMortarEffect_Killer2 delete
+}end
+
+//remove stuff that is no longer needed once the pow specialEd is dead (hit by truck)
+//=========================================================================
+e1l3_waitforedtobedead:{
+//=========================================================================
+	if(level.gametype == 0 ){ end }
+	
+	$SpecialEd waittill death
+	
+	local.deletedItems = 0
+	//remove script_origins used for directing the exploder chunks
+	for (local.i = 97967; local.i < 97998; local.i++) {
+		//remove in next frame (using delete here might cause issues)
+		local.ent = $("t"+local.i)
+		if(local.ent != NULL){
+			local.ent remove
+		}
+	}
+	println("e1l3_waitforedtobedead removed "+local.deletedItems+" script_origins")
+}end
+
+
+

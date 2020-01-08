@@ -1,0 +1,386 @@
+//created 20.FEB.2015 by chrissstrahl for moha coop
+//this provides all the weapons there are, this script might need to be
+//a little bit improved, in terms of weapon selection...
+//
+//I think this could be made compatible with the player load out for
+//each mission, so that the player can only use the weapons he is meant
+//to from singleplayer
+//
+//this is a working script to give the players more than just one weapon
+//how ever it is just a illusion! The player can only carry one primary
+//weapon at all times in multiplayer... So what this script does is simple
+//it replaces the currect primary weapon with a new one. It removes the
+//current primary weapon from the inventory and deletes it, this way the
+//new weapon will not get dropped to the ground!
+//The idea behind this is pretty basic, I have seen in a script it is
+//possible to targetname weapons and grab them, which is a fairly simple
+//and also ellegant solution, so I do not have to use a different method
+//which would clearly not been that efficent. !!!!entref!!!!
+//how ever, when we can grab the weapon, we can check what model it has
+//and trough that we can decide what weapon the player has to switch
+//to every time when the smoke granades are used.
+//The player will imidatly use his new main weapon
+
+
+//maximum ammount of weapons that will be in the player inventory per map
+level.coopArmoryMaxWeaponsManage = 6
+
+
+main:
+	local.playerCount = 0
+
+	while(1)
+	{
+	//a new player has entred, handle that player!
+		if(local.playerCount != $player.size){
+			local.playerCount = $player.size
+			
+		//make sure we do take care of every player 
+			for(local.i=1;local.i<=$player.size;local.i++){
+				if($player[local.i].flags[hasBeenHandled] == NIL){
+					thread coop_handlePlayerAllweapons local.i
+				}
+			}
+		}
+		waitframe
+	}
+end
+
+//this can be used to give all players ammo
+coop_ammo local.ammoName local.ammoAmmount:
+//first I need to know how we are going to manage the whole weapons thing
+end
+
+//this can be used to make all players use a specific weapon
+coop_useWeapon local.weaponModel:
+//first I need to know how we are going to manage the whole weapons thing
+end
+
+//this can be used to add weapons to the availabe list
+coop_addWeapon local.weaponModel:
+	if(local.weaponModel == NIL){
+		iprintlnbold ( "ERROR: Can NOT add NIL in coop_armory.scr" )
+		end
+	}
+	if(local.weaponModel == ""){
+		iprintlnbold ( "ERROR: Can NOT add <emptystring> in coop_armory.scr" )
+		end
+	}
+
+	local.maxWeapons = level.coopArmoryMaxWeaponsManage
+	local.inUse = 0
+	for(local.i=0;local.i<=local.maxWeapons;local.i++){
+		local.flagName = "coopArmoryAvailableWeapon" + local.i
+		if($world.flags[local.flagName] == NIL){
+			$world.flags[local.flagName] = local.weaponModel
+		}
+		else{
+		//if that weapon has been added allready, exit
+			if($world.flags[local.flagName] == local.weaponModel){
+				end
+			}
+			local.inUse += 1
+		}
+	}
+	
+	if(local.inUse == local.maxWeapons){
+		iprintlnbold ( "ERROR: Can NOT add more than: " + local.maxWeapons + " weapons in coop_armory.scr" )
+	}
+end
+
+
+//this can be used to remove weapons from the availabe list
+coop_removeWeapon local.weaponModel:
+	if(local.weaponModel == NIL){
+		iprintlnbold ( "ERROR: Can NOT remove NIL in coop_armory.scr" )
+		end
+	}
+	if(local.weaponModel == ""){
+		iprintlnbold ( "ERROR: Can NOT remove <emptystring> in coop_armory.scr" )
+		end
+	}
+
+	local.maxWeapons = level.coopArmoryMaxWeaponsManage
+	local.inUse = 0
+	for(local.i=0;local.i<=local.maxWeapons;local.i++){
+		local.flagName = "coopArmoryAvailableWeapon" + local.i
+		if($world.flags[local.flagName] != NIL){
+		//found weapon, remove it
+			if($world.flags[local.flagName] == local.weaponModel){
+				$world.flags[local.flagName] = NIL
+			}
+		}
+	}
+	//we could add a routine here that takes the weapon also away from the player...
+end
+
+//need to make a function here that equips the payer based upon the coop_addWeapon function
+
+
+
+//handle each player individually
+coop_handlePlayerAllweapons local.playerNum:
+	if(local.playerNum == NIL){end}
+	if($player[local.playerNum] == NULL){end}
+	
+	//make sure player gets handled only once
+	$player[local.playerNum].flags[hasBeenHandled] = 1
+	
+	//make sure player gets equiped at start
+	//$player[local.playerNum].flags[doequipme] = 1	
+	
+	//remember var for last weapon used
+	local.lastWeaponModel = "None"
+	
+	//remember var for starting weapon
+	local.startingWeaponModel = "None"
+	
+	local.resetData = 0
+	
+	//make sure player exists, each time we run this
+	while($player[local.playerNum] != NULL)
+	{
+	//make sure player is not a spectator
+		if($player[local.playerNum].dmteam != spectator){	//$player[x].dmteam == allies //$player[x].dmteam == axis
+			if(isAlive $player[local.playerNum]){
+				local.weaponTargetName = "coop_weapon" + local.playerNum + "" + level.time
+				$player[local.playerNum] weaponcommand "dual" "targetname" local.weaponTargetName
+				waitframe
+				if($player[local.playerNum] == NULL){
+					end
+				}
+			//check if the weapon command was relayed sucessfully, if it was, this entity should exist!
+				if($(local.weaponTargetName) != NULL){
+					local.weaponModel = $(local.weaponTargetName).model
+				//if player holds a weapon, it should not be NIL
+					if(local.weaponModel != NIL){
+					//make sure we have a starting weapon registred
+						if( local.startingWeaponModel == "None" )
+						{
+							local.startingWeaponModel = local.weaponModel
+						}
+					
+						if( local.lastWeaponModel != local.weaponModel ){
+						//give more of these granades, make sure player can not run out of these
+							//$player[local.playerNum] ammo "grenade" 6
+							
+						//give a smoke
+							if($player[local.playerNum].dmteam == axis){
+								$player[local.playerNum] give "models/weapons/nebelhandgranate.tik"
+							}else{
+								$player[local.playerNum] give "models/weapons/m18_smoke_grenade.tik"
+							}
+							$player[local.playerNum] ammo "smokegrenade" 6
+						
+							//tell me what weapon the player currently holds
+						//	iprintlnbold ( "WEAPON: " + local.weaponModel + " WAS: " + local.lastWeaponModel )
+						//	iprintlnbold ( "STARTING WEAPON: " + local.startingWeaponModel )
+
+							if( local.weaponModel == "models/weapons/nebelhandgranate.tik" 		||
+								local.weaponModel == "models/weapons/rdg-1_smoke_grenade.tik"	||
+								local.weaponModel == "models/weapons/m18_smoke_grenade.tik"	)
+							{
+							//remove imidatly that weapon
+								//iprintlnbold ( "SWITCH WEAPON... TAKING:" + local.startingWeaponModel )
+								$player[local.playerNum] take local.startingWeaponModel
+								$(local.weaponTargetName) remove
+								waitframe
+								
+							//exit if player is no more
+								if($player[local.playerNum] == NULL){end}
+								
+							//switch the weapons
+								if(local.startingWeaponModel == "models/weapons/thompsonsmg.tik"){
+									local.weapontoGive = "models/weapons/mp40.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/mp40.tik"){
+									local.weapontoGive = "models/weapons/p38.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/p38.tik"){
+									local.weapontoGive = "models/weapons/colt45.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/colt45.tik"){
+									local.weapontoGive = "models/weapons/silencedpistol.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/silencedpistol.tik"){
+									local.weapontoGive = "models/weapons/webley_revolver.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/webley_revolver.tik"){
+									local.weapontoGive = "models/weapons/nagant_revolver.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/nagant_revolver.tik"){
+									local.weapontoGive = "models/weapons/kar98.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/kar98.tik"){
+									local.weapontoGive = "models/weapons/kar98_mortar.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/kar98_mortar.tik"){
+									local.weapontoGive = "models/weapons/kar98sniper.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/kar98sniper.tik"){
+									local.weapontoGive = "models/weapons/m1_garand.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/m1_garand.tik"){
+									local.weapontoGive = "models/weapons/mg42carryable.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/mg42carryable.tik"){
+									local.weapontoGive = "models/weapons/mosin_nagant_rifle.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/mosin_nagant_rifle.tik"){
+									local.weapontoGive = "models/weapons/mp44.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/mp44.tik"){
+									local.weapontoGive = "models/weapons/panzerschreck.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/panzerschreck.tik"){
+									local.weapontoGive = "models/weapons/ppsh_smg.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/ppsh_smg.tik"){
+									local.weapontoGive = "models/weapons/shotgun.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/shotgun.tik"){
+									local.weapontoGive = "models/weapons/springfield.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/springfield.tik"){
+									local.weapontoGive = "models/weapons/sten.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/sten.tik"){
+									local.weapontoGive = "models/weapons/svt_rifle.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/svt_rifle.tik"){
+									local.weapontoGive = "models/weapons/uk_w_l42a1.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/uk_w_l42a1.tik"){
+									local.weapontoGive = "models/weapons/uk_w_piat.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/uk_w_piat.tik"){
+									local.weapontoGive = "models/weapons/uk_w_vickers.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/uk_w_vickers.tik"){
+									local.weapontoGive = "models/weapons/bar.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/bar.tik"){
+									local.weapontoGive = "models/weapons/bazooka.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/bazooka.tik"){
+									local.weapontoGive = "models/weapons/delisle.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/delisle.tik"){
+									local.weapontoGive = "models/weapons/enfield.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/enfield.tik"){
+									local.weapontoGive = "models/weapons/g43.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/g43.tik"){
+									local.weapontoGive = "models/weapons/it_w_beretta.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/it_w_beretta.tik"){
+									local.weapontoGive = "models/weapons/it_w_breda.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/it_w_breda.tik"){
+									local.weapontoGive = "models/weapons/it_w_carcano.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/it_w_carcano.tik"){
+									local.weapontoGive = "models/weapons/it_w_moschetto.tik"
+								}
+								else if(local.startingWeaponModel == "models/weapons/it_w_moschetto.tik"){
+									local.weapontoGive = "models/weapons/thompsonsmg.tik"
+								}
+								
+								//iprintlnbold ( "SWITCH WEAPON... GIVING:" + local.weapontoGive )
+								local.startingWeaponModel = local.weapontoGive
+								
+							//give new weapon
+								$player[local.playerNum] give local.weapontoGive
+								
+							//make player use it
+								$player[local.playerNum] use local.weapontoGive
+								
+							//exit if player is no more
+								waitframe
+								if($player[local.playerNum] == NULL){end}
+								
+							//these are now cycled above, so have them no longer availabe in a extra slot
+								if(	local.weapontoGive != "models/weapons/p38.tik" ){
+									$player[local.playerNum] take "models/weapons/p38.tik"
+								}
+								if(	local.weapontoGive != "models/weapons/colt45.tik" ){
+									$player[local.playerNum] take "models/weapons/colt45.tik"
+								}
+							}
+							
+							//only display weapon once
+							local.lastWeaponModel = local.weaponModel
+						
+						//give weapons
+							//if($player[local.playerNum].flags[doequipme] == 1){
+								//local.lastWeaponModel = local.weaponModel
+								//$player[local.playerNum].flags[doequipme] = 0
+								
+								//$player[local.playerNum] give "models/weapons/webley_revolver.tik"
+								//$player[local.playerNum] give "models/weapons/nagant_revolver.tik"
+								//$player[local.playerNum] give "models/weapons/p38.tik"
+								//$player[local.playerNum] give "models/weapons/colt45.tik"
+								//$player[local.playerNum] give "models/weapons/silencedpistol.tik"							
+							//}
+						}
+					//make sure that weapon is no longer accessible by script
+						$player[local.playerNum] weaponcommand dual targetname ""
+					}					
+				}
+				local.resetData = 0
+			}
+			//he's dead jim...
+			else{
+				local.resetData = 1
+			}
+		}
+		//is spectator
+		else{
+			local.resetData = 1
+		}
+		
+		//make sure we do it all over again, reset all vars
+		if(local.resetData == 1){
+			//reset remember var for starting weapon
+			local.startingWeaponModel = "None"
+			//reset remember var for last weapon used
+			local.lastWeaponModel = "None"
+			//make sure player will be equiped when spawned
+			//$player[local.playerNum].flags[doequipme] = 1		
+		}
+		waitframe
+	}
+end
+
+//	$player[local.playerNum] give "models/weapons/landmineaxis.tik"
+//	$player[local.playerNum] give "models/weapons/m2frag_grenade.tik"
+//	$player[local.playerNum] give "models/weapons/mills_grenade.tik"
+//	$player[local.playerNum] give "models/weapons/russian_f1_grenade.tik"
+//	$player[local.playerNum] give "models/weapons/it_w_bomba.tik"		
+
+// $player[local.playerNum] give "models/weapons/p38.tik"
+// $player[local.playerNum] give "models/weapons/colt45.tik"
+// $player[local.playerNum] give "models/weapons/silencedpistol.tik"
+
+// $player[local.playerNum] give "models/weapons/thompsonsmg.tik"
+// $player[local.playerNum] give "models/weapons/mp44.tik"
+// $player[local.playerNum] give "models/weapons/mp40.tik"
+// $player[local.playerNum] give "models/weapons/kar98.tik"
+// $player[local.playerNum] give "models/weapons/kar98sniper.tik"
+// $player[local.playerNum] give "models/weapons/panzerschreck.tik"
+// $player[local.playerNum] give "models/weapons/shotgun.tik"
+
+// $player[local.playerNum] give "models/weapons/m2frag_grenade.tik"
+// $player[local.playerNum] give "models/weapons/m1_garand.tik"
+// $player[local.playerNum] give "models/weapons/steilhandgranate.tik"
+
+
+// $player[local.playerNum] give "models/weapons/springfield.tik"
+// $player[local.playerNum] give "models/weapons/bar.tik"
+// $player[local.playerNum] give "models/weapons/bazooka.tik"
+
+
+
+
+

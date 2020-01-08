@@ -1,0 +1,463 @@
+//
+// explosion.scr
+//
+//
+// How to create triggered explosions:
+//
+//  1.  Create a trigger, give it the $targetname "explosiontrigger"
+//  2.  Give the trigger a #set of some number 
+//  3.  Create one to many script origin entities, give them $targetname of
+//      "explosion" and give them the same #set that the trigger has
+//
+//  That's it.  When the player enters the trigger, the game will play one
+//     explosion per second, and pick a random script origin from the pool
+//     of script origins with the same #set as the trigger.  
+//  If the trigger is of type multiple, then the explosions will play
+//     continuously until the player steps out of the trigger, and will
+//     begin playing again when the player steps into the trigger
+//  If the trigger is of type once, then a single explosion will play 
+//     (unless you specify #count, see below), once the explosion plays,
+//     that trigger will never cause an explosion again.
+//
+//  Other parameters you can give the trigger:
+//     #frequency - allows you to override the one explosion per second
+//        rate, in favor of your own rate (in hertz)
+//     #count - number of explosions to play.  For a multiple trigger,
+//        explosions will play continuously until the player leaves the
+//        trigger or the count is exhausted.  For a once trigger, <count>
+//        explosions will play regardless of what the player does.
+//
+//=========================================================================
+init:
+//=========================================================================
+{
+	if ($explosion == NULL){
+		level.explosions = 0
+	}
+	else{
+		level.explosions = $explosion.size
+	}
+
+	//println "explosion trigger count = " $explosiontrigger.size
+	level.explosion = exec global/makearray.scr $explosion
+	$explosiontrigger thread handleExplosionTrigger
+}end
+
+//=========================================================================
+handleExplosionTrigger:
+//=========================================================================
+{
+	if (self.frequency == NULL || self.frequency == NIL || self.frequency == 0){
+		self.frequency = 1
+	}
+
+	if (self.count == NULL || self.count == NIL){
+		self.count = 0
+	}
+
+	local.interval 		= 1.0/self.frequency
+	local.count 		= self.count
+	local.set 			= self.set
+	local.explosion[1] 	= NIL
+	local.explosions 	= 0
+
+	for (local.i = 0; local.i < level.explosions; local.i++) {
+		if (level.explosion[local.i + 1].set == self.set){
+			local.explosion[local.explosions + 1] = level.explosion[local.i + 1]
+			local.explosions++
+		}
+	}
+
+	//println self.targetname " in set " self.set " has " local.explosions " explosion points"
+	
+	while (1) {
+		self waittill trigger
+		self.triggerTime = level.time
+		self.playerExited = 0
+		//println " started explosion set " local.set
+		waitframe
+
+		if (self == NULL) {
+			// aha! we are (were) a triggeronce, play the explosions and get out
+			if (local.count == 0){
+				local.count = 1
+			}
+
+			for (local.i = 0; local.i < local.count; local.i++) {
+				local.index = (randomint local.explosions)
+
+				//waitthread big local.explosion[local.index + 1]
+				local.explosion[local.index + 1] waitthread Artillery
+				wait local.interval
+			}
+			break
+		}
+		else {
+			// we are a multple trigger, keep playing explosions until we 
+			//    exhaust the count, or the player leaves the trigger
+			self thread explosionTriggerDetectExit
+
+			local.count = 0
+			while (!(self.playerExited && local.count > 0)) {
+				if (self.count == 0 || local.count < self.count) {
+					local.count++
+
+					// play a random explosion
+					local.index = (randomint local.explosions)
+
+					//waitthread big 
+					local.explosion[local.index + 1] waitthread Artillery
+				}
+				wait local.interval
+			}
+		}
+		//println " ended explosion set " local.set
+	}
+}end
+
+//=========================================================================
+explosionTriggerThread:
+//=========================================================================
+{
+	while (1) {
+		self waittill trigger
+		self.triggerTime = level.time
+	}
+}end
+
+//=========================================================================
+explosionTriggerDetectExit:
+//=========================================================================
+{
+	thread explosionTriggerThread
+	self.triggerThread = parm.previousthread
+
+	while (self.playerExited == 0){
+		if (level.time - self.triggerTime > 0.5){
+			self.playerExited = 1
+			self.triggerThread delete
+		}
+		waitframe
+	}
+}end
+
+//=========================================================================
+regionExplosions:
+//=========================================================================
+{
+	while (1) {
+		local.waitTime = (randomint 20)
+		local.waitTime = local.waitTime*0.7
+		local.waitTime += 0.05
+		wait local.waitTime
+		
+	    local.player = exec coop_mod/replace.scr::player_random //chrissstrahl - coop mod, get any player
+
+		local.explosionRegionName = "explosion_region_" + local.player.frontLineRegion //chrissstrahl - coop compatibility
+		local.explosionRegion = $(local.explosionRegionName)
+		local.i = (randomint local.explosionRegion.size)
+		local.i++
+
+		//waitthread maps/e1l1/explosion.scr::big local.explosionRegion[local.i]
+		local.explosionRegion[local.i] waitthread Artillery
+	}
+}end
+
+//=========================================================================
+big local.ent local.playleadinsound local.lookLikeGrenade:
+//=========================================================================
+{
+	if (local.playleadinsound == 1){
+		local.ent.soundincoming = "arty_leadin"
+	}
+	else{
+		local.ent.soundincoming = "none"
+	}
+
+	local.ent waitthread Artillery local.lookLikeGrenade
+}end
+
+// -----------------------------------------------------------------------------------------------------
+//
+// Artillery.scr
+//
+// by Chris Caron   5.28.03
+// ---------------------------------------------------
+//
+// Use a script_origin as a point for Artillery hit
+//
+// Optional fields:
+// 
+// self.soundincoming -> sound of incoming
+//     default = arty_leadin
+//
+// self.soundhit      -> sound of explosion
+//     default = flakk88_hit
+//
+// self.primaryfx     -> explosion effect 1
+//     default = models/fx/bazookaexplosion_dm.tik
+//
+// self.secondaryfx   -> explosion effect 2
+//     default = models/fx/fx_pocketflash.tik
+//
+// self.mortaremitter -> dust cloud fx
+//     default = models/emitters/mortar_dirt_dustcloud.tik
+//
+// self.damage        -> amount of damage to inflict
+//      default 200
+//
+// self.radius        -> damage radius
+//     default = 200
+//
+// self.nodamaage	  -> disable damage on impact
+//     default 0 (off) 
+//
+// usage: $me thread Explosion
+// ---------------------------------------------------
+// other known options for mortaremitter:
+//
+//  "models/emitters/mortar_dirt_nosound.tik"
+//  "models/emitters/mortar_dirt_nebelwerfer.tik"
+//  "models/emitters/mortar_dirt.tik"
+//  "models/emitters/mortar_dirt_higgins.tik"
+////=========================================================================
+
+
+//=========================================================================
+Artillery local.lookLikeGrenade:
+//=========================================================================
+{
+	//self nottriggerable
+	//println "Exploding!"
+	local.exploding = 1
+
+	if (!self.soundincoming){
+		local.soundincoming = "none" // arty_leadin
+	}
+	else{
+		local.soundincoming = self.soundincoming
+	}
+
+	if (!self.soundhit) {
+		local.soundhit = flakk88_hit
+		local.soundhit = arty_exp_sand
+	}
+	else{
+		local.soundhit = self.soundhit
+	}
+
+	if (!self.primaryfx){
+		local.primaryfx = models/fx/bazookaexplosion_dm.tik
+	}
+	else{
+		local.primaryfx = self.primaryfx
+	}
+
+	if (!self.secondaryfx){
+		local.secondaryfx = models/fx/fx_pocketflash.tik
+	}
+	else{
+		local.secondaryfx = self.secondaryfx
+	}
+
+	if (!self.mortaremitter){
+		local.mortaremitter = "models/emitters/groundExplosion_e1l1.tik"
+	}
+	else{
+		local.mortaremitter = self.mortaremitter
+	}
+
+	if (!self.damage){
+		local.damage = 200
+	}
+	else{
+		local.damage = self.damage
+	}
+
+	if (!self.radius){
+		local.radius = 200
+	}
+	else{
+		local.radius = self.radius
+	}
+
+    waitthread IncomingArtillery self local.soundincoming local.soundhit local.primaryfx local.secondaryfx local.mortaremitter local.damage local.radius local.lookLikeGrenade
+	//self triggerable
+}end
+
+
+// This will send artillery to a specific place
+//=========================================================================
+IncomingArtillery local.ent local.soundincoming local.soundhit local.primaryfx local.secondaryfx local.mortaremitter local.damage local.radius local.lookLikeGrenade:
+//=========================================================================
+{
+	//println "making explosion at " local.ent.origin
+	//println "sound1 = " local.soundincoming
+	//println "sound2 = " local.soundhit
+	//println "primaryfx = " local.primaryfx
+	//println "secondaryfx = " local.secondaryfx
+	//println "damage = " local.damage
+	//println "radius = " local.radius
+	//println "mortaremmitter = " local.mortaremitter
+
+	if (!local.ent){
+		println "INCOMING ARTILLERY >>> local.ent is NULL"
+		end
+	}
+
+	if (local.soundincoming != "none"){
+		local.entity 		= spawn script_origin
+		local.entity.origin = local.ent.origin
+
+		local.entity playsound local.soundincoming wait
+		local.entity waittill sounddone
+		local.entity remove
+	}
+
+	//local.time = randomint(3) + 1
+	//wait local.time
+
+	local.soundObj = NULL
+	if (local.soundhit != "none") {
+		local.soundObj 		  = spawn script_origin
+		local.soundObj.origin = local.ent.origin
+
+		local.soundObj playsound local.soundhit
+	}
+
+	//thread StartEmitter local.ent.origin
+	if (local.lookLikeGrenade){
+		thread MortarEmitter local.ent.origin "models/emitters/mortar_dirt_dustcloud.tik"
+	}
+	else{
+		thread MortarEmitter local.ent.origin local.mortaremitter
+	}
+
+	//thread pocketExplosionFx local.primaryfx local.ent.origin 
+	//thread pocketFlashFx local.secondaryfx local.ent.origin
+	//earthquake 0.5 1 1 0
+	thread Earthquake local.ent.origin
+
+	// uncomment this to create radius damage
+	if (local.damage){
+		radiusdamage local.ent.origin local.damage local.radius
+	}
+	
+	if (local.soundObj != NULL) {
+		wait 1
+		local.soundObj remove
+	}
+}end
+
+
+// camera shake prooporitional to distance of local.origin
+// Default for maxShakeDist is 600 
+//=========================================================================
+Earthquake local.origin local.maxShakeDist:
+//=========================================================================
+{
+	if (!local.maxShakeDist){
+		local.maxShakeDist = 600
+	}
+
+	//chrissstrahl - make coop compatible use cloest player as basis
+	local.player = exec coop_mod/replace.scr::player_closestTo NIL local.origin
+	if(local.player==NULL){ end }
+	
+	local.dir  = local.player.origin
+	
+	local.dir -= local.origin
+	local.dist = vector_length local.dir
+	
+	if (local.dist < local.maxShakeDist) {
+		local.t = local.dist/local.maxShakeDist
+		//local.mag = (2*local.t) + (3*(1.0 - local.t))
+		local.mag = 1
+		earthquake 0.5 local.mag 1 0
+	}
+}end
+
+// there are multiple options for mortar emitters
+//=========================================================================
+MortarEmitter local.origin local.emitter:
+//=========================================================================
+{
+	//local.ent = spawn "models/emitters/mortar_dirt_nosound.tik"
+	//local.ent = spawn "models/emitters/mortar_dirt_nebelwerfer.tik"
+	//local.ent = spawn "models/emitters/mortar_dirt.tik"
+	//local.ent = spawn "models/emitters/mortar_dirt_higgins.tik"
+
+	local.ent 		 = spawn local.emitter // "models/emitters/mortar_dirt_dustcloud.tik"
+	local.ent.origin = local.origin
+	local.ent anim start
+	local.ent notsolid
+	wait 4
+
+	local.ent anim idle
+	waitframe
+
+	local.ent remove
+}end
+
+//=========================================================================
+pocketFlashFx local.fx local.origin:
+//=========================================================================
+{
+	local.temp = spawn script_model model local.fx
+	local.temp notsolid
+	local.temp.origin = local.origin  
+	local.temp anim start
+	local.temp notsolid
+	waitframe
+
+	local.temp remove
+}end
+
+//=========================================================================
+pocketExplosionFx local.fx local.origin:
+//=========================================================================
+{
+	local.temp = spawn script_model model local.fx
+	local.temp notsolid
+	local.temp.origin = local.origin  
+	local.temp anim start
+	local.temp notsolid
+	wait 7
+
+	local.temp remove
+}end
+
+//=========================================================================
+timedFireAndSmoke local.origin local.fireTime local.smokeTime:
+//=========================================================================
+{
+	if (level.slowMachine != 0){
+		end
+	}
+
+	if (local.fireTime == NIL || local.fireTime == NULL){
+		local.fireTime = 5
+	}
+
+	if (local.smokeTime == NIL || local.smokeTime == NULL){
+		local.smokeTime = 10
+	}
+
+	local.fire = spawn "models/emitters/fireandsmoke.tik"
+	local.fire.origin = local.origin
+	local.fire loopsound fire_med
+	wait local.fireTime
+
+	local.smoke = spawn "models/emitters/linger_smoke.tik"
+	local.smoke.origin = local.origin
+	wait 2
+
+	local.fire remove
+	local.smokeTime -= 2
+	
+	if (local.smokeTime > 0){
+		wait local.smokeTime
+	}
+	local.smoke remove
+}end
+

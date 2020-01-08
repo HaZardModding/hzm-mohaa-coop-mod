@@ -1,0 +1,237 @@
+//=========================================================================
+InitScene3: {
+//=========================================================================
+	//	thread startMusic_e3l3_scene3
+	$AB41 immune bullet
+	$AB41 immune bash
+	$AB41 rendereffects "-shadow"
+	$AB41 solid
+	$AB41 nodamage
+	$AB41 setcollisionentity $ab41_collide
+
+	$endguys thread Sleep
+
+	//get the entities so we can lock them...
+	$AB41.mg42 = $AB41 queryturretslotentity 0
+	$AB41.minigun = $AB41 queryturretslotentity 1
+
+	//lock the turret, mini turret, and the base-to-turret connection
+	$AB41 lock
+	$AB41.mg42 lock
+	$AB41.minigun lock
+	$AB41.minigun setbaseentity $AB41
+
+	level.AB41Ready = 1
+	level.firsttunnelguystrigger = waitthread global/FindTrigger.scr::FindTrigger "firsttunnelguystrigger"
+	level.secondKFiveDead = 0
+
+	thread fallerstuff "1strun"
+	thread fallerstuff "necorner"
+	$explodertrigger nottriggerable
+	//thread TruckBoomThink
+}end
+
+/*
+TruckBoomThink:
+	$TruckBoom waitthread global/vehicles_thinkers.scr::truck_INIT
+	$TruckBoom.health = 10
+	$TruckBoom waittill death
+	$TruckBoom thread global/vehicles_thinkers.scr::truck_killed local.type
+	$TruckBoom thread maps/e3l3/scene1.scr::TruckSmoke 
+End
+*/
+
+//=========================================================================
+startMusic_e3l3_scene3: {
+//=========================================================================
+	waitthread global/music.scr::StopSong 2.0
+	thread global/music.scr::PlaySongLoop "sound/music/E3L1_TakingOver.mp3"
+}end
+
+//=========================================================================
+fallerstuff local.triggername: {
+//=========================================================================
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger local.triggername
+	// iprintlnbold local.triggername local.trigger
+	local.trigger waittill trigger
+	waitframe
+	
+	for (local.i=1;local.i<$faller.size+1;local.i++) {
+		$faller[local.i] thread balconyGuy
+	}
+	//$faller thread balconyGuy
+}end
+
+// -----------------------------------------------
+//
+// Balcony Jump Gag
+//
+// by ccaron  4/25/2003
+//
+// a balcony guy is inactive until hit by a bullet
+// or player becomes visible
+//
+// if the guy is killed on the balcony, a 
+// balcony fall anim is executed.  If the 
+// guy is alarmed, then one of 2 possible
+// jump-over-the-railing anims is executed.
+//
+// call as: $guy thread balconyGuy
+//
+// -----------------------------------------------
+//=========================================================================
+balconyGuy: {
+//=========================================================================	
+	// println "balconyDeath"
+	if(isalive self) {
+		self.health = 500
+	}
+	else {
+		end
+	}
+
+	self.nosurprise = 1
+	self.nolongpain = 1
+	self.ainocrouch = 1
+	self.ainoprone = 1
+	self.ainododge = 1
+	self.ainohopforward = 1
+	self.ainohopbackward = 1
+	self.ainointerval = 1
+	self.fixedleash = 1
+	self.mindist = 0
+	self.leash = 0
+	self.type_grenade = balcony_grenade
+	self type_attack "balcony_attack"
+
+	// get the direction to fall
+	self.fallDir = angles_toforward(self.angles)
+	self.fallDir = vector_scale self.fallDir 100
+
+	// get the direction to jump
+	local.angle = self.angles
+	//self.jumpType = randomint(2)
+	self.jumpType = 0
+
+	if (self.jumpType == 0) {
+		local.angle[2] -= 90
+	}
+
+	self.jumpDir = angles_toforward(local.angle)  
+	self.jumpDir = vector_scale self.jumpDir 100
+
+  	// wait to get hurt  
+	painwait:
+
+	self waittill pain
+
+	// MJGHACK: only do the death anim if within visual range (and not preoccupied?)
+	local.dist = vector_length($player.origin - self.origin)
+	if ( (local.dist > 2500) || (self.enemy == NULL) ) {
+		self.health = 500
+		goto painwait
+	}
+  
+  	//println "balcony guy got hit!"
+  	//println "I am at :" self.origin
+  	//println "I will fall toward: " self.fallDir
+  	//println "I will jump toward: " self.jumpDir
+  	//println "My jump type is: " self.jumpType
+
+	self waitexec global/disable_ai.scr
+	self type_idle "idle"
+	waitframe
+
+	//println "balcony guy dead"
+	self nodamage
+	self notsolid
+	self thread TurnTo (self.fallDir + self.origin)
+	self anim_noclip death_balcony_intro
+	self waittill animdone
+
+	//self droptofloor
+	wait 0.2
+	//	iprintln "do anim"
+	
+	while (vector_length( self.velocity ) > 30)  {
+		self anim death_balcony_loop
+		wait 0.2
+	}
+
+	//	iprintln "do death anim"
+	self anim death_balcony_outtro
+	self waittill animdone
+	self bedead
+}end
+
+//=========================================================================
+TurnTo local.origin: {
+//=========================================================================
+	if (local.origin) {
+	 	local.ent = spawn script_origin
+	 	local.ent.origin = local.origin
+	  	self turnto local.ent
+	 	self waittill turndone
+	 	local.ent remove
+	}
+	else {
+		// iprintln "bad call!!!!!!!!!!"
+	}
+}end
+
+//=========================================================================
+DoObjective5: {
+//=========================================================================
+	level.AB41Ready = 1
+	$GetOnAB41Trigger delete
+	local.usekey = getboundkey1 "+use"
+	local.msg = (loc_convert_string "Press ") + local.usekey + (loc_convert_string " to board the AB41.")
+
+	waitexec global/DistanceUse.scr $AB41 200 local.msg
+	thread maps/e3l3/e3l3_AB41.scr::GetOnPathVehicle
+	thread startMusic_e3l3_scene3
+}end
+
+//=========================================================================
+DoObjective6: {
+//=========================================================================
+	$kfive_two waitthread maps/e3l3/scene2.scr::KFiveInit "ram"
+
+	while ( level.secondKFiveDead == 0 ) {		
+		waitframe
+	}
+	wait 2.0
+
+	// complete objective 4
+	if ( level.playerjumped == 1 ) {
+		waitthread global/objectives.scr::add_objectives 4 3
+		waitthread global/music.scr::StopSong 1.0
+		thread global/music.scr::PlaySong "sound/music/mus_allies_success.mp3"
+	}
+	wait 8.0			
+}end
+
+//=========================================================================
+CleanupScene3: {
+//=========================================================================
+}end
+
+//=========================================================================
+BridgeTankGo: {
+//=========================================================================
+	$tank drive $bridgetankpath 100 100 256 256
+	$tank waittill drive
+	$tank fullstop
+
+	level.sightdistance = 3200
+	level.playertanktarget = $AB41
+	$tank.paused = 0
+	$tank.gun setAimTarget level.playertanktarget
+}end
+
+//=========================================================================
+init1stcaveguys: {
+//=========================================================================
+	// println "init1stcaveguys"
+	$housebazookaguy exec global/setdeathanim.scr "death_mortar_flip"
+}end

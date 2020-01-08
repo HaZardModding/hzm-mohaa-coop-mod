@@ -1,0 +1,330 @@
+//chrissstrahl - modified for coop on 2019.08.25
+main local.music:
+	if ( level.ambient_script_run == 1 ){
+		end
+	}
+	
+	level.ambient_script_run = 1
+	
+	// set our gametype
+	level.gametype = int( getcvar( g_gametype ) )
+	
+	//chrissstrahl - do this only in sp
+	if(level.gametype == 0){
+		exec global/savenames.scr
+	}
+
+	if ( local.music != NIL ){
+		if ( level.music == NIL ){
+			level.music = local.music
+		}
+	}
+	if ( level.music != NIL ){
+		local.string = ("music/" + level.music + ".mus")
+		soundtrack local.string
+		println ("playing " + local.string)
+		forcemusic normal normal
+	}
+
+	level.gamma = 1
+	level.hazerange = 0
+	level.newhazerange = 0
+	level.haze = 0
+	if (level.gammacap == NIL){
+		level.gammacap = 0
+	}
+	level.farplanerate = 0.015
+
+	println "Loading Ambient.scr"
+
+	if ($interior == NULL){
+		level.interiors = 0
+	}else{
+		level.interiors = $interior.size
+	}
+
+	if (level.interiors > 0){
+		level.interior = exec global/makearray.scr $interior
+
+		for (local.i=1;local.i<level.interiors+1;local.i++){
+			level.interior[local.i] thread interior
+
+			if (level.interior[local.i].set == NIL){
+				println ("Warning, interior at " + level.interior[local.i].origin + " has no #set")
+				level.interior[local.i].set = 1
+			}
+			//else{ Spawned interior //[200] chrissstrahl - disabled in coop, because it is spam
+				//println ("Spawned interior " + local.i)
+			//}
+
+			if (level.interior[local.i].haze == NIL){
+				level.interior[local.i].haze = -1
+			}
+		}
+	}
+
+	if ($exterior == NULL){
+		level.exteriors = 0
+	}else{
+		level.exteriors = $exterior.size
+	}
+
+	if (level.exteriors > 0){
+		level.exterior = exec global/makearray.scr $exterior
+
+		for (local.i=1;local.i<level.exteriors+1;local.i++){
+			level.exterior[local.i] thread exterior
+
+			if (level.exterior[local.i].set == NIL){
+				println ("Warning, exterior at " + level.exterior[local.i].origin + " has no #set")
+				level.exterior[local.i].set = 1
+			}
+			//else{ //[200] chrissstrahl - disabled in coop, because it is spam
+				//println ("Spawned exterior " + local.i)
+			//}
+
+			if (level.exterior[local.i].haze == NIL){
+				level.exterior[local.i].haze = -1
+			}
+		}
+//		thread lightlevel
+		thread musiclevel
+	}
+//	thread exec global/door_locked.scr::lock
+
+	exec global/ambience.scr
+	
+	//[200] chrissstrahl - disabled, why it is set twiche, is beyond me - moh scripting at its best again ?
+	//level.ambient_script_run = 1
+end
+
+interior:
+
+	if (getcvar(notrigger) == "1"){
+		wait 4
+		self delete
+		end
+	}
+
+	while (1){
+		self waittill trigger
+
+		/*
+		if (self.set == 1)
+			forcemusic aux2 aux2
+		else
+		if (self.set == 2)
+			forcemusic aux4 aux4
+		else
+		if (self.set == 3)
+			forcemusic aux6 aux6
+		*/
+
+		/*
+		if (self.haze != -1)
+			level.newhazerange = self.haze
+		else
+			level.newhazerange = level.gammacap
+
+		level.haze = 1
+		*/
+
+		level.current_music = ("int" + self.set)
+//		while ($player istouching self)
+//			waitframe
+
+	}
+	
+end
+
+
+
+exterior:
+	if (getcvar(notrigger) == "1")
+	{
+		wait 4
+		self delete
+		end
+	}
+
+	while (1)
+	{
+		self waittill trigger
+
+		/*
+		if (self.set == 1)
+			forcemusic aux1 aux1
+		else
+		if (self.set == 2)
+			forcemusic aux3 aux3
+		else
+		if (self.set == 3)
+			forcemusic aux5 aux5
+		*/
+
+		/*
+		if (self.haze != -1)
+			level.newhazerange = self.haze
+		else
+			level.newhazerange = level.gammacap
+
+		level.haze = -1
+		*/
+		
+		level.current_music = ("ext" + self.set)
+//		while ($player istouching self)
+//			waitframe
+
+	}
+
+
+end
+
+musiclevel:
+//	level waittill spawn
+
+	local.lastmusic = -1
+	level.current_music = -1
+	while (1)
+	{
+		if (level.current_music != local.lastmusic)
+		{
+			local.break = 0
+			local.current_music = level.current_music
+
+			for (local.i=0;local.i<6;local.i++)
+			{
+				if (level.current_music == local.lastmusic)
+					local.break = 1	
+
+				waitframe
+			}
+		
+			if (local.break == 0)
+			if (level.current_music != local.lastmusic)
+			{
+				
+				if (level.current_music == "ext1")
+					forcemusic aux1 aux1
+				else
+				if (level.current_music == "ext2")
+					forcemusic aux3 aux3
+				else
+				if (level.current_music == "ext3")
+					forcemusic aux5 aux5
+				else
+				if (level.current_music == "int1")
+					forcemusic aux2 aux2
+				else
+				if (level.current_music == "int2")
+					forcemusic aux4 aux4
+				else
+				if (level.current_music == "int3")
+					forcemusic aux6 aux6
+
+				println ("forced music " + level.current_music)
+				local.lastmusic = local.current_music
+			}
+		}
+
+		wait 0.1
+	}
+end
+
+
+lightlevel:
+	//[200] chrissstrahl - don't do this in coop
+	if(int(getCvar("g_gametype")) != 0){
+		end
+	}
+
+	level waittill spawn
+	while (1==1)
+	{
+		if ((level.haze == 1) && (level.hazerange < level.newhazerange))
+		{
+			level.hazerange = level.hazerange + level.farplanerate
+			if (level.hazerange > level.newhazerange)
+			{
+				level.hazerange = level.newhazerange
+				level.haze = 0
+			}
+		}
+		else
+		if ((level.haze == -1) && (level.hazerange > 0))
+		{
+			level.hazerange = level.hazerange - level.farplanerate
+
+			if (level.hazerange < 0.1)
+			{
+				level.hazerange = 0
+				level.haze = 0
+			}
+		}
+		
+		if (level.hazerange > level.newhazerange)
+			level.hazerange = level.newhazerange
+			else
+		if (level.hazerange < 0)
+			level.hazerange = 0
+		
+//		println ("hazerange is " + level.hazerange)
+
+//		local.farplanecolor = level.farplanecolor + ( level.hazerange level.hazerange level.hazerange )
+//		$world farplane_color local.farplanecolor
+//		setcvar r_farplane_color local.farplanecolor
+//		local.gamma = level.gamma + level.hazerange
+		setcvar r_gammabias (level.hazerange + 1)
+
+		waitframe
+	}
+	
+
+end
+
+
+
+lighten:
+	//[200] chrissstrahl - don't do this in coop
+	if(int(getCvar("g_gametype")) != 0){
+		end
+	}
+	
+	while ((level.haze == 1) && (level.hazerange < level.farplanerange))
+	{
+		local.farplanecolor = level.farplanecolor + ( level.hazerange level.hazerange level.hazerange )
+		$world farplane_color local.farplanecolor
+		setcvar r_farplane_color local.farplanecolor
+		level.hazerange = level.hazerange + level.farplanerate
+		wait 0.1
+	}
+		level.hazerange = 0.3
+		local.farplanecolor = level.farplanecolor + ( level.hazerange level.hazerange level.hazerange )
+		$world farplane_color local.farplanecolor
+		setcvar r_farplane_color local.farplanecolor
+
+		level.haze = 0
+end
+
+darken:
+	//[200] chrissstrahl - don't do this in coop
+	if(int(getCvar("g_gametype")) != 0){
+		end
+	}
+	
+	while ((level.haze == -1) && (level.hazerange > 0.0))
+	{
+		local.farplanecolor = level.farplanecolor + ( level.hazerange level.hazerange level.hazerange )
+		$world farplane_color local.farplanecolor
+		setcvar r_farplane_color local.farplanecolor
+		level.hazerange = level.hazerange - level.farplanerate
+		wait 0.1
+	}
+		level.hazerange = 0
+		local.farplanecolor = level.farplanecolor + ( level.hazerange level.hazerange level.hazerange )
+		$world farplane_color local.farplanecolor
+		setcvar r_farplane_color local.farplanecolor
+
+		level.haze = 0
+
+end

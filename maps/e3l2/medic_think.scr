@@ -1,0 +1,750 @@
+// Medic thinkerton
+
+
+MedicInit:
+
+	$medic.destination = $player
+	$medic.friendtype  = 5		//medic
+	$medic.distance    = 256		//100		//16
+	//$medic lookat $player
+	//$medic turnto $player
+	$medic.wounded_to_heal = NULL
+	$medic.min_dist_to_player = 320		//2000		//600		//1600
+	$medic.stop_thinking = 0
+	$medic.crouching = 0
+	$medic.danger_leash_active = 1
+	$medic.force_huddle_point = NULL
+	$medic nodamage
+
+	$medic thread MedicThink
+//	$medic thread MedicMustLive
+//	$medic thread MedicPeriodicHealingThread
+
+	level.medic_safe = 0
+
+	end
+
+
+MedicThink:
+
+	thread MedicThinkStart
+	local.thread = parm.previousthread
+	self waittill death
+	if (local.thread)
+		local.thread delete
+
+	end
+
+
+MedicThinkStart:
+
+	if (level.frienddebug == NIL)
+	println (self + " did friendlythink")
+
+		level.entref++
+		self.entref = "friendly" + level.entref
+
+		if (self.lookat_time == NIL)
+			self.lookat_time = 1
+
+		if (self.look == NIL)
+			self.look = 1
+
+		if (self.area == NIL)
+			self.area = -1
+
+		if (self.mins == NIL)
+			self.mins = -20
+
+		if (self.maxs == NIL)
+			self.maxs = 20
+
+		if (self.friendtype == NIL)
+			self.friendtype = 0
+
+
+		if (self.distance == NIL)
+			self.distance = 250
+
+		self.destination = $player
+
+		if (getcvar(debug) == "1")
+			println ("destination is " + self.destination + " and friendtype is " + self.friendtype)
+
+
+		if (self.friendlyrepulsetest)
+			thread friendlyrepulse
+
+		if (self.destinationset == NIL)
+			self.destinationset = 10
+
+		if (self.destinationnum == NIL)
+			self.destinationnum = 10
+
+		if (self.maxhealth == NIL)
+			self.maxhealth = self.health
+
+		if (self.friendtype == 5)
+		{
+			self gun "none"
+			self exec global/disable_ai.scr
+
+			if (self.lasthealed == NIL)
+				self.lasthealed = level.time + 1
+
+			if (self.playerhealed == NIL)
+				self.playerhealed = level.time + 1
+
+			self.mins = -250		//-15
+			self.maxs = -225		//5
+		}
+
+//		if (getcvar(debug) == "1")
+//			thread friendlyhealth
+
+		self.originaldestination = self.destination
+
+//	self type_attack "cover"
+//	self.health = 5000
+//	self ammo_grenade 4
+
+		self.lastdestination = $player // was -1
+		local.standtime = level.time
+		local.runtime = level.time
+		local.friendrange = 150		//50
+		local.stand = 0
+		thread forceactiveatime
+
+		local.lastplayerset = -1
+
+
+		self.medic_leash = 320		//480
+		self.medic_leash_danger = 640
+		self.player_stop_dist = 200		//100		//200
+		self.cover_stop_dist = 150	//32
+		self.cover_leash = 100
+		self.stop_dist_margin = 75
+
+		self.medic_think_state = 301		// state "S1" - standing near player, in safety
+		self.last_medic_think_state = self.medic_think_state
+		//self.cowering = 0
+
+		self.reached_dest = 1
+		self.reached_dest_thread = NULL
+		self.dest_sanity_check_dist = 640
+
+		self.avoidplayer = 1
+
+
+println "**** MEDIC STARTING THINK"
+
+	while ((isalive self) && (self.stop_thinking == 0))
+	{
+
+			waitframe
+
+			//if (self.wounded_to_heal != NULL)
+			//iprintlnbold "WANTING TO HEAL THE SUCKER"
+
+			if ((self.wounded_to_heal != NULL) && 
+				((vector_within self.origin self.wounded_to_heal.origin 480) ||
+				 (vector_within $player.origin self.wounded_to_heal.origin 480)))
+			{
+				// go heal the sucker
+
+				//iprintlnbold "HEALING THE SUCKER"
+
+				if (self.crouching == 1)
+				{
+					self exec global/stand.scr
+					self waittill animdone
+				}
+
+				self turnto self.wounded_to_heal
+				self lookat self.wounded_to_heal
+
+				self.movedoneradius = 100
+				self walkto self.wounded_to_heal
+				self waittill movedone
+				while !(vector_within self.origin self.wounded_to_heal.origin self.movedoneradius)
+				{
+					wait 1
+					self walkto self.wounded_to_heal
+					self waittill movedone
+				}
+
+				//self.avoidplayer = 0
+
+				self upperanim pass_canteen_start
+				self waittill upperanimdone
+
+				self.wounded_to_heal heal 1
+				self.wounded_to_heal.been_healed = 1
+				self playsound med_canteen
+
+				self upperanim pass_canteen_end
+				self waittill upperanimdone
+
+				//self.avoidplayer = 1
+				self turnto NULL
+				self lookat NULL
+				//self turnto $player
+				//self lookat $player
+
+				self.wounded_to_heal = NULL
+
+				if (self.crouching == 1)
+				{
+					self exec global/crouch.scr
+					self waittill animdone
+				}
+			}
+
+
+			if (self.last_medic_think_state != self.medic_think_state)
+			{
+				println ("+++++++ Medic switched from state " + self.last_medic_think_state + " to state " + self.medic_think_state)
+				println ("                      Medic crouching state is " + self.crouching)
+				self.last_medic_think_state = self.medic_think_state
+			}
+
+
+			switch (self.medic_think_state)
+			{
+			// Transitional states
+
+				// T1) evaluating "dangerous destination"
+				case 101:
+					// if there is a cover spot within medic leash of player, go to D4 state
+					// otherwise, go to D3 state
+
+					local.nearest_index = -1
+					local.nearest_distance = 100000
+
+					//println "Medic looking for nearest cover point"
+
+					for (local.i=1; local.i<=$MedicCoverPoint.size; local.i++)
+					{
+						if (vector_within $MedicCoverPoint[local.i].origin $player.origin self.medic_leash_danger)
+						{
+							if ((local.nearest_index == -1) ||
+								(vector_closer $MedicCoverPoint[local.i].origin $MedicCoverPoint[local.nearest_index] self.origin))
+							{
+								local.nearest_index = local.i
+							}
+						}
+					}
+
+					if (self.crouching == 1)
+					{
+						self exec global/stand.scr
+						self waittill animdone
+						self.crouching = 0
+					}
+
+					if (local.nearest_index == -1)
+					{
+						self waitthread MedicGoTo $player self.player_stop_dist 1
+						//self.destination = $player
+						//self.movedoneradius = self.player_stop_dist		// - self.stop_dist_margin
+						//self runto self.destination
+
+						self.medic_think_state = 203
+					}
+					else
+					{
+						//println ("Medic using cover point # " + local.nearest_index)
+
+						self waitthread MedicGoTo $MedicCoverPoint[local.nearest_index] self.cover_stop_dist 1
+						//self.destination = $MedicCoverPoint[local.nearest_index]
+						//self.movedoneradius = self.cover_stop_dist		// - self.stop_dist_margin
+						//self runto self.destination
+
+						self.medic_think_state = 204
+					}
+
+					break
+
+				// T2) animating crouch, near player
+				case 102:
+					// when done with anim, go to D1 state
+
+					//self exec global/crouch.scr
+					self waittill animdone
+					self.medic_think_state = 201
+
+					break
+
+				// T3) animating crouch, near cover
+				case 103:
+					// when done with anim, go to D2 state
+
+					//self exec global/crouch.scr
+					self waittill animdone
+					self.medic_think_state = 202
+
+					break
+
+				// T4) animating stand-up, near player
+				case 104:
+					// when done with anim, go to S1 state
+
+					self exec global/stand.scr
+					self waittill animdone
+					self.medic_think_state = 301
+
+					break
+
+				// T5) animating stand-up, near cover
+				case 105:
+					// when done with anim, go to S1 state (S1 will run us to player if necessary)
+
+					self exec global/stand.scr
+					self waittill animdone
+					self.medic_think_state = 302
+
+					break
+
+
+			// Danger states
+
+				// D1) crouching near player
+				case 201:
+					// if Danger is deactivated, go to T4 state
+					// if player is outside of medic leash, go to T1 state
+
+					self.crouching = 1
+					if (level.dangerousness <= 0)
+						self.medic_think_state = 104
+					else
+					if ((self.danger_leash_active == 1) && !(vector_within self.origin $player.origin self.medic_leash_danger))
+						self.medic_think_state = 101
+
+					break
+
+				// D2) crouching at cover point
+				case 202:
+					// if Danger is deactivated, go to T5 state
+					// if player is outside of medic leash, go to T1 state
+
+					self.crouching = 1
+					if (level.dangerousness <= 0)
+						self.medic_think_state = 105
+					else
+					if ((self.danger_leash_active == 1) && !(vector_within self.origin $player.origin self.medic_leash_danger))
+						self.medic_think_state = 101
+
+					break
+
+				// D3) running to player, in danger
+				case 203:
+					// if Danger is deactivated, go to S2 state
+					// if within stop range of player, go to T2 state
+
+					self.crouching = 0
+					if (level.dangerousness <= 0)
+						self.medic_think_state = 302
+					else
+					if (self.reached_dest == 1)
+					//if (vector_within self.origin $player.origin self.medic_leash_danger)
+						self.medic_think_state = 102
+
+					break
+
+				// D4) running to cover
+				case 204:
+					// if Danger is deactivated, go to S2 state
+					// if within crouch range of cover, go to T3 state
+					// if cover dest is too far from player, goto T1 state
+
+					self.crouching = 0
+					if (level.dangerousness <= 0)
+					{
+						self waitthread MedicGoTo $player self.player_stop_dist 1
+						self.medic_think_state = 302
+					}
+					else
+					if (self.reached_dest == 1)
+					//if (vector_within self.origin self.destination.origin self.cover_leash)		//self.cover_stop_dist)
+						self.medic_think_state = 103
+					else
+					if !(vector_within self.destination.origin $player.origin self.medic_leash_danger)
+						self.medic_think_state = 101
+
+					break
+
+
+			// Safety states
+
+				// S1) standing near player
+				case 301:
+					// if Danger is activated, go to T1 state
+					// if player is outside of medic leash, start running to player and go to S2 state
+
+					self.crouching = 0
+					if (level.dangerousness > 0)
+						self.medic_think_state = 101
+					else
+					if !(vector_within self.origin $player.origin self.medic_leash)
+					{
+						self waitthread MedicGoTo $player self.player_stop_dist 0
+						//self.destination = $player
+						//self.movedoneradius = self.player_stop_dist		// - self.stop_dist_margin
+						//self runto self.destination
+
+						self.medic_think_state = 302
+					}
+
+					break
+
+				// S2) running to player, no danger
+				case 302:
+					// if Danger is activated, go to T1 state
+					// if within stop range of player, go to S1 state
+
+					self.crouching = 0
+					if (level.dangerousness > 0)
+						self.medic_think_state = 101
+					else
+					if (self.reached_dest == 1)
+					//if (vector_within self.origin $player.origin self.medic_leash)
+						self.medic_think_state = 301
+
+					break
+
+
+				// Misc states
+
+				// M1) going to forced huddle point
+				case 501:
+					if (self.reached_dest == 1)
+					{
+						//iprintlnbold "Medic 501:  reached dest"
+						if (self.crouching == 0)
+						{
+							self exec global/crouch.scr
+							self waittill animdone
+						}
+						self.medic_think_state = 502
+					}
+
+					break
+
+				// M2) holding at forced huddle point
+				case 502:
+					if (self.force_huddle_point == NULL)
+					{
+						//iprintlnbold "Medic 502:  leaving huddle"
+						self exec global/stand.scr
+						self waittill animdone
+						self.crouching = 0
+						self.medic_think_state = 301
+					}
+
+					break
+
+
+				// Diagnostic / Error states
+
+				// X1) destination pathing is failing
+				case 901:
+
+					self.crouching = 0
+					self exec global/stand.scr
+					wait 5
+					self.medic_think_state = 301
+
+					break
+			}
+	}
+
+println "**** MEDIC ENDED THINK"
+
+	end
+
+forceactiveatime:
+	while (isalive self)
+	{
+		self forceactivate
+		wait 50
+	}
+	end
+
+
+MedicGoTo local.dest local.movedonerad local.crouch_on_arrival:
+
+	if (self.stop_thinking == 1)
+		end
+
+	if (self.reached_dest_thread != NULL)
+	{
+		self.reached_dest_thread delete
+		self.reached_dest_thread = NULL
+	}
+
+	self.reached_dest = 0
+
+	self.destination = local.dest
+	self.movedoneradius = local.movedonerad
+	self runto self.destination
+
+	//iprintlnbold "MedicGoto did first runto"
+	self thread MedicReachedDestThread local.crouch_on_arrival
+	self.reachedDest_thread = parm.previousthread
+
+	end
+
+MedicReachedDestThread local.crouch_on_arrival:
+
+	if (self.stop_thinking == 1)
+		end
+
+	//iprintlnbold "MedicReachedDestThread waiting for movedone"
+	self waittill movedone
+	while (!(vector_within self.origin self.destination.origin self.movedoneradius) &&
+			(self.stop_thinking == 0))
+	{
+		//iprintlnbold ("MedicReachedDestThread:  move failed, waiting to re-try (" + vector_length(self.origin - self.destination.origin) + "/" + self.movedoneradius + ")")
+		wait 1
+		//iprintlnbold "MedicReachedDestThread:  re-trying move"
+		self runto self.destination
+		self waittill movedone
+	}
+
+	if (self.stop_thinking == 0)
+	{
+		if (local.crouch_on_arrival == 1)
+			self exec global/crouch.scr
+		self.reached_dest = 1
+
+		self.reached_dest_thread = NULL
+
+		if !(vector_within self.origin self.destination.origin self.dest_sanity_check_dist)
+			self.medic_think_state = 901		// it's "oh [shucks]" time
+	}
+
+	end
+
+
+
+/*
+MedicTakeCover:
+
+	self.cowering = 1
+
+	local.measure_from = $player
+	//local.measure_from = self
+
+	local.nearest_index = 1
+	//local.nearest_distance = vector_length(local.measure_from.origin - $MedicCoverPoint[1].origin)
+
+	//println "Medic looking for nearest cover point"
+
+	for (local.i=2; local.i<=$MedicCoverPoint.size; local.i++)
+	{
+		//local.curr_dist = vector_length(local.measure_from.origin - $MedicCoverPoint[local.i].origin)
+		//if (local.curr_dist < local.nearest_distance)
+		if (vector_closer $MedicCoverPoint[local.i].origin $MedicCoverPoint[local.nearest_index] local.measure_from.origin)
+		{
+			local.nearest_index = local.i
+			//local.nearest_distance = local.curr_dist
+		}
+	}
+
+	//println ("Medic using cover point # " + local.nearest_index)
+
+	self.destination = $MedicCoverPoint[local.nearest_index]
+	//self.destination = $MedicCoverPoint
+
+	$medic.reached_cover = 0
+
+	end
+*/
+
+
+MedicMustLive:
+
+	self waittill death
+	if (level.medic_safe == 0)
+	{
+		iprintlnbold "Medic was killed.  Mission failed."
+		wait 2
+		missionfailed
+	}
+
+	end
+
+
+MedicPeriodicHealingThread:
+
+	while ((isalive self) && (self.stop_thinking == 0))
+	{
+		wait 5
+
+		if ((level.dangerousness <= 0) &&
+			(self.wounded_to_heal == NULL) &&
+			(self.stop_thinking == 0))
+		{
+			self waitthread MedicImpromptuHeal $player
+			self waitthread MedicHealThyself
+		}
+		//else
+		//{
+		//	iprintlnbold ("Medic's health is at " + ((self.health * 100) / self.maxhealth) + " percent")
+		//}
+	}
+
+	end
+
+
+MedicImpromptuHeal local.ent:
+
+	if (isalive local.ent)
+	{
+		local.health = (local.ent.health * 100) / local.ent.maxhealth
+
+		if (local.health < 65)		//level.medicmin)
+		{
+			self.no_idle = 0
+
+			if (self.crouching == 1)
+			{
+				self exec global/stand.scr
+				self waittill animdone
+			}
+
+			self.movedoneradius = 150		//100
+			self runto local.ent
+			self waittill movedone
+
+			//self exec global/stand.scr
+
+			if (isalive local.ent)
+			{
+				if (vector_within self.origin local.ent.origin 190)		//140)
+				//local.vec = vector_length (self.origin - local.ent.origin)
+				//if (local.vec < 140)
+				{
+					//self nodamage
+					self.avoidplayer = 0
+//					self.no_idle = 1
+					self turnto local.ent
+					self waittill turndone
+					self upperanim pass_canteen_start
+					self waittill upperanimdone
+
+					local.ent heal 0.5
+					self playsound med_canteen
+					//self playsound med_kit
+
+					self upperanim pass_canteen_end
+					self waittill upperanimdone
+
+					self.avoidplayer = 1
+
+					self turnto NULL
+
+					//if (getcvar(alive) != "1")
+					//	self takedamage
+//					self.no_idle = 0
+
+				}
+			}
+
+			if (self.crouching == 1)
+			{
+				self exec global/crouch.scr
+				self waittill animdone
+			}
+
+
+			//if (getcvar(debug) == "1")
+			//	println ("medic healed " + local.ent)
+		}
+	}
+
+	end
+
+
+MedicHealThyself:
+
+	local.health = (self.health * 100) / self.maxhealth
+
+	//iprintlnbold ("Medic's health is at " + local.health + " percent")
+
+	if (local.health < 65)
+	{
+	/*
+		if (self.crouching == 1)
+		{
+			self exec global/stand.scr
+			self waittill animdone
+		}
+	*/
+
+		self upperanim pass_canteen_drink
+		wait 1
+		self playsound med_canteen
+		self waittill upperanimdone
+		self heal 0.5
+
+	/*
+		if (self.crouching == 1)
+		{
+			self exec global/crouch.scr
+			self waittill animdone
+		}
+	*/
+
+		//iprintlnbold ("***** Medic:  Look, Mommy! I healed my self to " + ((self.health * 100) / self.maxhealth) + " percent!")
+	}
+
+	end
+
+
+MedicHealWounded local.wounded:		// allows "healing chains"
+
+	while ($medic.wounded_to_heal != NULL)
+	{
+		//iprintlnbold "MedicHealWounded waiting to attach"		// "limpet-like"
+		wait 0.5
+	}
+
+	//iprintlnbold "MedicHealWounded attaching"
+	$medic.wounded_to_heal = local.wounded
+
+	end
+
+
+MedicForceHuddle local.huddle_point:
+
+	//iprintlnbold "MedicForceHuddle"
+	$medic.force_huddle_point = local.huddle_point
+	$medic waitthread MedicGoTo $medic.force_huddle_point $medic.cover_stop_dist 1
+	$medic.medic_think_state = 501
+
+	end
+
+
+MedicLeaveForcedHuddle:
+
+	//iprintlnbold "MedicLeaveForcedHuddle"
+	$medic.force_huddle_point = NULL
+
+	end
+
+
+MedicDisableDangerLeash:
+
+	$medic.danger_leash_active = 0
+
+	end
+
+
+MedicEnableDangerLeash:
+
+	$medic.danger_leash_active = 1
+
+	end
+
+

@@ -1,0 +1,880 @@
+//chrissstrahl - completed coopification on 2019.09.18
+
+//
+// sneakers.scr
+//
+
+init:
+	if (level.warpTo == "sneakers") {
+		// hack warp section
+		if(level.gametype == 0){
+			$player.origin = ( 3577 -1966.0 210.20 )
+			$player.viewangles = ( 0 90 0 )
+		}
+		waitthread maps/e1l3/Objectives.scr::catchup "tookFort"
+	}
+	else {
+		if (level.warpTo == "roofJaunt")
+			end		// don't need any of this, nor a Claus (warp section of RoofJaunt spawns one)
+	}
+
+	spawn trigger_relay targetname sneakersGagDone
+
+	spawn trigger_relay targetname convoyOnStreet_1
+	spawn trigger_relay targetname convoyOffStreet_1
+	spawn trigger_relay targetname convoyOnStreet_2
+	spawn trigger_relay targetname convoyOffStreet_2
+
+	level.clausEnteredStreet_1 = 0
+	level.clausEnteredStreet_2 = 0
+	level.clausDoneSneaking = 0
+	spawn trigger_relay targetname clausCrossingStreet_1
+	spawn trigger_relay targetname clausCrossingStreet_2
+
+	//level.streetCrossTime = 7 // how many seconds the player gets to cross the street
+//chrissstrahl - 7 secs is to low, we need more time in coop
+level.streetCrossTime = 20 // how many seconds the player gets to cross the street
+
+	level.street1Open = 0
+	level.street2Open = 0
+	level.sneakersDetected = 0
+
+	if ($ShadowTrigger)
+		$ShadowTrigger nottriggerable
+
+	thread monitorStreet_1
+	thread monitorStreet_2
+	thread doStreetGuys
+	thread doStreetTriggers
+	thread doShadowGuys
+	thread doConvoy
+	$WrongWay thread doWrongWay
+	$Claus thread doClaus
+
+end
+
+//-----------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------
+
+doClaus:
+	self.origin = $clausPath_1.origin
+	self ai_off
+	self hide
+	$ClausTrigger waittill trigger
+
+	thread ClausSneakersCollisionThread
+
+	waitthread maps/e1l3.scr::Autosave3
+
+	self ai_on
+	self exec coop_mod/replace.scr::lookat //chrissstrahl
+	self show
+	self.enableEnemy = 0
+	//self holster
+	self gun "beretta"
+	self notsolid
+	self nodamage
+	self physics_off
+
+	local.speed = 250 // speed when running
+
+	// stick claus on a script object 
+	local.model = spawn script_model
+	local.model.origin = self.origin
+	local.model.angles = self.angles
+	local.model notsolid
+	local.model physics_off
+	self.flyModel = local.model
+	self.flyModelSpeed = local.speed
+	waitframe
+
+	local.model.origin = $clausPath_1.origin
+
+	//local.m = spawn script_model model models/test/testwidget.tik
+	//local.m attach $Claus Bip01 1 ( 0 0 0 )
+
+	$clausTalkTrigger waittill trigger
+
+	//chrissstrahl - keep for sp
+	if(level.gametype == 0){
+		$player physics_off
+	}else{
+		//chrissstrahl - coop update spawnlocations
+		thread coop_mod/spawnlocations.scr::e1l3_update6
+		//chrissstrahl - make sure no rusher will mess the mission up
+		thread coop_mod/replace.scr::radiusFreeze (3152 -432 128) 128 //meeting Klaus
+	}
+
+	if ($ShadowTrigger)
+		$ShadowTrigger triggerable
+
+	self lookat NULL
+	
+	//chrissstrahl - playing this map more than 50 times drives you crazy hearing all the crap over again
+	if(level.coop_skipThisMeetKlaus == NIL){
+		self anim A_13_ClausTalk01	// Claus says "You are Sergeant..."
+		self waittill animdone
+		self anim A_13_ClausTalk02	// Claus says "The Germans are on..."
+		self waittill animdone
+		self anim A_13_ClausTalk03	// Claus says "Unfortunately, that's exactly..."
+		self waittill animdone
+		self anim A_13_ClausTalk04	// Claus says "I'm working on securing..."
+		self waittill animdone
+	}
+
+	//chrissstrahl - keep for so
+	if(level.gametype == 0){
+		$player physics_on
+	}else{
+		//chrissstrahl - save current mission progress, so it can be restored
+		setcvar "coop_save" "e1l3_sneakers"
+		iprintlnbold_noloc("Coop Mission Progress has been saved!")
+		//chrissstrahl - unfreeze previouse rushers
+		waitthread coop_mod/replace.scr::stopRadiusFreeze
+		//chrissstrahl - make sure no rusher will mess the mission up
+		thread coop_mod/replace.scr::radiusFreeze ( 3256 250 128 ) 64 //first ally stop
+	}	
+	
+	waitthread maps/e1l3/objectives.scr::transition metKlaus
+
+	//---------------------------------------------
+
+	// run claus over to the first street corner
+	self waitthread clausRun $clausPath_1	
+
+	// wait for the player to catch up
+	self anim A_13_ClausTalk05
+	wait (27.0 / 30.0)			//1
+	self ai_off
+	self unbind
+	self physics_on
+	if ($clausCatchupTrigger_1)
+		$clausCatchupTrigger_1 waittill trigger
+	self ai_on
+
+	// claus tells player to not go into street 1
+	self waittill animdone
+	self thread global/loopanim.scr::LoopAnim A_13_ClausTalk05_idle
+
+	// wait for the street to be clear
+	$convoyOffStreet_1 waittill trigger
+	self thread global/loopanim.scr::LoopAnimStop
+	level.clausEnteredStreet_1 = 1
+	wait 0.5
+	
+	//chrissstrahl - do only in mp
+	if(level.gametype != 0){
+		//chrissstrahl - unfreeze previouse rushers
+		waitthread coop_mod/replace.scr::stopRadiusFreeze
+		//chrissstrahl - make sure no rusher will mess the mission up
+		thread coop_mod/replace.scr::radiusFreeze ( 1928 2096 128 ) 64 //second ally stop
+	}
+
+	// tell the player that it's time to go
+	self ai_on
+	self anim_noclip A_13_ClausTalk06
+	self waittill animdone
+	trigger $clausCrossingStreet_1
+
+	//---------------------------------------------
+
+	// run claus over across the street and into the middle of the alley
+	self waitthread clausRun $clausPath_2
+	
+	//// wait for the player to catch up
+	//self upperanim unarmed_stand_alert
+	//self anim unarmed_stand_alert_legs
+	//self lookat $player
+	//$clausCatchupTrigger_2 waittill trigger
+	//self lookat NULL
+
+	//---------------------------------------------
+
+	// run claus over to the next street corner
+	self waitthread clausRun $clausPath_3
+
+	// wait for the player to catch up
+	self anim_noclip A_13_ClausTalk07
+	wait 1
+	self ai_off
+	self unbind
+	self physics_on
+	if ($clausCatchupTrigger_3)
+		$clausCatchupTrigger_3 waittill trigger
+	self ai_on
+
+	// claus tells player to not go into street 2
+	self waittill animdone
+	self thread global/loopanim.scr::LoopAnim A_13_ClausTalk07_idle
+
+	// wait for the street to be clear
+	$convoyOffStreet_2 waittill trigger
+	self thread global/loopanim.scr::LoopAnimStop
+	level.clausEnteredStreet_2 = 1
+	wait 0.5
+	
+	//chrissstrahl - do only in mp
+	if(level.gametype != 0){
+		//chrissstrahl - unfreeze previouse rushers
+		waitthread coop_mod/replace.scr::stopRadiusFreeze
+	}
+
+	// tell the player that it's time to go
+	self ai_on
+	self anim_noclip A_13_ClausTalk08
+	self waittill animdone
+
+	trigger $clausCrossingStreet_2
+	
+	//chrissstrahl - spawn new players at hotel entrance - make sure it won't trigger early
+	if(level.gametype != 0){
+		$RoofJauntStartTrigger nottriggerable
+		thread coop_mod/spawnlocations.scr::e1l3_update7
+	}
+
+	//---------------------------------------------
+
+	// run claus across the street, into the middle next alley
+	self waitthread clausRun $clausPath_4
+
+	//// wait for the player to catch up
+	//self lookat $player
+	//$clausCatchupTrigger_4 waittill trigger
+	//self lookat NULL
+
+	//---------------------------------------------
+
+	// run claus to the courtyard
+	self waitthread clausRun $clausPath_5
+
+	// crouch and wait for the player to arrive
+	self lookat $getawayTruck
+	self thread global/loopanim.scr::LoopAnim unarmed_crouch_alert
+
+	wait 2
+	self.flyModel remove
+	self physics_on
+	self solid
+	self takedamage
+
+	level.clausDoneSneaking = 1
+	
+	//chrissstrahl - klaus is ready, allow triggering now
+	if(level.gametype != 0){
+		$RoofJauntStartTrigger triggerable
+	}
+
+	//chrissstrahl - this waits for a player getting next to klaus
+	if (level.roof_jaunt_section_triggered == 0)
+		$RoofJauntStartTrigger waittill trigger
+
+	self lookat NULL
+	self thread global/loopanim.scr::LoopAnimStop
+
+
+	// roof jaunt code takes over control of Claus here
+	trigger $sneakersGagDone
+end
+
+
+ShadowThread:
+	$Claus hide
+	iprintlnbold "Klaus died.  You failed the mission."
+	
+	//chrissstrahl - keep for sp
+	if(level.gametype == 0){
+		wait 3
+		missionfailed	
+	}else{
+		exec coop_mod/replace.scr::missionfailed
+	}
+end
+
+
+ClausSneakersCollisionThread:
+
+	if (!$ClausSneakersCollision)
+		end
+
+	local.coll_z = $ClausSneakersCollision.origin[2]
+
+	while (level.clausDoneSneaking == 0)
+	{
+		$ClausSneakersCollision.origin = ( $Claus.origin[0] $Claus.origin[1] local.coll_z )
+		waitframe
+	}
+
+	$ClausSneakersCollision delete
+
+end
+
+
+
+clausRun local.path:
+	//self thread global/loopanim.scr::LoopAnim thompson_run_forward
+	self physics_off
+	self bind self.flyModel
+	//self thread global/loopanim.scr::LoopAnim unarmed_run_forward
+	self anim unarmed_run_forward
+	self.flyModel flypath local.path self.flyModelSpeed self.flyModelSpeed 100
+	self.flyModel waitmove
+	//self thread global/loopanim.scr::LoopAnimStop 
+end
+
+//-----------------------------------------------------------------------------
+
+deafGuyLogic:
+	//iprintlnbold self.targetname " going deaf"
+	self takedamage
+	self health 10000
+	self.enableEnemy = 1
+	self.accuracy = 100
+	self.hearing = 200		//0
+	self.sight = 300
+end
+
+blindGuyLogic:
+	//iprintlnbold self.targetname " going blind"
+	self takedamage
+	self health 10000
+	self.enableEnemy = 1
+	self.accuracy = 100
+	self.hearing = 4096
+	self.sight = 0
+end
+
+limitedSightGuyLogic:
+	//iprintlnbold self.targetname " going limited sight"
+	self takedamage
+	self health 10000
+	self.enableEnemy = 1
+	self.accuracy = 100
+	self.hearing = 2048
+	self.sight = 1000
+end
+
+detectGuyLogic:
+	while (self != NULL && (isAlive self)) {
+		//chrissstrahl - coopify
+		//if (((self.enemy == $player) || (self.enemy == $Claus)) && (level.sneakersDetected == 0)) {
+		//chrissstrahl - enemy can be NULL so we need to add that check
+		if(self.enemy != NULL && (level.sneakersDetected == 0))
+		if ((self.enemy.targetname == "player") || (self.enemy == $Claus)) {
+			level.sneakersDetected = 1
+			iprintlnbold "Your cover was blown."
+			
+			//chrissstrahl - keep for sp
+			if(level.gametype == 0){
+				wait 1
+				missionfailed	
+			}else{
+				exec coop_mod/replace.scr::missionfailed
+			}
+			end
+		}
+		wait 0.4
+	}
+end
+
+//-----------------------------------------------------------------------------
+
+doShadowGuys:
+	if ($shadowGuy_1)
+		$shadowGuy_1 delete
+	if ($shadowGuy_2)
+		$shadowGuy_2 delete
+//	waitthread global/ManSpawnNamed.scr::Init "shadowGuy_1"
+//	waitthread global/ManSpawnNamed.scr::Init "shadowGuy_2"
+//	$clausTalkTrigger waittill trigger
+//	waitthread global/ManSpawnNamed.scr::Spawn "shadowGuy_1"
+//	waitthread global/ManSpawnNamed.scr::Spawn "shadowGuy_2"
+//
+//	$shadowGuy_1 thread doShadowGuy $shadowGuyGoto_1 $shadowGuyTurnto_1 $street1Exit
+//	$shadowGuy_2 thread doShadowGuy $shadowGuyGoto_2 $shadowGuyTurnto_2 $street1Exit
+end
+
+//doShadowGuy local.gotoNode local.turntoNode local.removeTrigger:
+//	self thread detectGuyLogic
+//
+//	self thread deafGuyLogic
+//	self turnto $ClausTrigger
+//	$shadowGuysMoveTrigger waittill trigger
+//	self thread limitedSightGuyLogic
+//	self turnto NULL
+//	self runto local.gotoNode
+//	self waittill movedone
+//	self turnto local.turntoNode
+//	local.removeTrigger waittill trigger
+//
+//	self remove
+//end
+
+//-----------------------------------------------------------------------------
+
+doStreetGuys:
+	waitthread global/ManSpawnNamed.scr::Init "street1_guy1"
+	waitthread global/ManSpawnNamed.scr::Init "street1_guy2"
+	waitthread global/ManSpawnNamed.scr::Init "street2_guy1"
+	waitthread global/ManSpawnNamed.scr::Init "street2_guy2"
+	$ClausTrigger waittill trigger
+
+	waitthread global/ManSpawnNamed.scr::Spawn "street1_guy1"
+	waitthread global/ManSpawnNamed.scr::Spawn "street1_guy2"
+	waitthread global/ManSpawnNamed.scr::Spawn "street2_guy1"
+	waitthread global/ManSpawnNamed.scr::Spawn "street2_guy2"
+	$street1_guy1 thread doStreetGuy $street1_guy1_node_a $street1_guy1_node_b $street1_guy1_node_c $street1_guy1_node_d $convoyOnStreet_1 $convoyOffStreet_1 $street1Exit $street2Exit
+	$street1_guy2 thread doStreetGuy $street1_guy2_node_a $street1_guy2_node_b $street1_guy2_node_c $street1_guy2_node_d $convoyOnStreet_1 $convoyOffStreet_1 $street1Exit $street2Exit
+
+
+	$street2_guy1 thread global/aistate.scr::TurnOff
+	$street2_guy1 hide
+	$street2_guy2 thread global/aistate.scr::TurnOff
+	$street2_guy2 hide
+
+	$clausCatchupTrigger_2 waittill trigger
+
+	$street2_guy1 thread global/aistate.scr::TurnOn
+	$street2_guy1 show
+	$street2_guy2 thread global/aistate.scr::TurnOn
+	$street2_guy2 show
+
+	$street2_guy1 thread doStreetGuy $street2_guy1_node_a $street2_guy1_node_b $street2_guy1_node_c $street2_guy1_node_d $convoyOnStreet_2 $convoyOffStreet_2 $street2Exit $RoofJauntStartTrigger
+	$street2_guy2 thread doStreetGuy $street2_guy2_node_a $street2_guy2_node_b $street2_guy2_node_c $street2_guy2_node_d $convoyOnStreet_2 $convoyOffStreet_2 $street2Exit $RoofJauntStartTrigger
+end
+
+doStreetGuy local.node_a local.node_b local.node_c local.node_d local.closeTrigger local.openTrigger local.offStreetTrigger local.removeTrigger:
+	//local.guy.mood = bored //chrissstrahl - i guess somone did something wrong here
+	self.mood = bored //chrissstrahl - i guess this is the right way
+	self thread detectGuyLogic
+	self thread detectOffStreet local.offStreetTrigger local.node_c local.node_d local.removeTrigger
+
+	self.finishPatrol = 0																																	  
+																																							  
+	while (1) {																																				  
+		local.closeTrigger waittill trigger
+		if (self.finishPatrol)
+			break
+		self walkto local.node_b																															  
+		self waittill movedone
+		if (self.finishPatrol)
+			break
+		local.openTrigger waittill trigger
+		if (self.finishPatrol)
+			break
+		self walkto local.node_a
+		self waittill movedone
+		if (self.finishPatrol)
+			break
+	}		
+end	
+
+detectOffStreet local.trigger local.gotoNode local.turntoNode local.removeTrigger:
+	// at first we're blind, but can hear if the player shoots
+	self thread blindGuyLogic
+
+	local.trigger waittill trigger
+	self.finishPatrol = 1
+
+	// once the player goes by, we block the ally and need to see 
+	//    them if they come back
+	
+	//chrissstrahl - this will not work in coop, because the first player crossing would activate this
+	//if another player tris to cross the mission will fail, unless that player waits until all patroling ai is removed
+//self thread limitedSightGuyLogic
+
+	self walkto local.gotoNode
+	self waittill movedone
+	self turnto local.turntoNode
+	if (local.removeTrigger != NULL)
+		local.removeTrigger waittill trigger
+	self remove
+end
+
+//-----------------------------------------------------------------------------
+
+monitorStreet_1:
+	while (1) {
+		$convoyOnStreet_1 waittill trigger
+		level.street1Open = 0
+		//iprintlnbold "1 Closed"
+	
+		$convoyOffStreet_1 waittill trigger
+		level.street1Open = 1
+		//iprintlnbold "1 Open"
+	}				    
+end
+
+monitorStreet_2:
+	while (1) {
+		$convoyOnStreet_2 waittill trigger
+		level.street2Open = 0
+		//iprintlnbold "2 Closed"
+
+		$convoyOffStreet_2 waittill trigger
+		level.street2Open = 1
+		//iprintlnbold "2 Open"
+	}
+end
+
+doConvoy:
+	level.loopTime = 45 // seconds
+
+	$sneakerTruck_3 thread convoyTruck 1	1 1
+	$sneakerTruck_2 thread convoyTruck 0	3 2 "models/human/It_AX_Ital_Vol.tik"
+	$sneakerTank_1 	thread convoyTank  2	5.5
+
+	$sneakerTruck_5 thread convoyTruck 1	25 1
+	$sneakerTruck_4 thread convoyTruck 0	27 2 "models/human/It_AX_Ital_Vol.tik"
+	$sneakerTruck_1 thread convoyTruck 0	29 0
+	$sneakerTank_2 	thread convoyTank  2	31.5
+end
+
+convoyTank local.placement local.delay:
+	self.isConvoyTank = 1
+	self hide
+	self.startOrigin = self.origin
+	self.startAngles = self.angles
+	$ClausTrigger waittill trigger
+	self show
+	wait local.delay
+	self show
+	self thread convoyVehicle local.placement 13 45 25 13
+end
+
+convoyTruck local.placement local.delay local.hackScheme local.driver_type:
+	self.isConvoyTruck = 1
+	self hide
+	$ClausTrigger waittill trigger
+	self show
+	wait local.delay
+
+	if (local.hackScheme == 0)
+		local.passengers = 2
+	else
+		local.passengers = 0
+	self.hackScheme = local.hackScheme
+	self.driver_type = local.driver_type
+	self show
+	self.startOrigin = self.origin
+	self.startAngles = self.angles
+	self thread maps/e1l3/truckThink.scr::init 10000 local.passengers (self.targetname + "_passenger")
+	waitframe
+	self vehicleanim idlenolights
+	self thread convoyVehicle local.placement 150 200 400 75
+
+	while (self.loaded == 0)
+		waitframe
+
+	exec global/EntityIterateCommand.scr (self.targetname + "_passenger") disable_ai
+
+end
+
+convoyVehicleRemove:
+	if ($clausCatchupTrigger_4)
+		$clausCatchupTrigger_4 waittill trigger
+	while (self.onStreet2)
+		waitframe
+	self.convoyThread remove
+	waitframe
+	if (self.driver != NULL && self.driver != NIL) 
+		self.driver remove
+	if (self.passenger.size != NULL && self.passenger.size != NIL) {
+		for (local.i = 1; local.i < 7; local.i++) {
+			if (self.passenger[local.i] != NULL && self.passenger[local.i] != NIL)
+				self.passenger[local.i] remove
+		}
+	}
+	self remove
+end
+
+convoyVehicle local.placement local.slowSpeed local.slowAcc local.fastSpeed local.fastAcc:
+	// local.placement:  1 == front of convoy, 2 == rear, 0 == middle
+
+	self nodamage
+	self.health = 500000
+	self.convoyThread = local
+	self.trigger_1 = spawn trigger_relay 
+	self.trigger_2 = spawn trigger_relay 
+	self.trigger_3 = spawn trigger_relay 
+	self.trigger_4 = spawn trigger_relay 
+	self.trigger_5 = spawn trigger_relay 
+	self.trigger_6 = spawn trigger_relay 
+	self.trigger_7 = spawn trigger_relay 
+
+	self.onStreet2 = 0
+
+	// remove the vehicle at the appropriate time
+	self thread convoyVehicleRemove
+
+	while (1) {
+		local.startTime = level.time
+		self.origin = $convoyStartPoint.origin
+		self.angles = ( 0 270 0 )
+		wait 1
+
+		self drive $sneakerVehicleRoute local.fastSpeed 400 200 200
+	
+		self.trigger_1 waittill trigger
+		//iprintlnbold "trigger 1"
+		self modifydrive local.slowSpeed local.slowAcc 200
+
+		self.trigger_2 waittill trigger
+		//iprintlnbold "trigger 2"
+		self modifydrive local.fastSpeed local.fastAcc 200
+		if (local.placement == 1)
+			trigger $convoyOnStreet_1
+
+		self.trigger_3 waittill trigger
+		//iprintlnbold "trigger 3"
+		self modifydrive local.slowSpeed local.slowAcc 200
+		if (local.placement == 2)
+			trigger $convoyOffStreet_1
+
+		self.trigger_4 waittill trigger
+		//iprintlnbold "trigger 4"
+		self.onStreet2 = 1
+		self modifydrive local.fastSpeed local.fastAcc 200
+		if (local.placement == 1)
+			trigger $convoyOnStreet_2
+
+		self.trigger_5 waittill trigger
+		//iprintlnbold "trigger 5"
+		self.onStreet2 = 0
+		self modifydrive local.slowSpeed local.slowAcc 200
+		if (local.placement == 2)
+			trigger $convoyOffStreet_2
+
+		self.trigger_6 waittill trigger
+		self modifydrive local.fastSpeed local.fastAcc 200
+		//iprintlnbold "trigger 6"
+
+		self.trigger_7 waittill trigger
+		self fullstop
+		self.origin = self.startOrigin
+		self.angles = self.startAngles
+		wait 0.5
+
+		// hide vehicle
+		if (self.isConvoyTank) {
+			local.turret = self QueryTurretSlotEntity 0
+			local.turret hide
+			self hide
+		}
+		else if (self.isConvoyTruck) {
+			for (local.i = 1; local.i <= 6; local.i++) {
+				local.pass = self.passenger[local.i]
+				if (local.pass != NULL && local.pass != NIL) {
+					local.pass ai_off
+					local.pass hide
+				}
+			}
+			if (self.driver != NULL && self.driver != NIL) {
+				self.driver ai_off
+				self.driver hide
+			}
+			self hide
+		}
+				
+		// sync to desired loop time
+		
+		
+		//iprintlnbold_noloc ( "convoyVehicle sync-wait-start" )//chrissstrahl - debug
+		local.waitTime = level.loopTime - (level.time - local.startTime)
+		wait local.waitTime
+		//iprintlnbold_noloc ( "convoyVehicle sync-wait-end" )//chrissstrahl - debug
+
+		// show vehicle
+		if (self.isConvoyTank) {
+			local.turret = self QueryTurretSlotEntity 0
+			local.turret show
+			self show
+		}
+		else if (self.isConvoyTruck) {
+			for (local.i = 1; local.i <= 6; local.i++) {
+				local.pass = self.passenger[local.i]
+				if (local.pass != NULL && local.pass != NIL) {
+					local.pass ai_on
+					local.pass show
+				}
+			}
+			if (self.driver != NULL && self.driver != NIL) {
+				self.driver ai_on
+				self.driver show
+			}
+			self show
+		}
+	}
+end
+
+//-----------------------------------------------------------------------------
+
+vehicleTrigger_1 local.obj:
+	if (local.obj.trigger_1 != NULL && local.obj.trigger_1 != NIL)
+		trigger local.obj.trigger_1
+end
+
+vehicleTrigger_2 local.obj:
+	if (local.obj.trigger_2 != NULL && local.obj.trigger_2 != NIL)
+		trigger local.obj.trigger_2
+end
+
+vehicleTrigger_3 local.obj:
+	if (local.obj.trigger_3 != NULL && local.obj.trigger_3 != NIL)
+		trigger local.obj.trigger_3
+end
+
+vehicleTrigger_4 local.obj:
+	if (local.obj.trigger_4 != NULL && local.obj.trigger_4 != NIL)
+		trigger local.obj.trigger_4
+end
+
+vehicleTrigger_5 local.obj:
+	if (local.obj.trigger_5 != NULL && local.obj.trigger_5 != NIL)
+		trigger local.obj.trigger_5
+end
+
+vehicleTrigger_6 local.obj:
+	if (local.obj.trigger_6 != NULL && local.obj.trigger_6 != NIL)
+		trigger local.obj.trigger_6
+end
+
+vehicleTrigger_7 local.obj:
+	if (local.obj.trigger_7 != NULL && local.obj.trigger_7 != NIL)
+		trigger local.obj.trigger_7
+end
+
+//-----------------------------------------------------------------------------
+
+doStreetTriggers:
+	thread detectPlayerEarly
+	thread detectPlayerLate
+end
+
+detectPlayerEarly:
+	$street1Entry waittill trigger
+	if (level.street1Open == 0 || level.clausEnteredStreet_1 == 0) {
+		// player entered street before it is clear
+	//	iprintlnbold "player entered street too early"  //removed for localization lockdown
+		$street1_guy1 thread detectPlayer $street1_guy1_node_attack
+		$street1_guy2 thread detectPlayer $street1_guy2_node_attack
+		end
+	}
+
+	$street2Entry waittill trigger
+	if (level.street2Open == 0 || level.clausEnteredStreet_2 == 0) {
+		// player entered street before it is clear
+	//	iprintlnbold "player entered street too early"//removed for localization lockdown
+		$street2_guy1 thread detectPlayer $street2_guy1_node_attack
+		$street2_guy2 thread detectPlayer $street2_guy2_node_attack
+		end
+	}
+end
+
+detectPlayerLate:
+	level.exitedStreet1 = 0
+	level.exitedStreet2 = 0
+
+	thread detectOffStreet1
+	thread detectOffStreet2
+
+	$clausCrossingStreet_1 waittill trigger
+	wait level.streetCrossTime
+//iprintlnbold_noloc "detectPlayerLate on [ 1 ]" //chrissstrahl - debug
+	if (level.exitedStreet1 == 0) {
+		// player didn't cross the street in time
+//iprintlnbold_noloc "player didn't cross street [ 1 ]in time" //chrissstrahl - debug
+		$street1_guy1 thread detectPlayer $street1_guy1_node_attack
+		$street1_guy2 thread detectPlayer $street1_guy2_node_attack
+		end
+	}
+
+	$clausCrossingStreet_2 waittill trigger
+	wait level.streetCrossTime
+//iprintlnbold_noloc "detectPlayerLate on [ 2 ]" //chrissstrahl - debug
+	if (level.exitedStreet2 == 0) {
+		// player didn't cross the street in time
+//iprintlnbold_noloc "player didn't cross street [ 2 ] in time" //chrissstrahl - debug
+		$street2_guy1 thread detectPlayer $street2_guy1_node_attack
+		$street2_guy2 thread detectPlayer $street2_guy2_node_attack
+		end
+	}
+end
+
+detectOffStreet1:
+	$street1Exit waittill trigger
+	level.exitedStreet1 = 1
+end
+
+detectOffStreet2:
+	$street2Exit waittill trigger
+	level.exitedStreet2 = 2
+end
+
+detectPlayer local.attack_target:
+
+	self.sight = 4096
+	self.hearing = 4096
+	self noticescale 1
+
+	if (!local.attack_target){
+		//chrissstrahl - keep for sp
+		if(level.gametype == 0){
+			local.attack_target = $player
+		}
+		//chrissstrahl - coop - grab closest player
+		else{
+			local.player = NULL
+			while(local.player == NULL){
+				local.player = waitthread coop_mod/replace.scr::player_closestTo self NIL
+				waitframe
+			}
+			local.attack_target = local.player
+		}
+	}
+
+	wait (0.1 + (randomfloat 0.7))
+	
+	//chrissstrahl - coop, make sure we have a valid player
+	while(local.attack_target == NULL){
+		local.attack_target = waitthread coop_mod/replace.scr::player_closestTo self NIL
+		waitframe
+	}
+
+	self turnto local.attack_target //chrissstrahl - coop
+	
+	while (!(vector_within local.attack_target.origin self.origin 150))
+	{
+		self.type_attack = "runandshoot"
+		self runto local.attack_target
+		self waittill movedone
+	}
+
+end
+
+doWrongWay:
+	self waittill trigger
+	$street1_guy1 thread detectPlayer $street1_guy1_node_attack
+	$street1_guy2 thread detectPlayer $street1_guy2_node_attack
+	$street2_guy1 thread detectPlayer $street2_guy1_node_attack
+	$street2_guy2 thread detectPlayer $street2_guy2_node_attack
+
+	wait 1
+	if (level.sneakersDetected == 0) {
+		level.sneakersDetected = 1
+		iprintlnbold "Your cover was blown."	
+		
+		//chrissstrahl - keep for sp
+		if(level.gametype == 0){
+			$player physics_off
+			wait 1
+			missionfailed
+		}
+		else{
+			thread coop_mod/replace.scr::missionfailed
+		}
+		end
+	}
+end
+
+

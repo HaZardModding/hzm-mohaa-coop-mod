@@ -1,0 +1,423 @@
+//=========================================================================
+InitAfterSnipers: {
+//=========================================================================
+	$medicrun nottriggerable
+	$nextleveltrigger nottriggerable
+
+	level.gotPIAT = 0
+	level.playertanktarget = 0
+
+	//$tank1 thread global/vehicles_thinkers.scr::enemy_tank_think2
+	//local.tank1gun = $tank1 QueryTurretSlotEntity 0
+	//local.tank1gun setAimTarget $tank1target
+	//$tank1.health = 5
+	// hide the second tank until all the snipers are dead
+	//local.tank2gun = $tank2 QueryTurretSlotEntity 0
+	//local.tank2gun hide
+
+	$tank2 hide
+	$tank2 notsolid
+	$tank2.sighttrace = 0
+
+	level.PIATwall = waitthread global/FindTrigger.scr::FindTrigger "PIAT_exploder"
+	level.PIATwall nottriggerable
+	level.gotocity = 0
+
+	if($precourtyardparade) {
+		$precourtyardparade rendereffects "+dontdraw"
+	}
+}end
+
+//=========================================================================
+CleanupAfterSnipers: {
+//=========================================================================
+}end
+
+//=========================================================================
+DoObjectiveReturn: {
+//=========================================================================
+	while (level.savedBrits == 0) {
+		waitframe
+	}
+}end
+
+//=========================================================================
+DoObjectiveGetPIAT: {
+//=========================================================================
+	thread compassTracker
+
+	while (level.gotPIAT == 0) {
+		waitframe
+	}
+}end
+
+//=========================================================================
+compassTracker: {
+//=========================================================================
+	local.flipHeight = $compasstracker.origin[2]
+	local.curObjective = level.currentobjective
+
+	while ( level.gotPIAT == 0) {
+		local.height = $player.origin[2]
+
+		if (local.height > local.flipHeight) {
+			waitthread global/objectives.scr::add_objectives level.objPIAT 2  "Retrieve Munitions from the Supply House" $piat.origin
+			waitthread global/objectives.scr::current_objectives level.objPIAT
+		}
+		else {
+			waitthread global/objectives.scr::add_objectives level.objPIAT 2  "Retrieve Munitions from the Supply House" $compasstracker.origin
+			waitthread global/objectives.scr::current_objectives level.objPIAT
+		}
+		
+		waitframe
+	}
+}end
+
+//=========================================================================
+piatpickup: {
+//=========================================================================
+	self remove
+	level.gotPIAT = 1
+	local.origin = level.PIATwall.origin
+	spawn script_origin model "fx/dummy.tik" "targetname" "WallSoundmaker" origin (656 4663 424)
+
+	level.PIATwall triggerable
+	level.PIATwall thread PlayWhenTriggered $WallSoundmaker
+
+	exec global/autosave.scr level.autosave	//"Finding the Munitions Cache"
+	level.autosave++
+
+	//$tank2.myenemy = waitthread global/FindTrigger.scr::FindTrigger "PIAT_exploder"
+	//$tank2.myenemy = local.wall
+	//$tank2.gun setAimTarget $(local.wall)
+	//iprintln ("Wall is " + local.wall)
+
+	local.theTankTrigger = waitthread global/FindTrigger.scr::FindTrigger "autotank2trigger"
+	trigger $(local.theTankTrigger)
+	wait 3.0
+
+	$tank2.gun setAimTarget level.PIATwall
+	$tank2.gun waittill ontarget
+	$tank2.gun anim fire
+	$tank2 waitthread global/autotank.scr::AimAt $player
+	
+	//trigger $britsfollowtrigger
+	//remove $britsfollowtrigger
+	//	$britsfollowtrigger triggerable
+	// tank2.myenemy = 
+}end
+
+//=========================================================================
+PlayWhenTriggered local.wheretoplaysound: {
+//=========================================================================
+	self waittill trigger
+	local.wheretoplaysound playsound explode_building_large
+
+	// iprintln ("Radius Damage, this dist from player: " + vector_length($player.origin - local.origin))
+	//	radiusdamage (656 4663 424) 200 200 
+
+	local.wheretoplaysound waittill sounddone
+	local.wheretoplaysound remove
+}end
+
+//=========================================================================
+DoObjectiveDestroyTank: {
+//=========================================================================
+	// thread RollOutTank2
+	while ($tank2 && isalive $tank2) {
+		waitframe
+	}
+	
+	$medicrun triggerable
+	$medicrun waittill trigger
+	$britsfollowtrigger triggerable
+	// trigger $britsfollowtrigger
+}end
+
+//=========================================================================
+DoObjectiveGoToCity: {
+//=========================================================================
+	while (level.gotocity == 0) {
+		waitframe
+	}
+	
+	$pinnedbrit01 physics_on
+	$pinnedbrit02 physics_on
+	$pinnedbrit03 physics_on
+	$pinnedbrit04 physics_on
+
+	$pinnedbrit01 solid
+	$pinnedbrit02 solid
+	$pinnedbrit03 solid	
+	$pinnedbrit04 solid
+	$medic exec global/stand.scr
+	
+	$pinnedbrit01 thread global/LoopAnim.scr::LoopAnimStop
+	$pinnedbrit02 thread global/LoopAnim.scr::LoopAnimStop
+	$pinnedbrit03 thread global/LoopAnim.scr::LoopAnimStop
+	$pinnedbrit04 thread global/LoopAnim.scr::LoopAnimStop
+	$medic thread global/LoopAnim.scr::LoopAnimStop
+	$pinnedbrit01 threatbias 100
+	$pinnedbrit02 threatbias 100
+	$pinnedbrit03 threatbias 100
+	$pinnedbrit04 threatbias 100
+
+	$pinnedbrit01.accuracy = 100
+	$pinnedbrit02.accuracy = 100
+	$pinnedbrit03.accuracy = 100
+	$pinnedbrit04.accuracy = 100
+		
+	//	$pinnedbrit04 gun $pinnedbrit04.gun
+
+	$pinnedbrit01 exec global/enable_ai.scr
+	$pinnedbrit02 exec global/enable_ai.scr
+	$pinnedbrit03 exec global/enable_ai.scr
+	$pinnedbrit04 exec global/enable_ai.scr
+	$medic exec global/enable_ai.scr
+	
+	$medic.destination				= $player
+	$medic.friendtype		        = 5
+	$medic.medichealrate            = 0.25
+	level.medictime                 = 5
+
+	// stagger how far away they keep from their destinations
+	$medic.distance			            = 125
+
+	// setup the friendlies to follow the player...
+	$medic thread global/friendly.scr::friendlythink
+	
+	$pinnedbrit01 interval 200
+	$pinnedbrit02 interval 280
+	$pinnedbrit03 interval 250
+	$pinnedbrit04 interval 230
+
+	level.everyoneout = 0
+	thread TurnOffPeopleThreatBias
+
+	$pinnedbrit01 thread ExitStageRight 0
+	$pinnedbrit02 thread ExitStageRight randomfloat(1)  // KillPeopleFirst
+	$pinnedbrit03 thread ExitStageRight randomfloat(1)  // KillPeopleFirst
+	$pinnedbrit04 thread ExitStageRight randomfloat(1) // KillPeopleFirst
+	
+	while (level.gotocity != 1) {
+		waitframe
+	}
+		
+	$nextleveltrigger triggerable
+	$nextleveltrigger waittill trigger
+}end
+
+//=========================================================================
+TurnOffPeopleThreatBias: {
+//=========================================================================
+	for(local.i = 1; local.i <= $thejerks.size; local.i++) {
+		$thejerks[local.i] threatbias ignoreme
+	}
+
+	for(local.i = 1; local.i <= $piatdoorguys.size; local.i++) {
+		if(isalive $piatdoorguys[local.i]) {
+			$piatdoorguys[local.i] health 10
+			$piatdoorguys[local.i] takedamage
+		}
+	}
+
+	for(local.i = 1; local.i <= $precourtyardguys.size; local.i++) {
+		if(isalive $precourtyardguys[local.i]) {
+			$precourtyardguys[local.i] health 10
+			$precourtyardguys[local.i] takedamage
+		}
+	}
+
+	for(local.i = 1; local.i <= $chasetruckpassenger.size; local.i++) {
+		if(isalive $chasetruckpassenger[local.i]) {
+			$chasetruckpassenger[local.i] health 10
+			$chasetruckpassenger[local.i] takedamage
+		}
+	}
+
+	for(local.i = 1; local.i <= $guybehindcrate.size; local.i++) {
+		if(isalive $guybehindcrate[local.i]) {
+			$guybehindcrate[local.i] health 10
+			$guybehindcrate[local.i] takedamage
+		}
+	}
+
+	for(local.i = 1; local.i <= $badguys.size; local.i++) {
+		if(isalive $badguys[local.i]) {
+			$badguys[local.i] health 10
+			$badguys[local.i] takedamage
+		}
+	}
+}end
+
+//=========================================================================
+KillPeopleFirst2 local.passonnumber: {
+//=========================================================================
+	self.enemy = self.findenemy 
+
+	while(self.enemy != NIL  && self.enemy != NULL) {
+		self favoriteenemy self.enemy
+		self runto self.enemy
+		self.enemy waittill death
+		self.enemy = self.findenemy 
+	}
+
+	self thread ExitStageRight local.passonnumber
+}end
+
+// Attack thread
+//=========================================================================
+KillPeopleFirst local.passonnumber:
+//=========================================================================
+	local.badguyscount = 0
+	local.chasetruckpassengercount = 0
+	self.type_attack = "runandshoot"
+
+	if($badguys) {
+		for(local.i = 1; local.i <= $badguys.size; local.i++) {
+			if(isalive $badguys[local.i]) {
+				 local.badguyscount++
+			}
+		}			 
+	}
+	
+	if($chasetruckpassenger) {
+		for(local.i = 1; local.i <= $chasetruckpassenger.size; local.i++) {
+			if(isalive $chasetruckpassenger[local.i]) {
+				local.chasetruckpassengercount++
+			}
+		}
+	}
+				
+	while(local.badguyscount > 0 || local.chasetruckpassengercount > 0) {
+		local.guytoattack = NULL
+		local.chasetruckpassengercount = 0
+		local.badguyscount = 0
+
+		if($badguys) {
+			for(local.i = 1; local.i <= $badguys.size; local.i++) {
+				if(isalive $badguys[local.i]) {
+					local.view = self.origin + (0 0 150)
+					local.tank = $badguys[local.i].origin + (0 0 150)
+
+					if(sighttrace local.view local.tank) {
+						if(local.guytoattack == NULL) {
+							local.guytoattack = $badguys[local.i]
+	  					    local.badguyscount++
+	  					}    
+	  				}
+				}
+			}
+		}
+
+		if($chasetruckpassenger) {
+			for(local.i = 1; local.i <= $chasetruckpassenger.size; local.i++) {
+				if(isalive $chasetruckpassenger[local.i]) {
+					local.man = self.origin + (0 0 150)
+					local.guy = $chasetruckpassenger[local.i].origin + (0 0 150)
+
+					if(sighttrace local.man local.guy) {
+						if(local.guytoattack == NULL) {
+							local.guytoattack = $chasetruckpassenger[local.i]
+						}
+
+	  				    local.chasetruckpassengercount++
+	  				}
+				}
+			}	
+		}
+		self favoriteenemy local.guytoattack
+		self runto local.guytoattack
+		local.guytoattack waittill death
+		// iprintln ("The Count is: " + local.badguyscount + " " + local.chasetruckpassengercount)
+	}
+
+	self thread ExitStageRight local.passonnumber
+}end
+
+// Each guy will run to the door and open it when all are inside then the door is locked
+//=========================================================================
+ExitStageRight local.timewait: {
+//=========================================================================
+	// iprintln "EXITSTAGERIGHT"
+	self.MadeItToDoor = 0
+	self.type_attack = "runandshoot"
+	//self.enableEnemy = 0
+
+	if(local.timewait != 0) {
+		wait local.timewait
+	}
+
+	self.movedoneradius = 100
+	self exec global/moveto.scr anim/crouch_run.scr (619 3617 104)
+	// self runto (619 3617 104)
+	// thread StartPreCourtyardParade
+	self thread MakesureReachesDoor
+
+	while(vector_length(self.origin - $britsescape.origin) > 200) {
+		waitframe
+	}
+
+	self.MadeItToDoor = 1
+
+	if($britsescape.doorclosed != 1) {
+		$britsescape open self 
+	}
+
+	self runto $britsescapenode
+
+	while(vector_length(self.origin - $britsescapenode.origin) > 200) {
+		waitframe	
+	}
+
+	level.everyoneout++
+
+	if(level.everyoneout >= 4) {
+		$britsescape lock
+	}
+
+	self remove
+}end
+
+//=========================================================================
+MakesureReachesDoor: {
+//=========================================================================
+	while(self && self.MadeItToDoor != 1) {
+		self runto (619 3617 104)
+		wait 6
+	}
+}end
+
+//=========================================================================
+StartPreCourtyardParade: {
+//=========================================================================
+	if($precourtyardparade) {
+		if($precourtyardparade.activeguys == NIL) {
+			$precourtyardparade.activeguys = 6
+		}
+
+		if($precourtyardparade.totalguys == NIL) {
+			$precourtyardparade.totalguys = 20
+		}
+
+		$precourtyardparade thread global/parade.scr::RunParade
+	}
+}end
+
+//=========================================================================
+RollOutTank2: {
+//=========================================================================
+	level.playertanktarget = $player
+
+	$tank2 thread global/vehicles_thinkers.scr::enemy_tank_think2
+	$tank2 drive $tankpath 50 50 200 256
+	$tank2.health = 400
+
+	local.tank2gun = $tank2 QueryTurretSlotEntity 0
+	local.tank2gun show
+	$tank2 show
+	$tank2 solid
+	wait 12
+
+	$tank2 stop
+}end

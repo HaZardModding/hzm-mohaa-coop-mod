@@ -1,0 +1,82 @@
+//chrissstrahl - modified for coop on 2019.08.24
+main local.script:
+
+	if ( level.auto_script_run == 1 )
+	{
+		end
+	}
+	level.auto_script_run = 1
+
+	if ( local.script != NIL )
+	{
+		if ( level.script == NIL )
+		{
+			level.script = ("maps/" + local.script + ".scr")
+		}
+	}
+
+//CR I want to manualy call loadout at the right time
+//	exec global/loadout.scr
+	exec global/ai.scr
+	exec global/exploder.scr
+	exec global/turret.scr
+
+	//chrissstrahl - coop compatibility
+	waitthread coop_mod/replace.scr::waitTillPrespawn
+	
+	exec global/autobird.scr
+	exec global/autotank.scr
+	exec global/autoplane.scr
+	exec global/autotruck.scr
+	exec global/autoexplosion.scr
+
+	exec global/door_locked.scr
+	exec global/friendly.scr
+	exec global/ambient.scr local.script
+	exec global/bomber.scr
+
+	level.skill = getcvar (skill)
+	switch ( level.skill )
+	{
+	case 0:
+		level.enemyhealth = 45
+		break
+	case 1:
+		level.enemyhealth = 55
+		break
+	case 2:
+		level.enemyhealth = 65
+		break
+	default:
+		level.enemyhealth = 65
+	}
+
+	level.enemyhealthscalar = 1.0
+
+	level waittill spawn
+
+	// incase the previous level left max health in a weird state, meake
+	//    sure it is reset to the proper amount for this level
+	switch (level.skill) {
+		case 0:
+			local.newMaxHealth = 1500
+			break
+		case 1:
+			local.newMaxHealth = 750
+			break
+		case 2:
+			local.newMaxHealth = 250
+			break
+		default:
+			local.newMaxHealth = 1500
+			break
+	}
+	
+	//chrissstrahl - make sure this is done only in sp
+	if(level.gametype == 0){
+		// scale health back up to it is proportional to what it was before
+		local.newHealth = ($player.health/$player.max_health)*local.newMaxHealth
+		$player health local.newMaxHealth
+		$player healthonly local.newHealth
+	}
+end

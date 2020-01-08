@@ -1,0 +1,340 @@
+// SNOWY RAIL STATION
+// ARCHITECTURE/DESIGN: BENSON/ADAM/NED
+// SCRIPTING: Z
+//============================================================================
+main:{
+//============================================================================
+	level.coopNextMap = "m6l3a"			//Pasted by Criminal for coop comp. - set next map (for mom voteing)
+	level.coopPrevMap = "m6l2a"			//Pasted by Criminal for coop comp. - set previouse map (for mom voteing)
+	level.coop_aaMap = 1				//Pasted by Criminal for coop comp. - let global scripts know this is a AA level
+	level.coop_debugSpawn = 1 			//Pasted by Criminal for coop comp. - enable spawnpoint debug (make visible)
+	thread coop_mod/main.scr::main		//Pasted by Criminal for coop comp. - start coop mod extensions
+	
+	//chrissstrahl - prevent ai, especially those in the tower to prone or crouch
+	level.aipronechance = 0
+	level.aicrouchchance = 0
+
+	level.script = "maps/m6l2b.scr"
+	thread global/exploder.scr::main
+	//thread global/exploder.scr::repeat
+
+	level.used_power_box = 0 //tracks use of the power box
+	level.turret_sight_distance = 1324
+	level.spotrespondtime = 2
+	$obj3_front_door notsolid
+
+	exec global/loadout.scr maps/m6l2b.scr
+	exec global/spotlight.scr
+
+	level waitTill prespawn
+	println "z:        prespawn marker"
+	
+	$obj3_front_door solid
+	$obj3_front_door disconnect_paths
+
+	//$player stufftext "tmstartloop sound/music/mus_14a_action.mp3"		//Criminal.
+	exec coop_mod/replace.scr::tmstartloop "sound/music/mus_14a_action.mp3"	//Criminal - coop comp.
+
+	$station_guards ai_off
+	$power_guards ai_off
+	$track_guards ai_off
+	$town_guards ai_off
+
+	//*** SET SPECIAL ITEMS
+	//waitthread global/items.scr::add_item "binoculars"
+
+	//*** INITIALIZE FOG DISTANCE AND COLOR
+	//$world farplane_color ".1 .1 .12"
+	//$world farplane 1600
+
+	//*** INITIALIZE WEATHER EFFECTS (SNOW)
+	//setcvar "cg_rain_shader" "textures/snow"
+	//setcvar "cg_rain_numshaders" "12"
+	//setcvar "cg_rain_speed" "240"
+	//setcvar "cg_rain_speed_vary" "100"
+	//setcvar "cg_rain_min_dist" "3072"
+	//setcvar "cg_rain_length" "2"
+	//setcvar "cg_rain_width" "2"
+	//setcvar "cg_rain_density" ".4"
+	//setcvar "cg_rain_slant" "300"
+	//setcvar "cg_rain" "0"
+	setcvar "cg_rain_density" "0"
+
+	thread global/barrel.scr::explosive_barrel
+	soundtrack music/m6l2b.mus
+	exec global/ambient.scr m6l2b
+
+	thread scene1
+	thread objective1
+	//thread objective3
+	thread obj3_door_sound
+
+	level waittill spawn
+	println "z:        level waittill spawn marker"
+	
+	waitthread global/items.scr::add_item "explosives" nomessage
+
+	//$player stufftext "tmstartloop sound/music/mus_14a_action.mp3"		//Criminal.
+	exec coop_mod/replace.scr::tmstartloop "sound/music/mus_14a_action.mp3"	//Criminal - coop comp.
+
+	waitthread global/objectives.scr::add_objectives 1 2 "Find the train station." $obj1_trigger2.origin
+	waitthread global/objectives.scr::add_objectives 2 2 "Cut the electrical power to the fences." $obj2_so.origin
+	waitthread global/objectives.scr::add_objectives 3 2 "Send the radio transmission." $obj3_radio.origin
+	waitthread global/objectives.scr::current_objectives 1
+	thread global/door_locked.scr::lock
+
+	$electric_fence_sound 	exec global/loopsound.scr m6l2b_electrical_hum
+	$generator_sound 		exec global/loopsound.scr m6l2b_generator_run
+	$obj3_radio 			exec global/loopsound.scr m6l2b_radio_loop
+	$alarm_sound 			exec global/loopsound.scr alarmbell
+}end
+
+//============================================================================
+obj3_door_sound:{
+//============================================================================
+	while (level.obj3_door_open != 1){
+		$obj3_front_door waittill use
+		$obj3_front_door playsound door_wood_locked
+	}
+}end
+
+//============================================================================
+enable_town_guards:{
+//============================================================================
+	println "z:          $town_guards ai_on"
+	$town_guards ai_on
+}end
+
+//============================================================================
+enable_station_guards:{
+//============================================================================
+	println "z:          $station_guards ai_on"
+	$station_guards ai_on
+}end
+
+//============================================================================
+enable_power_guards:{
+//============================================================================
+	println "z:         $power_guards ai_on"
+	$power_guards ai_on
+}end
+
+//============================================================================
+enable_track_guards:{
+//============================================================================
+	println "z:         $track_guards ai_on"
+	$track_guards ai_on
+}end
+
+//============================================================================
+enable_upstairs_guards:{
+//============================================================================
+	println "z:         $upstairs_guards ai_on"
+	$upstairs_guards ai_on
+}end
+
+//============================================================================
+scene1:{
+//============================================================================
+	//first train rushes by
+	$first_train_front bind $first_train
+	$s1_trigger waittill trigger
+
+	thread train_collision
+	local.thread = parm.previousthread
+	$first_train playsound M6L2b_first_train
+	$first_train time 2  //change to 4 seconds
+	$first_train moveSouth 4700
+	$first_train waitmove
+	
+	local.thread delete
+	$first_train_front remove
+	$first_train remove
+}end
+
+//============================================================================
+train_collision:{
+//============================================================================
+	$first_train_front waittill touch
+	
+	//Criminal - Singleplayer.
+	if (level.gametype==0){
+		$player damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 -1
+		end
+	}
+
+	//Criminal - Multiplayer.
+	for (local.i = 1; local.i <= $player.size; local.i++) {
+		local.player = $player[local.i];
+		if(local.player != NULL && local.player.health > 0 && local.player istouching $first_train_front && local.player.dmteam != "spectator" ){
+			local.player damage $world 150 $world (0 0 0) (0 0 0) (0 0 0) 0 9 -1
+		}
+	}
+	//chrissstrahl - make sure the front keeps making damage
+	waitframe //chrissstrahl - just to be sure there won't be a infinity loop
+	thread train_collision
+}end
+
+//============================================================================
+objective1:{
+//============================================================================
+	//called by script
+
+	//$obj1_trigger1 waittill trigger
+	//	println "z:             hit objective 1 trigger 1"
+
+	//	$player set_objective_pos $obj1_trigger2.origin
+	//	waitthread global/objectives.scr::add_objectives 1 2 "Find the train station" $obj1_trigger2.origin
+	//	waitthread global/objectives.scr::current_objectives 1
+
+	$obj1_trigger2 waittill trigger
+	waitthread global/objectives.scr::add_objectives 1 3
+	waitthread global/objectives.scr::current_objectives 2
+
+	//$obj2_trigger1 waittill trigger
+	//	println "Z:         hit objective 2 trigger 1"
+	
+	//	$player set_objective_pos $obj2_trigger2.origin
+	//	waitthread global/objectives.scr::add_objectives 2 2 "Cut the Electrical Power to the Fences" $obj2_trigger2.origin
+	//	waitthread global/objectives.scr::current_objectives 2
+
+	//$obj2_trigger2 waittill trigger
+	//	println "Z:         hit objective 2 trigger 2"
+
+	//	$player set_objective_pos $obj2_so.origin
+	//	waitthread global/objectives.scr::add_objectives 2 2 "Cut the Electrical Power to the Fences" $exploder.origin //temp make it $obj2_so.origin later
+	//	waitthread global/objectives.scr::current_objectives 2
+}end
+
+//============================================================================
+autosave_tracks:{
+//============================================================================
+	if(level.gametype==0){//Criminal - Singleplayer
+		exec global/autosave.scr 1
+	}
+}end
+
+//============================================================================
+obj2_used_powerbox:{
+//============================================================================
+	//called by BSP
+	if (level.used_power_box == 1)	{end}
+	level.used_power_box = 1
+
+	thread global/exploder.scr::explode 71
+	waitthread global/objectives.scr::add_objectives 2 3
+	waitthread global/objectives.scr::current_objectives 3
+
+	$electric_fence_sound stoploopsound
+	$generator_sound stoploopsound
+	$generator_sound playsound m6l2b_generator_off
+
+	$obj2_so playsound short_circuit
+	$obj3_front_door rotateYdown 130
+	$obj3_front_door move
+
+	//thread enable_station_guards
+	$obj3_front_door disconnect_paths
+	level.obj3_door_open = 1
+	wait 2
+
+	if(level.gametype==0){//Criminal - Singleplayer.
+		exec global/autosave.scr 2
+	}
+}end
+
+/////////////////////////
+/////////////////////////
+//objective3:
+	//guides the player to the radio
+	// called by script
+
+//$obj3_trigger1 waittill trigger
+
+//	$player set_objective_pos $obj3_trigger2.origin
+//	waitthread global/objectives.scr::add_objectives 3 2 "Send the Radio Transmission" $obj3_trigger2.origin
+//	waitthread global/objectives.scr::current_objectives 3
+
+//$obj3_trigger2 waittill trigger
+
+//	$player set_objective_pos $obj3_radio.origin
+//	waitthread global/objectives.scr::add_objectives 3 2 "Send the Radio Transmission" $obj3_radio.origin
+//	waitthread global/objectives.scr::current_objectives 3
+//end
+
+//============================================================================
+obj3_used_radio:{
+//============================================================================
+	//called by BSP
+	$obj3_radio model miscobj/radio_military.tik
+	$obj3_radio stoploopsound
+	$obj3_radio playsound den_M6L2_630p
+
+	waitthread global/objectives.scr::add_objectives 3 3
+	wait 8
+
+	//	exec global/missioncomplete.scr m6l3a bsp2bsp
+	exec global/missioncomplete.scr m6l3a
+}end
+
+//============================================================================
+spotlight_turrets local.spotlight local.gunner:{
+//============================================================================
+	while ( local.spotlight.checkdeath != 1){
+		//local.distance = vector_length($player.origin - self.origin) //chrissstrahl
+		//chrissstrahl - make coop compatible
+		local.player = exec coop_mod/replace.scr::player_closestTo self 
+		while(local.player == NULL){
+			waitframe
+		}
+		
+		//local.distance = vector_length($player.origin - self.origin) //chrissstrahl
+		local.distance = vector_length(local.player.origin - self.origin) //chrissstrahl - coop compatible
+		
+		//println "local.distance " local.distance " level.turret_sight_distance " level.turret_sight_distance
+		if ( ( level.spotplayer != 1 ) || ( local.distance >= level.turret_sight_distance) ){
+			self stopFiring
+			self setAimTarget NULL
+		}else{
+			//self setAimTarget $player //chrissstrahl
+			self setAimTarget local.player //chrissstrahl - coop compatible
+			self startFiring
+		}
+		wait 1
+		//println "Z:        spotlight loop still going for: " self
+	}
+	
+	local.gunner exec global/bullethit.scr (0 0 250) 500 0 1
+	self stopFiring
+	self setAimTarget NULL
+
+	thread spotlight_spawner (local.spotlight + "_spawned1") $spotlight_spawner1
+	thread spotlight_spawner (local.spotlight + "_spawned2") $spotlight_spawner2
+}end
+
+//============================================================================
+spotlight_spawner local.name local.spawner:{
+//============================================================================
+	local.maxdist = (160 + randomint (600))
+	spawn models/human/german_wehrmact_soldier "targetname" local.name "type_attack" "turret" "leash" "2048" "maxdist" local.maxdist "mindist" "128"
+	local.name.origin = local.spawner
+	local.name thread runto_player 160
+}end
+
+//============================================================================
+runto_player local.distance:{
+//============================================================================
+	self forceactivate
+
+	//while ( (IsAlive self) && ( (vector_length($player.origin - self.origin)) > local.distance) ){ //chrissstrahl
+		//self runto $player.origin //chrissstrahl
+	
+	//chrissstrahl - make coop compatible
+	local.player = exec coop_mod/replace.scr::player_closestTo self //chrissstrahl - get closest player
+	while ( (IsAlive self) && ( (vector_length(local.player.origin - self.origin)) > local.distance) ){
+		self runto local.player.origin //chrissstrahl - run to player location
+		wait .2
+		local.player = exec coop_mod/replace.scr::player_closestTo self //chrissstrahl - get closest player again, ai might be closer to a different player now
+	}
+}end
+

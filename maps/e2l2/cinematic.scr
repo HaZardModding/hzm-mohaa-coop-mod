@@ -1,0 +1,679 @@
+//Script created by James Gaczkowski
+//============================================================================
+InitOutro: {
+//============================================================================
+	waitthread DoOutro
+}end
+
+//============================================================================
+DoOutro: {
+//============================================================================
+	drawhud 0  
+	$player takeall
+
+	//global initialization
+	waitexec global/fogtrigger.scr
+	$player stufftext "tmstop;"
+
+	//********HACKS**********
+	level.freeCam         = 0
+
+	level.skip_sceneOne   = 0  //skip intro pan
+	level.skip_sceneTwo   = 0  //skip pan plane front
+	level.skip_sceneThree = 0  //skip plane ramming 3 trucks
+	level.skip_sceneFive  = 0  //skip plane runway gag
+	level.skip_sceneSix   = 0  //skip tower gag
+	level.skip_sceneSeven = 0  //skip end
+
+	//********FOV************
+	level.sceneOneFOV    = 80
+	level.sceneTwoFOV    = 80
+	level.sceneThreeFOV  = 80
+	level.sceneFiveFOV   = 80
+	level.sceneSixFOV    = 80
+	level.sceneSevenFOV  = 80
+
+	//**************MISC*****************
+	//used in creation of paths in script
+	level.curSplineIndex = 0 
+
+	//**************FOG**********************
+	level.sceneOne_farDist  = 7000
+	level.sceneOne_fogBias  = 1500
+	level.sceneOne_fogColor = ( .25 .26 .28)
+
+	level.sceneTwo_farDist  = 6000
+	level.sceneTwo_fogBias  = -256
+	level.sceneTwo_fogColor = ( .25 .26 .28)
+
+	level.sceneThree_farDist  = 6000
+	level.sceneThree_fogBias  = 500
+	level.sceneThree_fogColor = ( .25 .26 .28)
+	
+	level.sceneFive_farDist  = 6000
+	level.sceneFive_fogBias  = -256
+	level.sceneFive_fogColor = ( .25 .26 .28)
+
+	level.sceneSix_farDist  = 6000
+	level.sceneSix_fogBias  = -256
+	level.sceneSix_fogColor = ( .25 .26 .28)
+
+	level.sceneSeven_farDist  = 6000
+	level.sceneSeven_fogBias  = -256
+	level.sceneSeven_fogColor = ( .25 .26 .28)
+
+	waitthread InitEndGag
+	waitthread sceneOne
+	waitthread sceneTwo
+	waitthread sceneThree
+	waitthread sceneFive
+	waitthread sceneSix
+	waitthread sceneSeven
+
+	//initialize
+	level.farDist  = 6000
+	level.fogBias  = -256
+	level.fogColor = ( .25 .26 .28)
+
+	if (level.freeCam == 1) {
+		iprintln  "Hacks enabled, using free cam."
+	}
+}end 
+
+//============================================================================
+InitEndGag: {
+//============================================================================
+	thread startBeacon
+
+	//don't worry about the player
+	$player notsolid
+	$player noclip
+	$player physics_off
+	$player hide
+
+	//create the cameras
+	spawn camera targetname TheCam
+	$TheCam notsolid
+
+	spawn camera targetname TheCam2
+	$TheCam2 notsolid
+	$TheCam2 showquakes 1
+
+	spawn camera targetname TheCam3
+	$TheCam3 notsolid
+	$TheCam3 showquakes 1
+
+	spawn camera targetname TheCam4
+	$TheCam4 notsolid
+	$TheCam4 showquakes 1
+
+	spawn camera targetname TheCam5
+	$TheCam5 notsolid
+	$TheCam5 showquakes 1
+
+	spawn camera targetname TheCam6
+	$TheCam6 notsolid
+	$TheCam6 showquakes 1
+
+	spawn camera targetname TheCam7
+	$TheCam7 notsolid
+	$TheCam7 showquakes 1
+
+	waitthread spawnCinematicStuff 
+	waitthread hackyStuff 
+}end
+
+//============================================================================
+sceneOne: {
+//============================================================================
+	//play the music
+	forcemusic aux5 aux5
+
+	if (level.skip_sceneOne == 0) {
+		local.shotOneLength = 5.0
+		local.camPathName = "camPathOne"
+		local.startPoint  = (1861.3 1434.3 2782.63)      
+		local.endPoint    = (1861.3 1434.3 3428.2) 
+		local.startAngles = (0 319.5 0)
+		local.endAngles   = (0 319.5 0)
+		local.camPathOneSpeed = 0.4
+
+		waitthread createCamPath local.camPathName local.startPoint local.endPoint                            
+
+		level.farDist   = level.sceneOne_farDist;
+		level.fogBias   = level.sceneOne_fogBias;
+		level.fogColor  = level.sceneOne_fogColor;
+
+		thread setFog level.sceneOne_farDist level.sceneOne_fogBias level.sceneOne_fogColor
+		$TheCam fov level.sceneOneFOV 
+
+		if (level.freeCam == 1) {
+			//place the player near the camera, let him roam
+			$player.origin = (4029.5 -412.1 3146.9) 
+			$player.viewangles = (0 94.4 0) 
+		}
+		else {
+			level.sceneDone = 0
+			waitframe
+		
+			$TheCam speed local.camPathOneSpeed
+			fadeout .1 0 0 0 1
+
+			//make sure there are no people in the cinematic
+			removeclass actor
+
+			fadein 3.5 0 0 0 1
+			$TheCam follow $camPathOne $sceneOneTarget 
+			$TheCam.angles = local.startAngles
+			cuecamera $TheCam 0.0
+			$TheCam cut
+		}
+		wait 4.0
+		thread moveDoor $door2a 10.2 (0 -350 0)
+		thread moveDoor $door2b 10.2 (0  350 0) 
+
+		wait local.shotOneLength
+		level.sceneDone = 1
+	}
+	else {
+		iprintln "Hacks enabled, skipping sceneOne shotOne."
+	}
+}end
+
+//============================================================================
+sceneTwo: {
+//============================================================================
+	if (level.skip_sceneTwo == 0) {
+		local.camPathName = "camPathTwo"
+		local.startPoint  = (4668.92 2830.7 2552.1)  
+		local.endPoint    = (4714.4 2422.8 2552.1)
+		local.camPathTwoSpeed = 0.4
+
+		waitthread createCamPath local.camPathName local.startPoint local.endPoint                            
+	
+		if (level.freeCam == 1) {
+			//place the player near the camera, let him roam
+			$player.origin = local.startPoint
+			$player.viewangles = local.startAngles
+		}
+		else {
+			level.sceneDone = 0
+			thread createJointTarget "hackyLook" $cinePlane5 "propellor_root"
+			waitframe
+
+			$TheCam2 speed local.camPathTwoSpeed
+			$TheCam2 follow $camPathTwo $hackyLook 
+			$TheCam2 cut
+			$TheCam cut
+			cuecamera $TheCam2 0.0
+			$TheCam2 cut
+		}
+
+		$cinePlane5 anim spark
+		wait 5.0
+
+		thread moveDoor $door1a 15.2 (0 -350 0)
+		thread moveDoor $door1b 15.2 (0  350 0) 
+		wait 4.0
+
+		//prepare for the next scene
+		$cinePlane2 hide
+		$cinePlane2.origin = $cinematicHanger2.origin
+		$cinePlane2 anim idle
+		$cinePlane2.origin += (400 30 0)
+		$cinePlane2.angles = (0 174 0)
+		waitframe
+
+		$cinePlane2 show
+		$cinePlane2 moveanim start_gag2
+		wait 1.5
+
+		level.sceneDone = 1
+	}
+	else {
+		iprintln "Hacks enabled, skipping sceneOne sceneTwo."
+	}
+}end
+
+//============================================================================
+sceneThree: {
+//============================================================================
+	if (level.skip_sceneThree == 0) {
+		local.camPathName = "camPathThree"
+		local.startPoint  = (3714.4 3881 2533.1) 
+		local.endPoint    = (2150.6 3857.4 2733.1)
+		local.startAngles = (0 80 0)
+		local.endAngles   = (0 80 0)
+		local.camPathThreeSpeed = 0.5
+
+		level.farDist  = level.sceneThree_farDist;
+		level.fogBias  = level.sceneThree_fogBias;
+		level.fogColor = level.sceneThree_fogColor;
+
+		waitthread createCamPath local.camPathName local.startPoint local.endPoint
+		thread setFog level.sceneThree_farDist level.sceneThree_fogBias level.sceneThree_fogColor
+
+		if (level.freeCam == 1) {
+			//place the player near the camera, let him roam
+			$player.origin = local.startPoint
+			$player.viewangles = local.startAngles
+		}
+		else {
+			level.sceneDone = 0
+			waitframe
+
+			$TheCam3 speed local.camPathThreeSpeed
+			$TheCam3 follow $camPathThree $cinePlane2
+			$TheCam3.angles = local.startAngles
+			$TheCam2 cut
+			$TheCam3 cut
+			cuecamera $TheCam3 0.0
+			$TheCam3 cut
+		}
+
+		$cinePlane2 show
+		thread moveDoor $door3b 3.2 ( -350 0 0)
+		thread moveDoor $door3a 3.2 (  350 0 0) 
+		wait 4.2
+
+		//transition camera to look at the middle truck
+		$TheCam3 nowatch 1.0
+		$TheCam3 watch $cinematicOpel1 1.0
+
+		thread doEarthquake 1.0 .4 .7 0
+		$cinematicTanker anim explode 
+		wait 0.2
+
+		$cinematicTanker show
+		$airfieldtruck3 remove
+		wait 0.3
+
+		thread doEarthquake 1.0 .3 .6 0
+		$cinematicOpel1 show
+		$airfieldtruck2 remove
+		$cinematicOpel1 anim explode	
+		wait 0.5
+
+		thread doEarthquake 1.0 .3 .6 0
+		$cinematicOpel2 show
+		$airfieldtruck1 remove
+		$cinematicOpel2 anim explode
+		wait 3.0
+
+		level.sceneDone = 1
+	}	
+	else {
+		iprintln "Hacks enabled, skipping sceneThree."
+	}
+}end
+
+//============================================================================
+sceneFive: {
+//============================================================================
+	if (level.skip_sceneFive == 0) {
+		local.camPathName = "camPathFive"
+		local.startPoint  = (1609.6 1830 3585) 
+		local.endPoint    = (1894.3 1027.3 3585.1) 
+		local.startAngles = (21.714 -103.69 0)
+		local.endAngles   = (21.714 -103.69 0)
+		local.camPathFiveSpeed = 0.5
+
+		level.farDist  = level.sceneFive_farDist;
+		level.fogBias  = level.sceneFive_fogBias;
+		level.fogColor = level.sceneFive_fogColor;
+
+		waitthread createCamPath local.camPathName local.startPoint local.endPoint                            
+		thread setFog level.sceneFive_farDist level.sceneFive_fogBias level.sceneFive_fogColor
+
+		if (level.freeCam == 1) {
+			//place the player near the camera, let him roam
+			$player.origin = local.startPoint
+			$player.viewangles = local.startAngles
+		}
+		else {
+			level.sceneDone = 0
+			waitframe
+
+			$TheCam5 speed local.camPathFiveSpeed
+			$TheCam5 follow $camPathFive $cinePlane3
+			$TheCam5.angles = local.startAngles
+			$TheCam3 nowatch
+			$TheCam3 cut
+			$TheCam5 cut
+			cuecamera $TheCam5 0.0
+			$TheCam5 cut
+		}
+		$cinePlane3 moveanim start_gag3
+		wait 4.0
+		level.sceneDone = 1
+	}
+	else {
+		iprintln "Hacks enabled, skipping sceneFive."
+	}
+}end
+
+//============================================================================
+sceneSix: {
+//============================================================================
+	if (level.skip_sceneSix == 0) {
+		local.camPathName = "camPathSix"
+		local.startPoint  = (3624.5 1348.1 2829.7)
+		local.endPoint    = (3614.3 807.6 3100.7)
+		local.startAngles = (21.714 -103.69 0)
+		local.endAngles   = (21.714 -103.69 0)
+		local.camPathSixSpeed = 2
+
+		level.farDist  = level.sceneSix_farDist;
+		level.fogBias  = level.sceneSix_fogBias;
+		level.fogColor = level.sceneSix_fogColor;
+
+		waitthread createCamPath local.camPathName local.startPoint local.endPoint                            
+		thread setFog level.sceneSix_farDist level.sceneSix_fogBias level.sceneSix_fogColor
+	
+		if (level.freeCam == 1) {
+			//place the player near the camera, let him roam
+			$player.origin = local.shotThreeCamPos
+			$player.viewangles = local.shotThreeCamAngles
+		}
+		else {
+			level.sceneDone = 0
+			waitframe
+
+			$TheCam6 speed local.camPathSixSpeed
+			$TheCam6 follow $camPathSix $treeTarget
+			$TheCam6.angles = local.startAngles
+			$TheCam5 cut
+			$TheCam6 cut
+			cuecamera $TheCam6 0.0
+			$TheCam6 cut
+		}
+		
+		//prepare the scene
+		$cinetower_corona hide
+		$cinetower_light  hide
+		wait 0.5
+
+		thread doEarthquake 1.0 .3 .6 0
+
+		//trigger the tower exploder
+		thread global/exploder.scr::explode 9000
+		wait 2.0
+
+		$cinePlane3 remove
+		waitframe
+
+		level.sceneDone = 1
+	}
+	else {
+		iprintln "Hacks enabled, skipping sceneSix."
+	}
+}end
+
+//============================================================================
+sceneSeven: {
+//============================================================================
+	if (level.skip_sceneSeven == 0) {
+		local.camPathName = "camPathSeven"
+		local.startPoint  = (4702.4 1139.8 2550.8) 
+		local.endPoint    = (4702.4 1139.8 2550.8) 
+		local.startAngles = ( -26.9 -126.4 0)
+		local.endAngles   = ( -26.9 -126.4 0)
+		local.camPathSevenSpeed = 0.5
+
+		level.farDist  = level.sceneSeven_farDist;
+		level.fogBias  = level.sceneSeven_fogBias;
+		level.fogColor = level.sceneSeven_fogColor;
+
+		waitthread createCamPath local.camPathName local.startPoint local.endPoint                            
+		thread setFog level.sceneSeven_farDist level.sceneSeven_fogBias level.sceneSeven_fogColor
+
+		if (level.freeCam == 1) {
+			//place the player near the camera, let him roam
+			$player.origin = local.startPoint
+			$player.viewangles = local.startAngles
+		}
+		else {
+			level.sceneDone = 0
+			waitframe
+
+			$TheCam7 speed local.camPathSevenSpeed
+			$TheCam7 follow $camPathSeven $cinePlane1 
+			$TheCam7.angles = local.startAngles
+			$TheCam6 cut
+			$TheCam7 cut
+			cuecamera $TheCam7 0.0
+			$TheCam7 cut 
+		}
+
+		//prepare the scene
+		$carport_corona1 hide
+		$carport_light1  hide
+		$carport_corona2 hide
+		$carport_light2  hide
+
+		$cinePlane1.origin = (3639.5 5248.9 2550) 
+		$cinePlane1 show
+		waitframe
+
+		$cinePlane1 moveanim start_gag4
+		wait 1.8
+
+		//transition camera to look at the explosion
+		$TheCam7 nowatch 
+		wait 0.2
+
+		$cinematicTanker1 anim explode
+		wait 0.8
+
+		$fueltruck remove
+		$cinematicTanker1 show	
+		waitframe
+
+		thread doEarthquake 1.0 .3 .6 0
+		wait 0.3
+
+		$TheCam7 watch $finalTarget 0.0
+		$cinematicTanker2 anim explode2
+		$fueltruck2 remove	
+		$cinematicTanker2 show
+		waitframe
+
+		thread doEarthquake 1.0 .3 .6 0
+		waitframe
+
+		//trigger the roof exploder
+		thread global/exploder.scr::explode 9001
+		waitframe
+
+		$cinePlane1 remove
+		wait 6.0
+
+		level.sceneDone = 1
+
+		//Thanks for watching
+		fadeout 3.5 0 0 0 1
+		wait 3.5
+		exec global/missioncomplete.scr e2l3 1 1
+	}
+	else {
+		iprintln "Hacks enabled, skipping sceneSeven."
+	}
+}end
+
+//                   MISC FUNCTIONS
+
+//============================================================================
+setFog level.farDist level.fogBias level.fogColor: {
+//============================================================================
+	if (level.nofog) {
+		level.farDist = 40000
+	}
+
+	$world farclipoverride level.farDist
+	$world farplane level.farDist
+	$world farplane_bias level.fogBias
+
+	if (level.fogColor != NIL)  {
+		$world farplane_color level.fogColor
+	}
+}end
+
+//============================================================================
+spawnCinematicStuff: {
+//============================================================================
+	//replace the 4 veltros with cinematic versions
+	spawn script_model model models/vehicles/it_v_veltro_e2l2_cinematic5.tik targetname cinePlane5 
+	spawn script_model model models/vehicles/it_v_veltro_e2l2_cinematic2.tik targetname cinePlane1
+	spawn script_model model models/vehicles/it_v_veltro_e2l2_cinematic2.tik targetname cinePlane2
+	spawn script_model model models/vehicles/it_v_veltro_e2l2_cinematic3.tik targetname cinePlane3
+	spawn script_model model models/vehicles/it_v_veltro_e2l2_cinematic2.tik targetname cinePlane4
+
+	//this is the last plane used, let's hide it 'til we need it
+	$cinePlane1 hide
+	$cinePlane1.origin = $airplane3.origin
+	$cinePlane1.angles = $airplane3.angles
+
+	//let's not stop anything due to collisions
+	$cinePlane1 notsolid
+	$cinePlane2 notsolid
+	$cinePlane3 notsolid
+	$cinePlane4 notsolid
+	$cinePlane5 notsolid
+
+	$cinePlane5.origin = $airplane1.origin
+	$cinePlane5.angles = $airplane1.angles
+	$cinePlane2.origin = $airplane2.origin
+	$cinePlane2.angles = $airplane2.angles
+	$cinePlane3.origin = $airplane3.origin
+	$cinePlane3.angles = $airplane3.angles
+	$cinePlane4.origin = $airplane4.origin
+	$cinePlane4.angles = $airplane4.angles
+
+	$airplane1 remove
+	$airplane2 remove
+	$airplane3 remove
+	$airplane4 remove
+	
+	$cinePlane5 anim idle
+	$cinePlane2 anim idle
+	$cinePlane3 anim idle
+	$cinePlane4 anim idle
+
+	spawn script_model model models/vehicles/oiltanker_d.tik   targetname cinematicTanker
+	spawn script_model model models/vehicles/e2l2_opel_one.tik targetname cinematicOpel1
+	spawn script_model model models/vehicles/e2l2_opel_two.tik targetname cinematicOpel2
+	spawn script_model model models/vehicles/oiltanker_d.tik   targetname cinematicTanker1
+	spawn script_model model models/vehicles/oiltanker_d.tik   targetname cinematicTanker2
+	waitframe
+
+	//used in gag 2
+	$cinematicTanker.origin = $airfieldtruck3.origin
+	$cinematicTanker.angles = $airfieldtruck3.angles
+	$cinematicTanker hide
+	$cinematicOpel1.origin  = $airfieldtruck2.origin
+	$cinematicOpel1.angles  = $airfieldtruck2.angles
+	$cinematicOpel1 hide
+	$cinematicOpel2.origin  = $airfieldtruck1.origin
+	$cinematicOpel2.angles  = $airfieldtruck1.angles
+	$cinematicOpel2 hide
+
+	//used in the final gag
+	$cinematicTanker1.origin = $fueltruck.origin
+	$cinematicTanker1.angles = $fueltruck.angles
+	$cinematicTanker1 hide
+	$cinematicTanker2.origin = $fueltruck2.origin
+	$cinematicTanker2.angles = $fueltruck2.angles
+	$cinematicTanker2 hide
+
+	//placed in front of hangers for spawning things
+	spawn script_origin targetname cinematicHanger1 origin (3754.0 4097.0 2536)
+	spawn script_origin targetname cinematicHanger2 origin (4399.4 3908.0 2536)
+	spawn script_origin targetname cinematicHanger3 origin (4424.3 2637.9 2536)
+
+	//various origins used to constrain the camera
+	spawn script_origin targetname sceneOneTarget origin (4337.0 5024.4 2671.4)
+	spawn script_origin targetname treeTarget origin (3614.3 0 2990.7)
+	spawn script_origin targetname treeTarget2 origin (2787.48 -2033 3141.6)
+	spawn script_origin targetname finalTarget origin (4201.2 477.69 2737.09)	
+}end
+
+//============================================================================
+supaMusicHack local.musicToPlay: {
+//============================================================================
+	//yes, you will play the corret music! JimG
+	level.music = local.musicToPlay
+	local.string = ("music/" + level.music + ".mus")
+	soundtrack local.string
+	println ("playing " + local.string)
+	forcemusic normal normal
+}end
+
+//============================================================================
+createCamPath local.name local.startPoint local.endPoint: {
+//============================================================================
+	local.splineStart = spawn SplinePath targetname local.name
+	local.splineStart.origin = local.startPoint
+
+	local.splineEnd = waitthread newSplineNode local.name
+	local.splineEnd.origin = local.endPoint
+
+	local.splineMid = waitthread newSplineNode local.name
+	local.splineMid.origin = (local.splineStart.origin + local.splineEnd.origin) * 0.5
+
+	local.splineStart.target = local.splineMid.targetname
+	local.splineMid.target = local.splineEnd.targetname
+}end
+
+//============================================================================
+newSplineNode local.name: {
+//============================================================================
+	local.newName = local.name + "_" + level.curSplineIndex
+	local.splinepath = spawn SplinePath targetname local.newName
+	level.curSplineIndex++
+}end local.splinepath
+
+//============================================================================
+hackyStuff: {
+//============================================================================
+	//door is not placed flush with hanger edge
+	thread moveDoor $door1b 0.2 (13 0 0)
+	thread moveDoor $door1a 0.2 (15 0 0) 
+
+	//door is partially opened, let's close it
+	waitthread moveDoor $door4b 0.1 (0 200 0)
+	waitframe
+
+	//it's kinda boring to sit and watch gates retract
+	//let's open them up a bit so it's not as painful
+	thread moveDoor $door4b 0.1 (0 -250 0)
+	thread moveDoor $door4a 0.1 (55 250 0) 	
+}end
+
+//============================================================================
+moveDoor local.name local.time local.offset: {
+//============================================================================
+	local.name time local.time
+	local.origPos = local.name.origin + local.offset
+	local.name moveto local.origPos
+	local.name move
+}end
+
+//============================================================================
+doEarthquake local.duration local.magnitude local.no_rampup local.no_rampdown: {
+//============================================================================
+	earthquake local.duration local.magnitude local.no_rampup local.no_rampdown
+}end
+
+//============================================================================
+createJointTarget local.name local.object local.joint: {
+//============================================================================
+	local.jointPos = local.object gettagposition local.joint 
+	spawn script_origin targetName local.name origin local.jointPos
+}end
+
+//============================================================================
+startBeacon: {
+//============================================================================
+	$beam1 bind $beamcenter
+	$beamcenter rotatey 30
+}end

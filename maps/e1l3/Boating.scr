@@ -1,0 +1,1038 @@
+//chrissstrahl - completed coopification on 2019.09.18
+
+// Boating
+//=========================================================================
+init:
+//=========================================================================
+{
+	level.start_boats_immediately = 0
+	if (level.warpTo == "boating"){
+		// hack warp section
+		
+		//chrissstrahl - keep for sp
+		if(level.gametype == 0){
+			$player.origin 		= ( -128 -5248 216 )
+			$player.viewangles 	= ( 0 180 0 )
+		}
+
+		//level.start_boats_immediately = 1
+		waitthread maps/e1l3/Objectives.scr::catchup "gotBriefing"
+	}
+
+	// initialization
+	waitthread global/ManSpawnNamed.scr::Init "BoatARower"
+	waitthread global/ManSpawnNamed.scr::Init "BoatAGunner"
+	waitthread global/ManSpawnNamed.scr::Init "BoatBRower"
+	waitthread global/ManSpawnNamed.scr::Init "BoatBGunner"
+	waitthread global/ManSpawnNamed.scr::Init "Boat1Rower"
+	waitthread global/ManSpawnNamed.scr::Init "Boat2Rower"
+	waitthread global/ManSpawnNamed.scr::Init "Boat2Gunner"
+	//waitthread global/ManSpawnNamed.scr::Init "Boat3Rower"
+	//waitthread global/ManSpawnNamed.scr::Init "Boat3Gunner"
+	//waitthread global/ManSpawnNamed.scr::Init "BoatEnemy"
+	spawn trigger_relay "targetname" "StartBoatingGag_Trigger"
+
+	level.boating_spawn_more_enemies_trigger = waitthread global/FindTrigger.scr::FindTrigger "BoatEnemySpawnerTrigger"
+	level.boating_spawn_more_enemies_trigger nottriggerable
+
+	// spawn work thread
+	thread DoWork
+	println "boating initialized"
+}end
+
+//=========================================================================
+DoWork:
+//=========================================================================
+{
+	if ((level.warpTo != NIL) &&
+		(level.warpTo != "None") &&
+		(level.warpTo != "tankRide") &&
+		(level.warpTo != "briefing") &&
+		(level.warpTo != "boating")){
+		end
+	}
+
+	if (level.warpTo != "boating"){
+		$StartBoatingGag_Trigger waittill trigger
+	}
+	
+	//chrissstrahl - handle in coop - glue spots for players
+	if(level.gametype != 0){	
+		$playerspot_boat delete
+		spawn script_model model "models/items/Af_P_Lantern.tik" origin ( -1072 -4664 0 ) notsolid 1 targetname coop_boatGlue1 hide 1
+		spawn script_model model "models/items/Af_P_Lantern.tik" origin ( -1040 -4704 0 ) notsolid 1 targetname coop_boatGlue2 hide 1
+		spawn script_model model "models/items/Af_P_Lantern.tik" origin ( -1104 -4704 0 ) notsolid 1 targetname coop_boatGlue3 hide 1
+		spawn script_model model "models/items/Af_P_Lantern.tik" origin ( -1104 -4744 0 ) notsolid 1 targetname coop_boatGlue4 hide 1
+		spawn script_model model "models/items/Af_P_Lantern.tik" origin ( -1040 -4744 0 ) notsolid 1 targetname coop_boatGlue5 hide 1
+		spawn script_model model "models/items/Af_P_Lantern.tik" origin ( -1040 -4784 0 ) notsolid 1 targetname coop_boatGlue6 hide 1
+		spawn script_model model "models/items/Af_P_Lantern.tik" origin ( -1104 -4784 0 ) notsolid 1 targetname coop_boatGlue7 hide 1
+		spawn script_model model "models/items/Af_P_Lantern.tik" origin ( -1072 -4824 0 ) notsolid 1 targetname coop_boatGlue8 hide 1
+
+		for(local.i=1;local.i<9;local.i++){
+			local.ent = $("coop_boatGlue"+local.i)
+			local.ent bind $Boat1
+		}
+	}
+
+	waitthread global/ManSpawnNamed.scr::Spawn "BoatARower"
+	waitthread global/ManSpawnNamed.scr::Spawn "BoatAGunner"
+	waitthread global/ManSpawnNamed.scr::Spawn "BoatBRower"
+	waitthread global/ManSpawnNamed.scr::Spawn "BoatBGunner"
+	waitthread global/ManSpawnNamed.scr::Spawn "Boat1Rower"
+	waitthread global/ManSpawnNamed.scr::Spawn "Boat2Rower"
+	waitthread global/ManSpawnNamed.scr::Spawn "Boat2Gunner"
+	//waitthread global/ManSpawnNamed.scr::Spawn "Boat3Rower"
+	//waitthread global/ManSpawnNamed.scr::Spawn "Boat3Gunner"
+	waitframe
+
+	$BoatARower    exec global/disable_ai.scr
+	$BoatAGunner   exec global/disable_ai.scr
+	$BoatBRower    exec global/disable_ai.scr
+	$BoatBGunner   exec global/disable_ai.scr
+	$Boat1Rower    exec global/disable_ai.scr
+	$Boat2Rower    exec global/disable_ai.scr
+	$Boat2Gunner   exec global/disable_ai.scr
+	//$Boat3Rower  exec global/disable_ai.scr
+	//$Boat3Gunner exec global/disable_ai.scr
+
+	//waitthread global/ManSpawnNamed.scr::Spawn "BoatEnemy"
+	waitthread LoadBoats
+
+	level.stop_water_mortar = 1
+	$BoatEnemy thread doBoatEnemyCleanup
+
+	for (local.i=1; local.i<=$BoatEnemy.size; local.i++){
+		$BoatEnemy[local.i] ai_on
+	}
+
+	thread RandomMortars
+
+	while (level.num_guys_to_land > 0){ //chrissstrahl
+		waitframe
+	}
+
+	// guys are on shore, and are my buddies, so let's change their targetnames
+	//	$Boat3Rower.targetname = "BoatGuyLeader"
+	//	$Boat3Gunner.targetname = "BoatGuy"
+	$Boat1Rower.targetname = "BoatGuy"
+	waitframe
+
+	$BoatGuy takedamage
+	$BoatGuy threatbias 1000
+	$BoatGuy health 10
+	$BoatGuy interval 256
+	$BoatGuy exec global/enable_ai.scr
+	
+	//chrissstrahl - made coop compatible
+	//$BoatGuy.destination = $player
+	$BoatGuy exec coop_mod/main.scr::destination
+	
+	$BoatGuy.friendtype = 1
+	$BoatGuy.distance = 128		//256
+	$BoatGuy thread global/friendly.scr::friendlythink
+
+	//	$BoatGuyLeader waitthread global/friendly.scr::friendlystop
+	//	wait 0.2
+	//
+	//	for (local.i=1; local.i<=$BoatGuy.size; local.i++)
+	//	{
+	//		$BoatGuy[local.i] takedamage
+	//		$BoatGuy[local.i] threatbias 1000
+	//		$BoatGuy[local.i] health 10
+	//		$BoatGuy[local.i] interval 256
+	////		$BoatGuy[local.i] exec global/enable_ai.scr
+	//		$BoatGuy[local.i].destination = $BoatGuyLeader
+	//		$BoatGuy[local.i].friendtype = 1
+	//		$BoatGuy[local.i].distance = 250
+	//			$BoatGuy[local.i] thread global/friendly.scr::friendlythink
+	//	}
+	//
+	//	$BoatGuyLeader threatbias 200
+	//	$BoatGuyLeader nodamage
+	//	$BoatGuyLeader exec global/enable_ai.scr
+	//	$BoatGuyLeader health 10
+	//	$BoatGuyLeader interval 256
+	//	$BoatGuyLeader runto $BoatLeaderWaitPoint_BlastHole
+	//	//$BoatGuyLeader exec global/disable_ai.scr
+	//	//$BoatGuyLeader waitthread global/SafeMoveTo.scr::SafeRunTo $BoatLeaderWaitPoint_BlastHole
+
+	//chrissstrahl - coop compatible
+	//$player threatbias 1000
+	exec coop_mod/replace.scr::threatbias 1000
+
+	//	// make all enemies over here sit up and Take Notice!
+	//
+	//	waitthread SetAllFavoriteEnemy "BoatEnemy" $player
+	//	waitthread SetAllFavoriteEnemy "wall_attacker" $player
+	//	waitthread SetAllFavoriteEnemy "AcrossCanalGuys" $player
+}end
+
+//=========================================================================
+SetAllFavoriteEnemy local.name local.enemy:
+//=========================================================================
+{
+	if (!local.name || !$(local.name)){
+		end
+	}
+
+	for (local.i=1; local.i<=$(local.name).size; local.i++){
+		if (isalive $(local.name)[local.i]){
+			$(local.name)[local.i] favoriteenemy local.enemy
+		}
+	}
+}end
+
+//=========================================================================
+LoadBoats:
+//=========================================================================
+{
+	level.num_boats_landed = 0
+	level.player_in_boat   = 0
+	level.num_guys_to_land = 2		//4
+
+	$BoatA thread LoadBoat $BoatARower $BoatAGunner 1		// dies
+	$BoatB thread LoadBoat $BoatBRower $BoatBGunner 1		// dies
+
+	$Boat1 thread LoadBoat $Boat1Rower
+	$Boat2 thread LoadBoat $Boat2Rower $Boat2Gunner 1		// dies
+	//$Boat3 thread LoadBoat $Boat3Rower $Boat3Gunner
+
+	//chrissstrahl - coop replacement
+	$Boat1Rower exec coop_mod/replace.scr::lookat
+	
+	thread DriveBoats
+
+	//chrissstrahl - coop replacement - wait until a player is close
+	//while !(vector_within $player.origin $Boat1.origin 600){
+	while !( waitexec coop_mod/replace.scr::withinDistanceOf $Boat1 600 ){
+		waitframe
+	}
+
+	$Boat1Rower playsound DFRUS_E1L3_AC6102_02
+	
+	//iprintlnbold "DFRUS_E1L3_AC6102_01 US Corporal:  Hey, we're over here!"
+	wait 2
+	//iprintlnbold "DFRUS_E1L3_AC6103_01 US Corporal:  What are you waiting for, an invitation?  Let's go!"
+	
+	// This sound is commented out of uberdialog as of 7/1/03
+	//$Boat1Rower playsound DFRUS_E1L3_AC6103_01
+	//wait 2
+	
+	// wait for player to get in range
+	//chrissstrahl - coop replacement - wait until a player is close
+	//while !(vector_within $player.origin $Boat1.origin 200){
+	while !( waitexec coop_mod/replace.scr::withinDistanceOf $Boat1 200 ){
+		waitframe
+	}
+
+	$Boat1Rower lookat NULL
+	
+	//chrissstrahl - handle singleplayer
+	if(level.gametype == 0){
+		local.org = $playerspot_boat.origin - (0 0 64)
+		$playerspot_boat.origin = local.org
+		$playerspot_boat bind $Boat1	
+		freezeplayer
+		$player physics_off
+		$player.viewangles = (0 270 0)
+		$player glue $playerspot_boat 0
+		$player notsolid
+		$player physics_on
+		releaseplayer	
+	}
+	//chrissstrahl - handle coop
+	else{
+		//glue all players to the boat - glue each player to a own spot by providing just the base targetname
+		exec coop_mod/replace.scr::glue "coop_boatGlue" 270
+	}
+
+	$Boat1.has_player = 1
+	level.player_in_boat = 1
+	$cappy delete
+
+	if ($BoatGuySplodeHuddlePoint){
+		waitthread global/ObjMgr.scr::SetObjCompassTarg "crossCanal" $BoatGuySplodeHuddlePoint
+	}
+
+	if (level.boating_spawn_more_enemies_trigger){
+		level.boating_spawn_more_enemies_trigger triggerable
+		trigger level.boating_spawn_more_enemies_trigger
+	}
+	wait 4.5
+
+	$Boat2Gunner playsound DFRUS_E1L3_AS6203
+	//	wait 4
+	//	$Boat1Rower playsound DFRUS_E1L3_AS6204
+	//	wait 3
+	//	$Boat3Gunner playsound DFRUS_E1L3_AC6104
+
+	//iprintlnbold "DFRUS_E1L3_AS6203	US Soldier #2:  Shoot the hell outa those Krauts while I work the oars!"
+	//iprintlnbold "DFRUS_E1L3_AS6204	US Soldier #2:	Captain  Corporal, did I mention I can't swim?"
+	//iprintlnbold "DFRUS_E1L3_AC6104 US Corporal:  Relax, Torry -- chances are you'll get shot before you drown."
+}end
+
+//=========================================================================
+LoadBoat local.rower local.gunner local.boat_dies:
+//=========================================================================
+{
+	if (local.boat_dies == NIL){
+		local.boat_dies = 0
+	}
+
+	self notsolid
+	self anim 13P105_OarsatSide
+
+	if (local.gunner != NIL){
+		local.gunner.on_boat = 0
+		local.gunner thread GunnerGetInBoat self
+	}
+
+	local.rower nodamage
+	local.rower gun "m1 garand"		//"None"
+	local.rower.no_idle = 1
+	local.rower physics_off
+	local.rower attach self "passenger2" 0
+	local.rower thread global/LoopAnim.Scr::LoopAnim A_13_boatidle			//13C101_CaptainIdle
+	local.rower.on_boat = 1
+	local.rower thread BoatPassengerMatchAngles self
+
+	self.has_player = 0
+	self.fate_is_sealed = local.boat_dies
+	local.rower waitthread global/LoopAnim.Scr::LoopAnimStop
+	waitframe
+
+	local.rower.is_shooting = 1
+	local.rower.is_rowing = 0
+	wait (0.2 + (randomfloat 3))
+
+	while (local.rower.is_rowing == 0){
+		local.rower upperanim rifle_aim
+		local.rower waittill upperanimdone
+
+		if (local.rower.is_rowing == 0){
+			wait (0.1 + (randomfloat 0.4))
+		}
+
+		local.targ = waitexec global/FindNearestEntity.scr self.origin "BoatEnemy" "wall_attacker" "AcrossCanalGuys"
+
+		if (local.targ){
+			local.a = (angles_pointat NULL local.rower local.targ)
+			local.rower.angles = ( 0 (local.a[1] + 180) 0 )
+		}
+
+		local.rower upperanim rifle_shoot
+		local.rower waittill upperanimdone
+
+		if (local.rower.is_rowing == 1){
+			break
+		}
+		wait (0.2 + (randomfloat 3))
+	}
+
+	local.rower.is_shooting = 0
+	local.rower.angles = ( 0 90 0 )
+}end
+
+//=========================================================================
+GunnerGetInBoat local.boat:
+//=========================================================================
+{
+	self nodamage
+	self gun "m1 garand"
+
+	if (((self == $Boat2Gunner) || (self == $Boat3Gunner))){//&&//$GunnerGetInBoat2Trigger && $GunnerGetInBoat3Trigger)
+
+		if (self == $Boat2Gunner){
+			local.get_on_trigger = $GunnerGetInBoat2Trigger
+		}
+		else{
+			local.get_on_trigger = $GunnerGetInBoat3Trigger
+		}
+
+		local.get_on_pos_origin 	= local.boat.origin + ( 20 -118 0 )			//( 0 -108 0 )
+		local.get_on_pos_origin[2] 	= self.origin[2]
+		local.get_on_pos 			= spawn script_origin origin local.get_on_pos_origin
+		self exec global/enable_ai.scr
+
+		if (local.get_on_trigger){
+			local.get_on_trigger waittill trigger
+		}
+		else{
+			//chrissstrahl - coop compatible
+			//while (!(vector_within self.origin $player.origin 384)){
+			while !( waitexec coop_mod/replace.scr::withinDistanceOf self 384 ){
+				waitframe
+			}
+		}
+
+		self exec global/disable_ai.scr
+		self waitthread global/SafeMoveTo.scr::SafeRunTo_Wait local.get_on_pos 32
+		self.angles = ( 0 90 0 )
+		self anim_noclip A_13_Getin_boat
+		self waittill animdone
+		local.get_on_pos delete
+	}
+
+	self.no_idle = 1
+	self physics_off
+	//	self.origin = local.boat gettagposition "passenger1"
+	//	self bind local.boat
+	self attach local.boat "passenger1" 0
+	//self thread global/LoopAnim.Scr::LoopAnim A_13_boatidle		//13C101_CaptainIdle
+	self.on_boat = 1
+	//	self thread BoatPassengerMatchAngles local.boat
+	self thread GunnerThink local.boat
+}end
+
+//=========================================================================
+BoatPassengerMatchAngles local.boat:
+//=========================================================================
+{
+	local.boat_yaw = local.boat.angles[1]
+	local.guy_yaw  = self.angles[1]
+	local.guy_yaw_offset = local.guy_yaw - local.boat_yaw
+
+	while ((isalive self) && (self.on_boat == 1)){
+		waitframe
+		self.angles = (0 (local.boat.angles[1] + local.guy_yaw_offset) 0)
+	}
+}end
+
+//=========================================================================
+RandomMortars:
+//=========================================================================
+{
+	//chrissstrahl - it keeps on fireing in mp, so reduce count - stop fiering if boat is gone
+	//while (level.num_boats_landed < 2){
+	while (level.num_boats_landed < 1 && $boat1 != NULL){
+		local.index = 1 + (randomint ($BoatMortarEffect.size))
+		//chrissstrahl - keep for sp
+		if(level.gametype == 0){
+			$player playsound arty_leadin wait
+			$player waittill sounddone		
+		}
+		//chrissstrahl - handle in mp
+		else{
+			$boat1 playsound arty_leadin
+			$boat1 waittill sounddone
+		}
+		$BoatMortarEffect[local.index] anim start
+		wait (2.0 + (randomfloat 3)) //chrissstrahl - moved here so the NULL check actually works out
+	}
+	exec coop_mod/butler.scr::e1l3_boatClensing
+}end
+
+//=========================================================================
+DriveBoats:
+//=========================================================================
+{
+	if ($StartDoomedBoats_Trigger){
+		$StartDoomedBoats_Trigger waittill trigger
+	}
+
+	$BoatA thread DriveBoat 95 "A"
+	$BoatB thread DriveBoat 80 "B"
+
+	while (level.player_in_boat == 0){
+		waitframe
+	}
+
+	$Boat2 thread DriveBoat 120 "2"
+	wait 1
+
+	//$Boat3 thread DriveBoat 110 "3" $Boat3Path_node6
+	wait 1
+
+	$Boat1 thread DriveBoat 105 "1" $Boat1Path_node7
+
+	/*
+	while !(vector_within $player.origin $Boat1.origin 800)
+		waitframe
+
+	$Boat2 thread DriveBoat 95 "2"
+
+	while !(vector_within $player.origin $Boat1.origin 600)
+		waitframe
+
+	$Boat3 thread DriveBoat 80 "3"
+
+	while (level.player_in_boat == 0)
+		waitframe
+
+	$Boat1 thread DriveBoat 70 "1"
+	*/
+}end
+
+//=========================================================================
+DriveBoat local.speed local.set local.final_node:
+//=========================================================================
+{
+	local.path  = $("Boat" + local.set + "Path")
+	local.rower = $("Boat" + local.set + "Rower")
+
+	if (local.set != "1"){
+		local.gunner = $("Boat" + local.set + "Gunner")
+	}
+	else{
+		local.gunner = NULL
+	}
+
+	if (local.gunner){
+		local.gunner.manual_yaw_speed = -2
+	}
+
+	//	if ((local.gunner != NIL) && (local.gunner != NULL))
+	//		local.gunner thread GunnerThink self
+	//	local.gunner thread global/LoopAnim.Scr::LoopAnim 13C101_CaptainIdle
+
+	local.rower.is_rowing = 1
+	while (local.rower.is_shooting == 1){
+		waitframe
+	}
+
+	if (local.gunner){
+		while (local.gunner.on_boat == 0){
+			waitframe
+		}
+	}
+
+	local.rower gun "None"
+	local.rower thread global/LoopAnim.Scr::LoopAnim 13A101_SlowRow
+	self notsolid
+	self thread global/LoopAnim.Scr::LoopAnim 13P101_SlowPaddle
+
+	self.rower_gun = spawn script_model model "models/weapons/m1_garand.tik"
+	//	self.rower_gun attach $boat "passenger2" 0 ( 20 -30 -10 )
+	//	self.rower_gun angles "-30 -120 180"
+
+	// jsl-->offset these to get it just right....
+	self.rower_gun attach self "passenger2" 1 ( -20 -25 0 )
+	self.rower_gun angles ( 0 0 0 )		//"0 -120 120"
+	self.rower_gun notsolid
+
+	//	if ((local.gunner != NIL) && (local.gunner != NULL))
+	//		local.gunner exec global/enable_ai.scr
+
+	self flypath local.path local.speed local.speed 90		//128
+
+	if (self.fate_is_sealed == 1){
+		self thread BoatSinker local.rower local.gunner $("BoatMortarEffect_Killer" + local.set)
+	}
+	else{
+		self thread BoatStopCheckThread
+		//		self move
+		//		self waitmove
+		//			self stop
+
+		//		if (self.has_player == 1)
+		//		{
+		//			thread UnloadPlayer		// let player get out first
+		//		}
+		//
+		//		if ((local.gunner != NIL) && (local.gunner != NULL) && (isalive local.gunner))
+		//			local.gunner thread GunnerGetOutOfBoat $("Boat" + local.set + "GunnerDismount")
+
+		//[200] chrissstrahl - make sure this does not get stuck
+		//because sometimes that node was just gone and the script did get stuck
+		//not sure if my agressive cleanup is responsible for that
+		//how ever, this fixes this issue quite nicely
+		while (1){
+			waitframe
+			if(local.final_node != NULL){
+				if(vector_within local.final_node.origin local.rower.origin 256){
+					break
+				}
+			}else{
+				break
+			}
+		}
+
+		local.rower waitthread global/LoopAnim.Scr::LoopAnimStop
+		self thread global/LoopAnim.Scr::LoopAnimStop
+		self anim 13P104_PutOarsDown
+		local.rower anim 13A105_PutOarsDown
+		local.rower thread GiveRowerGun self.rower_gun
+
+		//local.rower.no_idle = 0
+		//local.rower waittill animdone
+		self thread global/LoopAnim.Scr::LoopAnim 13P105_OarsatSide
+
+		while (self.stopped == 0){
+			waitframe
+		}
+
+		//	self waitmove
+		//	self stop
+
+		if (self.has_player == 1){
+			thread UnloadPlayer		// let player get out first
+		}
+
+		if ((local.gunner != NIL) && (local.gunner != NULL) && (isalive local.gunner)){
+			local.gunner thread GunnerGetOutOfBoat $("Boat" + local.set + "GunnerDismount")
+		}
+
+		local.rower.no_idle = 0
+		//local.rower waittill animdone
+
+		local.rower detach
+		local.rower solid
+		local.rower physics_on
+
+
+		local.rower anim_noclip A_13_boatexit
+		//local.rower anim_noclip 13A104_RowerDock
+		local.rower waittill animdone
+		local.rower.on_boat = 0
+		local.rower waitthread global/SafeMoveTo.scr::SafeRunTo_Wait $("Boat" + local.set + "RowerDismount") 32
+		//local.rower runto $("Boat" + local.set + "RowerDismount")
+		//local.rower waittill movedone
+		level.num_guys_to_land--
+		local.rower exec global/enable_ai.scr
+
+		if (local.rower != $Boat3Rower){		// becomes BoatGuyLeader
+			local.rower takedamage
+			local.rower health 10
+		}
+		level.num_boats_landed++
+	}
+}end
+
+//=========================================================================
+BoatStopCheckThread:
+//=========================================================================
+{
+	self.stopped = 0
+	self waitmove
+	self stop
+	self.stopped = 1
+}end
+
+//=========================================================================
+GunnerThink local.boat:
+//=========================================================================
+{
+	self waitthread global/LoopAnim.Scr::LoopAnimStop
+	self.no_idle = 1
+
+	/*
+	if ((local.boat == $Boat1) ||
+		(local.boat == $Boat2) ||
+		(local.boat == $Boat3))
+	local.target_boat_enemies = 1
+	else
+	local.target_boat_enemies = 0
+	*/
+
+	local.start_yaw = 85
+	local.yaw = local.start_yaw
+	self.manual_yaw_speed = 0
+
+	//	wait 1
+	//	iprintlnbold "STAND"
+
+	self anim_noclip A_13_boatstand
+	self waittill animdone
+	self anim_noclip A_13_boatready
+
+	//	self waittill animdone
+
+	local.prev_time = level.time
+	wait (0.2 + (randomfloat 3))
+
+	while (self && (isalive self) && (self.on_boat == 1)){
+		//		switch (1 + (randomint 2))
+		//		{
+		//			case 1:
+		//				local.shoot_anim = "A_13_boatfireR_mid"
+		//				break
+		//			case 2:
+				local.shoot_anim = "A_13_boatfireR_hi"
+		//				break
+		///*		--- Left shot anims don't really work, directionwise.  Plus, one of them is broken
+		//			case 3:
+		//				local.shoot_anim = "A_13_boatfireL_mid"
+		//				break
+		//			case 4:
+		//				local.shoot_anim = "A_13_boatfireL_hi"
+		//				break
+		//*/
+		//			default:
+		//				break
+		//		}
+		
+	local.targ = waitexec global/FindNearestEntity.scr self.origin "BoatEnemy" "wall_attacker" "AcrossCanalGuys"
+	if (local.targ){
+		local.a 	= (angles_pointat NULL self local.targ)
+		self.angles = ( 0 (local.a[1] + 190) 0 )			//+180
+	}
+
+	//	local.dt = level.time - local.prev_time
+	//	local.prev_time = level.time
+	//	local.yaw += (local.dt * self.manual_yaw_speed)
+	//	self.angles = ( 0 local.yaw 0 )
+
+		self anim_noclip local.shoot_anim
+		self waittill animdone
+		self anim_noclip A_13_boatready
+		wait (0.2 + (randomfloat 1))
+	}
+}end
+
+
+/*
+FindNearestGuy local.name_1 local.name_2 local.name_3 local.name_4 local.name_5:
+
+	local.nearest = NULL
+
+	if (local.name_1)
+		local.nearest = self waitthread FNG_SingName local.nearest local.name_1
+	if (local.name_2)
+		local.nearest = self waitthread FNG_SingName local.nearest local.name_2
+	if (local.name_3)
+		local.nearest = self waitthread FNG_SingName local.nearest local.name_3
+	if (local.name_4)
+		local.nearest = self waitthread FNG_SingName local.nearest local.name_4
+	if (local.name_5)
+		local.nearest = self waitthread FNG_SingName local.nearest local.name_5
+
+end local.nearest
+
+FNG_SingName local.nearest local.name:
+
+	if (!$(local.name))
+		end local.nearest
+
+	for (local.i=1; local.i<=$(local.name).size; local.i++)
+	{
+		if (!local.nearest || (vector_closer $(local.name)[local.i].origin local.nearest.origin self.origin))
+			local.nearest = $(local.name)[local.i]
+	}
+
+end local.nearest
+*/
+
+//=========================================================================
+GiveRowerGun local.rower_gun:
+//=========================================================================
+{
+	wait 1.26
+	self gun "m1 garand"
+	local.rower_gun delete
+
+	wait 2.0
+	//	self detach
+	//	self solid
+	//	self physics_on
+	//	self.on_boat = 0
+}end
+
+//=========================================================================
+GunnerGetOutOfBoat local.dest:
+//=========================================================================
+{
+	wait 0.5
+	self waitthread global/LoopAnim.Scr::LoopAnimStop
+	self exec global/disable_ai.scr
+
+	self detach
+	self solid
+	self physics_on
+	self.on_boat = 0
+
+	self.angles = ( 0 0 0 )
+	self notsolid
+	self anim_noclip A_13_boatexit
+	self waittill animdone
+
+	//	self anim_noclip 13C107_transtodock
+	//	self waittill animdone
+	//	self anim_noclip 13C105_CaptainDock
+	//	self waittill animdone
+
+	self waitthread global/SafeMoveTo.scr::SafeRunTo_Wait local.dest 1
+	self solid
+
+	//	self runto local.dest
+	//	self waittill movedone
+	level.num_guys_to_land--
+
+	self exec global/enable_ai.scr
+	self takedamage
+	self.no_idle = 0
+}end
+
+//=========================================================================
+UnloadPlayer:
+//=========================================================================
+{
+	wait 1
+
+	//chrissstrahl
+	if(level.gametype == 0){
+		$playerspot_boat unbind
+
+		local.uptime = 0.1
+		$playerspot_boat time local.uptime
+		$playerspot_boat moveup 30
+		$playerspot_boat move
+		wait local.uptime
+
+		local.northtime = 0.1
+		$playerspot_boat time local.northtime
+		$playerspot_boat movenorth 100
+		$playerspot_boat move
+		wait local.northtime
+		$player unglue
+		$player solid	
+	}else{
+		//make sure players spawn on the other side from now on
+		waitthread coop_mod/spawnlocations.scr::e1l3_update2
+		//unglue players from boat
+		waitexec coop_mod/replace.scr::unglue
+		
+		for (local.pl = 1;local.pl <= $player.size;local.pl++){
+			local.player =  $player[local.pl]
+			if(local.player == NULL || local.player.dmteam == "spectator"){
+				continue
+			}
+			thread coop_mod/main.scr::playerPlaceAtSpawn local.pl
+		}
+		
+		//remove the glue spots
+		for(local.i=1;local.i<9;local.i++){
+			local.ent = $("coop_boatGlue"+local.i)
+			local.ent remove
+		}
+
+		//sink boat slowly - remove once it has stopped moving
+		$Boat1 time 90
+		$Boat1 movedown 100
+		$Boat1 move
+		thread coop_mod/butler.scr::remove $Boat1 NIL 1
+	}
+
+	level.num_guys_to_land--
+
+	waitthread maps/e1l3/Objectives.scr::transition "crossedCanal"
+}end
+
+//=========================================================================
+BoatSinker local.rower local.gunner local.arty_fx:
+//=========================================================================
+{
+	thread PlaySoundWhenInRange "arty_leadin" self local.arty_fx 128
+
+	self waitmove
+	local.arty_fx anim start
+
+	//	self stop
+
+	self waitthread global/LoopAnim.Scr::LoopAnimStop
+	local.gunner waitthread global/LoopAnim.Scr::LoopAnimStop
+
+	//	local.gunner unbind
+	//	local.gunner physics_on
+
+	local.gunner.on_boat = 0
+	local.rower waitthread global/LoopAnim.Scr::LoopAnimStop
+
+	//	local.rower unbind
+	//	local.rower physics_on
+
+	local.rower.on_boat = 0
+	waitframe
+
+	//	waitframe
+	//	waitframe
+
+	local.gunner thread LaunchKill
+	local.rower thread LaunchKill
+
+	//	local.gunner takedamage
+	//	local.gunner damage $world 5000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	//	local.rower takedamage
+	//	local.rower damage $world 5000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+
+	local.roll 			= 0
+	local.roll_vel 		= 500		//340
+	local.roll_acc 		= -local.roll_vel * 1		//0.85
+	local.roll_dir_mult = 1
+
+	if ((randomint 2) == 0){
+		local.roll_vel 		= -local.roll_vel
+		local.roll_acc 		= -local.roll_acc
+		local.roll_dir_mult = -local.roll_dir_mult
+	}
+
+	local.pitch 		 = 0
+	local.pitch_vel 	 = 25		//40
+	local.pitch_acc 	 = -local.pitch_vel * 1
+	local.pitch_dir_mult = 1
+
+	if ((randomint 2) == 0){
+		local.pitch_vel 	 = -local.pitch_vel
+		local.pitch_acc 	 = -local.pitch_acc
+		local.pitch_dir_mult = -local.pitch_dir_mult
+	}
+
+	local.yaw 				= self.angles[1]
+	local.start_time 		= level.time
+	local.start_sink_time 	= local.start_time + 0.5		//1
+	local.disappear_time 	= local.start_time + 10
+
+	local.x 	= self.origin[0]
+	local.y 	= self.origin[1]
+	local.z 	= self.origin[2]
+	local.z_vel = 10		//0
+	local.z_acc = 100		//400
+
+	local.prev_time = level.time
+	while (level.time < local.disappear_time){
+		local.dt 		= level.time - local.prev_time
+		local.prev_time = level.time
+		local.roll_vel += (local.dt * local.roll_acc)
+
+		if ((local.roll_vel * local.roll_dir_mult) < 0){
+			local.roll_vel = 0
+		}
+
+		local.roll 		+= (local.dt * local.roll_vel)
+		local.pitch_vel += (local.dt * local.pitch_acc)
+
+		if ((local.pitch_vel * local.roll_dir_mult) < 0){
+			local.pitch_vel = 0
+		}
+
+		local.pitch += (local.dt * local.pitch_vel)
+
+		if (level.time >= local.start_sink_time){
+			local.z_vel -= (local.dt * local.z_acc)
+			local.z += (local.dt * local.z_vel)
+		}
+
+		self.angles = (local.pitch local.yaw local.roll)
+		self.origin = (local.x local.y local.z)
+		waitframe
+	}
+	self delete
+	
+	//chrissstrahl - remove the paths of the sunk boats
+	exec coop_mod/butler.scr::e1l3_boatDieFastClensing
+
+	/*
+	self time 10		//1
+	self moveDown 100
+
+	self rotateZ 180
+	wait 0.8
+	self stop
+
+	self rotateX 15
+	wait 0.8
+	self stop
+
+	//	self time 0.25
+	//	self moveUp 10
+	//	self move
+
+	wait 1
+	
+	//	self time 1
+	//	self moveDown 100
+		self move
+	*/
+}end
+
+//=========================================================================
+LaunchKill:
+//=========================================================================
+{
+	self waitthread global/LoopAnim.Scr::LoopAnimStop
+	self detach
+	//	self physics_on
+	self takedamage
+	self damage $world 5000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	self notsolid
+	self.no_idle = 1
+	self dontdropweapons
+	self thread DelayedDeactivation 0.75		//0.5		//1
+
+	local.max_horiz_vel = 200		//50
+	local.x_vel 		= (randomfloat (2*local.max_horiz_vel)) - local.max_horiz_vel
+	local.y_vel 		= (randomfloat (2*local.max_horiz_vel)) - local.max_horiz_vel
+
+	local.min_vert_vel 	= 100		//200
+	local.max_vert_vel 	= 200		//400
+	local.z_vel 		= (randomfloat (local.max_vert_vel - local.min_vert_vel)) + local.min_vert_vel
+
+	local.pos = self.origin
+	local.vel = ( local.x_vel local.y_vel local.z_vel )
+	local.acc = ( 0 0 -400 )
+
+	local.done_time 	= level.time + 10
+	local.prev_time 	= level.time
+	local.did_hit_water = 0
+
+	while (level.time < local.done_time){
+		local.dt 		 = level.time - local.prev_time
+		local.prev_time  = level.time
+		local.vel 		+= (local.acc * local.dt)
+
+		if ((local.did_hit_water == 0) && (local.pos[2] <= 0)){
+			local.vel = (local.vel * 0.25)
+			local.acc = (local.acc * 0.05)		//0.25)
+			local.did_hit_water = 1
+		}
+
+		local.pos += (local.vel * local.dt)
+		self.origin = local.pos
+		waitframe
+	}
+	self delete
+}end
+
+//=========================================================================
+DelayedDeactivation local.delay:
+//=========================================================================
+{
+	wait local.delay
+	self ai_off
+}end
+
+//=========================================================================
+PlaySoundWhenInRange local.sound local.this local.that local.range:
+//=========================================================================
+{
+	//chrissstrahl - make sure this does not spam the console
+	while (1){
+		waitframe
+		if(local.this != NULL && local.that != NULL){
+			if(vector_within local.this.origin local.that.origin local.range){
+				break
+			}
+		}else{
+			end
+		}
+	}
+	//chrissstrahl - keep for sp
+	if(level.gametype == 0){
+		$player playsound local.sound wait
+	}
+	else{
+		waitexec coop_mod/replace.scr::playsound local.sound
+	}
+}end
+
+
+//=========================================================================
+doBoatEnemyCleanup:
+//=========================================================================
+{
+	$ClausTrigger waittill trigger
+	
+	if (self != NULL && self != NIL){
+		self remove
+	}
+}end
+

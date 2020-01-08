@@ -1,0 +1,1097 @@
+//=========================================================================
+main:{
+//=========================================================================
+	level.coop_aaMap = 1				//chrissstrahl - let global scripts know this is a AA level
+	level.coopPrevMap = "m1l3a"			//chrissstrahl - set previouse map (for mom voteing)
+	level.coopNextMap = "m1l3c"			//chrissstrahl - set next map (for mom voteing)
+	level.coop_disableSpawnWarper	= TRUE		//chrissstrahl - disable respawn warper - we need all players to spawn at a specific place
+	thread coop_mod/main.scr::main 			//chrissstrahl - start coop mod extensions
+	
+	//chrissstrahl - setup stuff that is needed
+	if(level.gametype != 0){
+		thread coop_setup
+		thread coop_setupAttach
+	}
+	//end chrissstrahl
+	
+// AIRFIELD 
+// ARCHITECTURE: STEVE/TODD
+// SCRIPTING: Z
+
+	level.script = "maps/m1l3b.scr"
+	thread global/exploder.scr::main
+	//thread global/exploder.scr::repeat
+
+	exec global/ai.scr
+	level.dontdropweapons = 1
+
+	exec global/loadout.scr maps/m1l3b.scr
+	
+//	$world farplane 4600
+//	$world farplane 6000
+//	$world farplane_color ".03 .05 .09"
+
+	exec global/spotlight.scr
+
+//////////////////////
+level waitTill prespawn
+println "z:        prespawn marker"
+//////////////////////
+	$opel2_detector notsolid
+	$opel3_detector notsolid
+	$opel3_detector2 notsolid
+	$notsolid notsolid    //railings for panzerschreck guy
+
+	level.opel3_start = 0  //init the opel that rides on the airfield
+
+	level.tempnum = 0
+	level.bombnum = 0
+	level.playertank = 1 //needed for using things designed to aim at tanks
+
+	level.aircraft_intact = 12
+
+	level.slowspeed = 200 //was 200 
+	level.fastspeed = 400 //was 400
+	level.reversespeed = -120 //was -150
+	level.lookahead = 256
+	level.truck_health = 4000
+		
+//	level.truck_health = 200
+
+	level.grillo = $oss_man
+	
+	level.totalbaddies = 0
+
+	level.playerjeep = $playerjeep
+	level.playerjeep thread global/vehicles_thinkers.scr::PLAYER_JEEP_CONTROLLER $s1_trigger1
+
+//	local.offset = 128
+//	local.accuracy = 100
+//	local.turnspeed = 100
+//	local.bulletdamage = 5
+//	$mg42_gun_1 thread global/mg42.scr::JEEP_SETUP $mg42_trigger1_1 $mg42_trigger2_1 $mg42_gunner_1 $playerjeep local.offset local.accuracy local.turnspeed local.bulletdamage $mg42_surpression_1
+//	$mg42_gun_2 thread global/mg42.scr::JEEP_SETUP $mg42_trigger1_2 $mg42_trigger2_2 $mg42_gunner_2 $playerjeep local.offset local.accuracy local.turnspeed local.bulletdamage $mg42_surpression_2
+//	$mg42_gun_3 thread global/mg42.scr::JEEP_SETUP $mg42_trigger1_3 $mg42_trigger2_3 $mg42_gunner_3 $playerjeep local.offset local.accuracy local.turnspeed local.bulletdamage $mg42_surpression_3
+
+	$panzer1 thread init_panzer
+	$panzer2 thread init_panzer
+
+	$opel1.nolights = 1
+	$opel1 thread global/vehicles_thinkers.scr::enemy_truck_think level.truck_health
+	
+	$stuka1 thread enemy_stuka_think
+	$stuka2 thread enemy_stuka_think
+	$stuka3 thread enemy_stuka_think
+	$stuka4 thread enemy_stuka_think
+	$stuka5 thread enemy_stuka_think
+	$stuka6 thread enemy_stuka_think
+	$stuka8 thread enemy_stuka_think
+	$stuka9 thread enemy_stuka_think
+	$stuka10 thread enemy_stuka_think
+	$stuka11 thread enemy_stuka_think
+	$stuka12 thread enemy_stuka_think
+	$stuka13 thread enemy_stuka_think
+	
+	$stuka7 thread monkey_stuka_setup
+
+	$bike1 thread global/vehicles_thinkers.scr::enemy_bike_think
+	$bike2 thread global/vehicles_thinkers.scr::enemy_bike_think
+
+	level.spottarget = level.playerjeep
+
+	thread global/barrel.scr::explosive_barrel
+	exec global/ambient.scr m1l3b
+
+//////////////////////
+//level waitTill spawn //chrissstrahl
+//println "z:        level waittill spawn marker" //chrissstrahl
+waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl - coop - make sure level starts after a player has joined
+//////////////////////
+
+	//*** telling the AI to not drop health
+	level.nodrophealth = 1
+	
+	exec global/spotlight.scr::corona $opel2 "light left" // Turn on headlight coronas
+	exec global/spotlight.scr::corona $opel2 "light right"
+
+	$opel2 thread global/vehicles_thinkers.scr::enemy_truck_think level.truck_health 5 $opel2_path1 NULL
+	
+	//chrissstrahl - wait until player is glued to jeep
+	if(level.gametype != 0){
+		while( level.coop_inJeep == NIL || level.coop_inJeep == 0 ){
+			waitframe
+		}
+	}
+	//chrissstrahl - give ammo to other players
+	thread coop_giveAmmo
+	//end chrissstrahl
+	
+	level.playerjeep thread PLAYER_JEEP_Drive
+
+	exec coop_mod/replace.scr::tmstartloop "sound/music/mus_14a_action.mp3" //chrissstrahl - made coop compatible
+	
+	/////////////////////////////////////
+	//*** TEMP reset the Objectives portion of the HUD
+//	waitthread global/objectives.scr::reset_objectives
+//	waitthread global/objectives.scr::blank_objectives
+	
+	local.obj_text = ("Destroy the aircraft. [" + level.aircraft_intact + " remaining]")
+	
+	waitthread global/objectives.scr::add_objectives 1 2 local.obj_text $level_end.origin
+	waitthread global/objectives.scr::current_objectives 1
+	/////////////////////////////////////
+	
+	//chrissstrahl - only do this in sp
+	if(level.gametype == 0){
+		wait 2
+		$player playsound med_kit
+		$player heal 1	
+	}
+	//end chrissstrahl
+
+}end
+
+friendly_message0:
+	wait 2
+	$oss_man say dfr_m1l3_147m_2 
+	// Get ready. We're almost there now.
+	wait 2.1
+	$oss_man say dfr_m1l3_148m_2 
+	// Remember, don’t just take out the planes, we also want to get the fuel dump and any guys on the ground.
+	wait 5.5
+	$oss_man say dfr_m1l3_149m_2 
+	// And try to not let any of those planes get off the ground. 
+	end
+
+friendly_message1:
+	if ( level.s2_started == 1) 
+		end
+	level.grillo say dfr_m1l3_add08
+	// "Powell, shoot those barrels!"
+	end
+
+friendly_message2:
+	level.grillo say dfr_m1l3_add09
+	// "Look out, here come the guards!"
+	end
+
+friendly_message3:
+	level.grillo say dfr_m1l3_add10
+	// "That got their attention."
+	end
+	
+friendly_message4:
+	if (isAlive $opel2)
+		if ($opel2.health == 4000)
+			level.grillo say dfr_m1l3_add11
+	// "Powell, we got a truck on our tail."
+	
+	wait 8
+	if (isAlive $opel2)
+		if ($opel2.health > 0)
+			level.grillo say dfr_m1l3_add12
+	// "Deal with that truck!"
+	
+	wait 8
+	
+	if (isAlive $opel2)
+		if ($opel2.health > 0)
+			level.grillo say dfr_m1l3_add13
+	// "Powell, the truck!"
+	end
+
+friendly_message5:
+	end
+	level.grillo say dfr_m1l3_add14
+	// "MG 42!"
+	
+	wait 8
+	
+	if (IsAlive $mg42_gunner_3)
+	{
+		level.grillo say dfr_m1l3_add06
+		// "It's another MG 42!"
+		// level.grillo say dfr_m1l3_add15
+		// "Machine gun nest!"
+	}
+	end
+
+takeoff_dialog:
+	wait 3
+	level.grillo say dfr_m1l3_150m_2 // Don't let that Stuka get away!
+	end
+	
+strafing_dialog:
+	// wait 1
+	
+	local.temp = (randomint 4)
+	if (local.temp == 0)
+	{
+		level.grillo say dfr_m1l3_151m_2 
+		// It's coming back for a strafing run, take it down!
+	}
+	if (local.temp == 1)
+	{
+		level.grillo say dfr_m1l3_152m_2 
+		// It's coming in after us!
+	}
+	if (local.temp == 2)
+	{
+		level.grillo say dfr_m1l3_153m_2 
+		// Take that Stuka down, now!
+	}
+end
+
+friendly_message_end:
+	$oss_man say dfr_m1l3_154m_1 // Lets split up. I'll draw their reinforcements away. 
+	wait 2.6
+	$oss_man say dfr_m1l3_155m_1 // Go through that bunker to the light house. 
+	wait 1.6
+	$oss_man say dfr_m1l3_156m_1 // I'll meet up with you there.
+	wait 1
+	end
+
+
+
+
+
+
+
+//-------------------------------------
+opel2_thinker:
+wait 5
+	while ( (level.passing_point != 1) && (IsAlive $opel2) && ($opel2.drive_done != 1) )
+	{
+		local.distance = vector_length (level.playerjeep.origin - $opel2.origin)
+		//println "z:          opel distance: " local.distance //chrissstrahl - stop spam
+		if (local.distance < 700)
+		{
+		//	println "z:    opel too close"
+			$opel2 modifydrive 200 200 level.lookahead
+		}
+		else
+		{
+		//	println "z:    opel too far"
+			$opel2 modifydrive 450 50 level.lookahead
+		}
+		wait .2
+	}
+	if ( (IsAlive $opel2) && ($opel2.drive_done != 1) )
+	{
+		println "z:    opel at passing point"
+		$opel2 modifydrive 550 50 level.lookahead
+	}
+end
+
+passing_time:
+	thread guys_from_airfield
+	level.passing_point = 1
+	end
+
+//-------------------------------------
+start_opel3:
+	level.opel3_start ++
+	println "z:          level.opel3_start: " level.opel3_start
+	if (level.opel3_start != 1)
+		end
+	
+	wait 3
+	
+	exec global/spotlight.scr::corona $opel3 "light left" // Turn on headlight coronas
+	exec global/spotlight.scr::corona $opel3 "light right"
+//	$opel3 thread global/vehicles_thinkers.scr::enemy_truck_think level.truck_health 3 $opel3_path NULL afrika "models/human/german_afrika_private" panzer
+	$opel3 thread global/vehicles_thinkers.scr::enemy_truck_think level.truck_health 4 $opel3_path NULL
+	
+	wait 2
+	
+	while ( (IsAlive $opel3) && ($opel3.drive_done != 1) )
+	{
+		if (vector_within level.playerjeep.origin $opel3.origin 700)
+		{
+			println "z:    opel3 too close"
+			$opel3 modifydrive 250 200 level.lookahead
+		}
+		else
+		{
+			println "z:    opel3 too far"
+			$opel3 modifydrive 450 50 level.lookahead
+		}
+		wait .4
+	}
+end
+
+barrel_opel:
+	$opel1 damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	wait 3
+	thread start_s2
+	end
+
+barrel_panzer1:
+	$panzer1 thread kill_panzer
+	wait 3
+	thread start_s2
+	end
+
+barrel_panzer2:
+	$panzer2 thread kill_panzer
+	wait 3
+	thread start_s2
+	end
+	
+barrel_noise:
+	wait 3
+	thread start_s2
+	end
+
+
+init_panzer:
+	self rendereffects "-shadow"
+	if (self.target)
+		self.collisionent = self.target
+	self nodamage
+end
+
+kill_panzer:
+	self playsound explode_tank
+	local.gun = self QueryTurretSlotEntity 0
+	if (local.gun)
+	{
+		self DetachTurretSlot 0
+		local.gun remove
+	}
+	local.gun2 = self QueryTurretSlotEntity 1
+	if (local.gun2)
+	{
+		self DetachTurretSlot 1
+		local.gun2 remove
+	}
+	self thread spawn_fx models/fx/fx_tank_explosion.tik
+	exec global/earthquake.scr .2 4 0 0
+	local.model = models/vehicles/panzer_iv_d.tik
+	local.damaged = thread spawn_damaged local.model
+	self remove
+end
+
+start_s2:
+	if ( level.s2_started == 1) 
+		end
+	level.s2_started = 1
+	println "z:         scene2 started"
+
+	wait 2
+//	$alarm_sound exec global/loopsound.scr m1l3a_alarm
+
+	thread friendly_message2
+	
+
+
+		thread global/ai.scr::spawn 1
+		thread global/ai.scr::spawn 2
+		thread global/ai.scr::spawn 3
+		thread global/ai.scr::spawn 4
+	wait 6
+	if (level.totalbaddies <= 1)
+	{
+		thread global/ai.scr::spawn 1
+		thread global/ai.scr::spawn 2
+		thread global/ai.scr::spawn 3
+		thread global/ai.scr::spawn 4
+	}
+	wait 12
+	thread friendly_message3
+//	thread guys_from_airfield
+end
+
+guys_from_airfield:
+	println "z:        guys from airfield"
+
+	for (local.i = 1; local.i < 4; local.i++)
+	{
+		thread global/ai.scr::spawn 7
+		wait ( (randomint 4) + 1)
+	}
+end
+
+////////////////
+scene5:
+//called by trigger just before the loop
+if (level.s5_started == 1)
+	end
+level.s5_started = 1
+
+while (level.aircraft_intact > 0)
+{
+//	println "level.totalbaddies: " level.totalbaddies
+	if (level.totalbaddies <= 2)
+	{
+		local.r = (randomint 5)
+		if (local.r == 0)
+			thread global/ai.scr::spawn 5 // where you came from
+		if (local.r == 1)
+			thread global/ai.scr::spawn 6 // where you came from
+		if (local.r == 2)
+			thread global/ai.scr::spawn 100 //south east
+		if (local.r == 3)
+			thread global/ai.scr::spawn 101 // north east
+		if (local.r == 4)
+			thread global/ai.scr::spawn 99	//bunker
+	}
+	wait 1	
+}
+end
+
+
+touch_check local.detector:
+	local.touch = 0
+	println "z:          touch check local.detector: " local.detector
+	println "z:          touch check self: " self
+	println "z:          touch check self.damaged: " self.damaged
+	println "z:          touch check self.collisionent: " self.collisionent
+	
+	if (self)
+	{
+		if (self istouching local.detector)
+		{
+			local.touch = 1
+			println "z:      " self " is touching " local.detector
+		}
+		else
+		{
+			println "z:       " self " is not touching " local.detector
+		}
+	}
+	if (self.collisionent)
+	{
+		if (self.collisionent istouching local.detector)
+		{
+			local.touch = 1	
+			println "z:       " self ".collisionent is touching " local.detector		
+		}
+		else
+		{
+			println "z:      " self ".collisionent is not touching " local.detector
+		}
+	}
+	if (self.damaged)
+	{
+		if (self.damaged istouching local.detector)
+		{
+			local.touch = 1
+			println "z:       " self ".damaged is touching " local.detector
+		}
+		else
+		{
+			println "z:       " self ".damaged is not touching " local.detector
+		}
+	}
+end local.touch
+	
+//////////////////////
+PLAYER_JEEP_Drive local.trigger:
+	//local.trigger waittill trigger
+	// drive Vector position, Float speed, Float acceleration, Float reach_distance, Float look_ahead, [ Vector alternate_position ] 
+	//println  "z:         before it starts driving"
+	thread opel2_thinker
+	
+	self drive $jeeppath1 level.slowspeed 80 200 level.lookahead
+	//println  "z:         after it starts driving"
+
+	waitthread friendly_message0
+	wait 4
+	thread friendly_message4
+
+	self waitTill drive
+	self stop
+
+	wait 4
+
+	println "z:        going in reverse"
+	self drive $jeeppath2 level.reversespeed 50 200 level.lookahead
+	wait 1
+	self waitTill drive
+	self stop
+
+	thread start_s2
+	thread guys_from_airfield
+
+	println "z:        switching to forward"
+
+	local.touch = $opel2 thread touch_check $opel2_detector
+
+
+	if (local.touch == 1)
+	{
+		self drive $jeeppath3alt level.fastspeed 80 200 level.lookahead
+	}
+	else
+	{
+		self drive $jeeppath3 level.fastspeed 80 200 level.lookahead
+	}
+
+stuka_loop:
+
+	println "z:      $next_path_check2 waittill trigger "  
+$next_path_check2 waittill trigger 
+	println "z:      $next_path_check2 triggered "  
+	
+	println "z:   stukas intact: " level.aircraft_intact
+	if (level.aircraft_intact == 0)
+	{
+		thread stuka_loop_exit2
+		println "z:          exit number 2"
+		end
+	}
+	local.touch = $opel3 thread touch_check $opel3_detector
+			
+	if (local.touch == 1)
+	{
+		self nextdrive $jeeppath4alt
+	}
+	else
+	{
+		self nextdrive $jeeppath4
+	}
+	// it is still currently driving path3 or path6
+
+	self waitTill drive
+	//now it is switching to path4 or path4alt
+
+	println "z:      $next_path_check1 waittill trigger "  
+$next_path_check1 waittill trigger 
+	println "z:      $next_path_check1 triggered "  
+
+	println "z:   stukas intact: " level.aircraft_intact
+	if (level.aircraft_intact == 0)
+	{
+		thread stuka_loop_exit1
+		println "z:          exit number 1"
+		end
+	}
+	self nextdrive $jeeppath6
+
+	self waitTill drive
+	//switches to path6
+goto stuka_loop
+end
+	
+stuka_loop_exit1:
+	self nextdrive $jeeppath7
+	self waitTill drive
+	//switches to path7
+
+	self waitTill drive
+	self stop
+	thread arrived
+end
+
+stuka_loop_exit2:
+	local.touch = $opel3 thread touch_check $opel3_detector2
+			
+	if (local.touch == 1)
+	{
+		self nextdrive $jeeppath5alt
+	}
+	else
+	{
+		self nextdrive $jeeppath5
+	}
+	
+	self waitTill drive
+	//switches to path5 or path5alt
+
+	self waitTill drive
+	self stop
+	thread arrived
+end
+
+arrived:
+	$oss_man exec coop_mod/replace.scr::eyeslookat //chrissstrahl - made coop compatible
+	waitthread friendly_message_end
+	exec global/missioncomplete.scr m1l3c bsp2bsp
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//******************************************
+enemy_stuka_think:
+	self rendereffects "-shadow"
+	self solid
+	self.health = 1500
+	self takedamage
+	self removeondeath 0 
+	if (self.target)
+	{
+		self.collisionent = self.target
+		//self.collisionent hide
+	}
+
+self waittill death
+
+	thread plane_exploded
+end
+
+plane_exploded:
+	self show
+	self playsound explode_plane
+	exec global/earthquake.scr .2 4 0 0
+	
+	if $(self.right_mg)
+		self.right_mg thread plane_remove_mg
+	if $(self.left_mg)
+		self.left_mg thread plane_remove_mg
+	
+	println "Z:    stukas remaining " level.aircraft_intact
+	level.aircraft_intact--
+	
+	local.obj_text = ("Destroy the aircraft. [" + level.aircraft_intact + " remaining]")
+	if (level.aircraft_intact != 0)
+		waitthread global/objectives.scr::add_objectives 1 2 local.obj_text
+	else
+		waitthread global/objectives.scr::add_objectives 1 3 local.obj_text
+
+	local.offset = (0 0 72)
+
+	
+	if (self.target == "fock_mask")
+	{
+		if (self.dont_explode != 1)
+		{
+			self thread spawn_fx models/fx/fx_stuka_explosion.tik local.offset
+			wait .2
+		}
+		local.damaged = thread spawn_damaged models/vehicles/fockwulf_d.tik
+	}
+	else
+	{
+		if (self.dont_explode != 1)
+		{
+			self thread spawn_fx models/fx/fx_stuka_explosion.tik local.offset
+			wait .2
+		}
+		local.damaged = thread spawn_damaged models/vehicles/stukadesrt_d.tik
+		local.damaged anim idle
+	}
+	for (local.i = 1; local.i <= 9; local.i++)
+	{
+		if ( (randomint 5) == 1)
+			local.damaged thread stuka_fire local.i
+	}
+//	if (self.crashed == 1)
+//		local.damaged thread plane_straighten
+	local.damaged notsolid
+	self remove
+end
+
+stuka_fire local.i:	
+	wait 1
+	local.temp = spawn models/emitters/firegood
+	local.tag = ("fire" + local.i)
+	println "z:      local.tag " local.tag
+	local.temp.angles = (270 0 0)
+	local.temp.origin = self gettagposition local.tag
+	//local.temp.origin = (self.origin + (local.randomx local.randomy 32))
+	local.temp anim start
+	
+	
+	wait 20
+	local.temp delete
+end
+
+monkey_stuka_setup:
+	// plane_taxi
+	// plane_takeoff
+
+	// Setup Custom Plane Vars
+	self.IsInAir = 0
+	self.GoingDown = 0
+
+	// Setup Built-in Plane Vars
+	self setsize "-100 -100 -100" "100 100 100"
+	self.mins = ( -100 -100 -100 )
+	self.maxs = (100 100 100)
+	self solid
+	self takedamage
+	
+	self.right_so bind self
+	self.right_mg glue self.right_so
+	self.left_so bind self
+	self.left_mg glue self.left_so
+
+	//add hide the mgs
+
+	self.right_target bind self
+	self.left_target bind self
+	
+	self.origin = self.path.origin
+	self.angles = self.path.angles
+
+	self.right_mg hide
+	self.left_mg hide
+	
+	self.right_mg setAimTarget self.right_target
+	self.left_mg setAimTarget self.left_target
+	self.right_mg tracerFrequency 1
+	self.left_mg tracerFrequency 1
+
+level waittill spawn
+//println "z:     waitting for self.start_trigger"
+
+	self loopsound m1l3b_stuka_idle
+
+self.start_trigger waitTill trigger
+	
+	thread takeoff_dialog
+	
+	println "z:     stuka taking off"
+	self stoploopsound
+	self playsound m1l3b_first_stuka_takeoff
+	self followpath self.path
+	self waitmove
+	self hide
+	self nodamage
+//	self.went_east = 1
+	thread strafing_loop
+	self thread DamageManager
+end
+
+
+strafing_loop:
+while ( (self.GoingDown != 1) && (self != NULL) )
+{
+self.strafe_trigger waittill trigger
+	wait ( (randomint 5) + 1)
+	
+	if (self == NULL)
+		end
+	
+	self.right_mg startFiring
+	self.left_mg startFiring
+	thread strafing_dialog
+	self playsound m1l3b_stuka_strafing_run
+	self show
+	self takedamage
+	self followpath self.strafe_path
+	self waitmove
+	
+	if ( (self == NULL) || (self.GoingDown == 1) )
+		end
+	
+	self hide
+	self nodamage
+//	self.went_east = 1
+	self.right_mg stopFiring
+	self.left_mg stopFiring
+	
+	
+self.strafe_trigger2 waittill trigger
+	wait ( (randomint 5) + 1)
+	
+	if (self == NULL)
+		end
+		
+	self.right_mg startFiring
+	self.left_mg startFiring
+	thread strafing_dialog
+	self playsound m1l3b_stuka_strafing_run
+	self show
+	self takedamage
+	self followpath self.strafe_path2
+	self waitmove
+	
+	if ( (self == NULL) || (self.GoingDown == 1) )
+		end
+	
+	self hide
+	self nodamage
+	self.right_mg stopFiring
+	self.left_mg stopFiring
+}
+end
+
+
+DamageManager:
+	local.damage_events = 0
+	while (local.damage_events < 2)
+	{
+		self waitTill damage
+		local.damage_events ++
+		println "z:    local.damage_events " local.damage_events
+		wait .5
+	}
+	
+	self.right_mg thread plane_remove_mg
+	self.left_mg thread plane_remove_mg
+	
+	self.GoingDown = 1
+//	thread flying_plane_killed
+	self thread planeonfire
+end
+
+planeonfire:
+//	local.temp = spawn effectentity model models/emitters/planesmokefly.tik
+	local.temp = spawn effectentity model models/fx/fx_flying_stuka_explosion.tik
+	local.temp notsolid
+	local.temp anim start
+	local.offset = (0 0 92)
+
+	self playsound explode_plane_flying
+
+//	local.temp2 = spawn effectentity model models/fx/fx_stuka_explosion.tik
+//	local.temp2 notsolid
+//	local.temp2 anim start
+
+//	self.dont_explode = 1
+
+	local.temp.origin = (self.origin + local.offset)
+	local.start_time = level.time
+
+	while(level.time < local.start_time + 10)
+	{
+		local.temp.origin = (self.origin + local.offset)
+		waitframe
+	//	println "z:      creating plane on fire fx"
+	}
+
+	local.temp remove
+	self hide
+end
+
+
+plane_remove_mg:
+	self stopFiring
+	self remove
+end
+
+
+
+
+flying_plane_killed:
+
+		// Save Destroyed Values
+		local.velocity = self.velocity
+		local.avelocity = self.avelocity
+
+		self endpath // stop the follow path
+
+		self physics_on	
+		self gravity 0.25
+
+		// Restore Destroyed Values
+		self.velocity = local.velocity
+		self RotateX local.avelocity[0]
+		self RotateY local.avelocity[1]
+		self RotateZ local.avelocity[2]
+
+		self hide
+		self notsolid
+		
+		self thread planecrash	
+end
+
+planecrash:
+	while(1)
+	{
+		local.desiredpitch = -25
+	
+		local.pitch = self.angles[0]	
+		if(local.pitch > 180)
+		{
+			local.pitch -= 360
+		}
+		
+		local.delta = local.pitch - local.desiredpitch
+		local.delta = local.delta * 0.33 
+		
+		self RotateX local.delta
+
+		local.start = self.origin
+		local.end = local.start - (0 0 4096)
+	
+		local.groundpos = local.start
+		local.groundpos = trace local.start local.end 1 self.mins self.maxs
+		local.grounddist = vector_length(self.origin - local.groundpos)
+		if(local.grounddist < 25)
+		{
+			self.crashed = 1
+		//	self thread plane_exploded
+			end
+		}
+	
+		wait 0.05
+	}
+end
+
+
+
+
+plane_straighten:
+	println "z:     straightening crashed plane"
+	println "z:     plane angles: "	self.angles
+	wait 1
+	self time 1
+	self rotateYupto 0
+	self rotateZupto 0
+	self waitmove
+	println "z:     plane angles (after waitmove): "	self.angles
+	self notsolid
+end
+
+//----------------------------------
+spawn_damaged local.model:
+	local.damaged = spawn script_model model local.model
+	local.damaged.origin = self.origin
+	local.damaged.angles = self.angles
+end local.damaged
+
+spawn_fx local.fx local.offset:
+	local.temp = spawn script_model model local.fx
+	if (local.offset)
+		local.temp.origin = (self.origin + local.offset)
+	else
+		local.temp.origin = self.origin
+	local.temp anim start
+	wait 5
+	local.temp remove
+end
+
+//=========================================================================
+coop_setup:{
+//=========================================================================
+	//chrissstrahl - spawn trigger to run a thread each time a player spawns to manager player upon spawn
+	spawn trigger_multiple setthread "coop_playerSpawned" targetname "coop_playerSpawn" origin (106 -4466 32)
+	waitframe
+	$coop_playerSpawn setsize ( -50 -50 -100) (50 50 100)
+}end
+
+//=========================================================================
+coop_setupAttach:{
+//=========================================================================
+	//chrissstrahl - spawn entities which we'll attach to the model then glue the players to
+	local.distance = -100
+	for(local.i=2;local.i<=8;local.i++){
+		if(local.i==2){ local.offset = ( (local.distance) -10 -10) }
+		else if(local.i==3){ local.offset = ( (local.distance) 30 -10) }
+		else if(local.i==4){ local.offset = ( (local.distance) 70 -10) }
+		else if(local.i==5){ local.offset = ( (local.distance + -40) -10 -50) }
+		else if(local.i==6){ local.offset = ( (local.distance + -40) 30 -50) }
+		else if(local.i==7){ local.offset = ( (local.distance + -40) 70 -50) }
+		else{ local.offset = ( (distance + -80) 30 -50) }
+	
+		local.ent = spawn script_model model "models/fx/dummy.tik" targetname ("playerAttach"+local.i) notsolid 1
+		waitframe
+		local.ent attach $playerjeep "passenger0" 0 ( local.offset )
+	}
+}end
+
+//chrissstrahl - this handles all players that touch the trigger, regardles of who triggred it
+//=========================================================================
+coop_playerSpawned:{
+//=========================================================================
+	$playerjeep notsolid
+	$oss_man notsolid
+	//$t209 remove
+
+	for(local.i=1;local.i <= $player.size;local.i++){
+		local.player = $player[local.i]
+		if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 ){
+			if(local.player isTouching $coop_playerSpawn){
+				if(local.i == 1){
+					level.coop_inJeep = 1
+					if(local.player.flags["coop_inJeep"] == NIL){
+						local.player.flags["coop_inJeep"] = 1
+
+						local.player notsolid
+						
+						local.vturretent = $playerjeep queryturretslotentity 0
+						local.vturretent unlock
+						$playerjeep attachturretslot 0 local.player    // Attach the player to the jeep
+						local.player perferredweapon ".30cal Machine Gun"
+						local.vturretent lock
+						
+						local.player thread coop_monitorPlayer1
+					}
+				}
+				else{
+					//chrissstrahl - they don't need to be monitored, the coop mod does unglue on death
+					//local.player physics_off						//chrissstrahl - this will not work if player shall keep his weapon
+					local.player notsolid							//chrissstrahl - prevent players from stopping bullets of others
+					local.attach = $("playerAttach"+local.i)
+					
+					local.player origin local.attach.origin			//chrissstrahl - this might reduce the shaking
+					local.player velocity local.attach.velocity	//chrissstrahl - this might reduce the shaking
+					local.player forcelegsstate CROUCH_IDLE
+					local.player glue local.attach
+				}
+			}
+		}
+	}
+}end
+
+//chrissstrahl - this handles player 1 - deattach from turret on death
+//=========================================================================
+coop_monitorPlayer1:{
+//=========================================================================
+	while(self != NULL){
+		if(self.health <= 0 && self.flags["coop_inJeep"] != NIL){
+			self.flags["coop_inJeep"] = NIL
+			end
+		}
+		waitframe
+	}
+}end
+
+
+//chrissstrahl - gives ammo to the other players
+//=========================================================================
+coop_giveAmmo:{
+//=========================================================================
+	while(1){
+		for(local.i=1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+			if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 ){
+				//if(local.i == 1){
+					//continue
+				//}
+				local.player ammo rifle 100
+				local.player ammo mg 100
+				local.player ammo smg 100
+				local.player ammo pistol 100
+				local.player ammo heavy 100
+				local.player ammo grenade 100
+			}
+		}
+		wait 30
+	}
+}end
+
+
+//SOURCE DIALOG
+/*
+dfr_m1l2_147m_2 //Get ready. We're almost there now.
+dfr_m1l2_148m_2 //Remember, don’t just take out the planes, we also want to get the fuel dump and any guys on the ground.
+dfr_m1l2_149m_2 //And try to not let any of those planes get off the ground. 
+dfr_m1l2_150m_2 //Don't let that Stuka get away!
+dfr_m1l2_151m_2 //It's coming back for a strafing run, take it down!
+dfr_m1l2_152m_2 //It's coming in after us!
+dfr_m1l2_153m_2 //Take that Stuka down, now!
+
+//animated
+dfr_m1l2_154m_2 //Lets split up. I'll draw their reinforcements away. 
+dfr_m1l2_155m_1 //Go through that bunker to the light house. 
+dfr_m1l2_156m_1 //I'll meet up with you there.
+*/
+

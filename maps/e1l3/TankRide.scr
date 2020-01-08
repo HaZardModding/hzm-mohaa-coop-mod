@@ -1,0 +1,598 @@
+//chrissstrahl - completed coopification on 2019.09.18
+//
+// TankRide
+//
+// by ccaron 5/21/2003
+//
+// entities:
+//   $tank_ride_artillery (array of script_origins from where to spawn artilery sounds)
+//   $player_tank		  (THE tank)	  
+//   $follow_tank		  (THE truck behind you)
+//   $leader_tank		
+//   $player_tank_path	  
+//   $follow_truck_path	  
+//   $tank_ride_trigger	  (trigger that starts scene)
+//
+// -----------------------------------------------------
+
+// Init the scene
+init:
+	level waittill spawn
+
+	println "---------- > Initializing TankRide ... "
+	
+	if (level.warpTo == "tankRide"){
+		// hack warp section
+		//chrissstrahl - keep for sp
+		if(level.gametype == 0){
+			$player.origin = "-1952 -6384 128"
+		}
+	}
+	else{
+		if ((level.warpTo != NIL) && (level.warpTo != "None")){
+			//waitthread maps/e1l3.scr::ArmPlayer		-- doesn't exist
+			end		// don't do the tank ride when warping to later sections
+		}
+	}
+
+	// initialization
+	if ($tank_ride_artillery == NULL){
+		println "ERROR: No $tank_ride_artillery, quitting gag"
+		end
+	}
+
+	if ($player_tank == NULL){
+		println "ERROR: No $player_tank, quitting gag"
+		end
+	}
+
+	if ($follow_tank == NULL){
+		println "ERROR: No $follow_tank, quitting gag"
+		end
+	}
+
+	if ($leader_tank == NULL){
+		println "ERROR: No $leader_tank, quitting gag"
+		end
+	}
+
+	if ($player_tank_path == NULL){
+		println "ERROR: No $player_tank_path, quitting gag"
+		end
+	}
+	
+	thread DoScene
+end
+
+// --------------------------------------------------------------------
+// --------------------------------------------------------------------
+// --------------------------------------------------------------------
+DoScene:
+	// set these vars to position player on the tank
+	drawhud 0
+	local.tankspeed			= 400
+	local.playeroffset		= ( -24.000000 -21.000000 87.375000 ) // $player.origin - $player_tank.origin //  ( -152 -23 100 )
+	//local.buddy1offset		= ( 162.000000 120.000000 -25.625000 ) // $buddy1.origin - $player_tank.origin // ( -120 0 0 )
+	//local.buddy1offset		= ( 162.000000 -9.000000 -25.625000 ) // $buddy1.origin - $player_tank.origin // ( -120 0 0 )
+	local.buddy1offset		= ( 162.000000 10.000000 -25.625000 ) // $buddy1.origin - $player_tank.origin // ( -120 0 0 )
+	local.buddy2offset		= ( -172.000000 41.000000 1.500000 )  // $buddy2.origin - $leader_tank.origin //  ( -130 0 0 )
+
+	local.buddy1exitoffset = $buddy1.origin - $player_tank.origin 
+	local.buddy1exitoffset += ( 0 129 0 )
+
+	local.buddy2exitoffset = $buddy2.origin - $leader_tank.origin 
+
+	println "TANKRIDE >>> Player offset = " local.playeroffset
+	println "TANKRIDE >>> Buddy1 offset = " local.buddy1offset
+	println "TANKRIDE >>> Buddy2 offset = " local.buddy2offset
+
+//	local.hull = $tiger_hull
+	local.hull = $sherman_tank_hull
+//	$player_tank.collisionent = local.hull
+//	$follow_tank.collisionent = local.hull
+//	$leader_tank.collisionent = local.hull
+	$player_tank setcollisionentity local.hull
+	$follow_tank setcollisionentity local.hull
+	$leader_tank setcollisionentity local.hull
+
+	$player_tank notsolid
+	$follow_tank notsolid
+	$leader_tank notsolid
+
+	$player_tank nodamage
+	$follow_tank nodamage
+	$leader_tank nodamage
+
+	// open the hatch
+	$player_tank_turret0 anim hatch_open_idle
+
+	if ($buddy1)
+	{
+		$buddy1 waitthread MountTank2 $player_tank local.buddy1offset
+		$buddy1 thread global/LoopAnim.scr::LoopAnim A_13_TankSit01
+		$buddy1 gun enfield
+		$buddy1 dontdropweapons
+		$buddy1 exec global/disable_ai.scr
+	}
+	else
+		println "-------- > can't find buddy1"
+		
+	if ($buddy2)
+	{
+		$buddy2 waitthread MountTank2 $leader_tank local.buddy2offset
+		$buddy2 thread global/LoopAnim.scr::LoopAnim A_13_TankSit02
+		$buddy2 gun thompson
+		$buddy2 dontdropweapons
+		$buddy2 exec global/disable_ai.scr
+	}
+	else
+		println "-------- > can't find buddy2"
+
+
+	//[200] chrissstrahl - wait for any player to join
+	waitthread coop_mod/replace.scr::waitForPlayer
+	if(level.gametype != 0){
+		fadein 5.5 0 0 0 1
+	}
+
+    if (level.flythrough != 1){
+		//chrissstrahl - skip during test/development
+		if(level.coop_skipThisTankRide == NIL){
+			//iprintln "Attaching player ............ "
+			//chrissstrahl - keep for sp
+			if(level.gametype == 0){
+				$player thread MountTank2 $player_tank local.playeroffset
+			}
+			//chrissstrahl - multiplayer
+			else{
+				local.script_o = spawn script_origin targetname "coop_playerTankGlue"
+				local.script_o.origin = $player_tank.origin + local.playeroffset
+				local.script_o bind $player_tank
+
+				exec coop_mod/replace.scr::glue local.script_o  
+			}
+		}
+    }
+	else
+	{
+		//chrissstrahl - keep for sp
+		if(level.gametype == 0){
+			$player notsolid
+		}
+	}
+
+	// Start the ambient artillery
+	thread StartAmbientArtillery
+
+	$leader_tank thread Drive $leader_tank_path local.tankspeed 
+	
+	// Get the player tank moving
+	$player_tank thread Drive $player_tank_path 1
+	wait 1
+	$player_tank modifydrive local.tankspeed 200 100
+
+	// get the follow truck moving
+	wait 3.0
+	
+	$follow_tank thread Drive $follow_tank_path local.tankspeed
+
+	// wait for the player tank to finish
+	$player_tank.collisionent disconnect_paths
+
+	wait 6.5
+	$buddy2 thread BuddyOffTank "A_13_TankJump02" $leader_tank local.buddy2exitoffset $buddyspot[1]
+	$buddy1 thread BuddyOffTank "A_13_TankJump01" $player_tank local.buddy1exitoffset $buddyspot[2]
+	wait 3.5
+	//$player_tank waittill drive
+
+	// kill the ambient artillery
+	waitthread StopAmbientArtillery	
+
+	//iprintln "player getting off ..."
+
+	// remove player from tank
+	//chrissstrahl - skip during test/development
+	if(level.coop_skipThisTankRide == NIL){
+		//chrissstrahl - keep for sp
+		if(level.gametype == 0){
+			$player unglue
+			$player solid
+			$player takedamage
+		}
+		//chrissstrahl - coop
+		else{
+			waitexec coop_mod/replace.scr::unglue
+			$coop_playerTankGlue remove
+		}
+	}
+
+	//$cappy.origin 		= ( 1384 -5916 128 ) //chrissstrahl
+	$cappy.origin 		= ( 1384 -5940 128 ) //chrissstrahl
+	/*
+	$boat_guy_1.origin 	= ( 1270 -5916 128 )
+	$boat_guy_2.origin 	= ( 1270 -6035 128 )
+	*/
+
+	if (level.flythrough == 0) {
+		//$player.origin = $playerdroppoint.origin 
+		
+		//chrissstrahl - skip during test/development
+		if(level.coop_skipThisTankRide == NIL){
+			//chrissstrahl - keep for sp
+			if(level.gametype == 0){
+				$player.origin = ( 1384 -6035 128 )
+			}
+		}
+	}
+
+	//$cappy turnto $boat_guy_2
+	$boat_guy_1 turnto $cappy
+	if($boat_guy_2!=NULL){ $boat_guy_2 turnto $cappy } //chrissstrahl - prevent console spam
+			   
+	wait 2
+
+    trigger $briefing_trigger
+	$leader_tank thread TankAttack 15 $LeaderTankPath2 $tank_target_points
+	wait 15
+
+	wait 7.0
+	local.blow_up = waitthread global/FindTrigger.scr::FindTrigger "intro_exploder"
+	trigger local.blow_up
+	wait 1
+	$player_tank thread TankDie $PlayerTankPath2
+end
+
+doRunto local.gotoNode:
+	self takedamage
+	self unglue
+	self solid	  
+	self physics_on
+	while (!(vector_within self.origin local.gotoNode 200)) {
+		self runto local.gotoNode
+		self waittill movedone
+		wait 0.25
+	}
+	self.enableEnemy = 1
+	self damage $world 55000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+end
+
+
+// --------------------------------------------------------------------
+// --------------------------------------------------------------------
+// --------------------------------------------------------------------
+Drive local.path local.speed:
+
+	self drive local.path local.speed 30 200 100
+	self waittill drive
+	self stop
+	//self.collisionent disconnect_paths
+
+end
+
+// --------------------------------------------------------------------
+// --------------------------------------------------------------------
+// --------------------------------------------------------------------
+TankDie local.path:
+	self.gun = self QueryTurretSlotEntity 0
+	$buddy2 notsolid
+	self drive local.path
+	self waittill drive
+	$buddy2 solid
+	self stop
+	//self.health = 10
+	self thread maps/e1l3/conquest.scr::bigexplosion
+	self nodamage
+	wait 1	
+	self hide
+	self.gun hide
+
+	local.damaged_version = self waitthread spawn_damaged vehicles/shermantank_damaged.tik $sherman_tank_hull
+	local.damaged_version.targetname = (self.targetname + "_damaged")
+end
+
+// --------------------------------------------------------------------
+// --------------------------------------------------------------------
+// --------------------------------------------------------------------
+spawn_damaged local.model:
+	local.damaged = spawn script_model model local.model
+	local.damaged.origin = self.origin
+	local.damaged.angles = self.angles
+	local.damaged notsolid
+
+end local.damaged
+
+
+// --------------------------------------------------------------------
+// --------------------------------------------------------------------
+// --------------------------------------------------------------------
+TankAttack local.delay_til_drive local.path local.array:
+
+	self thread TankDelayedDrive local.delay_til_drive local.path
+
+//	self drive local.path
+//	self waittill drive
+//	self stop
+
+	if (!local.array)
+		end
+
+	//iprintln "TANKRIDE >>> local.array.size = " local.array.size
+
+	self.gun = self QueryTurretSlotEntity 0
+
+	if (!self.gun)
+	{
+		//iprintln "TANKRIDE >>> Con't find tank turret!"
+		end
+	}
+
+	self.script_o = spawn script_origin
+	
+	local.coopBackupVar = self.script_o //chrissstrahl - make sure we can delete this entity
+	
+	self.stop_firing = 0
+	self.gun setaimtarget self.script_o
+
+	while (self && (isalive self) && self.stop_firing == 0)
+	{
+		local.rand = 1 + randomint local.array.size
+		self.script_o.origin = local.array[local.rand].origin
+
+		wait (2 + randomint 3)
+		//chrissstrahl - prevent console spam
+		if(self == NULL){ break }
+		
+		self.gun waittill ontarget
+		self.gun anim fire
+		wait 1.0
+		self.script_o thread TankHit
+	}
+	
+	//chrissstrahl - just make sure we can remove stuff without console spam
+	if(self != NULL){
+		self.script_o remove
+	}else{
+		if(local.coopBackupVar != NILL && local.coopBackupVar != NULL){
+			local.coopBackupVar remove
+		}
+	}
+
+	println "TANKRIDE >>> Tank attack over"
+end
+
+
+TankDelayedDrive local.delay local.path:
+
+	wait local.delay
+	self drive local.path
+	self waittill drive
+	self stop
+
+end
+
+
+// --------------------------------------------------------------------
+// --------------------------------------------------------------------
+// --------------------------------------------------------------------
+BuddyOffTank local.anim local.tank local.exitoffset local.runto:
+
+//	wait 2.0
+
+	self waitthread global/LoopAnim.scr::LoopAnimStop
+	self lookat NULL
+	self anim local.anim
+	self nodamage
+	
+	local.v = vector_toangles local.exitoffset
+	local.l = vector_length local.exitoffset
+	local.v[1] += local.tank.angles[1]
+	local.v = angles_toforward local.v
+	local.v = vector_normalize local.v
+	local.v = vector_scale local.v local.l
+	local.exit = local.tank.origin + local.v
+
+	self waittill animdone
+	self unglue
+	self physics_on
+	self.script_o remove
+	self.movedoneradius = 300
+	self.enableEnemy = 0
+
+	self thread doRunto local.runto
+end
+
+
+// ---------------------------------------
+// Remove all entities not needed anymore
+// ---------------------------------------
+StopAmbientArtillery:
+
+	if ($tank_ride_artillery)
+	{
+		for (local.i = 1; local.i <= $tank_ride_artillery.size; local.i++)
+		{
+			$tank_ride_artillery[local.i] remove		
+		}
+	}
+	
+end
+
+
+// ----------------------------
+// Look for artillery origins
+// ----------------------------
+StartAmbientArtillery:
+
+	while  ($tank_ride_artillery)
+	{
+		local.rand = 1 + randomint $tank_ride_artillery.size
+		
+		$tank_ride_artillery[local.rand] thread Explosion
+
+		wait (.5 + randomfloat 2.0)
+	}
+
+	println "Ambient Artillery Over"
+
+end
+
+
+// ---------------------------------------------
+// Attach an entity to a tank with hack methods
+// ---------------------------------------------
+
+MountTank2 local.tank local.offset:
+
+	self.script_o = spawn script_origin
+	self.script_o.origin = local.tank.origin + local.offset
+	self.script_o bind local.tank
+
+	self holster			//holster the players weapon
+	self takeall			//take all weapons away from the player
+	self notsolid
+	self physics_off
+
+	self glue self.script_o  
+
+end
+
+// -----------------------------------------------------------------------------------------------------
+// Explosion, create an explosion effect from a trigger event
+//    also do damage in certain radius
+//
+// NOTE: cannot use trigger_once because the trigger will
+//       destoy itself and its data will not be retrievable.
+//
+// Available Fields:
+// self.soundincoming -> sound of incoming, default = arty_leadin05
+// self.soundhit      -> sound of explosion, default = flakk88_hit1
+// self.primaryfx     -> explosion effect 1, default = models/fx/bazookaexplosion_dm.tik
+// self.secondaryfx   -> explosion effect 2, default = models/fx/fx_pocketflash.tik
+// self.radiusx		  -> damage radius x   , default = 200
+// self.radiusy       -> damage radius y   , default = 200
+//
+// usage: $me thread Explosion
+//
+// -----------------------------------------------------------------------------------------------------
+Explosion:
+
+	//self nottriggerable
+
+	println "Exploding!"
+
+	local.exploding = 1
+
+	if (self.soundincoming == NIL)
+		local.soundincoming = arty_leadin05
+	else
+		local.soundincoming = self.soundincoming
+
+	if (self.soundhit == NIL)
+		local.soundhit = flakk88_hit1
+	else
+		local.soundhit = self.soundhit
+
+	if (self.primaryfx == NIL)
+		local.primaryfx = models/fx/bazookaexplosion_dm.tik
+	else
+		local.primaryfx = self.primaryfx
+
+	if (self.secondaryfx == NIL)
+		local.secondaryfx = models/fx/fx_pocketflash.tik
+	else
+		local.secondaryfx = self.secondaryfx
+
+	if (self.radiusx == NIL)
+		local.radiusx = 200
+	else
+		local.radiusx = self.radiusx
+
+	if (self.radiusy == NIL)
+		local.radiusy = 200
+	else
+		local.radiusy = self.radiusy
+
+	waitthread IncomingArtillery self local.soundincoming local.soundhit local.primaryfx local.secondaryfx local.radiusx local.radiusy
+
+	//self triggerable
+
+end
+
+// This will send artillery to a specific place
+IncomingArtillery local.ent local.soundincoming local.soundhit local.primaryfx local.secondaryfx local.radiusx local.radiusy:
+
+	//println "making explosion at " local.ent.origin
+	//println "location = " local.origin.origin
+	//println "sound1 = " local.soundincoming
+	//println "sound2 = " local.soundhit
+	//println "primaryfx = " local.primaryfx
+	//println "secondaryfx = " local.secondaryfx
+	//println "radiusx = " local.radiusx
+	//println "radiusy = " local.radiusy
+
+	if (!local.ent)
+		end
+
+	local.ent playsound local.soundincoming
+	local.time = randomint(3) + 1
+
+	wait local.time
+
+	local.ent playsound local.soundhit
+
+	local.origin = local.ent.origin
+	local.origin[0] += (30 - randomint 60)
+	local.origin[1] += (30 - randomint 60)
+
+	thread StartEmitter local.origin
+	thread pocketExplosionFx local.primaryfx local.origin 
+	thread pocketFlashFx models/fx/fx_pocketflash.tik local.origin
+	earthquake 0.5 1 1 0
+
+	//radiusdamage local.ent.origin local.radiusx local.radiusy
+
+end
+
+// usage self thread TankHit
+TankHit:
+	self playsound flakk88_hit1
+	//thread StartEmitter local.ent.origin //chrissstrahl
+	//chrissstrahl - fix this
+	thread StartEmitter self.origin
+	thread pocketExplosionFx models/fx/bazookaexplosion_dm.tik self.origin 
+	thread pocketFlashFx local.secondaryfx self.origin
+	radiusdamage self.origin 50 50 
+end
+
+// Perform a sandy explosion effect (from e1l1)
+StartEmitter local.origin:
+	local.emitter = spawn script_simplestrafinggunfire
+	// script_aimedstrafinggunfire
+	local.emitter.origin = local.origin
+	local.emitter on
+
+	wait 0.1
+	local.emitter remove
+end
+
+pocketFlashFx local.fx local.origin:
+	
+	local.temp = spawn script_model model local.fx
+	local.temp notsolid
+	local.temp.origin = local.origin  
+	local.temp anim start
+	local.temp notsolid
+	waitframe
+	local.temp remove
+end
+
+pocketExplosionFx local.fx local.origin:
+	
+	local.temp = spawn script_model model local.fx
+	local.temp notsolid
+	local.temp.origin = local.origin  
+	local.temp anim start
+	local.temp notsolid
+	wait 7
+	local.temp remove
+end

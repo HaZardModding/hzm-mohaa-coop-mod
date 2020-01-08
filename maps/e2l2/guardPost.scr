@@ -1,0 +1,323 @@
+//
+// guardPost.scr
+//
+
+//============================================================================
+init: {
+//============================================================================
+	level.guard_post_disable_baddies = 0
+	level.disable_player_gp_jeep_attach = 0
+	level.reversespeed = -200	
+	
+	// initialization  
+	$GuardPostJeep.turret = $GuardPostJeep queryturretslotentity 0
+	$GuardPostJeep.turret lock
+	$GuardPostJeep lock
+	$GuardPostJeep nodamage
+	$GuardPostJeep setcollisionentity $jeephull
+
+	$commdialog_trigger thread Playcommdialog
+	$jeepthrutrees thread PlayJeepTree
+	$jeepbounce thread PlayJeepBounce
+	$jeepfence thread PlayJeepFence
+	$behind_trigger thread Playbehindus
+	$upahead_trigger thread Playupahead
+	$holdon_trigger thread Playholdon
+
+	// main work thread
+	thread DoStuff
+	thread mg42
+}end
+
+//============================================================================
+DoStuff: {
+//============================================================================
+	//JEEP SEQUENCE	
+	// run lyndon to jeep after the tower is destroyed...	
+	level.CommDestroyed waittill trigger
+
+	$lyndon waitthread global/friendly.scr::friendlystop
+	wait 0.25
+
+	$lyndon exec global/disable_ai.scr
+	wait 0.25
+
+	spawn trigger_relay "targetname" "lyndonAtJeep_Trigger"
+	$lyndon waitthread global/SafeMoveTo.scr::SafeRunTo $lyndonStealJeepPoint[1] $lyndonAtJeep_Trigger
+
+	$lyndonAtJeep_Trigger waittill trigger
+	$lyndonAtJeep_Trigger delete
+
+	// put lyndon in jeep
+	$lyndon holster
+	wait 1
+
+	$lyndon lookat $player	
+	$lyndon say A_22_Phillips_3 
+	$lyndon waittill saydone
+
+	waitthread global/jeepanim.scr::DriverGetInJeep $GuardPostJeep $lyndon
+	$GuardPostJeep.driver = $lyndon
+	
+	// put player in jeep
+	local.player_mount_jeep_dist				= 128		//200
+	local.max_player_dist_to_jeep				= 1024
+	local.time_player_allowed_away_from_jeep	= 5
+	local.usekey = getboundkey1 "+use"
+	local.bail_msg = (loc_convert_string "Press ") + local.usekey + (loc_convert_string " to get in jeep.")
+	thread global/throbtext.scr::throbtext local.bail_msg 0	
+	local.player_shot			= 0
+	local.throb_text_on			= 0
+	level.inJeep				= 1
+	
+	while ( (!(vector_within $player.origin $lyndon.origin local.player_mount_jeep_dist) || !$player.useheld) && (local.player_shot == 0) ) {
+		waitframe		
+
+		if (vector_within $player.origin $lyndon.origin local.player_mount_jeep_dist) {
+			if (local.throb_text_on == 0) {					
+				local.usekey = getboundkey1 "+use"
+				local.msg = (loc_convert_string ("Press " + local.usekey + " to get in jeep."))
+				thread global/throbtext.scr::throbtext local.msg 0
+				local.throb_text_on = 1
+			}
+		}
+		else {
+			if (local.throb_text_on == 1) {
+				thread global/throbtext.scr::throbtext_off
+				local.throb_text_on = 0
+			}
+		}
+	}
+	
+	$lyndon lookat NULL
+
+	if (local.throb_text_on == 1) {
+		thread global/throbtext.scr::throbtext_off	
+	}
+
+	if (level.disable_player_gp_jeep_attach == 0) {		
+		$player forcelegsstate "STAND"
+		$GuardPostJeep unlock
+		$GuardPostJeep.turret unlock
+		$GuardPostJeep attachturretslot 0 $player
+		$GuardPostJeep.turret lock
+		$GuardPostJeep lock
+	}
+
+	//Init the chase trucks
+	thread maps/e2l2/trucks.scr::InitChaseTrucks
+	thread maps/e2l2/objectives.scr::transition "gottojeep"
+
+	//just in case turn the throbbing text off again
+	thread global/throbtext.scr::throbtext_off
+
+	//do autosave here
+	thread maps/e2l2.scr::Autosave2
+	
+	// Drive, damn you!  Drive like the wind!			
+	thread maps/e2l2.scr::DoMusic "jeepride"	
+	$GuardPostJeep drive $GuardPostJeepPath 350 75 256// 256		//200 156	
+	$GuardPostJeep waittill drive
+	$GuardPostJeep vehicleanim idlelights
+	thread global/spotlight.scr::deadcorona $GuardPostJeep "light left"
+	thread global/spotlight.scr::deadcorona $GuardPostJeep "light right"
+	$GuardPostJeep stop
+	waitthread blockade_reverse1
+	thread getout
+	$lyndon notsolid		
+
+	local.jeep_origin = $GuardPostJeep.origin
+	local.jeep_angles = $GuardPostJeep.angles
+}end
+
+//============================================================================
+getout: {
+//============================================================================
+	//unlock the jeep and turret
+	$GuardPostJeep.turret = $GuardPostJeep queryturretslotentity 0
+	$GuardPostJeep unlock
+	$GuardPostJeep.turret unlock
+
+	$player.origin = $GuardPostJeep.turret.origin
+	wait .5
+
+	$GuardPostJeep doUse $player
+	$GuardPostJeep lock
+	$GuardPostJeep.turret lock
+
+	local.angles = $GuardPostJeep.angles
+	local.angles[0] = 0
+	local.angles[2] = 0
+
+	$player.viewangles = local.angles		
+	$GuardPostJeep thread jeepnewpath
+}end
+
+//============================================================================
+blockade_reverse1: {
+//============================================================================
+	level.reversespeed = -250
+	wait 3
+
+	$GuardPostJeep drive $blockade_reverse level.reversespeed 250 250 256
+	$GuardPostJeep waittill drive
+	wait 2
+
+	$GuardPostJeep drive $jeeploop1 350 75 256 // 256
+	$GuardPostJeep waittill drive
+	wait 1
+
+	$GuardPostJeep drive $GuardPostJeepPath_new  350 75 250 //256
+	$GuardPostJeep waittill drive
+}end
+
+//============================================================================
+jeepnewpath: {
+//============================================================================
+	$player.origin = $playeroutofjeep.origin
+	$player glue $airfieldspot
+	$guysnearairfield delete
+
+	level.reversespeed = -250
+	wait 3
+
+	$lyndon waitthread DoCappyAirFieldSpeech		
+	wait 1
+
+	//Give him the silenced pistol
+	$player takeall		
+	$player item weapons/It_W_Beretta.tik
+	$player item weapons/DeLisle.tik
+	$player ammo rifle 70
+	$player useweaponclass rifle
+	
+	thread control_tower
+	wait 2
+
+	//self thread global/LoopAnim.scr::LoopAnim A_22_driver_idle	
+	self drive $jeepnewpath1 level.reversespeed 150 200 256
+	self waittill drive
+	wait 2
+
+	self drive $jeepnewpatha 550 450 256
+	self waittill drive
+	self stop
+	
+	$GuardPostJeep remove
+	$lyndon remove
+}end
+
+//============================================================================
+control_tower: {
+//============================================================================
+	$beam1 bind $beamcenter	
+	$beamcenter rotatey 20
+}end
+
+//============================================================================
+timedFireAndSmoke local.origin local.fireTime local.smokeTime: {
+//============================================================================
+	if (local.fireTime == NIL || local.fireTime == NULL) {
+		local.fireTime = 15
+	}
+
+	if (local.smokeTime == NIL || local.smokeTime == NULL) {
+		local.smokeTime = 15
+	}
+
+	local.fire = spawn "models/emitters/fireandsmoke.tik"
+	local.fire.origin = local.origin
+	wait local.fireTime
+
+	local.smoke = spawn "models/emitters/linger_smoke.tik"
+	local.smoke.origin = local.origin
+	wait 2
+
+	local.fire remove
+	
+	local.smokeTime -= 2
+	if (local.smokeTime > 0) {
+		wait local.smokeTime
+	}
+
+	local.smoke remove
+}end
+
+//============================================================================
+mg42: {
+//============================================================================
+	$mg42 maxyawoffset 50
+	$mg42 pitchcaps "-20 20 0"
+	$mg42 AIbulletspread 100 200 //150
+	$mg42 burstFireSettings 1 3 1.5 3
+}end
+
+//============================================================================
+DoCappyAirFieldSpeech: {
+//============================================================================
+	thread maps/e2l2.scr::DoMusic "airfield"
+	
+	self thread global/loopanim.scr::LoopUpperAnim A_22_TerryTalkTurn_idle	
+	self say A_22_Phillips_5A
+	self waittill saydone
+	self say A_22_Phillips_5B
+	self waittill saydone
+	
+	//self thread global/loopanim.scr::LoopAnimStop
+	self upperanim A_22_Phillips_5c
+	self say A_22_Phillips_5c_talk
+	self waittill saydone
+	
+	thread maps/e2l2/objectives.scr::transition "reachedAirfield"		
+	$player unglue $airfieldspot
+	$GuardPostJeep thread maps/e2l2/JeepAnims.scr::DoJeepLeaveAirFieldAnims
+}end
+
+//============================================================================
+Playcommdialog: {
+//============================================================================
+	self waittill trigger
+	$lyndon say dfrus_e2l2_jp2738
+}end
+
+//============================================================================
+PlayJeepTree: {
+//============================================================================
+	self waittill trigger
+	$GuardPostJeep playsound jeep_thru_tree
+}end
+
+//============================================================================
+PlayJeepBounce: {
+//============================================================================
+	self waittill trigger
+	$GuardPostJeep playsound jeep_bounce
+}end
+
+//============================================================================
+PlayJeepFence: {
+//============================================================================
+	self waittill trigger
+	$GuardPostJeep playsound jeep_thru_fence
+}end
+
+//============================================================================
+Playbehindus: {
+//============================================================================	
+	self waittill trigger
+	$lyndon say dfrus_e2l2_jp2744a
+}end
+
+//============================================================================
+Playupahead: {
+//============================================================================
+	self waittill trigger
+	$lyndon say dfrus_e2l2_jp2749a
+}end
+
+//============================================================================
+Playholdon: {
+//============================================================================
+	self waittill trigger
+	$lyndon say dfrus_e2l2_jp2750a
+}end

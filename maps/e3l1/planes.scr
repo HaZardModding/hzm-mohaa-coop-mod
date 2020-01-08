@@ -1,0 +1,243 @@
+//=========================================================================
+InitPlanes: {
+//=========================================================================
+	waitthread global/hoveringplane.scr::InitHoveringPlanes 3 1000 1200 0.1 0.25 2500 "vehicles/stuka_strafe.tik" 3000
+	waitthread global/hoveringplane.scr::StartHoveringPlanes
+}end
+
+//=========================================================================
+Do2ndStukaGag: {
+//=========================================================================
+	level.stuka.active = 1
+
+	// move the stuka to the next location
+	level.stuka.origin = $stuka1_path.origin
+	level.stuka.angles = $stuka1_path.angles
+
+	// wait a moment
+	wait 1.0
+
+	// show the plane
+	level.stuka show
+
+	// send the stuka on its path
+	level.stuka flypath $stuka1_path 2000 2000 500
+	level.stuka playsound plane_by
+
+	// detect the bomb crossing the trigger
+	$stuka1_bomb_path thread global/autoplane.scr::TriggerPlaneDropBomb
+
+	// wait until the stuka finishes
+	level.stuka waitmove
+	level.stuka hide
+	level.stuka.active = 0
+}end
+
+//=========================================================================
+Do3rdStukaGag: {
+//=========================================================================
+	level.stuka.active = 1
+
+	// move the stuka to the next location
+	level.stuka.origin = $stuka2_path.origin
+	level.stuka.angles = $stuka2_path.angles
+
+	// wait a moment
+	wait 1.5
+
+	// show the plane
+	level.stuka show
+	level.stuka anim fire
+
+	// send the stuka on its path
+	level.stuka flypath $stuka2_path 2000 2000 500
+
+	// detect the bomb crossing the trigger
+	//$stuka1_bomb_path thread maps/e3l1/scene1.scr::TriggerPlaneDropBomb
+
+	// wait until the stuka finishes
+	level.stuka waitmove
+	level.stuka hide
+	level.stuka anim idle
+	level.stuka.active = 0
+}end
+
+//=========================================================================
+InitP47: {
+//=========================================================================
+	// create & initialize the plane
+	level.p47 = spawn script_model_realdamage // "spawnflags" "2"
+	level.p47.origin = $p47_path.origin
+	level.p47.angles = $p47_path.angles
+	level.p47 model "vehicles/p47fly.tik"
+	level.p47 anim idle
+
+	level.p47gun_1 = spawn script_aimedstrafinggunfire
+	level.p47gun_1.origin = level.p47 gettagposition "tag_barrel01"
+	level.p47gun_1.angles = level.p47.angles
+	level.p47gun_1 bind level.p47
+	level.p47gun_1 tracerFrequency 1
+
+	level.p47gun_2 = spawn script_aimedstrafinggunfire
+	level.p47gun_2.origin = level.p47 gettagposition "tag_barrel06"
+	level.p47gun_2.angles = level.p47.angles
+	level.p47gun_2 bind level.p47
+	level.p47gun_2 tracerFrequency 1
+
+	level.p47gun_3 = spawn script_aimedstrafinggunfire
+	level.p47gun_3.origin = level.p47 gettagposition "tag_barrel06"
+	level.p47gun_3.angles = level.p47.angles
+	level.p47gun_3 bind level.p47
+	level.p47gun_3 tracerFrequency 1
+
+	level.p47gun_4 = spawn script_aimedstrafinggunfire
+	level.p47gun_4.origin = level.p47 gettagposition "tag_barrel06"
+	level.p47gun_4.angles = level.p47.angles
+	level.p47gun_4 bind level.p47
+	level.p47gun_4 tracerFrequency 1
+
+	level.p47gun_5 = spawn script_aimedstrafinggunfire
+	level.p47gun_5.origin = level.p47 gettagposition "tag_barrel06"
+	level.p47gun_5.angles = level.p47.angles
+	level.p47gun_5 bind level.p47
+	level.p47gun_5 tracerFrequency 1
+
+	level.p47gun_6 = spawn script_aimedstrafinggunfire
+	level.p47gun_6.origin = level.p47 gettagposition "tag_barrel06"
+	level.p47gun_6.angles = level.p47.angles
+	level.p47gun_6 bind level.p47
+	level.p47gun_6 tracerFrequency 1
+
+	// give the stuka some health and game parameters
+	level.p47.health = 100 //5 * 180			// # shots @ 180 HP
+	level.p47 solid
+	level.p47.collisionent = level.p47.target
+	level.p47 health 1		
+	level.p47 nodamage
+}end
+
+//=========================================================================
+DoP47Gag: {
+//=========================================================================
+	waitthread InitP47
+
+	// wait a moment
+	wait 4.0
+
+	// show the plane
+	level.p47 show
+	level.p47 anim fire
+
+	// send the stuka on its path
+	level.p47 flypath $p47_path 1000 2000 500
+
+	// wait until the P47 finishes
+	level.p47 waitmove
+	level.p47 hide
+	level.p47 anim idle
+}end
+
+//=========================================================================
+rollplane local.rollspeed: {
+//=========================================================================
+ 	local.ang = self.angles
+ 
+	while ( self != NIL && self != NULL ) {
+		if (level.stuka_roll) {
+			local.cang = self.angles
+			local.ang[2] -= local.rollspeed
+			local.cang[2] = local.ang[2]
+			self angles local.cang
+		}
+		waitframe
+	}
+}end
+
+//=========================================================================
+InitPlaneBombGag: {
+//=========================================================================
+	// create & initialize the plane
+	level.stuka = spawn script_model_realdamage "spawnflags" "2"
+	level.stuka.origin = $plane1path.origin
+	level.stuka.angles = $plane1path.angles
+	level.stuka model "vehicles/stuka_strafe.tik"
+	level.stuka anim idle
+
+	// set up the right gun
+	level.stukagunr = spawn script_aimedstrafinggunfire
+	level.stukagunr.origin = level.stuka gettagposition "tag_barrel1"
+	level.stukagunr.angles = level.stuka.angles
+	level.stukagunr bind level.stuka
+	//level.stukagunr tracerFrequency 1
+
+	// set the left gun
+	level.stukagunl = spawn script_aimedstrafinggunfire
+	level.stukagunl.origin = level.stuka gettagposition "tag_barrel2"
+	level.stukagunl.angles = level.stuka.angles
+	level.stukagunl bind level.stuka
+	//level.stukagunl tracerFrequency 1
+
+	// give the stuka some health and game parameters
+	//level.stuka.health = 1			// # shots @ 180 HP
+	level.stuka.collisionent = level.stuka.target
+	level.stuka solid
+	level.stuka.health = 100	
+	level.stuka takedamage
+	level.stuka rendereffects "-shadow"
+	level.stuka thread StukaDeathHandler
+}end
+
+//=========================================================================
+DoPlaneBombGag: {
+//=========================================================================
+	waitthread InitPlaneBombGag
+	level.stuka.active = 1
+	
+	$plane1trigger2.myexplodertrigger = waitthread find_explodertrigger 34325
+	$plane1trigger3.myexplodertrigger = waitthread find_explodertrigger 667755
+	$plane1trigger4.myexplodertrigger = waitthread find_explodertrigger 667757
+	$citybomb.myexplodertrigger = waitthread find_explodertrigger 7004340534
+	level.stuka flypath $plane1path 2250 2000 500
+
+	$plane1trigger1 thread global/autoplane.scr::TriggerPlaneDropBomb level.stuka
+	$plane1trigger2 thread global/autoplane.scr::TriggerPlaneDropBomb level.stuka
+	$plane1trigger3 thread global/autoplane.scr::TriggerPlaneDropBomb level.stuka
+	$plane1trigger4 thread global/autoplane.scr::TriggerPlaneDropBomb level.stuka
+
+	level.stuka waitmove
+	level.stuka hide
+	level.stuka.active = 0
+}end
+
+//=========================================================================
+find_explodertrigger local.number: {
+//=========================================================================
+	for (local.i=1;local.i<$explodertrigger.size+1;local.i++) {
+		if ($explodertrigger[local.i].set == local.number) {
+			local.returntrigger = $explodertrigger[local.i]
+			// iprintln "Does this ever happen?"
+			goto FindexploderTriggerEnd
+		}
+	}
+FindexploderTriggerEnd:
+}end local.returntrigger
+
+
+//=========================================================================
+StukaDeathHandler: {
+//=========================================================================
+	while (level.stuka.active == 1 && level.stuka.health > 0) {
+		waitframe
+	}
+
+	if (level.stuka.active == 1) {
+		self thread spawn_fx models/fx/fx_stuka_explosion.tik local.offset
+		wait .2
+
+		self model "vehicles/stuka_wing_d.tik"
+		self anim 24P011_expl01
+		self waittill animdone
+		self anim smoke
+		thread maps/e3l1/planes.scr::rollplane 7
+	}
+}end

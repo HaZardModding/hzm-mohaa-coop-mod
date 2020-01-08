@@ -1,0 +1,166 @@
+//=========================================================================
+InitEscape:
+//=========================================================================
+{
+	level.escaped = 0
+
+	/*
+	level.escape4trigger = waitthread global/FindTrigger.scr::FindTrigger "escape4trigger"
+	level.escape5trigger = waitthread global/FindTrigger.scr::FindTrigger "escape5trigger"
+	level.escape4trigger nottriggerable
+	level.escape5trigger nottriggerable
+	*/
+	// $frontdoor1[1] lock
+	// $frontdoor1[2] lock
+}end
+
+//=========================================================================
+ObjectiveEscapeCastle:
+//=========================================================================
+{
+	if (level.hackescape == 1){
+		//dprintln "Skipping escape --hack"
+		$player.origin = $wingametrigger.origin
+		trigger $wingametrigger
+		end
+	}
+
+	exec global/autosave.scr 9 // Calling in the Airstrike
+
+	local.towerbackdoor = waitthread global/FindTrigger.scr::FindTrigger "towerbackdoorlockedtrigger"
+	local.towerbackdoor nottriggerable
+	$hideroomgermandoor unlock
+
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "hideroomgermantrigger"
+	trigger local.trigger 
+
+	level.escape4trigger triggerable
+	level.escape5trigger triggerable
+
+	// open the way out
+	$librarybackdoor unlock
+	$frontdoor2[1] unlock
+	$frontdoor2[2] unlock
+	$frontdoor1[1] unlock
+	$frontdoor1[2] unlock
+	thread AirstrikeTimer
+	thread TheRoundUp
+
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "towerrearattack"
+	trigger local.trigger
+
+	$wingametrigger waittill trigger
+	level.escaped = 1
+}end
+
+//=========================================================================
+AirstrikeTimer:
+//=========================================================================
+{
+	level.timerTime = 60
+
+	//level.fakeexplosive = spawn animate/explosive.tik
+	//level.fakeexplosive stopwatchduration level.timerTime
+	//level.fakeexplosive doUse $player
+	/*
+	iprintlnbold "2 minutes until the airstrike"
+	$wingametrigger thread watchTrigger	
+	wait 60.0		
+	if($wingametrigger.triggered == 1)			
+			End			
+	iprintlnbold "1 minute until the airstrike"
+	*/
+
+	thread EndStopWatch
+	wait level.timerTime
+	
+	if (level.escaped == 0){
+		iprintlnbold "You failed to escape the Castle in time"
+		$wingametrigger nottriggerable
+		wait 1.5
+
+		thread maps/e3l4/Tower.scr::Earthquake $radiotower.origin 2000
+		thread maps/e3l4/Tower.scr::pocketFlashFx models/fx/fx_pocketflash.tik $player.origin
+	  	//  wait 1.5
+	    
+		thread maps/e3l4/Tower.scr::DustMiteThread ($player.origin + (0 0 20)) "models/emitters/tehao_explosionDust.tik"
+		$player exec global/bullethit.scr (0 0 250) 5000 0 1
+		missionfailed
+	}	
+}end
+
+//=========================================================================
+EndStopWatch:
+//=========================================================================
+{
+	$player stopwatch level.timerTime
+	$wingametrigger waittill trigger
+	$player stopwatch 0
+}end
+ 
+//=========================================================================
+watchTrigger:
+//=========================================================================
+{
+	self waittill trigger
+	self.triggered = 1
+}end
+
+//=========================================================================
+CleanupSceneEscape:
+//=========================================================================
+{
+	removeclass actor
+}end
+
+// The Allied Round Up of our guys to run out
+//=========================================================================
+TheRoundUp:
+//=========================================================================
+{
+	local.alliescount 	= 0
+	local.dist 			= 100
+
+	while(local.alliescount < 4){
+		if(isalive $libraryguy1  && $libraryguy1.ally != 1 && vector_length($libraryguy1.origin- $player.origin) > 200){
+			$libraryguy1.ally = 1 
+			$libraryguy1 thread BuddyUp local.dist
+			local.alliescount++
+			local.dist = local.dist + 20 
+		}
+		else if(isalive $libraryguy2 && $libraryguy2.ally != 1 && vector_length($libraryguy2.origin- $player.origin) > 200){
+			$libraryguy2.ally = 1
+			$libraryguy2 thread BuddyUp local.dist
+			local.alliescount++
+			local.dist = local.dist + 20 
+		}
+		else if(isalive $libraryguy3 && $libraryguy3.ally != 1 && vector_length($libraryguy3.origin- $player.origin) > 200){
+			$libraryguy3.ally = 1
+			$libraryguy3 thread BuddyUp local.dist
+			local.alliescount++
+			local.dist = local.dist + 20 
+		}
+		waitframe
+	}
+}end
+
+//=========================================================================
+BuddyUp local.dist:
+//=========================================================================
+{
+	self.destination		= $player
+	self.friendtype			=     1
+
+	// stagger how far away they keep from their destinations
+	self.distance			= local.dist
+
+	// setup the friendlies to follow the player...
+	self  thread global/friendly.scr::friendlythink
+}end
+
+//=========================================================================
+CleanupSceneExit:
+//=========================================================================
+{
+	removeclass actor
+}end

@@ -1,0 +1,2227 @@
+// Mackey was here, and even made the bsp for this level, wow!
+main:{
+	level.coopNextMap = "briefing/briefing6"	//Pasted by Criminal for coop comp. - set next map (for mom voteing)
+	level.coopPrevMap = "m5l2b"					//Pasted by Criminal for coop comp. - set previouse map (for mom voteing)
+	level.coop_aaMap = 1						//Pasted by Criminal for coop comp. - let global scripts know this is a AA level
+	level.coop_debugSpawn = 1 					//Pasted by Criminal for coop comp. - enable spawnpoint debug (make visible)
+	thread coop_mod/main.scr::main         	//Pasted by Criminal for coop comp. - start coop mod extensions
+
+//////////////////////////////////
+	exec global/ai.scr
+	exec global/exploder.scr
+	exec global/loadout.scr "maps/m5l3.scr"
+
+	$plunger notsolid	
+	$tankclip notsolid
+	$tankclip2 delete
+	// $tankclip2 notsolid
+//////////////////////////////////
+
+	level waittill prespawn
+	exec global/door_locked.scr
+	exec global/friendly.scr
+
+//	fadeout 0.1 0 0 0 1
+
+	exec global/shutter.scr
+	exec global/ambient.scr m5l3
+	exec global/bomber.scr
+
+	thread levelmusic
+
+	level.debug = 1
+
+
+	if(level.gametype == 0){ //chrissstrahl - sp
+		local.org = $player.origin
+		$player glue $playertank 0
+		$player physics_off
+
+		$player unglue
+		$player physics_on	
+		$player.origin = local.org
+	}
+
+	$plunger.angles = (0 90 0)
+
+	level.cheat = 0
+
+	local.tempstring = "0.4 0.5 0.6"
+//	setcvar cg_playermodel 0
+//	setcvar r_farplane 15000
+//	setcvar r_farplane_color local.tempstring
+// setcvar "r_farplane_color ""0.4 0.5 0.6"""
+	thread initalarm
+	$flak88trigger thread flak88trigger
+
+	level.plunging = 0
+	level.healthoffset = 5000
+	level.lasttanknum = 0
+	level.readytofiresound = 0
+	level.hitrandomsound = 0
+	level.lasttankhitsound = 0
+	level.tankkilledtime = level.time
+	level.bridgerunners = 0
+	level.wintime = level.time + 500000
+	level.destroytime = level.time + 500000
+	level.grr = 0
+	level.gammacap = 0.4
+
+	level.tower = 0
+	$towerup thread towerup
+	$towerdown thread towerdown
+
+	$bomber1trigger thread bomberdetect 1
+	$bomber2trigger thread bomberdetect 2
+
+
+	local.aimer = spawn script_origin
+	local.aimer.origin = $playertank.origin
+	local.aimer glue $playertank
+
+	local.aimon = spawn script_origin
+	local.aimon.origin = $playertank.origin + (0 0 50)
+	local.aimon bind local.aimer
+
+	$playertank.aimspot = local.aimon
+
+	level.warning = 1
+	level.script = maps/m5l3.scr
+	level.curvehicles = 0
+	level.maxvehicles = 5
+	level.tankrange = 6500
+	level.lastshottime = level.time
+	level.lasttankhit = level.time
+
+	for (local.i=0;local.i<level.maxvehicles+2;local.i++){
+		local.ent = spawn script_origin // "targetname" ("tempent__" + local.i)
+		level.enemytanks[local.i] = local.ent // $("tempent__" + local.i)
+	}
+
+	thread towerdeath
+
+	level.flags[tankatbridge] = 0 // Tank has reached the bridge
+	level.flags[plungergone] = 0 // Tank has destroyed the plunger
+	level.flags[readytosnipe] = 0 // Player is ready to snipe
+	level.flags[Final_Tank_Approaches] = 0 // The final tank approacheth
+	level.flags[Bridge_Is_Gone] = 0 // The bridge is gone
+	level.flags[Enemy_wants_to_blow_the_bridge] = 0 // The enemy wants to blow the bridge
+	level.flags[King_Tiger_Lost] = 0 // The tank is dead
+	level.flags[Flak88_dead] = 0 // Flak88 is dead
+	level.flags[Artillary_Ready] = 0 // Artillery can fire
+	level.flags[Reinforcements] = 0 // Reinforcements
+	level.flags[The_Day_is_won] = 0 // Day is yet to be won
+	level.flags[killed_king_tiger] = 0 // enemy king tiger is not dead
+
+	$flak88 thread flak88
+
+	$obj5 thread objgen 5
+	// thread global/bomber.scr::repeat
+	
+	level.totalbaddies = 0
+
+/////////////////////////////////
+	//level waittill spawn //chrissstrahl
+	waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl - coop
+	
+	thread objectives
+
+	local.tempvar = getcvar(bridge)
+
+	huddraw_alpha 100 0
+	huddraw_string 100 " "
+
+	$playertank setcollisionentity $kingtigercollision
+	$playertank disconnect_paths
+
+	waitthread global/items.scr::add_item "binoculars"
+	waitthread global/items.scr::add_item "radio"
+
+	
+//	$kingtigercollision solid
+
+	if (game.skill == "hard")
+		thread bridgesetup
+
+//	wait 6
+//	println "ehhhhhhh"
+	//chrissstrahl - play sound on each player instead on $player
+	exec coop_mod/replace.scr::playsound dfr_m5l2_517 // centerprint "Sir, we're in position. The tank will stay here while you check out the bridge."
+
+	if (getcvar(tankgo) == "1")
+		$playertank thread dodrive
+		
+	//chrissstrahl - spawn snipers at positions we need em
+	thread coop_spawnSniper
+}end
+
+towerdeath:{
+	while (level.time + 2 < level.destroytime){
+		wait 1
+	}
+	
+	if (exec coop_mod/replace.scr::istouching $towerkill){//chrissstrahl - coop
+		//chrissstrahl - play sound on each player instead on $player
+		exec coop_mod/replace.scr::playsound dfr_m5l2_add07
+		//println "get out of the tower"
+	}
+
+	local.tower = level.tower
+	local.count = 1
+	while (level.tower < 5){
+		while  (local.tower == level.tower){
+			wait 0.5
+		}		
+
+		local.tower = level.tower
+		local.count++
+
+		if (local.count == 2){
+			if (exec coop_mod/replace.scr::istouching $towerkill){//chrissstrahl - coop
+				exec coop_mod/replace.scr::playsound dfr_m5l2_add09 // Get out of that tower! //chrissstrahl - coop
+				//println "get out of the tower" //chrissstrahl
+			}
+		}
+		else
+		if (local.count == 3){
+			if (exec coop_mod/replace.scr::istouching $towerkill){ //chrissstrahl - coop
+				exec coop_mod/replace.scr::playsound dfr_m5l2_add10 //chrissstrahl - coop
+				//println "get out of the tower" //chrissstrahl
+			}
+		}
+		else
+		if (local.count == 4){
+			if (exec coop_mod/replace.scr::istouching $towerkill){ //chrissstrahl - coop
+				exec coop_mod/replace.scr::playsound dfr_m5l2_add11 //chrissstrahl - coop
+				//println "get out of the tower" //chrissstrahl
+			}
+		}
+		waitframe
+	}
+}end
+
+
+objectives:{
+	waitthread global/objectives.scr::add_objectives 1 2 "Sneak in and find a high position overlooking the bridge." $obj5.origin
+	waitthread global/objectives.scr::add_objectives 2 2 "Snipe the Germans that try to blow up the bridge." $obj5.origin
+	waitthread global/objectives.scr::add_objectives 3 2 "Use the high vantage point to call in artillery strikes. You may have to use multiple buildings to cover all the approaches to the bridge." $obj5.origin
+	waitthread global/objectives.scr::add_objectives 4 1 "Destroy the enemy King Tiger." $obj5.origin
+	waitthread global/objectives.scr::current_objectives 1
+}end
+
+
+alarming:{
+	if (getcvar(debug) == "1"){
+		println "this is alarming!"
+	}
+}end
+
+setlevelflag local.flag local.delay:{
+	wait local.delay
+	level.flags[local.flag] = 1
+}end
+
+bomberdetect local.bomb:{
+	//level waittill spawn //chrissstrahl
+	waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl
+
+	level.lastbombtime = level.time
+	while (1==1){
+		if (level.time > level.lastbombtime)
+		for (local.i=1;local.i<level.maxvehicles+1;local.i++){
+			if (isalive level.enemytanks[local.i]){
+				local.vec = vector_length(level.enemytanks[local.i].origin - self.origin)
+				
+				if (local.vec < 500){
+					level.lastbombtime = level.time + 25
+					thread global/bomber.scr::bomb local.bomb
+					end
+				}
+			}
+		}
+		wait 1
+	}
+}end
+
+bomberhit:{
+	for (local.i=1;local.i<level.maxvehicles+1;local.i++){
+		if (isalive level.enemytanks[local.i]){
+			local.vec = vector_length(level.enemytanks[local.i].origin - self.origin)
+			if (getcvar(debug) == "1")
+				println ("**-Bomb dropped, was " + local.vec + " away from tank " + local.i + "-**")
+			if (local.vec < 400){ // was 1200
+				if (getcvar(debug) == "1")
+					println "bomberhit!"
+
+//					level.enemytanks[local.i].health = level.enemytanks[local.i].health - 1500
+//					level.enemytanks[local.i] exec global/bullethit.scr (0 0 250) 500 25 1
+//					level.enemytanks[local.i] damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 -1
+				level.enemytanks[local.i] damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+				if (getcvar(debug) == "1")
+				println ("&&&&&&&&&&&&&&& Tank had " + level.enemytanks[local.i].health)
+
+				level.tankkilledtime = level.time + 100
+			}
+
+		}
+	}
+}end
+
+
+killplayer local.ent:{
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player != NULL ){
+			if(level.gametype != 0){
+				if( local.player.health <= 0 || local.player.dmteam == "spectator" && level.gametype != 0 ){
+					continue
+				}
+			}
+			local.player exec global/bullethit.scr (0 0 250) 500 25 1
+			local.player damage $world 5500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+		}
+	}
+}end
+
+dotankkill:{
+	for (local.i=1;local.i<level.maxvehicles+1;local.i++){
+		if (isalive level.enemytanks[local.i]){
+			if ((self istouching level.enemytanks[local.i]) && (self != level.enemytanks[local.i])){
+				level.enemytanks[local.i] damage $world 9000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+			}
+		}
+	}	
+}end
+
+
+enemytankstart:{
+	wait 10
+	level.firsttank = 1
+	level.tigernumber = 0
+
+	while ((level.flags[Final_Tank_Approaches] == 0) && (level.flags[King_Tiger_Lost] == 0) && (level.tigernumber == 0)){
+		println ("Current time: " + level.time + " and current wintime " + level.wintime)
+
+		if (level.time < level.wintime - 30){
+			if (level.curvehicles < level.maxvehicles){
+				for (local.i=1;local.i<level.maxvehicles+1;local.i++){
+					if !(isalive level.enemytanks[local.i]){
+						level.curvehicles++	
+						local.tank = spawn vehicles/tigertank "origin" "5 5 -3000" // "targetname" "some_tank"// "angles" "0 90 0"// was .tik 
+						wait 1
+						thread dotankkill
+				
+						level.enemytanks[local.i] = local.tank
+						local.tank.health = 1400
+						local.tank setcollisionentity $tigercollision
+						local.tank thread tankattack
+						local.i = level.maxvehicles + 5
+					}
+				}
+			}
+		}
+		else
+		if (level.time < level.wintime + 30){
+			if (level.curvehicles < level.maxvehicles)
+			for (local.i=1;local.i<level.maxvehicles+1;local.i++){
+				println ("CCC" + local.i)
+					if (!(isalive level.enemytanks[local.i]) && (level.tigernumber == 0)){
+						level.tigernumber++
+						level.grr++
+						if (level.grr == 1){
+							println ("level.tigernumber is " + level.tigernumber)
+							level.curvehicles++	
+							local.tank = spawn vehicles/kingtank "origin" "5 5 -3000" // "targetname" "some_kingtank" // "angles" "0 90 0"// was .tik
+							wait 1
+							thread dotankkill
+
+	//						if (getcvar(debug) == "1")
+							println "***** KING TIGER *****"
+							level.enemytanks[local.i] = local.tank
+							local.tank.origin = ( 5 5 -3000)
+							local.tank.health = 7000
+							local.tank setcollisionentity $kingtigercollision
+							local.tank thread tankattack
+							local.i = level.maxvehicles + 5
+						}
+					}
+				}			
+	
+		}
+		wait (9 + randomint(4))
+	}
+}end
+
+
+buildingsolid:{
+	for (local.i=1;local.i<level.exploders+1;local.i++){
+		if (level.exploder[local.i].set < 100)
+		level.exploder[local.i] notsolid
+	}
+
+	buld:
+
+	for (local.i=1;local.i<level.explodersmasheds+1;local.i++){
+		if (level.explodersmashed[local.i].set < 100)
+		level.explodersmashed[local.i] notsolid
+	}
+
+	wait 0.25
+	goto buld
+}end
+
+
+artilleryattack:{
+//	wait 16
+	exec coop_mod/replace.scr::playsound dfr_m5l2_525 // Powell, our artillery is ready. Just give us the coordinates, and remember, there will be a slight delay before the shell arrives.
+	level.flags[Artillary_Ready] = 1
+	//$player waittill sounddone //chrissstrahl
+	wait 9 //chrissstrahl - was 4
+
+	if (getcvar(skill) == "0"){
+		wait 10
+	}
+	else
+	if (getcvar(skill) == "1"){
+		wait 3
+	}
+
+	thread enemyref
+}end
+
+objgen local.num:{
+	if (getcvar(cheat) == "1"){
+		$playertank.health = 50000 // was 3000
+	}
+	else
+	if (game.skill == "easy"){
+		$playertank.health = 15400 + level.healthoffset // was 3000
+	}
+	else{
+		$playertank.health = 11000 + level.healthoffset // was 3000
+	}
+
+//	$playertank.health = 15400 + level.healthoffset // was 3000
+//	$playertank.health = 8400 + level.healthoffset // was 3000
+//	$playertank.health = 17400 + level.healthoffset // was 3000
+
+	//chrissstrahl - coop test
+	if(level.gametype != 0){
+		$playertank.health = 50000 + level.healthoffset
+	}
+
+	level.tankhealthmax = $playertank.health
+	set_objective_pos $("obj" + local.num).origin
+
+	//level waittill spawn //chrissstrahl
+	waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl
+
+//	while ((vector_length($player.origin - $("obj" + local.num).origin)) > 100)
+	//chrissstrahl - coop
+	while (!(exec coop_mod/replace.scr::istouching $binoleft) && !(exec coop_mod/replace.scr::istouching $binoright) && !(exec coop_mod/replace.scr::istouching $binomid)){
+		wait 0.5
+	}
+
+
+	wait 4
+	
+	//iprintlnbold_noloc("DEV: plunger")
+	//chrissstrahl - coop
+	//$player playsound dfr_m5l2_524 // Powell, look for a plunger. We believe the enemy has the bridge wired for detonation. You've gotta stop them from pressing that plunger at all costs.
+	//$player waittill sounddone //chrissstrahl
+	exec coop_mod/replace.scr::playsound dfr_m5l2_524 // Powell, look for a plunger. We believe the enemy has the bridge wired for detonation. You've gotta stop them from pressing that plunger at all costs.
+	wait 9 //chrissstrahl - we need to use wait here, using waitexec or waittill sounddone will freeze the script - reason unknown
+	
+	//iprintlnbold_noloc("DEV: blow")
+	//chrissstrahl - coop
+	exec coop_mod/replace.scr::playsound dfr_m5l3_add01 // Make absolutely sure they don't get the opportunity to blow up the bridge.
+
+	//iprintlnbold_noloc("DEV: new music")
+	
+//	$player stoploopsound
+//	$player loopsound "sound/music/action_11.mp3" 2
+
+//	forcemusic aux1 aux1  // was forcemusic
+//	$player stufftext "tmstart sound/music/mus_11b_action.mp3"
+	exec coop_mod/replace.scr::tmstart "sound/music/mus_11b_action.mp3" //chrissstrahl - coop
+// mus_SniperTown_01b.mp3
+
+	//iprintlnbold_noloc("DEV: timer")
+	level.destroytime = level.time + 80
+	//iprintlnbold_noloc("DEV: objective")
+
+	waitthread global/objectives.scr::add_objectives 1 3 "Sneak in and find a high position overlooking the bridge." $obj5.origin
+//	waitthread global/objectives.scr::add_objectives 2 2 "Snipe the Germans that try to blow up the bridge." $obj5.origin
+//	waitthread global/objectives.scr::add_objectives 3 2 "Use the high vantage point to call in artillery strikes. You may have to use multiple buildings to cover all the approaches to the bridge." $obj5.origin
+//	waitthread global/objectives.scr::add_objectives 4 1 "Destroy the enemy King Tiger." $obj5.origin
+	waitthread global/objectives.scr::current_objectives 2
+
+	//iprintlnbold_noloc("DEV: vars")
+	
+	level.flags[readytosnipe] = 1 // Player is ready to snipe
+	exec global/autosave.scr 1
+	
+	//iprintlnbold_noloc("DEV: drive")
+	
+	$playertank thread dodrive
+	
+	//iprintlnbold_noloc("DEV: enemy drive")
+	
+	thread enemytankstart
+	
+	//iprintlnbold_noloc("DEV: playsound")
+	
+	//chrissstrahl - coop
+	exec coop_mod/replace.scr::playsound dfr_m5l2_518 // "Okay sir, were moving the tank up to the bridge."
+
+	//iprintlnbold_noloc("DEV: set flags")
+
+	thread setlevelflag 6 10
+	
+	local.gennum = 1
+	if (getcvar(debug) == "1"){
+		println ("*********** SPAWNED BRIDGE BLOWER " + local.gennum + " AT ORIGIN " + level.buildingspawn[local.gennum].origin)
+	}
+	
+	//iprintlnbold_noloc("DEV: blowup bridge guys")
+	
+	thread spawnthreadguy "bridgeblowprep" "plungerprepnode" level.buildingspawn[local.gennum].origin 25
+	wait 5
+	
+	iprintlnbold_noloc("DEV: warning sound")
+		
+	exec coop_mod/replace.scr::playsound m5l3_warning4 //chrissstrahl - coop
+// 126  453
+
+	if (getcvar(skill) == "0"){
+		local.guytime = 13
+		local.cap = 6
+	}
+	else{
+		local.guytime = 8
+		local.cap = 5
+	}
+	
+	level.totalbridgeblowers = 1
+	local.count = 0
+	
+	//iprintlnbold_noloc("DEV: while")
+	
+	
+	while ((level.flags[plungergone] == 0) && (level.flags[Bridge_Is_Gone] != 1)){
+		if (local.guytime > local.cap){
+			local.guytime += -2
+		}
+		else{
+			local.guytime = local.cap
+		}
+
+		while (level.totalbridgeblowers > 3){
+			wait 0.5
+		}
+
+		if (getcvar(debug) == "1"){
+			println ("Enemy_wantsbridge = " + level.flags[Enemy_wants_to_blow_the_bridge])
+		}
+
+//		if (level.flags[Enemy_wants_to_blow_the_bridge] == 1)
+//		{
+			level.totalbridgeblowers++
+			local.gennum = randomint (level.buildingspawns) + 1
+			if (getcvar(debug) == "1"){
+				println ("*********** SPAWNED BRIDGE BLOWER " + local.gennum + " AT ORIGIN " + level.buildingspawn[local.gennum].origin)
+			}
+			thread spawnthreadguy "bridgeblowprep" "plungerprepnode" level.buildingspawn[local.gennum].origin 25
+//		}
+
+		wait local.guytime
+		local.count++
+		if (local.count == 1){
+			exec coop_mod/replace.scr::playsound m5l3_warning5 //chrissstrahl - coop
+		}
+		else
+		if (local.count == 3){
+			exec coop_mod/replace.scr::playsound m5l3_warning3 //chrissstrahl - coop
+		}
+		wait randomint(4)
+	}
+	
+	//iprintlnbold_noloc("DEV: end while")
+
+//	thread buildingsolid
+	thread artilleryattack
+
+
+//			if (($player istouching $binomid) && (local.destroytime != -1))
+//		level.wintime = level.time + 200
+
+	level.wintime = level.time + 100
+	println ("MADE LEVEL WINTIME = " + level.wintime)
+
+	//iprintlnbold_noloc("DEV: while 2")
+		
+	while ((level.flags[Final_Tank_Approaches] == 0) && (level.flags[King_Tiger_Lost] == 0)){
+		if ($playertank.health < level.healthoffset){
+			level.flags[King_Tiger_Lost] = 1
+		}
+		else{
+//			if ((level.time > level.wintime) && ($player istouching $endtouch))
+			//chrissstrahl - coop
+			if ((level.time > level.wintime) && (	(exec coop_mod/replace.scr::istouching $binoleft) ||
+													(exec coop_mod/replace.scr::istouching $binoright) ||
+													(exec coop_mod/replace.scr::istouching $binomid)))
+			if (level.curvehicles < 2){
+				level.flags[Final_Tank_Approaches] = 1
+			}
+		}
+		wait 0.2
+	}
+
+//	waitthread global/objectives.scr::add_objectives 1 3 "Sneak in and find a high position overlooking the bridge." $obj5.origin
+//	waitthread global/objectives.scr::add_objectives 2 3 "Snipe the Germans that try to blow up the bridge." $obj5.origin
+	waitthread global/objectives.scr::add_objectives 3 3 "Use the high vantage point to call in artillery strikes. You may have to use multiple buildings to cover all the approaches to the bridge." $obj5.origin
+	waitthread global/objectives.scr::add_objectives 4 2 "Destroy the enemy King Tiger." $obj5.origin
+	waitthread global/objectives.scr::current_objectives 4
+	
+	
+	//iprintlnbold_noloc("DEV: while 3")
+
+//	while (level.flags[King_Tiger_Lost] == 0)
+//		wait 0.5
+	while ((level.curvehicles > 0) && (level.flags[King_Tiger_Lost] == 0)){
+		if ($playertank.health < level.healthoffset){
+			level.flags[King_Tiger_Lost] = 1
+		}
+
+		wait 0.2
+	}
+
+
+	if (level.flags[King_Tiger_Lost] == 1)
+	{
+
+		exec global/model.scr $playertank.origin "models/fx/fx_tank_explosion.tik" 2
+		local.ent_d = spawn script_model
+		local.ent_d model "vehicles/kingtank_d.tik"
+		local.ent_d.origin = $playertank.origin
+		local.ent_d.angles = $playertank.angles
+		$playertank hide
+		local.gun3 = $playertank QueryTurretSlotEntity 0
+		local.gun3 hide
+
+
+		iprintlnbold "The King Tiger has been lost, you have failed"
+		wait 3
+		if (getcvar(debug) != "1"){
+			missionfailed
+			//iprintlnbold_noloc("DEV: Mission Failed (TANK DESTROYED)!!!")
+			
+			//chrissstrahl - reload map in mp
+			if(level.gametype != 0){
+				local.levelname = getcvar("mapname")
+				exec global/missioncomplete.scr local.levelname
+				wait 1
+				//stuffcmd "rcon map m5l2a"
+				//server "map" m5l2b"
+				//chrissstrahl - how much you may try not to obey I will get you, BITCH!
+				local.hostPlayer = getentbyentnum 0	
+				local.hostPlayer stufftext ("map "+local.levelname)
+			}
+		}
+		end
+	}
+
+	level.flags[killed_king_tiger] = 1
+
+	//chrissstrahl - coop
+	exec coop_mod/replace.scr::playsound dfr_m5l2_535 // Good work Powell. Your reinforcements have arrived.
+
+	wait 0.5
+
+//	while (vector_length($player.origin - $finisher2.origin) > 120)
+//		wait 0.5
+
+//	waitthread global/objectives.scr::add_objectives 1 3 "Sneak in and find a high position overlooking the bridge." $obj5.origin
+//	waitthread global/objectives.scr::add_objectives 2 3 "Snipe the Germans that try to blow up the bridge." $obj5.origin
+//	waitthread global/objectives.scr::add_objectives 3 3 "Use the high vantage point to call in artillery strikes. You may have to use multiple buildings to cover all the approaches to the bridge." $obj5.origin
+	waitthread global/objectives.scr::add_objectives 4 3 "Destroy the enemy King Tiger." $obj5.origin
+
+	level.flags[The_Day_is_won] = 1
+	wait 0.5
+
+	setcvar "g_m6l1" "1"
+	exec global/missioncomplete.scr briefing/briefing6
+}end
+
+friendlylook:{
+	while (isalive self){
+		self exec coop_mod/replace.scr::lookat
+		wait 5
+	}
+}end
+
+
+tankattackdrive:{
+	println "***** TANKATTACKDRIVE *****"
+	if (level.cheat == 1){
+		self.origin = $tanklspawn.origin
+		self drive $tanklpath 20 50 100 256 // ideal speed, accelleration/deceleration, close to nodes,  lookahead
+		self waitTill drive
+		self fullstop
+		end
+	}
+
+	if (level.firsttank == 1){
+		self.origin = $tanklspawn.origin
+		self drive $tanklpath 20 50 100 256 // ideal speed, accelleration/deceleration, close to nodes,  lookahead
+		self waitTill drive
+		self fullstop
+
+		level.firsttank = 0
+		end
+	}
+
+	local.num = level.lasttanknum
+
+	while (local.num == level.lasttanknum){
+		local.num = randomint (3)
+	}
+
+	level.lasttanknum = local.num
+	if (local.num == 0){
+		self.angles = (0 90 0)
+		self.origin = $tanklspawn.origin
+		self drive $tanklpath 20 50 100 256 // ideal speed, accelleration/deceleration, close to nodes,  lookahead
+		self waitTill drive
+		self fullstop
+	}
+	else
+	if (local.num == 1){
+		self.angles = (0 90 0)
+		self.origin = $tankrspawn.origin
+		self drive $tankrpath 20 50 100 256 // ideal speed, accelleration/deceleration, close to nodes,  lookahead
+		self waitTill drive
+		self fullstop
+	}
+	else{
+		self.angles = (0 315 0)
+		self.origin = $tankmspawn.origin
+		self drive $tankmpath 20 50 100 256 // ideal speed, accelleration/deceleration, close to nodes,  lookahead
+		self waitTill drive
+		self fullstop
+	}
+}end
+
+
+shoottank:{
+	self waitTill drive
+	self fullstop
+}end
+
+
+tankshotthink local.gun local.targ:{
+	println ("***** TANKSHOOTTHINK *****") //chrissstrahl - coop
+	while (isalive self){
+		local.shot = 0
+		if ((level.time > level.destroytime) && (level.tower < 6)){
+			if (level.tower < 3){
+				local.hitorigin = trace (self.origin + (0 0 200)) ($towerupent.origin) 0
+				if ((vector_length (local.hitorigin - $towerupent.origin) < 600)){
+					local.gun setAimTarget towerupent
+					local.gun waittill ontarget
+					if (getcvar(debug) == "1")
+					println "TOWER 1!"
+					local.gun startfiring // anim "fire"
+					wait 5
+					if !(isalive self)
+						end
+					local.gun stopfiring // anim "fire"
+					local.shot = 1
+				}
+			}
+			else{
+				local.hitorigin = trace (self.origin + (0 0 200)) ($towerdownent.origin) 0
+				if ((vector_length (local.hitorigin - $towerdownent.origin) < 600)){
+					local.gun setAimTarget towerdownent
+					local.gun waittill ontarget
+					if (getcvar(debug) == "1")
+					println "TOWER 2!"
+					local.gun startfiring // anim "fire"
+					wait 5
+					if !(isalive self)
+						end
+					local.gun stopfiring // anim "fire"
+					local.shot = 1
+				}
+			}
+		}
+
+		if (local.shot == 0){
+			local.gun setAimTarget local.targ
+			local.hitorigin = trace (self.origin + (0 0 200)) ($playertank.origin + (0 0 200)) 0
+			if ((vector_length (local.hitorigin - $playertank.origin) < 600)){
+				local.gun startfiring // anim "fire"
+				wait 1
+			}
+			if !(isalive self){ end }
+			
+			local.gun stopfiring // anim "fire"
+		}
+		wait 2
+	}
+}end
+
+tankattack:{
+	println ("***** TANKATTACK *****") //chrissstrahl - coop
+	local.aimer = spawn script_origin
+	local.aimer.origin = self.origin
+	local.aimer glue self
+
+	local.aimon = spawn script_origin
+	local.aimon.origin = self.origin + (0 0 75)
+	local.aimon bind local.aimer
+
+	self.aimspot2 = local.aimer
+	self.aimspot = local.aimon
+	self.aimspot notsolid
+	self.aimspot2 notsolid
+	
+	local.aimspot2 = self.aimspot2
+	local.aimspot = self.aimspot
+
+	local.gun = self QueryTurretSlotEntity 0
+	local.gun2 = self QueryTurretSlotEntity 1
+//		local.targ = $playertank QueryTurretSlotEntity 0
+	local.targ = $playertank.aimspot
+	local.gun setAimTarget local.targ
+
+	local.gun notsolid
+	
+	thread tankattackdrive 
+	thread tankshotthink local.gun local.targ
+	local.thread = parm.previousthread
+
+	if (getcvar(debug) == "1"){
+		println ("****** " + self + " begins with " + self.health + " health")
+	}
+	
+	self waittill death
+	exec global/model.scr self.origin "models/fx/fx_tank_explosion.tik" 2
+	local.aimspot2 delete
+	local.aimspot delete
+
+	thread tankhitenemy
+
+	level.curvehicles = level.curvehicles - 1
+	wait 5
+}end
+
+tankhitenemy:{
+	println "***** TANKHITENEMY *****"
+	if (level.time > level.tankkilledtime){
+		wait randomfloat (0.5)
+		local.random = level.lasttankhitsound 
+		
+		while (local.random == level.lasttankhitsound ){
+			local.random = randomint(5) + 19
+		}
+
+		level.lasttankhitsound = local.random
+
+		//chrissstrahl - coop
+		exec coop_mod/replace.scr::playsound ("dfr_m5l2_5" + local.random) // Got that tank!
+	}
+}end
+
+spawnthreadguy local.thread local.node local.org local.h:{
+	local.ent = spawn human/german_wehrmact_soldier
+	local.ent thread bridgeblowdeath
+	local.ent exec global/disable_ai.scr
+	local.ent forceactivate
+	local.ent.origin = local.org
+	local.ent useweaponclass rifle
+	local.ent runto local.node
+	local.ent waittill movedone
+
+	if (parm.movedone){
+		local.ent thread local.thread
+	}
+	else if (isalive local.ent){
+		local.ent exec global/enable_ai.scr
+		local.ent.health = 1
+	}
+}end
+
+bridgeblowdeath:{
+	self waittill death
+	level.totalbridgeblowers--
+}end
+
+
+spawnbridgeblower local.thread local.node local.org local.h:{
+	local.ent = spawn human/german_wehrmact_soldier
+	local.ent exec global/disable_ai.scr
+	local.ent model "human/german_wehrmact_soldier.tik"
+	local.ent.origin = local.org
+//		local.ent weapon models/weapons/KAR98.tik
+	local.ent useweaponclass rifle
+	local.ent runto local.node
+	local.ent waittill movedone
+	
+	local.ent thread bridgeblowprep
+	
+	if (getcvar(debug) == "1"){
+		println "* SHOULD BE DOING THE BRIDGE BLOW THING *"
+	}
+
+	if ((level.flags[plungergone] == 1) || (level.flags[Bridge_Is_Gone] == 1)){
+		local.ent runto $killbaddie
+		local.ent  waittill movedone
+		if (getcvar(debug) == "1"){
+			println ("deletin " + self)
+		}
+		local.ent delete
+	}
+	else{
+		if (getcvar(debug) == "1"){
+			println "BLOWING BRIDGE!!!!!!!!!!!!!!!!!!!!!!"
+		}
+		level.flags[Enemy_wants_to_blow_the_bridge] = 1
+		local.ent  runto $bridgeblownode
+		local.ent  waittill movedone
+		local.ent  thread bridgeblow
+	}
+}end
+
+
+bridgeblowprep:{
+	self exec global/disable_ai.scr
+	if (getcvar(debug) == "1"){
+		println "************ running bridgeblow prep"
+	}
+	if ((level.flags[plungergone] == 1) || (level.flags[Bridge_Is_Gone] == 1)){
+		if (getcvar(debug) == "1"){
+			println (self + " is running away, away, away")
+		}
+		self runto $killbaddie
+		self waittill movedone
+		println ("deletin " + self)
+//		self delete
+	}
+	else{
+		if (getcvar(debug) == "1"){
+			println (self + " is running to bridgeblownode")
+		}
+		level.flags[Enemy_wants_to_blow_the_bridge] = 1
+		while (level.plunging != 0){
+			wait randomfloat(1)
+			waitframe
+		}
+
+		thread plungifier
+		
+		self runto $bridgeblownode
+		if (getcvar(debug) == "1"){
+			println "001"
+		}
+		self waittill movedone
+		if (parm.movedone){
+			if (getcvar(debug) == "1"){
+				println "002"
+			}
+			self thread bridgeblow
+		}
+		else{
+			level.plunging = 0
+		}
+	}
+}end
+
+plungifier:
+	level.plunging = 1
+	while (isalive self){
+		waitframe
+	}
+	
+	level.plunging = 0
+end
+
+
+drivepath local.path:{
+	self drive $(local.path) 80 5 100 256 // ideal speed, accelleration/deceleration, close to nodes,  lookahead
+	self waitTill drive
+	self fullstop
+	level.drove++
+}end
+
+
+enemyref:{
+//	wait 15
+	level.flags[Reinforcements] = 1
+	exec coop_mod/replace.scr::playsound dfr_m5l2_534 //chrissstrahl - coop
+}end
+
+levelalpha:{
+	while (level.alpha < 1){
+		level.alpha = level.alpha + 0.03
+		huddraw_alpha 100 level.alpha
+		wait 0.1
+	}
+	level.alpha = 1
+}end
+
+
+showhealth:{
+	local.lasthealth = -1
+	level.alpha = 0
+	thread levelalpha
+	
+	while ((level.flags[The_Day_is_won] == 0) && (level.flags[King_Tiger_Lost] == 0)){
+		if (local.lasthealth != $playertank.health){
+			local.lasthealth = $playertank.health
+			local.index = 100
+			local.num = (($playertank.health - level.healthoffset) * 100) / (level.tankhealthmax - level.healthoffset)
+			local.n = int local.num
+			
+			if (local.n < 1){
+				level.flags[King_Tiger_Lost] = 1
+				local.n = 0
+			}
+			
+			local.string = ("KING TIGER HEALTH " + local.n)
+			local.distance = local.string.size / -2
+			huddraw_font local.index "facfont-20"
+			huddraw_string local.index local.string
+			huddraw_align local.index center top
+			huddraw_rect local.index (local.distance * 13) 10 0 0
+			local.num = local.num / 100
+			local.colorR = 1
+			local.colorG = 1
+			local.colorB = 1
+			
+			if (local.num > 0.6){
+				local.colorR = 0
+				local.colorG = 1
+				local.colorB = 0
+			}
+			else
+			if (local.num > 0.3){
+				local.dif = local.num - 0.3
+				local.curval = local.dif / 0.3
+
+
+				local.colorR = (1.0 - local.curval)
+				local.colorG = 1
+				local.colorB = 0
+			}
+			else
+			if (local.num > 0.1){
+				local.dif = local.num - 0.2
+				local.curval = local.dif / 0.2
+
+
+				local.colorR = 1
+				local.colorG = local.curval
+				local.colorB = 0
+			}
+			else{
+				local.colorR = 1
+				local.colorG = 0
+				local.colorB = 0
+			}
+			huddraw_color local.index local.colorR local.colorG local.colorB
+			huddraw_alpha local.index level.alpha
+		}
+		waitframe
+	}
+
+	if (level.flags[King_Tiger_Lost] == 1){
+		local.index = 100
+
+		local.string = ("KING TIGER HEALTH 0")
+		local.distance = local.string.size / -2
+
+		huddraw_font local.index "facfont-20"
+		huddraw_string local.index local.string
+		huddraw_align local.index center top
+		huddraw_rect local.index (local.distance * 13) 10 0 0
+		local.num = local.num / 100
+		local.colorR = 0
+		local.colorG = 0
+		local.colorB = 0
+
+		huddraw_color local.index local.colorR local.colorG local.colorB
+		huddraw_alpha local.index 1
+	}
+	else{
+		//$playertank.health = 50000 //chrissstrahl
+		$playertank.health = 500000 //chrissstrahl
+		while (level.alpha > 0){
+			//chrissstrahl - differecient between sp and mp, because of nettraffic
+			if(level.gametype == 0){ //sp
+				level.alpha = level.alpha - 0.05
+				wait 0.1			
+			}else{ //mp
+				level.alpha = level.alpha - 0.25
+				wait 0.5
+			}
+			huddraw_alpha local.index level.alpha
+		}
+	}
+}end
+
+drive_disconnect:{
+	self.stopdisc = 0
+	while (self.stopdisc == 0){
+		self disconnect_paths
+		wait 0.5
+	}
+}end
+
+
+dodrive:{
+	self drive $(self.targetname + "path") 50 5 100 256 // ideal speed, accelleration/deceleration, close to nodes,  lookahead
+	self thread drive_disconnect
+	self waitTill drive
+	self.stopdisc = 1
+	self fullstop
+	$playertank thread showhealth
+
+	if (self.targetname == "playertank"){
+		level.flags[tankatbridge] = 1 // Tank has reached the bridge
+
+
+		local.gun = $playertank QueryTurretSlotEntity 0
+		local.gun setAimTarget $flak88
+		wait 3
+		local.gun startfiring // anim "fire"
+		thread global/shutter.scr::shuttrig 2
+		exec global/model.scr $flak88.origin "models/emitters/explosion_mine.tik"
+		level.flags[Flak88_dead] = 1
+		$flak88click delete
+		wait 0.1
+		if (level.flags[Bridge_Is_Gone] == 0)
+		$tankclip solid
+//		$tankclip2 solid
+		$tankclip disconnect_paths
+		$flak88 remove
+		wait 2
+		local.gun stopfiring // anim "fire"
+		wait 1
+
+		local.gun setAimTarget $plunger
+//		local.gun waittill ontarget
+		wait 3
+		local.gun startfiring // anim "fire"
+		thread global/shutter.scr::shuttrig 2
+		thread global/exploder.scr::explode 102
+		exec global/model.scr $plunger.origin "models/emitters/explosion_mine.tik"
+		level.flags[plungergone] = 1 // Tank has destroyed the plunger
+
+		level.totalbridgeblowers = -1
+		$plunger hide
+//	waitthread global/objectives.scr::add_objectives 1 3 "Sneak in and find a high position overlooking the bridge." $obj5.origin
+		waitthread global/objectives.scr::add_objectives 2 3 "Snipe the Germans that try to blow up the bridge." $obj5.origin
+//	waitthread global/objectives.scr::add_objectives 3 2 "Use the high vantage point to call in artillery strikes. You may have to use multiple buildings to cover all the approaches to the bridge." $obj5.origin
+//	waitthread global/objectives.scr::add_objectives 4 1 "Destroy the enemy King Tiger." $obj5.origin
+		waitthread global/objectives.scr::current_objectives 3
+		wait 2
+		
+		local.gun stopfiring // anim "fire"
+
+		local.org = self.origin
+		thread setorigin local.org	
+
+		if (getcvar(debug) == "1"){
+			println ("****** " + self + " begins with " + self.health + " health")
+		}
+
+		local.playertankhealth = $playertank.health
+		local.lasttanksoundtime = level.time
+//	local.tankhit = 0
+
+		while ((isalive self)  &&  (level.flags[King_Tiger_Lost] == 0)){
+			if (local.playertankhealth != $playertank.health){	
+				if (getcvar(debug) == "1"){
+					println ("player tank health is " + $playertank.health + " and maximum player tank health is " + (level.tankhealthmax - level.healthoffset))
+				}
+				local.playertankhealth = $playertank.health
+
+				if (level.time > local.lasttanksoundtime){
+					local.health_fraction = ($playertank.health - level.healthoffset) / (level.tankhealthmax - level.healthoffset)
+						
+					if (local.health_fraction >= 0.7){
+						exec coop_mod/replace.scr::playsound tank_hurt1 //chrissstrahl - coop
+						println "played tank_hurt1"
+					}
+					else if (local.health_fraction >= 0.4){
+						exec coop_mod/replace.scr::playsound tank_hurt2 //chrissstrahl - coop
+						println "played tank_hurt2"
+					}
+					else{
+						exec coop_mod/replace.scr::playsound tank_hurt3 //chrissstrahl - coop
+						println "played tank_hurt3"
+					}
+				}
+			}
+
+			local.range = 50000
+			for (local.i=1;local.i<level.maxvehicles+1;local.i++){
+				if (isalive level.enemytanks[local.i]){
+					if ((vector_length(level.enemytanks[local.i].origin - $playertank.origin)) < local.range){
+						local.targ = level.enemytanks[local.i].aimspot
+						local.range = vector_length(level.enemytanks[local.i].origin - $playertank.origin)
+					}
+				}
+			}
+
+			if (local.range < level.tankrange){
+				local.gun setAimTarget local.targ
+				local.gun waittill ontarget
+				wait 0.5
+				local.gun waitthread firegun
+			}
+			wait 1
+		}
+	}
+	group delete
+}end
+
+setorigin local.origin:{
+	while (isalive self){
+		self.origin = local.origin
+		waitframe
+	}
+}end
+
+firegun:{
+	self startfiring
+	thread global/shutter.scr::shuttrig 2
+	wait 3
+	self stopfiring
+}end
+
+
+
+
+flak88trigger:{
+	if (getcvar(debug) == "1"){
+		println "flakked"
+	}
+	self waittill trigger
+	if (parm.other == $playertank){
+		$flak88 delete
+		self delete
+	}
+	else{
+		goto flak88trigger
+	}
+}end
+
+towerup:{
+	println "prepping tower1"
+	while (level.tower < 3){
+		self waittill trigger
+		println ("1GOT HIT BY " + parm.other + " " + parm.owner)
+
+		for (local.i=1;local.i<level.maxvehicles+1;local.i++){
+			if (isalive level.enemytanks[local.i]){
+				local.gun = level.enemytanks[local.i] QueryTurretSlotEntity 0
+				if (local.gun == parm.owner){
+					level.tower++
+					if (getcvar(debug) == "1"){
+						println ("level tower is " + level.tower)
+					}
+					if (level.tower == 2){
+						thread global/exploder.scr::explode 104
+						level.destroytowertime = level.time + 8
+//						$player playsound radio_watchout // "Watch out!"
+					}
+				}
+
+			}
+		}
+	}
+}end
+
+
+towerdown:{
+	while (level.tower < 6){
+		self waittill trigger
+		println ("2GOT HIT BY " + parm.other + " " + parm.owner)
+
+		if (level.tower > 2){
+			if (level.time > level.destroytowertime){
+				for (local.i=1;local.i<level.maxvehicles+1;local.i++){
+					if (isalive level.enemytanks[local.i])
+					{	
+					local.gun = level.enemytanks[local.i] QueryTurretSlotEntity 0
+					if (local.gun == parm.owner)
+						{
+							level.tower++
+					if (getcvar(debug) == "1")
+							println ("level tower is " + level.tower)
+							if (level.tower == 5)
+							{
+								thread global/exploder.scr::explode 103
+								thread killplayer $towerkill
+							}
+						}
+			
+					}
+				}
+			}
+		}
+	}
+	self delete
+}end	
+
+
+livecheck:{
+	self waittill death
+	group delete
+}end
+
+flak88click:
+	local.player = parm.other //chrissstrahl - coop
+	
+	if (level.flags[Artillary_Ready] == 1){
+		if (level.flags[Flak88_dead] == 0){
+			if (( istouching $binoleft) || (local.player istouching $binoright) || (local.player istouching $binomid)){ //chrissstrahl - coop
+				if (level.time > level.lastshottime){
+					level.lastshottime = level.time + 7
+					waitthread hitcoord // Roger got coords
+					wait 4
+
+					thread bomberhit
+
+					exec global/model.scr $flak88.origin "models/emitters/explosion_mine.tik"
+					$flak88 remove
+
+					if (getcvar(bridge) != "1"){
+						thread explodesound
+						thread global/exploder.scr::explode 101
+						wait 2
+						thread global/exploder.scr::explode 301
+						thread global/exploder.scr::explode 302
+						thread global/exploder.scr::explode 303
+						thread global/exploder.scr::explode 304
+						thread global/exploder.scr::explode 305
+						thread global/exploder.scr::explode 306
+						thread global/exploder.scr::explode 307
+						thread global/exploder.scr::explode 308
+					}
+					wait 2
+			//		$bridgeclip notsolid
+					iprintlnbold "By accidentally destroying the bridge, you have failed the mission"
+					wait 3
+					if (getcvar(debug) != "1"){
+						missionfailed
+						
+						//chrissstrahl - reload map in mp
+						if(level.gametype != 0){
+							local.levelname = getcvar("mapname")
+							exec global/missioncomplete.scr local.levelname
+							wait 1
+							//stuffcmd "rcon map m5l2a"
+							//server "map" m5l2b"
+							//chrissstrahl - how much you may try not to obey I will get you, BITCH!
+							local.hostPlayer = getentbyentnum 0	
+							local.hostPlayer stufftext ("map "+local.levelname)
+						}
+					}
+					//iprintlnbold_noloc("DEV: Mission failed")
+					end
+				}
+			}
+		}
+	}
+	local.player playsound fail_artillery //chrissstrahl - coop
+end
+
+clicker local.click local.player:{ //chrissstrahl - coop, added parameter to retrive clicking player
+	if (level.flags[Artillary_Ready] == 1){
+		if (level.time > level.lastshottime){
+			level.lastshottime = level.time + 7
+			waitthread hitcoord // Roger got coords
+			wait 4
+
+			if (self != NULL){
+				if ((local.player istouching $binoleft) || (local.player istouching $binoright) || (local.player istouching $binomid)){ //chrissstrahl - coop
+					waitthread arty
+					thread global/exploder.scr::explode local.click
+				}
+			}
+			if (self != NULL){
+				self delete
+			}
+
+			wait (1 + randomfloat(1))
+			thread readytofire
+			end
+		}
+	}
+
+	local.player playsound fail_artillery //chrissstrahl - coop
+}end
+
+click1:{
+	thread clicker 1 parm.other //chrissstrahl - coop, added player who clicked
+}end
+
+click2:{
+	thread clicker 2 parm.other //chrissstrahl - coop, added player who clicked
+}end
+
+click3:{
+	thread clicker 3 parm.other //chrissstrahl - coop, added player who clicked
+}end
+
+click4:{
+	thread clicker 4 parm.other //chrissstrahl - coop, added player who clicked
+}end
+
+click5:{
+	thread clicker 5 parm.other //chrissstrahl - coop, added player who clicked
+}end
+
+click6:{
+	thread clicker 6 parm.other //chrissstrahl - coop, added player who clicked
+}end
+
+click7:{
+	thread clicker 7 parm.other //chrissstrahl - coop, added player who clicked
+}end
+
+click8:{
+	thread clicker 8 parm.other //chrissstrahl - coop, added player who clicked
+}end
+
+click9:{
+	thread clicker 9 parm.other //chrissstrahl - coop, added player who clicked
+}end
+
+click10:{
+	thread clicker 10 parm.other //chrissstrahl - coop, added player who clicked
+}end
+
+arty:{
+	local.ent = spawn script_model
+	local.ent model "fx/dummy.tik"
+	waitframe //chrissstrahl - make sure this really works in mp as well
+	//local.ent.origin = $player.origin //  local.vec
+	local.ent.origin = waitexec coop_mod/replace.scr::origin local.ent //chrissstrahl - coop
+	local.num = 7 + randomint (4)
+	local.ent playsound arty_leadin wait
+//	local.ent playsound ("arty_leadin0" + local.num) wait
+//	println ("played " + ("arty_leadin0" + local.num))
+
+	//chrissstrahl - this might make problems, waiting for a sound can cause the script to freeze
+	//local.ent waittill sounddone
+	wait 6.9 //chrissstrahl - replacement, since waittill sounddone may freeze the script in mp/bt
+	local.ent delete
+}end
+
+
+artillaryhit local.origin local.shot:{
+	wait (randomfloat(0.5))
+	waitthread arty
+	local.vec = local.origin // self.origin
+	local.vec[0] = local.vec[0] + randomint(800) - 400
+	local.vec[1] = local.vec[1] + randomint(800) - 400
+	local.vec[2] = local.vec[2] + randomint(50) - 25
+
+	exec global/model.scr local.vec local.model local.scale
+	if (local.shot != NIL){
+		wait 0.3
+		thread bomberhit
+	}
+}end
+
+hitcoord:{
+	wait (randomfloat(1) + 0.4)
+	local.random = level.hitrandomsound
+
+	while (local.random == level.hitrandomsound){
+		local.random = randomint(8) + 9
+	}
+
+	level.hitrandomsound = local.random
+	
+	if (local.random < 10)
+		exec coop_mod/replace.scr::playsound ("dfr_m5l2_50" + local.random) //chrissstrahl - coop
+	else
+		exec coop_mod/replace.scr::playsound ("dfr_m5l2_5" + local.random) //chrissstrahl - coop
+}end
+
+readytofire:{
+	local.random = level.readytofiresound
+
+	while (local.random == level.readytofiresound){
+		local.random = randomint(5) + 4
+	}
+
+	level.readytofiresound = local.random
+	exec coop_mod/replace.scr::playsound ("dfr_m5l2_50" + local.random) //chrissstrahl - coop
+}end
+
+
+clickhit:{
+//	exec global/model.scr self.origin "models/emitters/mortar_higgins.tik"
+	if (level.flags[Artillary_Ready] == 1)
+	if (	(exec coop_mod/replace.scr::istouching $binoleft) ||
+			(exec coop_mod/replace.scr::istouching $binoright) ||
+			(exec coop_mod/replace.scr::istouching $binomid)	){
+		if (level.time > level.lastshottime){
+			level.lastshottime = level.time + 7
+			waitthread hitcoord // Roger got coords
+
+			local.vec = (0 0 0)
+			for (local.i=1;local.i<level.binoorgs+1;local.i++){
+				if (self.set == level.binoorg[local.i].set){
+					local.vec = level.binoorg[local.i].origin
+					local.i = level.binoorgs + 5
+				}
+			}
+			wait 3.5 // was 2
+			println "DID THE HIT"
+//			thread artillaryhit local.vec "models/emitters/explosion_mine.tik" 2
+			thread artillaryhit local.vec "models/emitters/mortar_higgins.tik" 2.5
+			thread artillaryhit local.vec "models/emitters/mortar_higgins.tik" 3
+			thread artillaryhit local.vec "models/emitters/mortar_higgins.tik" 2 1
+//			thread artillaryhit local.vec "models/emitters/explosion_mine.tik" 2
+
+			wait (1 + randomfloat(1))
+			thread readytofire
+			wait 2
+			end	
+		}
+	}
+	exec coop_mod/replace.scr::playsound fail_artillery //chrissstrahl - coop
+}end
+
+showorgg:{
+	if (getcvar(debug) == "1"){
+		println (self.targetname + " origin " + self.origin)
+	}
+	wait 0.4
+	goto showorgg
+}end
+
+initalarm:{
+	thread enemyspawnerthink
+
+	if ($clicktarget == NULL){
+		level.clicktargets = 0
+	}
+	else{
+		level.clicktargets = $clicktarget.size
+	}
+
+	if (level.clicktargets > 0){
+		level.clicktarget = exec global/makearray.scr $clicktarget
+
+		for (local.i=1;local.i<level.clicktargets+1;local.i++){
+			if (level.clicktarget[local.i].set == NIL){
+				println "Error, clicktarget has no #set"
+			}
+			else{
+				println ("Spawned clicktarget " + level.clicktarget[local.i].set)
+			}
+		}
+	}
+
+	if ($end == NULL){
+		level.ends = 0
+	}
+	else{
+		level.ends = $end.size
+	}
+
+	if (level.ends > 0){
+		level.end = exec global/makearray.scr $end
+	}
+
+	if ($endpoint == NULL){
+		level.endpoints = 0
+	}
+	else{
+		level.endpoints = $endpoint.size
+	}
+
+	if (level.endpoints > 0){
+		level.endpoint = exec global/makearray.scr $endpoint
+	}
+
+	if ($binoorg == NULL){
+		level.binoorgs = 0
+	}
+	else{
+		level.binoorgs = $binoorg.size
+	}
+
+	if (level.binoorgs > 0){
+		level.binoorg = exec global/makearray.scr $binoorg
+		
+		for (local.i=1;local.i<level.binoorgs+1;local.i++){
+//			level.binoorg[local.i] thread binoorgboom
+			if (level.binoorg[local.i].set == NIL){
+				println "Error, binoorg has no #set"
+			}
+			else{
+				println ("Spawned binoorg " + level.binoorg[local.i].set)
+			}
+		}
+	}
+
+	if ($tanktrigger == NULL){
+		level.tanktriggers = 0
+	}
+	else{
+		level.tanktriggers = $tanktrigger.size
+	}
+
+	if (level.tanktriggers > 0){
+		level.tanktrigger = exec global/makearray.scr $tanktrigger
+		
+		for (local.i=1;local.i<level.tanktriggers+1;local.i++){
+			level.tanktrigger[local.i] thread tanktriggerboom
+			if (level.tanktrigger[local.i].set == NIL){
+				println "Error, tanktrigger has no #set"
+			}
+			else{
+				println ("Spawned tanktrigger " + level.tanktrigger[local.i].set)
+			}
+		}
+	}
+
+
+	if ($buildingspawn == NULL){
+		level.buildingspawns = 0
+	}
+	else{
+		level.buildingspawns = $buildingspawn.size
+	}
+
+	if (level.buildingspawns > 0){
+		level.buildingspawn = exec global/makearray.scr $buildingspawn
+
+		for (local.i=1;local.i<level.buildingspawns+1;local.i++){
+			if (level.buildingspawn[local.i].set == NIL){
+				println "Error, buildingspawn has no #set"
+			}
+			else{
+				println ("Spawned buildingspawn " + level.buildingspawn[local.i].set)
+			}
+		}
+	}
+
+	if ($alarmspawn == NULL){
+		level.alarmspawns = 0
+	}
+	else{
+		level.alarmspawns = $alarmspawn.size
+	}
+
+	if (level.alarmspawns > 0){
+		level.alarmspawn = exec global/makearray.scr $alarmspawn
+
+		for (local.i=1;local.i<level.alarmspawns+1;local.i++){
+			if (level.alarmspawn[local.i].set == NIL){
+				println "Error, alarmspawn has no #set"
+			}
+			else{
+				println ("Spawned alarmspawn " + level.alarmspawn[local.i].set)
+			}
+		}
+	}
+
+	if ($alarmpath == NULL){
+		level.alarmpaths = 0
+	}
+	else{
+		level.alarmpaths = $alarmpath.size
+	}
+
+	if (level.alarmpaths > 0){
+		level.alarmpath = exec global/makearray.scr $alarmpath
+		for (local.i=1;local.i<level.alarmpaths+1;local.i++){
+			level.alarmpath[local.i].used = 0
+
+			if (level.alarmpath[local.i].set == NIL)
+				println "Error, alarmpath has no #set"
+			else
+				println ("Spawned alarmpath " + level.alarmpath[local.i].set)
+		}
+	}
+
+	if ($alarmtrigger == NULL){
+		level.alarmtriggers = 0
+	}
+	else{
+		level.alarmtriggers = $alarmtrigger.size
+	}
+
+	if (level.alarmtriggers > 0){
+		level.alarmtrigger = exec global/makearray.scr $alarmtrigger
+
+		for (local.i=1;local.i<level.alarmtriggers+1;local.i++){
+			level.alarmtrigger[local.i] thread alarmtrigger
+
+			if (level.alarmtrigger[local.i].set == NIL)
+				println "Error, alarmtrigger has no #set"
+			else
+				println ("Spawned alarmtrigger " + level.alarmtrigger[local.i].set)
+		}
+	}
+}end
+
+alarmtrigger:{
+	level.alarmoff[self.set] = 0
+	self waittill trigger
+	level.alarmoff[self.set] = 1
+}end
+
+
+alarmhit local.num:{
+//		self exec global/disable_ai.scr
+//		self patrolpath $("alarm" + local.num + "pathnew")
+		self type_idle "runner"
+		self type_attack "alarm"
+		self alarmthread "bridgeprep2"
+//		self alarmnode ""
+
+
+	if (level.alarmoff[local.num] == 0){
+		level.alarmoff[local.num] = 1
+
+		for (local.i=1;local.i<level.alarmspawns+1;local.i++){
+// vehicles//tigertank.tik
+			if (level.alarmspawn[local.i].set == local.num){
+				spawn human/german_wehrmact_soldier "targetname" ("respondguy" + local.num + "_" + local.i)
+				$("respondguy" + local.num + "_" + local.i) forceactivate
+
+				$("respondguy" + local.num + "_" + local.i) model "human/german_wehrmact_soldier.tik"
+				$("respondguy" + local.num + "_" + local.i).origin = level.alarmspawn[local.i].origin
+				$("respondguy" + local.num + "_" + local.i) type_attack "cover" // was turret
+	//			$("respondguy" + local.num + "_" + local.i) type_curious "curious"
+				$("respondguy" + local.num + "_" + local.i) type_disguise "salute"
+				$("respondguy" + local.num + "_" + local.i) type_grenade "grenade"
+				$("respondguy" + local.num + "_" + local.i) type_idle "runner"
+	//			$("respondguy" + local.num + "_" + local.i) type_killed "killed"
+	//			$("respondguy" + local.num + "_" + local.i) type_pain "pain"
+
+	//			$("respondguy" + local.num + "_" + local.i) weapon models/weapons/KAR98.tik
+				$("respondguy" + local.num + "_" + local.i) useweaponclass rifle
+
+				local.dist = randomint(400)
+				$("respondguy" + local.num + "_" + local.i) mindist local.dist
+				local.dist = local.dist + randomint(400)
+				$("respondguy" + local.num + "_" + local.i) maxdist local.dist
+
+				for (local.p=1;local.p<level.alarmpaths+1;local.p++){
+					if ((level.alarmpath[local.p].set == local.num) && (level.alarmpath[local.p].used == 0)){
+						level.alarmpath[local.p].used = 1
+						local.patrolpath = level.alarmpath[local.p]
+						$("respondguy" + local.num + "_" + local.i) patrolpath local.patrolpath
+						local.p = level.alarmpaths + 5
+					}
+				}
+
+//			$("respondguy" + local.num + "_" + local.i) patrolpath $t447
+			$("respondguy" + local.num + "_" + local.i) exec global/enable_ai.scr
+//			$("respondguy" + local.num + "_" + local.i) gun "weapons/KAR98.tik"
+			}
+		}
+	}
+}end
+
+
+spawnendguy local.origin:{
+	local.ent = spawn human/2nd-ranger_private
+	local.ent.origin = local.origin
+	local.ent.angles = (0 90 0)
+	local.ent.health = 5000
+	local.ent.leash = 5000
+	local.ent type_attack "turret"
+	local.newnum = randomint(level.endpoints - 1) + 1
+	local.ent2 = level.endpoint[local.newnum]
+	local.ent runto local.ent2
+}end
+
+alarm1:{
+//	thread alarmhit 1	
+	thread global/ai.scr::spawn 216
+}end
+
+alarm2:{
+	thread global/ai.scr::spawn 215
+//	thread alarmhit 2
+}end
+
+
+bridgeblow:{
+	if (getcvar(cheat) == "1"){ end }
+
+	self exec global/disable_ai.scr
+	if ((level.flags[plungergone] == 1) || (level.flags[Bridge_Is_Gone] == 1)){
+		self exec global/disable_ai.scr
+		self.movedoneradius = 500
+		self runto $killbaddie
+		self waittill movedone
+//		self delete
+		self damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+		end
+	}
+
+	self exec global/disable_ai.scr
+	self.health = 1
+	wait 0.1
+	self.origin = $plunger gettagposition "tag_origin"
+	self.angles = (0 90 0)
+	self anim "plunger_set"
+	self waittill animdone
+
+//	wait 1
+	if (isalive self){
+		if ((level.flags[plungergone] == 1) || (level.flags[Bridge_Is_Gone] == 1)){
+			self runto $killbaddie
+			self waittill movedone
+	//		self delete
+			end
+		}
+
+		if (getcvar(bridge) != "1"){
+			level.flags[Bridge_Is_Gone] = 1
+			$tankclip notsolid
+
+			self notsolid
+			self anim "plunger_fire"
+			$plunger thread fireplunger
+			self waittill animdone
+		//	self exec global/enable_ai.scr
+
+			thread explodesound
+			thread global/exploder.scr::explode 101
+			wait 2
+			thread global/exploder.scr::explode 301
+			thread global/exploder.scr::explode 302
+			thread global/exploder.scr::explode 303
+			thread global/exploder.scr::explode 304
+			thread global/exploder.scr::explode 305
+			thread global/exploder.scr::explode 306
+			thread global/exploder.scr::explode 307
+			thread global/exploder.scr::explode 308
+		}
+
+		self solid
+		self runto $killbaddie
+	//	fadeout 3.5 0 0 0 1
+
+	//			$bridgeclip notsolid
+		iprintlnbold "The bridge was destroyed. You failed the mission."
+		wait 3
+		
+		if (getcvar(debug) == "1"){ end }
+				
+		//iprintlnbold_noloc("DEV: Mission failed")
+		missionfailed
+		
+		//chrissstrahl - reload map in mp
+		if(level.gametype != 0){
+			local.levelname = getcvar("mapname")
+			exec global/missioncomplete.scr local.levelname
+			wait 1
+			//stuffcmd "rcon map m5l2a"
+			//server "map" m5l2b"
+			//chrissstrahl - how much you may try not to obey I will get you, BITCH!
+			local.hostPlayer = getentbyentnum 0	
+			local.hostPlayer stufftext ("map "+local.levelname)
+		}
+	}
+}end
+
+fireplunger:{
+	self anim "fire"
+//	self waittill animdone
+}end
+
+explodesound:{
+	local.ent = spawn script_origin
+	local.ent.origin = $t123.origin
+	local.ent playsound explode_bridge wait
+	local.ent waittill sounddone
+	local.ent delete
+}end
+
+
+tanktriggerboom:{
+	self waittill trigger
+
+	if (level.time > level.lasttankhit){
+	for (local.i=1;local.i<level.maxvehicles+1;local.i++){
+		if (isalive level.enemytanks[local.i]){
+			local.gun = level.enemytanks[local.i] QueryTurretSlotEntity 0
+			if (local.gun == parm.owner){
+				level.lasttankhit = level.time + 10
+				thread global/exploder.scr::explode self.set
+
+				for (local.p=1;local.p<level.clicktargets+1;local.p++){
+//				println ("     set " + level.clicktarget[local.p].set + " compared to " + self.set)
+
+					if (level.clicktarget[local.p])
+					if ((level.clicktarget[local.p].set == NIL) || (level.clicktarget[local.p].set == self.set))
+						level.clicktarget[local.p] delete
+				}
+
+				self delete
+				end
+			}
+		}
+	}
+
+		local.gun = $playertank QueryTurretSlotEntity 0
+		if (local.gun == parm.owner){
+			level.lasttankhit = level.time + 10
+			thread global/exploder.scr::explode self.set
+
+				for (local.p=1;local.p<level.clicktargets+1;local.p++){
+//				println ("     set " + level.clicktarget[local.p].set + " compared to " + self.set)
+
+					if (level.clicktarget[local.p])
+					if ((level.clicktarget[local.p].set == NIL) || (level.clicktarget[local.p].set == self.set))
+						level.clicktarget[local.p] delete
+				}
+			self delete
+			end
+		}
+	}
+	thread tanktriggerboom
+}end
+
+
+
+
+enemyspawnerthink:{
+	//level waittill spawn //chrissstrahl
+	waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl
+
+	local.maxguys = 5
+	local.num = 0
+
+
+	while (level.flags[Reinforcements] == 0){
+		wait 1
+	}
+
+	for (local.i=1;local.i<local.maxguys;local.i++){
+		spawn script_origin "targetname" ("dummy" + local.i) 
+		local.ent[local.i] = $("dummy" + local.i)
+	}
+
+enemyspawnerthinkgo:
+	println "spawnthinkgo 01"
+
+	while (level.flags[killed_king_tiger] == 0){
+		println "spawnthinkgo 02"
+	
+		//chrissstrahl - coop
+		while (	!(exec coop_mod/replace.scr::istouching $binoleft) &&
+				!(exec coop_mod/replace.scr::istouching $binoright) &&
+				!(exec coop_mod/replace.scr::istouching $binomid))
+		{	
+			wait 3
+		}
+
+		while (level.totalbaddies < 2){// was 3
+			if (exec coop_mod/replace.scr::istouching $binoleft){ //chrissstrahl - coop
+				println "spawned left guy"
+				thread global/ai.scr::spawn (204 + randomint(3))
+			}
+			else
+			if (exec coop_mod/replace.scr::istouching $binomid){ //chrissstrahl - coop
+				println "spawned mid guy"
+				thread global/ai.scr::spawn (201 + randomint(3))
+			}
+			else
+			if (exec coop_mod/replace.scr::istouching $binoright){ //chrissstrahl - coop
+				println "spawned right guy"
+				thread global/ai.scr::spawn (207 + randomint(3))
+			}
+
+			wait 1
+		}
+
+	println "spawnthinkgo 03"
+		wait 5
+	}
+
+	wait (7 + randomint(10))
+	if (level.time < level.wintime + 15)
+	goto enemyspawnerthinkgo
+}end
+
+
+levelmusic:{
+	exec coop_mod/replace.scr::tmstart "sound/music/mus_SniperTown_01b.mp3"  //chrissstrahl - coop
+}end
+
+///////////////////////// // local.target local.range local.offset local.trigger local.variable local.gun_name:
+flak88:{
+	//level waittill spawn //chrissstrahl
+	waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl
+
+	//chrissstrahl - coop
+	if(level.gametype != 0){
+		$flak88 setaimtarget NULL
+	}else{//chrissstrahl - sp
+		$flak88 setaimtarget NULL
+	}
+	local.gun_name = $flak88
+
+	while (level.flags[Flak88_dead] == 0){
+		local.player = exec coop_mod/replace.scr::getToucher $flak88_trigger //chrissstrahl - coop
+		if ( local.player != NULL ){
+			$flak88 setaimtarget local.player //chrissstrahl
+			$flak88 playsound flak_snd_fire
+			wait 0.5
+
+			local.dist = vector_length ($flak88.origin - local.player.origin) //chrissstrahl
+			local.dist = local.dist - 1300
+			local.range = 25 + (local.dist / 7)
+			local.offset = 50 + (local.dist / 1.2727)
+
+			 println "z:    params " local.range local.offset
+
+			local.vec = vector_normalize (local.gun_name.origin - (local.player.origin)) //chrissstrahl
+			local.a = vector_scale local.vec local.offset
+			local.a =  local.a + local.player.origin + (0 0 32) //chrissstrahl
+
+			for (local.i=0;local.i<2;local.i++){
+				if (randomint(100) > 50)
+					local.a[local.i] = local.a[local.i] + randomint(local.range)
+				else
+					local.a[local.i] = local.a[local.i] - randomint(local.range)
+			}
+			exec global/model.scr local.a "models/fx/scriptbazookaexplosion.tik"
+			wait 1.5
+		}
+		else 
+			$flak88 setaimtarget $t425
+
+		wait 0.35
+	}
+}end
+
+bridgeprep2:{
+	end
+
+	self.type_attack = "cover"
+	self exec coop_mod/replace.scr::runtoClosest //chrissstrahl - coop
+	wait (3 + randomint(3))
+	
+	while (level.bridgerunners > 0){ // Just for demo, no bridge runners
+		wait 0.5
+	}
+		
+	if (isalive self){
+		level.bridgerunners++
+		thread deathrunner
+		self type_attack "alarm"
+		self alarmthread "bridgeblowprep"
+		self alarmnode "plungerprepnode"
+	}
+}end
+
+bridgesetup:{
+	while (level.flags[plungergone] == 0){
+		while (level.bridgerunners > 0){
+			wait 0.5
+		}
+
+		wait randomfloat(3)
+		local.ent = -1
+		local.lastent = -1
+		local.range = 1500
+		for (local.i=1;local.i<level.enemys+1;local.i++){
+			if (isalive level.enemy[local.i]){
+				//chrissstrahl - check each player in coop
+				for (local.i = 1;local.i <= $player.size;local.i++){
+					local.player =  $player[local.i]
+					//chrissstrahl - check always
+					if(	local.player == NULL || local.player.health <= 0 )	{
+						continue
+					}
+					//chrissstrahl - check only during mp
+					if(level.gametype != 0){
+						if(	local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1){
+							continue
+						}
+					}
+
+					local.newrange = vector_length (level.enemy[local.i].origin - local.player.origin) //chrissstrahl
+					if (local.newrange < local.range){
+						local.range = local.newrange
+						if (local.lastent == -1){
+							local.ent = local.lastent
+							local.lastent = local.i
+						}
+						else{
+							local.lastent = local.i
+							local.ent = local.i
+						}
+					}
+				}
+
+				if (local.ent != -1){
+					if (level.enemy[local.ent] exec coop_mod/replace.scr::cansee local.player){ //chrissstrahl - coop
+						level.enemy[local.ent] thread bridgeblownow (randomint(3))
+					}
+				}
+				wait 2
+			}
+		}
+	}
+}end
+
+bridgeblownow local.randnum:{
+//	println ("random is " + local.randnum)
+//	centerprint "I'm going to detonate the bridge!"
+
+	centerprint "Powell, stop him before he can blow the bridge!"
+//	if (local.randnum == 0)
+//		self say dfr_M5L3_mackey1
+//	else
+//	if (local.randnum == 1)
+//		self say dfr_M5L3_mackey2
+//	else
+//		self say dfr_M5L3_mackey3
+
+	level.bridgerunners++
+	self thread deathrunner
+	self type_attack "alarm"
+	self alarmthread "bridgeblowprep"
+	self alarmnode "plungerprepnode"
+	
+	wait (1.5 + randomfloat(1))
+	if (isalive self){
+		local.num = randomint(3) + 1
+		while (local.num == level.warning){
+			local.num = randomint(3) + 1
+		}
+
+		level.warning = local.num
+		if (level.warning == 1){
+			exec coop_mod/replace.scr::playsound m5l3_warning1 //chrissstrahl - coop
+		}
+		else if (level.warning == 2){
+			exec coop_mod/replace.scr::playsound m5l3_warning2 //chrissstrahl - coop
+		}
+		else if (level.warning == 3){
+			exec coop_mod/replace.scr::playsound m5l3_warning6 //chrissstrahl - coop
+		}
+	}
+}end
+
+deathrunner:{
+	self waittill death
+	level.bridgerunners--
+}end
+
+
+// exploders:
+// 101 bridge
+// 102 plunger
+// 103 mid tower
+// 104 top tower
+
+/*
+	201 left
+	202
+	203
+
+	204 mid
+	205
+	206
+
+	207 right
+	208
+	209
+
+	215	alarm2
+	216	alarm1
+
+	301 - 308 killplayer guys
+
+	401 rescue guys	
+
+	402 enemy rescue attackers
+
+
+	plungerprepnode
+	bridgeblowprep
+*/
+
+//chrissstrahl - spawn bazooka for players to kill tank
+//============================================================================
+coop_spawnSniper:{
+//============================================================================
+	local.trigg1 = spawn trigger_multiple origin ( -1015 1640 664 ) setthread "coop_sniperSwitch" wait 2
+	local.trigg2 = spawn trigger_multiple origin ( 862 1620 900 ) setthread "coop_sniperSwitch" wait 2
+	local.trigg3 = spawn trigger_multiple origin ( 272 1687 928 ) setthread "coop_sniperSwitch" wait 2
+	spawn script_model model "models/weapons/KAR98sniper.tik" targetname "theOneAndOnlyTrueSniper1" origin ( -1015 1640 664 ) notsolid 1 angles (0 0 180)
+	spawn script_model model "models/weapons/KAR98sniper.tik" targetname "theOneAndOnlyTrueSniper2" origin ( 862 1604 928 ) notsolid 1 angles (0 0 180)
+	spawn script_model model "models/weapons/KAR98sniper.tik" targetname "theOneAndOnlyTrueSniper3" origin ( 272 1687 928 ) notsolid 1 angles (0 0 180)
+	waitframe
+	local.trigg1 setsize ( -10 -10 0 ) ( 10 10 50 )
+	local.trigg2 setsize ( -10 -10 0 ) ( 10 10 50 )
+	local.trigg3 setsize ( -10 -10 0 ) ( 10 10 50 )
+	$theOneAndOnlyTrueSniper1 rotateY 100
+	$theOneAndOnlyTrueSniper2 rotateY 100
+	$theOneAndOnlyTrueSniper3 rotateY 100
+}end
+
+//chrissstrahl - allow players to switch their weapons
+//============================================================================
+coop_sniperSwitch:{
+//============================================================================
+	//iprintlnbold_noloc("coop_SniperSwitch")
+	if( parm.other.targetname == "player"){
+		local.player = parm.other
+		if( local.player.flags["coop_SniperSwitch"] == NIL ){	
+			local.isPrimary = 0
+			local.primary = waitexec coop_mod/main.scr::getActiveWeapon local.player
+			for(local.x=0;local.x<4;local.x++){
+				if(local.player == NULL || local.player.health <= 0){	end	}
+				for(local.y=0;local.y<5;local.y++){
+					local.type = "heavy"
+					if(local.y == 0){ local.type = "smg" }
+					else if(local.y == 1){ local.type = "rifle" }
+					else if(local.y == 2){ local.type = "mg" }
+					local.player useweaponclass (local.type)
+					waitframe
+				}
+				local.primary = waitexec coop_mod/main.scr::getActiveWeapon local.player
+				local.isPrimary = waitexec coop_mod/main.scr::isPrimaryWeapon local.primary
+				if(local.isPrimary == 1){
+					local.player.flags["coop_SniperSwitch"] = local.primary
+					break					
+				}
+			}
+			//if no more player
+			if(local.player == NULL || local.player.health <= 0){	end	}
+			
+			//if the player still does not have a primary weapon stop right here
+			if(	local.isPrimary == 0 ){
+				local.player iprint ("You need a Primary Weapon in order to Trade your weapon!") 1
+				end
+			}
+			exec coop_mod/main.scr::playerForcePrimary local.player "models/weapons/KAR98sniper.tik"
+			local.player item rifle
+		}else{
+			exec coop_mod/main.scr::playerForcePrimary local.player local.player.flags["coop_SniperSwitch"]
+			local.player.flags["coop_SniperSwitch"] = NIL
+		}
+	}
+}end
+

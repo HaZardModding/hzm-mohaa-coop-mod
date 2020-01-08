@@ -1,0 +1,1198 @@
+
+// global attributes
+
+// init AA gun
+//============================================================================
+initAA: {
+//============================================================================
+	level.gunShootRadius = 500
+	level.gunMinShootRadius = 100 
+	level.AAgunVelocity  = 150  
+
+	$aagun1 thread maps/e2l1/aaguns.scr::StartAAGun $aagun1_turret0 $aagun1guy $aagun1charge $aagun1shottrigger 0 //aagun
+	$aagun2.charge = $aagun2charge
+	$aagun2.flak = 0
+
+	$aagun3 thread maps/e2l1/aaguns.scr::StartAAGun $aagun3_turret0 $aagun3guy $aagun3charge $aagun3shottrigger 0 //aagun
+	$aagun4.charge = $aagun4charge
+	$aagun4.flak = 0
+
+	$aagun5 thread maps/e2l1/aaguns.scr::StartAAGun $aagun5_turret0 $aagun5guy $aagun5charge $aagun5shottrigger 0 //aagun
+	$aagun6.charge = $aagun6charge
+	$aagun6.flak = 0
+
+    $aagun2 thread FlakGunSetup $aagun2guy1 $aagun2guy2		// $aagun2guy3	// MJG: no third gunner on this gun?
+    $aagun4 thread FlakGunSetup		// $aagun4guy1 $aagun4guy2 $aagun4guy3	// MJG: no gunners on this gun?
+    $aagun6 thread FlakGunSetup
+	thread SetupPitchCaps
+
+	$aagun1guards thread WakeUpGunner
+	$aagun3guards thread WakeUpGunner
+	$aagun5guards thread WakeUpGunner
+	waitframe
+
+	$aagun1 thread GunOrExplosive
+	$aagun2 thread GunOrExplosive
+	$aagun3 thread GunOrExplosive
+	$aagun4 thread GunOrExplosive 
+	$aagun5 thread GunOrExplosive
+	$aagun6 thread GunOrExplosive
+
+	$aagun1 thread GunOKExplode
+	$aagun2 thread GunOKExplode
+	$aagun3 thread GunOKExplode
+	$aagun5 thread GunOKExplode
+	$aagun4 thread GunNoExplode 
+	$aagun6 thread GunNoExplode 
+
+    $aagun1 thread SetAAGunTarget NULL
+	$aagun2 thread SetAAGunTarget NULL
+	$aagun3 thread SetAAGunTarget NULL
+	$aagun4 thread SetAAGunTarget NULL
+	$aagun5 thread SetAAGunTarget NULL
+	$aagun6 thread SetAAGunTarget NULL
+
+	$aagun2guy1 ai_off
+	$aagun2guy2 ai_off
+	//$aagun2guy3 ai_off		// MJG: doesn't exist?
+
+	$aagun3guy ai_off
+	for (local.i=1;local.i<=$aagun3guards.size;local.i++) {
+		$aagun3guards[local.i] ai_off
+	}
+
+	//	$aagun4guy1 ai_off		// MJG: doesn't exist?
+	//	$aagun4guy2 ai_off		// MJG: doesn't exist?
+	//	$aagun4guy3 ai_off		// MJG: doesn't exist?
+
+	$aagun5guy ai_off
+	for (local.i=1;local.i<=$aagun5guards.size;local.i++) {
+		$aagun5guards[local.i] ai_off
+	}
+
+	$aagun5charge setusethread StartFinalGlider
+	$aagun4charge setusethread FriendsRunAway
+	$aagun6charge setusethread FriendsRunAway2
+	wait 10
+
+	$aagun1 angle 50
+	$aagun2 angle 360
+	$aagun3 angle 350
+	$aagun4 angle 270
+	$aagun5 angle 45
+
+	thread WaitSet800
+	thread WaitSet802
+}end
+
+
+//============================================================================
+SetupPitchCaps: {
+//============================================================================
+	// only let player get on the aaguns from behind it...
+	$aagun1 maxuseangle 25
+	$aagun2 maxuseangle 25
+	$aagun3 maxuseangle 25
+	$aagun4 maxuseangle 25
+	$aagun5 maxuseangle 25
+	$aagun6 maxuseangle 25
+
+	// The FLAK cannons:
+  	$aagun2.turret		= $aagun2 QueryTurretSlotEntity 0
+	$aagun4.turret		= $aagun4 QueryTurretSlotEntity 0
+	$aagun6.turret		= $aagun6 QueryTurretSlotEntity 0
+
+	$aagun2.turret turnspeed 15
+	$aagun2.turret pitchspeed 12
+	$aagun2.turret pitchcaps "-70 15 0"
+	$aagun2.turret viewjitter 7
+	$aagun2.turret firedelay 3
+	$aagun2.turret maxyawoffset 60.0
+	//$aagun2 thread global/stationaryweapons.scr::MountedStationaryWeaponWithCollision "models/statweapons/flak88_d.tik" $flak88_destroyed_collision
+
+	$aagun4.turret turnspeed 15
+	$aagun4.turret pitchspeed 12
+	$aagun4.turret pitchcaps "-70 10 0"
+	$aagun4.turret viewjitter 7
+	$aagun4.turret firedelay 3
+	$aagun4.turret maxyawoffset 60.0
+	//$aagun4 thread global/stationaryweapons.scr::MountedStationaryWeaponWithCollision "models/statweapons/flak88_d.tik" $flak88_destroyed_collision
+
+	$aagun6.turret turnspeed 15
+	$aagun6.turret pitchspeed 12
+	$aagun6.turret pitchcaps "-70 10 0"
+	$aagun6.turret viewjitter 7
+	$aagun6.turret firedelay 3
+	$aagun6.turret maxyawoffset 70.0
+	//$aagun thread global/stationaryweapons.scr::MountedStationaryWeaponWithCollision "models/statweapons/flak88_d.tik" $flak88_destroyed_collision
+
+	// The AA guns
+	$aagun1.turret		= $aagun1 QueryTurretSlotEntity 0
+	$aagun3.turret		= $aagun3 QueryTurretSlotEntity 0
+	$aagun5.turret		= $aagun5 QueryTurretSlotEntity 0
+
+	$aagun1.turret maxyawoffset 100.0
+	$aagun1.turret turnspeed 80
+	$aagun1.turret pitchspeed 20
+	$aagun1.turret pitchcaps "-80 20 0"
+	$aagun1.turret viewjitter 2
+	$aagun1.turret firedelay 0.08
+
+	$aagun3.turret maxyawoffset 115.0
+	$aagun3.turret turnspeed 80
+	$aagun3.turret pitchspeed 25
+	$aagun3.turret pitchcaps "-50 25 0"
+	$aagun3.turret viewjitter 1
+	$aagun3.turret firedelay 0.08
+
+	$aagun5.turret maxyawoffset 95.0
+	$aagun5.turret turnspeed 80
+	$aagun5.turret pitchspeed 25
+	$aagun5.turret pitchcaps "-50 10 0"
+	$aagun5.turret viewjitter 1
+	$aagun5.turret firedelay 0.08
+}end
+
+//============================================================================
+StartFinalGlider: {
+//============================================================================
+	if (level.numAAGunsAlive == 2) {
+		$fifthflybytrigger triggerable
+		trigger $fifthflybytrigger
+	}
+}end
+
+//============================================================================
+FriendsRunAway2: {
+//============================================================================
+	$gobs thread RunHome
+	$johnson thread RunHome
+	$phillips waitthread RunHome
+}end
+
+//============================================================================
+RunHome: {
+//============================================================================
+	if ( !isAlive self ) {end}
+	self waitthread global/SafeMoveTo.scr::reach self.myhome
+}end
+
+// para friendlies running away from the aagun explosion...
+//============================================================================
+FriendsRunAway: {
+//============================================================================
+	// stop our friendly behavior 1st...
+	$hudson thread global/friendly.scr::friendlystop
+	$michaels thread global/friendly.scr::friendlystop
+	$mcmartin thread global/friendly.scr::friendlystop
+
+	if ( isAlive $hudson ) {
+		$hudson runto $rally_1
+	}
+
+	if ( isAlive $michaels ) {
+		$michaels runto $rally_2
+	}
+
+	if ( isAlive $mcmartin ) {
+		$mcmartin runto $rally_3
+	}
+
+	wait 6
+
+	if ( isAlive $hudson ) {
+		$hudson runto NULL
+	}
+
+	if ( isAlive $michaels ) {
+		$michaels runto NULL
+	}
+
+	if ( isAlive $mcmartin ) {
+		$mcmartin runto NULL
+	}
+
+	if ( isAlive $hudson ) {
+		$hudson thread SayThanks
+	}
+
+	// wait until player heads towards the watertower to become friends...
+	//	dprintln "waiting for failsafe trigger to fire..."
+	$ab_failsafe_trigger waittill trigger
+
+	//	dprintln "failsafe trigger fired again.."
+	if (isAlive $hudson) {
+		$hudson.friendtype = 1
+		$hudson.destination = $player
+		$hudson thread global/friendly.scr::friendlythink
+		$hudson.distance = 175
+		$hudson.interval = 128
+	}
+
+	if (isAlive $michaels) {
+		$michaels.friendtype = 1
+		$michaels.destination = $player
+		$michaels thread global/friendly.scr::friendlythink
+		$michaels.distance = 200
+		$michaels.interval = 128
+	}
+
+	if (isAlive $mcmartin) {
+		$mcmartin.friendtype = 1
+		$mcmartin.destination = $player
+		$mcmartin thread global/friendly.scr::friendlythink
+		$mcmartin.friendtype = 1
+		$mcmartin.distance = 150
+		$mcmartin.interval = 128
+	}
+}end
+
+//============================================================================
+SayThanks: {
+//============================================================================
+	//dprintln "hudson attempting to say thanks..."
+	while ( isAlive(self) ) {
+		self runto $player
+
+		if ( vector_length($player.origin - self.origin) < 300 && self.enemy==NULL ) {
+			$hudson lookat $player 
+			$hudson say A_21_Hudson_2		// "Thanks a lot, Baker!" maps "e2l1 "
+			$hudson waittill saydone
+			wait .6
+
+			$hudson say A_21_Hudson_3		// "The rest of the five-oh-five should be here any minute now.  Keep moving!" maps "e2l1 "
+			$hudson waittill saydone
+			$hudson lookat NULL
+			end
+		}
+		wait 0.1
+	}
+}end
+
+//============================================================================
+DestroyAAGun: {
+//============================================================================
+	// "self" refers to the explosive on the static weapon         
+	// "self.target" refers to the static weapon it's attached to  
+
+	// put a hurtin' on the player who thinks standing close is a good idea
+	local.dist = vector_length( $player.origin - self.origin )
+	if ( local.dist < 250 ) {
+		$player damage $world 2500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	}
+
+	if (self.target == "aagun2") {
+		thread maps/e2l1/gliders.scr::startthirdflyby
+		exec global/autosave.scr 2
+
+	}
+	else if (self.target == "aagun1") {
+		thread maps/e2l1/gliders.scr::startfirstflyby
+	}
+	else if (level.numAAGunsAlive == 2) {
+		$fifthflybytrigger triggerable
+	}
+
+	exec global/earthquake.scr .2 4 0 0
+	radiusdamage self.origin 200 200
+	self thread spawn_fx models/fx/fx_truck_explosion.tik
+
+	local.destroyed	= spawn self.target.destroyedmodel 
+	local.destroyed.origin = self.target.origin
+	local.destroyed.angles = self.target.turret.angles
+
+	// make the new thing immobile
+	local.destroyed mass 100000
+	local.destroyed notsolid
+	local.destroyed thread maps/e2l1/effectVisibility.scr::aagun
+
+	local.soundorigin = spawn script_model model "fx/dummy.tik"
+	local.soundorigin.origin = local.destroyed.origin
+	local.soundorigin loopsound fire_med1
+	local.soundorigin notsolid
+
+	local.col = spawn script_object model self.target.destroyedcollision.brushmodel
+	local.col.origin = local.destroyed.origin
+	local.col.angles = local.destroyed.angles
+	local.col safesolid
+
+	self.target remove
+
+	local.hurt_brush = spawn trigger_hurt
+	local.hurt_brush.origin = local.col.origin
+	local.hurt_brush setsize "-32 -32 -128" "32 32 256"
+
+	// 5 pts of damage per sec...
+	local.hurt_brush damage 37.5	// 5 % of 750
+	local.hurt_brush wait 1
+
+	waitframe
+	waitthread maps/e2l1/objectives.scr::transition "destroyedAA"
+	//waitthread maps/e2l1/objectives.scr::DoAAGunObjective
+}end
+
+//============================================================================
+StartAAGun local.turret local.driver local.charge local.shottrigger local.flak: {
+//============================================================================
+	self lock
+	//	self.turret.lock
+
+	self.flak = local.flak
+	self.shottrigger = local.shottrigger
+	self.driver = local.driver
+	self.driver.AAGun = self
+	self.driver.pain = 0
+	self.turret = local.turret
+	self.charge = local.charge
+	self.aimat = spawn script_origin
+	self.movevec = (0 0 0)
+	self.stopfiring = 0
+	self.getting_off = 0
+	self.breaktime = level.time+5
+	self.oldtime = level.time
+	self.aimingatplayer = 0
+
+	self.collisionent = $aagun_collision
+	//	self.turret.collisionent = $aagun_turret_collision
+	self.turret.collisionent = $aagun_turret_collision_ai
+	self.destroyedmodel = "models/statweapons/p_aagun_d.tik"
+	self.destroyedcollision = $aagun_destroyed_collision
+
+	if (local.driver) {
+		local.driver.health = 10000
+		local.driver anim AV_use_AA_gun
+		local.driver gun holster
+		local.driver exec global/disable_ai.scr
+		local.driver physics_off
+		local.driver notsolid
+
+		local.driver.painhandler = maps/e2l1/aaguns.scr::AAGunPain
+		local.driver.deathhandler = maps/e2l1/aaguns.scr::AAGunPain
+		local.driver.origin = self.turret gettagposition "tag_seat"
+		local.driver.angles = self.turret gettagangles "tag_seat"
+	
+		if (self.flak == 1) {
+			self thread FlakGunFire
+		}
+		else {
+			self thread AAGunFire
+		}
+
+		self thread AAGunThink
+	}
+	else {
+		// just have it face forward...
+		self.turret thread CenterTurret
+	}
+
+	self nodamage
+	self.turret nodamage
+	self removeondeath 0
+
+	//CR  Deadlines aproach, bring out yer' hacks
+	//	level waittill spawn
+	self.charge thread HoldChargePlace self.turret
+}End
+
+//============================================================================
+HoldChargePlace local.turret: {
+//============================================================================
+	self.exploded = 0
+	local.angles    = vector_subtract local.turret.angles self.angles
+	local.neworigin = ( 0 0 0 )
+	local.rotatedOffset = ( 0 0 0 )
+	local.fwd  = angles_toforward local.turret.angles
+	local.left = angles_toleft local.turret.angles
+	local.up   = angles_toup local.turret.angles
+	local.offset = vector_subtract self.origin local.turret.origin
+	local.rotatedOffset[0] = vector_dot local.offset local.fwd
+	local.rotatedOffset[1] = vector_dot local.offset local.left
+	local.rotatedOffset[2] = vector_dot local.offset local.up
+
+	//iprintln ( "HI, I should be at " + local.rotatedOffset )
+
+	while ( self && self.exploded == 0 ) {
+		local.fwd  = angles_toforward local.turret.angles
+		local.left = angles_toleft local.turret.angles
+		local.up   = angles_toup local.turret.angles
+
+		local.scratch = vector_scale local.left local.rotatedOffset[1]
+		local.neworigin = vector_scale local.fwd local.rotatedOffset[0]
+		local.neworigin = vector_add local.neworigin local.scratch
+		local.scratch = vector_scale local.up local.rotatedOffset[2]
+		local.neworigin = vector_add local.neworigin local.scratch
+		local.neworigin = vector_add local.neworigin local.turret.origin
+
+		self origin local.neworigin
+		self angles (vector_add local.angles local.turret.angles)
+
+		//iprintln ( "HI, I am at " + local.neworigin )
+		waitframe
+	}
+}end
+
+//============================================================================
+AAGunThink: {
+//============================================================================
+	while (self.stopfiring == 0) {
+		self.driver.origin = self.turret gettagposition "tag_seat"
+		self.driver.angles = self.turret gettagangles "tag_seat"
+		self.shottrigger.origin = self.driver.origin
+		self.shottrigger.angles = self.driver.angles
+
+		if (self.aimingatplayer == 0 && (vector_length($player.origin-self.driver.origin) < 700 || self.driver.pain == 1)) {
+			self thread AimAtPlayerAndGetOut
+		}
+		//waitframe
+		wait 0.1
+	}
+
+	if ( self.getting_off==0 ) {
+		self.turret setaimtarget NULL
+	}
+
+	//self unlock
+	//self.charge explosioneffect "models/fx/demodamage_flak88.tik"
+	//self.charge setusethread charge_used
+}End
+
+//	 jsl--> modified to aim at the player and then get out hiding
+//	the ugly transition off the gun....
+//============================================================================
+AimAtPlayerAndGetOut: {
+//============================================================================
+	self.aimingatplayer = 1
+	self.pause = 1
+	//self.stopfiring = 1
+	self.getting_off = 1
+	self.driver lookat $player
+	self.turret turnspeed 60
+	self.turret setaimtarget $player
+	self.turret waittill ontarget
+	self.turret setaimtarget NULL
+	self.turret turnspeed 30
+
+	//	self.pause = 0
+	//	wait 4
+	self waitthread AAGunExit
+}End
+
+//============================================================================
+AAGunPain: {
+//============================================================================
+	waitframe
+	self.pain = 1
+}End
+
+//============================================================================
+AAGunShot: {
+//============================================================================
+	self.target.driver.pain = 1
+}End
+
+//============================================================================
+WakeUpGunner: {
+//============================================================================
+	self.hearing = 1000
+	self sight 1000
+	self thread WakeUpPain
+	self thread WakeUpDeath
+	self thread WakeUpEnemy
+}End
+
+//============================================================================
+WakeUpPain: {
+//============================================================================
+	self waittill pain
+
+	for (local.i=1;local.i<$(self.targetname).size;local.i++){
+		$(self.targetname)[local.i] attackplayer
+	}
+
+	self.target.pain = 1
+}End
+
+//============================================================================
+WakeUpDeath: {
+//============================================================================
+	self waittill death
+	self.target.pain = 1
+}End
+
+//============================================================================
+WakeUpEnemy: {
+//============================================================================
+	self waittill hasenemy
+
+	for (local.i=1;local.i<$(self.targetname).size;local.i++) {
+		$(self.targetname)[local.i] attackplayer
+	}
+
+	self.target.pain = 1
+}End
+
+//============================================================================
+AAGunExit: {
+//============================================================================
+	self.driver.health = 20
+	self.stopfiring = 1
+
+	local.offset = 1.0*(self.driver.origin - self.turret.origin)
+	local.exitpoint = self.driver.origin + local.offset
+	self.driver.origin = local.exitpoint
+	self.driver physics_on
+	self.driver solid
+
+	self.driver gun "beretta"
+	self.driver unholster
+	self.driver exec global/enable_ai.scr
+
+	self.turret.collisionent = $aagun_turret_collision
+	self.shottrigger remove
+	self.turret thread CenterTurret
+	wait 1.5
+
+	self.driver runto $player	// make sure we go after player...
+	self.driver attackplayer
+}End
+
+//	Since we can't accurately represent the collision when the turret is pointing up,
+//  we re-center the pitch of the turret so that the collision will line up correctly.
+//============================================================================
+CenterTurret: {
+//============================================================================
+	if ( self.auto_center ) {
+		self.auto_center delete
+		self.auto_center = NULL
+	}
+
+	local.vF = self.forwardvector
+	local.vF[2] = 0
+
+	local.o  = self.origin
+	local.o[2] += 20
+	local.o  = local.o + (local.vF * 100)
+
+	self.auto_center = spawn info_notnull origin local.o
+
+	if ( self.auto_center ) {
+		self setaimtarget self.auto_center
+	}
+}end
+
+//============================================================================
+AAGunFire: {
+//============================================================================
+	self thread adjustFireDirection
+	self.breaktime = level.time+5
+
+	while (self.stopfiring == 0) {
+		if (self.pause != 1) {
+			self.turret anim fire_1
+			wait 0.15
+			self.turret anim fire_2
+			wait 0.15
+			self.turret anim fire_3
+			wait 0.15
+			self.turret anim fire_4
+			wait 0.15
+
+			if (self.breaktime < level.time) {
+				wait (1+randomint(2))
+				self.breaktime = level.time+4+randomint(4)
+			}
+		}
+		else {
+			//waitframe
+			wait 0.1
+		}
+	}
+}End
+
+//============================================================================
+adjustFireDirection: {
+//============================================================================
+	while (self.stopfiring == 0) {
+		if (self.breaktime < level.time) {			
+			local.moveto = thread chooseRandomOrigin self.origin level.gunShootRadius
+			self.movevec = local.moveto - self.aimat.origin
+			self.movevec = vector_normalize (self.movevec)
+		}
+
+		local.vec = self.movevec * (level.AAgunVelocity * (level.time - self.oldtime))
+		self.aimat.origin += local.vec
+
+		self.oldtime = level.time
+		wait 0.1	// waitframe
+	}
+}end
+
+//============================================================================
+FlakGunFire: {
+//============================================================================
+	self.stopfiring = 0
+	while (self.stopfiring == 0) {
+		//self.aimat.origin = thread chooseRandomOrigin self.origin level.gunShootRadius
+		self.turret anim fire
+		wait (2+randomint(1))
+	}
+}End
+
+//============================================================================
+SetAAGunTarget local.guntarget: {
+//============================================================================
+	self.oldtime = level.time
+
+	if (local.guntarget == NULL || local.guntarget == NIL) {
+		if (self.aimat) {
+			self.aimat.origin = thread chooseRandomOrigin self.origin level.gunShootRadius
+ 			self.turret setaimtarget self.aimat
+			self.driver lookat self.aimat.origin
+		}
+	}
+	else if (self.stopfiring == 0) {
+		self.turret setaimtarget local.guntarget
+		self.driver lookat local.guntarget
+	}
+}End
+
+// return a random origin with a distance from local.origin
+// in range of 0 to local.radius
+//============================================================================
+chooseRandomOrigin local.origin local.radius: {
+//============================================================================
+	local.neworigin = local.origin
+	local.neworigin[0] += randomint(2 * local.radius) - local.radius
+	local.neworigin[1] += randomint(2 * local.radius) - local.radius
+	local.neworigin[2] += 500
+}end local.neworigin
+
+//============================================================================
+GunOrExplosive: {
+//============================================================================
+	self.helpactiveturret = 0
+	self.helpactiveexplosive = 0
+	self.playerinturret = 0
+	//self.charge setusable 0
+	self.explosiveset = 0
+	
+	while (self) {
+		local.gundist = vector_length($player.origin-self.origin)
+		local.explosivedist = vector_length($player.origin-self.charge.origin)
+		local.canuse = self canuse $player
+
+		if ( local.gundist < 200 && self.explosiveset == 0) {
+			if ((self.flak == 1 && self.bFlakCancelled == 1) || (self.flak == 0 && self.stopfiring == 0)) {
+				local.aionturret = 1
+			}
+			else {
+				local.aionturret = 0
+			}
+
+			if (self.playerinturret == 0 && local.aionturret == 0) {
+				if ( local.canuse==1 ) {
+					if (self.helpactiveturret == 0) {
+						self.helpactiveexplosive = 0
+						self.helpactiveturret = 1
+						local.usekey = getboundkey1 "+use"
+
+						if (self.flak == 1) {
+							local.msg = (loc_convert_string "Press ") + local.usekey + (loc_convert_string " to use the flak cannon.")
+						}
+						else {
+							local.msg = (loc_convert_string "Press ") + local.usekey + (loc_convert_string " to use the AA gun.")
+						}
+
+						thread global/throbtext.scr::throbtext local.msg 1000
+					}
+				}
+				else if (local.explosivedist < 60 && self.noexplode == 0) {
+					if (self.helpactiveexplosive == 0) {
+						self.helpactiveturret = 0
+						self.helpactiveexplosive = 1
+						local.usekey = getboundkey1 "+use"
+						local.msg = (loc_convert_string "Press ") + local.usekey + (loc_convert_string " to set the explosive.")
+						thread global/throbtext.scr::throbtext local.msg 1000
+					}
+				}
+				else {
+					thread global/throbtext.scr::throbtext_off
+					self.helpactiveturret = 0
+					self.helpactiveexplosive = 0
+				}
+			}
+			if ($player.useheld) {
+				if (self.helpactiveexplosive == 1) {
+					self.explosiveset = 1
+					//jsl->invalid command					self.charge setusable 1
+					self.charge doUse
+					thread global/throbtext.scr::throbtext_off
+					end
+				}
+				else if (self.helpactiveturret == 1) {
+					self.helpactiveturret = 0
+					thread global/throbtext.scr::throbtext_off
+					self.playerinturret = 1
+					self unlock
+					self.turret unlock
+					self doUse $player
+					self lock
+					self.turret lock
+					self.turret aimat
+					wait 1
+				}
+				else if (self.playerinturret == 1) {
+					self.playerinturret = 0
+					self unlock
+					self.turret unlock
+					self doUse $player
+					self lock
+					self.turret lock
+					self.turret thread CenterTurret
+					//self.turret setaimtarget NULL
+					wait 1
+				}
+			}
+		}
+		else {
+			if (self.helpactiveturret == 1 || self.helpactiveexplosive == 1) {
+				thread global/throbtext.scr::throbtext_off
+				self.helpactiveturret = 0
+				self.helpactiveexplosive = 0
+			}
+		}
+		//waitframe
+		wait 0.1
+	}
+}end
+
+//============================================================================
+GunNoExplode: {
+//============================================================================
+	self.noexplode = 1
+	self.charge hide
+}end
+
+//============================================================================
+GunOKExplode: {
+//============================================================================
+	self.noexplode = 0
+	self.charge show
+}end
+
+//============================================================================
+EnableFlakGuys local.gun: {
+//============================================================================
+	if ( (local.gun.guy1 != NIL) && (local.gun.guy1 != NULL) ) {
+		local.gun.guy1 exec global/enable_ai.scr
+		local.gun.guy1 threatbias 5000
+	}
+
+	if ( (local.gun.guy2 != NIL) && (local.gun.guy2 != NULL) ) {
+		local.gun.guy2 exec global/enable_ai.scr
+		local.gun.guy2 threatbias 5000
+	}
+
+	if ( (local.gun.guy3 != NIL) && (local.gun.guy3 != NULL) ) {
+		local.gun.guy3 exec global/enable_ai.scr
+		local.gun.guy3 threatbias 5000
+	}
+}End
+
+//============================================================================
+FlakGunSetup local.guy1 local.guy2 local.guy3: {
+//============================================================================
+	self.turret = self QueryTurretSlotEntity 0
+	self lock
+	//self.turret lock
+
+	self seatoffset "-100 0 80"
+	self.collisionent = $flak88_collision
+	self.turret.collisionent = $flak88_turret_collision
+	self.destroyedmodel = "models/statweapons/flak88_d.tik"
+	self.destroyedcollision = $flak88_destroyed_collision
+
+	self nodamage
+	self.turret nodamage
+	self removeondeath 0
+
+	if ( (local.guy1 != NIL) && (local.guy1 != NULL) ) {
+		self.guy1 = local.guy1
+		self.guy1 exec global/enable_ai.scr
+		self.guy1.no_idle = 1
+
+		self.guy1.FlakLoad			= 12G101_FlakLoad1
+		self.guy1.FlakLoad2Cover	= 12G102_FlakLoad2Cover
+		self.guy1.FlakCover			= 12G103_FlakCover
+		self.guy1.FlakCover2Load	= 12G104_FlakCover2Load
+
+		self.guy1 thread UpdatePosition self.turret 40 -60 90
+		self.guy1 thread DoFlakGuy self 1 self.guy3
+		self.guy1 thread CancelGagWait self
+
+		self.guy1 hearing 1
+		self.guy1 sight 1
+	}
+
+	if ( (local.guy2 != NIL) && (local.guy2 != NULL) ) {
+		self.guy2 = local.guy2
+		self.guy2 exec global/enable_ai.scr
+		self.guy2.no_idle = 1
+
+		self.guy2.FlakLoad			= 12G201_FlakLoad2
+		self.guy2.FlakLoad2Cover	= 12G202_FlakLoad2Cover
+		self.guy2.FlakCover			= 12G203_FlakCover
+		self.guy2.FlakCover2Load	= 12G204_FlakCover2Load
+
+		self.guy2 thread UpdatePosition self.turret -20 -175 0
+		self.guy2 thread DoFlakGuy self 0 self.guy3
+		self.guy2 thread CancelGagWait self
+
+		self.guy2 hearing 1
+		self.guy2 sight 1
+	}
+
+	if ( (local.guy3 != NIL) && (local.guy3 != NULL) ) {
+		self.guy3 = local.guy3
+		self.guy3 exec global/enable_ai.scr
+		self.guy3.no_idle = 1
+
+		self.guy3.angles = "0 -180 0"
+		self.guy3.origin = self gettagposition "passenger3"
+
+		// #6 is the officer...
+		self.guy3 thread DoFlakOfficer
+		self.guy3 thread CancelGagWait self
+
+		self.guy3 hearing 1
+		self.guy3 sight 1
+	}
+}End
+
+//============================================================================
+UpdatePosition local.trackobj local.xoff local.yoff local.spin: {
+//============================================================================ 
+	//	dprintln "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ my offsets are: " self.offset[1] ", " self.offset[2]
+	while ( isAlive self && (self.enemy == NULL) ) {
+		local.origin = self.origin
+		local.org = local.trackobj.origin + (local.trackobj.forwardvector * local.yoff) + (local.trackobj.rightvector * local.xoff)
+		local.origin[0] = local.org[0]
+		local.origin[1] = local.org[1]
+		self.origin = local.origin
+
+		local.angles = local.trackobj.angles
+		local.angles[1] += local.spin
+		self.angles = local.angles
+		waitframe
+	}
+}end
+
+//============================================================================
+DoFlakGuy local.gun local.bFireFlak local.officer: {
+//============================================================================
+	//self exec global/disable_ai.scr
+	self.flakthread = local
+	self holster
+
+	while ( isAlive self ) {
+		self anim self.FlakLoad
+		self waittill animdone
+
+		if ( local.bFireFlak==1 ) {
+			if ( (local.officer != NIL) && (local.officer != NULL) ) {
+				local.officer thread OfficerLook
+			}
+
+			local.gun thread Fire
+		}
+
+		self anim self.FlakLoad2Cover
+		self waittill animdone
+		self thread global/LoopAnim.Scr::LoopAnim self.FlakCover
+		wait 1
+
+		self thread global/LoopAnim.Scr::LoopAnimStop
+		self anim self.FlakCover2Load
+		self waittill animdone
+	}
+}End
+
+//============================================================================
+OfficerIdle: {
+//============================================================================
+	self thread global/LoopAnim.Scr::LoopAnimStop
+	self thread global/LoopAnim.Scr::LoopAnim 12G301_Officeridle
+}End
+
+//============================================================================
+OfficerLook: {
+//============================================================================
+	self thread global/LoopAnim.Scr::LoopAnimStop
+	self anim 12G302_Officeridle2Look
+	self waittill animdone
+	
+	self anim 12G303_OfficerLook
+	self waittill animdone
+
+	self anim 12G304_OfficerLook2Idle
+	self waittill animdone
+	self thread OfficerIdle
+}End
+
+//============================================================================
+DoFlakOfficer: {
+//============================================================================
+	//self exec global/disable_ai.scr
+	self holster
+	self thread OfficerIdle
+}End
+
+//	if any of the flak guys get shot, we'll go take out the captain
+//  unless the captain has started firing at us...
+//============================================================================
+CancelGagWait local.gun: {
+//============================================================================
+	local.gun.bFlakCancelled = 0
+
+	self thread CancelGagOnDeath local.gun
+	self thread CancelGagOnEnemy local.gun
+	self waittill pain
+	self thread CancelGag local.gun
+}End
+
+//============================================================================
+CancelGagOnDeath local.gun: {
+//============================================================================
+	self waittill death
+	self thread CancelGag local.gun
+}end
+
+//============================================================================
+CancelGagOnEnemy local.gun: {
+//============================================================================
+	self waittill hasenemy
+	self thread CancelGag local.gun
+}end
+
+//============================================================================
+AlertGunners local.gun: {
+//============================================================================
+	if ( local.gun.guy1 != NIL ) {
+		local.gun.guy1 hearing 2048
+		local.gun.guy1 sight 2048
+		local.gun.guy1 exec global/enable_ai.scr	
+	}
+
+	if ( local.gun.guy2 != NIL ) {
+		local.gun.guy2 hearing 2048
+		local.gun.guy2 sight 2048
+		local.gun.guy2 exec global/enable_ai.scr	
+	}
+
+	if ( local.gun.guy3 != NIL ) {
+		local.gun.guy3 hearing 2048
+		local.gun.guy3 sight 2048
+		local.gun.guy3 exec global/enable_ai.scr	
+	}
+}end
+
+//============================================================================
+CancelGag local.gun: {
+//============================================================================
+	if ( local.gun.bFlakCancelled == 1 ) {
+		End
+	}
+
+	local.gun.bFlakCancelled = 1
+
+	// let it move baby!
+	local.gun waitthread StopFlak88Guys
+
+	if ( local.gun.guy1 != NIL ) {
+		local.gun.guy1 exec global/enable_ai.scr	
+		local.gun.guy1 anim idle
+		local.gun.guy1 gun "moschetto"
+	}
+	
+	if ( local.gun.guy2 != NIL ) {
+		local.gun.guy2 exec global/enable_ai.scr	
+		local.gun.guy2 anim idle
+		local.gun.guy2 gun "moschetto"
+	}
+		
+	if ( local.gun.guy3 != NIL ) {
+		local.gun.guy3 exec global/enable_ai.scr	
+		local.gun.guy3 anim idle
+		local.gun.guy3 gun "moschetto"
+	}
+	
+	local.gun setaimtarget NULL
+}End
+	
+//	Flak88 firing...
+//============================================================================
+Fire: {
+//============================================================================
+	if(self.target == "") {
+		self.turret setaimtarget $player
+	}
+	else {
+		self.turret setaimtarget self.target
+	}
+
+	wait 0.75
+	self.turret waittill ontarget
+	self.turret anim fire
+}End
+
+//	Stop shooting the flak and go after cappy...
+//============================================================================
+StopFlak88Guys: {
+//============================================================================
+	level.bFlakCancelled = 1
+	waitthread EnableFlakGuys self
+
+	// crank up their hearing and sight...
+	if ( (self.guy1 != NIL) && (self.guy1 != NULL) ) {
+		self.guy1 hearing 5000
+		self.guy1 sight 5000
+		self.guy1.flakthread delete
+		self.guy1 waitthread global/LoopAnim.Scr::LoopAnimStop
+		self.guy1 detach
+		self.guy1 unholster
+		self.guy1 takedamage
+		self.guy1 solid
+	}
+
+	if ( (self.guy2 != NIL) && (self.guy2 != NULL) ) {
+		self.guy2 hearing 5000
+		self.guy2 sight 5000
+		self.guy2.flakthread delete
+		self.guy2 waitthread global/LoopAnim.Scr::LoopAnimStop
+		self.guy2 detach
+		self.guy2 unholster
+		self.guy2 takedamage
+		self.guy2 solid
+	}
+
+	if ( (self.guy3 != NIL) && (self.guy3 != NULL) ) {
+		self.guy3 hearing 5000
+		self.guy3 sight 5000
+		self.guy3 waitthread global/LoopAnim.Scr::LoopAnimStop
+		self.guy3 detach
+		self.guy3 takedamage
+		self.guy3 solid
+	}
+
+	self.turret setaimtarget NULL
+}End
+
+//============================================================================
+spawn_fx local.fx: {
+//============================================================================
+	local.temp = spawn script_model model local.fx
+	local.temp notsolid
+	local.temp.origin = self.origin
+	local.temp anim start
+	local.temp notsolid
+	wait 5
+
+	local.temp remove
+}end
+
+//============================================================================
+TurnOnAAGun2Guys: {
+//============================================================================
+	$aagun2guy1 ai_on
+	$aagun2guy2 ai_on
+	//	$aagun2guy3 ai_on		// MJG: doesn't exist?
+}end
+
+//============================================================================
+TurnOnAAGun3Guys: {
+//============================================================================
+	$aagun3guy ai_on
+	for (local.i=1;local.i<=$aagun3guards.size;local.i++) {
+		$aagun3guards[local.i] ai_on
+	}
+}end
+
+//============================================================================
+TurnOnAAGun4Guys: {
+//============================================================================
+	$aagun4guy1 ai_on
+	$aagun4guy2 ai_on
+	$aagun4guy3 ai_on
+}end
+
+//============================================================================
+TurnOnAAGun5Guys: {
+//============================================================================
+	$aagun5guy ai_on
+	for (local.i=1;local.i<=$aagun5guards.size;local.i++) {
+		$aagun5guards[local.i] ai_on
+	}
+}end
+
+
+//	Set800 is an ambush on aagun5...
+//============================================================================
+WaitSet800: {
+//============================================================================
+	$aagun5_ambush waittill trigger
+	waitthread global/ai.scr::spawnset 800 "set800"
+
+	//	dprintln "set800 has been spawned."
+	level.set800counter = 0
+	$set800 thread Init800
+}end
+
+//============================================================================
+Init800: {
+//============================================================================
+	self type_attack runandshoot
+	self.enableEnemy = 1
+	self.aipronechance = 0
+	self.aicrouchchance = 0
+	level.set800counter++
+
+	switch (level.set800counter) {
+		case 1:
+		case 2:
+		self gun moschetto
+		break
+		default:
+		self gun carcano
+		self weaponcommand mainhand weaponsubtype 17
+		break
+	}
+}end
+
+//	Set802 runs behind phone pole
+//============================================================================
+WaitSet802: {
+//============================================================================
+	$pole_runner waittill trigger
+	waitthread global/ai.scr::spawnset 802 "set802"
+	level.set802counter = 0
+	$set802 thread Init802
+}end
+
+//============================================================================
+Init802: {
+//============================================================================
+	self type_attack runandshoot
+	self.enableEnemy = 1
+	level.set800counter++
+
+	switch (level.set800counter) {
+		case 1:
+		case 2:
+		self gun moschetto
+		break
+		default:
+		self gun carcano
+		self weaponcommand mainhand weaponsubtype 17
+		break
+	}
+}end

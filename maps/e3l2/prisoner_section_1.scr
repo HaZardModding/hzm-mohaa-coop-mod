@@ -1,0 +1,472 @@
+// E3L2 - Prisoner Section 1
+
+//
+// test_prisoner.scr
+//
+// by ccaron   5/1/2003
+//
+// sequence of events:
+// 1> player activates trigger that starts the march toward truck
+//    one of the gaurds has a gun to prisoner's head
+//    player needs to snipe this gaurd.  If player snipes the other
+//    gaurd, the prisoner is killed (missionfailed).  
+//    If player triggers the 2nd trigger the prisoner is killed.
+// 2> Once first gaurd is killed, the prisoner runs for cover.
+//    The other gaurd starts to shoot at the player.  Also some 
+//    guys in the back of the truck come out and start to shoot
+//    at the player.  Once all of these guys are dead, the wounded
+//    walks toward the player to get healed.
+// 3> If the player does nothing, the prisoner is escorted to the
+//    truck, the truck drives off and missionfailed
+//    
+// NEEDED in the map:
+// 1> trigger once that starts the march ($targetname startMarchingTrigger)
+// 2> trigger once that executes the prisoner ($targetname killPrisonerTrigger)
+// 3> 2 gaurds ($targetname gaurd1/2)
+// 4> 1 truck ($targetname theTruck)
+//
+// -------------------------------------------------------------------
+
+//=========================================================================
+InitSection: {
+//=========================================================================
+	level.prisonerSceneGuysAlive = 0
+	level.marching_prisoner_saved = 0
+
+	waitthread global/ManSpawnNamed.scr::Init "gaurd1"
+	waitthread global/ManSpawnNamed.scr::Init "gaurd2"
+	waitthread global/ManSpawnNamed.scr::Init "prisoner"
+	waitthread global/ManSpawnNamed.scr::Init "mgGuy2"
+	waitthread global/ManSpawnNamed.scr::Init "sniper2"
+	waitthread global/ManSpawnNamed.scr::Init "sniper3"
+
+	//	$gaurd1 exec global/disable_ai.scr
+	//	$gaurd2 exec global/disable_ai.scr
+	//	$prisoner exec global/disable_ai.scr
+	//
+	//	$gaurd1 waitthread maps/e3l2.scr::DisableGuy
+	//	$gaurd2 waitthread maps/e3l2.scr::DisableGuy
+	//	$prisoner waitthread maps/e3l2.scr::DisableGuy
+	//	$mgGuy2 waitthread maps/e3l2.scr::DisableGuy
+	//	$sniper3 waitthread maps/e3l2.scr::DisableGuy
+
+	thread HomeStretchCompassTargetingThread
+	thread startPrisonerMarch
+}end
+
+//=========================================================================
+waitToDie: {
+//=========================================================================
+	level.prisonerSceneGuysAlive ++
+	self waittill death
+	level.prisonerSceneGuysAlive --
+}end
+
+// LoadTheTruckthread
+//=========================================================================
+LoadTheTruckthread local.crosser: {
+//=========================================================================
+	// loadup the truck guys
+	$theTruck waitthread global/vehicles_thinkers.scr::truck_INIT
+	$theTruck waitthread global/vehicles_thinkers.scr::LoadPassengers 3 "models/human/german_wehrmact_soldier" NIL "truckGuys"
+	$truckGuys thread waitToDie
+	$truckGuys thread LoadGuyInTruck
+
+	// spawn sniper, 2
+	waitthread global/ManSpawnNamed.scr::Spawn "sniper2"
+}end
+
+//=========================================================================
+LoadGuyInTruck: {
+//=========================================================================
+	self waitexec global/crouch.scr
+	self waitexec global/disable_ai.scr
+	wait .5
+	self thread maps/e3l2.scr::DisableGuy
+}end
+
+// Start the march
+//=========================================================================
+startPrisonerMarch: {
+//=========================================================================
+	$startMarchingTrigger waittill trigger
+
+	exec global/spotlight.scr::corona $theTruck "light left" // Turn on headlight coronas
+	exec global/spotlight.scr::corona $theTruck "light right"
+	exec global/autosave.scr 2
+	
+	waitthread global/ManSpawnNamed.scr::Spawn "gaurd1"
+	waitthread global/ManSpawnNamed.scr::Spawn "gaurd2"
+	waitthread global/ManSpawnNamed.scr::Spawn "prisoner"
+	waitthread global/ManSpawnNamed.scr::Spawn "mgGuy2"
+	waitthread global/ManSpawnNamed.scr::Spawn "sniper3"
+	waitframe
+
+	$gaurd1 exec global/disable_ai.scr
+	$gaurd2 exec global/disable_ai.scr
+	$prisoner exec global/disable_ai.scr
+	waitthread global/ObjMgr.scr::SetObjCompassTarg "findPOWs" $prisoner 1
+
+	$prisoner holster
+	//	$gaurd1 waitthread maps/e3l2.scr::EnableGuy
+	//	$gaurd2 waitthread maps/e3l2.scr::EnableGuy
+	//	$prisoner waitthread maps/e3l2.scr::EnableGuy
+	//	$mgGuy2 waitthread maps/e3l2.scr::EnableGuy
+	//	$sniper3 waitthread maps/e3l2.scr::EnableGuy
+
+	// Stuff moved from init
+	$gaurd1 aimat $prisoner
+	$gaurd1 lookat $prisoner
+	$gaurd1 aimat $prisoner
+	$gaurd1 favoriteenemy $prisoner
+	$gaurd2 favoriteenemy $player
+	$gaurd1 thread waitToDie
+	$gaurd2 thread waitToDie
+	$mgGuy2 favoriteenemy $player
+
+	// bring to life sniper3
+	$sniper3 favoriteenemy $player
+	$sniper3 thread MyBalconyFall
+
+	$gaurd1 exec global/enable_ai.scr
+	$gaurd2 exec global/enable_ai.scr
+
+	$prisoner thread mustLive
+	$prisoner thread woundedThink
+
+	$gaurd1 aimat $prisoner
+	$gaurd1 lookat $prisoner
+
+	$gaurd1 exec global/disable_ai.scr
+	$gaurd2 exec global/disable_ai.scr
+
+	// when this returns, the player has started attacking
+	waitthread playerAction
+
+	// spark the enemies to life
+	$gaurd1 exec global/enable_ai.scr
+	$gaurd2 exec global/enable_ai.scr
+	thread truckGuys
+
+	//$prisoner exec global/enable_ai.scr
+	while (level.prisonerSceneGuysAlive > 0) { 
+		waitframe 
+	}
+}end
+
+//=========================================================================
+MyBalconyFall: {
+ //=========================================================================
+	if(!(isalive self) || self.health <= 0) {
+		end 
+	}
+
+	self ai_on
+	self physics_on
+
+	// need the set health very high to catch
+	// when guy is dead.
+	self.health += 10000
+	self.nolongpain = 1
+	self.ainocrouch = 1
+	self.ainoprone = 1
+	self.ainododge = 1
+	self.ainohopforward = 1
+	self.ainohopbackward = 1
+	self.ainointerval = 1
+	self.fixedleash = 1
+	self.mindist = 0
+	self.leash = 0
+	self.type_grenade = balcony_grenade
+  
+	// this here to keep guy from moving around
+	self type_attack "turret"
+
+	// get the direction to fall
+	self.fallDir = angles_toforward(self.angles)
+	self.fallDir = vector_scale self.fallDir 100
+
+	// get the direction to jump
+	local.angle = self.angles
+
+	// wait to get hurt  
+	while (self.health > 10000) {
+		waitframe
+	}
+  
+	self nodamage
+	self notsolid
+	self exec global/disable_ai.scr
+
+	self thread TurnToOrigin (self.fallDir + self.origin)
+	self anim_noclip death_balcony_intro
+	self waittill animdone
+	wait 0.4
+
+	while (self.origin[2] > -445) {
+		while (vector_length( self.velocity ) > 100)  {
+			self anim death_balcony_loop
+			waitframe
+		}
+
+		waitframe
+		self droptofloor
+	}
+
+	self anim death_balcony_outtro
+	self waittill animdone
+	self bedead
+}end
+
+//=========================================================================
+TurnToOrigin local.origin: {
+//=========================================================================
+	if (self == NULL) {
+		println "ERROR: Must call TurnTo as: $guy TurnTo local.origin."
+	}	
+	else if (local.origin) {
+		local.ent = spawn script_origin
+		local.ent.origin = local.origin
+		self turnto local.ent
+		self waittill turndone
+		local.ent remove
+	}
+	else {
+		println "ERROR: " self ".TurnTo requires an origin parameter."
+	}
+}end
+
+// Wait till the player attacks or trips the trigger
+//=========================================================================
+playerAction: {
+//=========================================================================
+	level.playerAttacking = 0
+	thread dontGetTooClose
+	
+	//tells gaurd1 to follow the prisoner out to the truck
+	$gaurd1 thread vatchZePrizoner
+	$gaurd2 thread followZeLeader
+	$gaurd1 thread waitToBeAttacked
+	$gaurd2 thread waitToBeAttacked
+
+	while (level.playerAttacking == 0) { 
+		waitframe 
+	}
+}end
+
+// called from playerAction, sets the officer (gaurd1) to follow the prisoner out
+// with a gun pointed at his head.  When the alarm is raised the thread will die
+// and he will attempt to kill the prisoner
+//=========================================================================
+vatchZePrizoner: {
+//=========================================================================
+	wait 0.5
+	while (level.playerAttacking == 0) {
+		wait .4
+		//this works fine on my box, let me know if you have problems - IPC
+		self upperanim pistol_aim
+		self walkto $prisoner
+	}
+}end
+
+//=========================================================================
+followZeLeader: {
+//=========================================================================
+	//wait 0.5
+	while (level.playerAttacking == 0) {
+		self walkto $gaurd1
+		wait .1
+	}
+}end
+
+//=========================================================================
+dontGetTooClose: {
+//=========================================================================
+	while (vector_length($player.origin - $prisoner.origin) > 600) {
+		waitframe
+	}
+
+	//iprintln "got too close!"
+	level.playerAttacking = 1
+}end
+
+//=========================================================================
+waitToBeAttacked: {
+//=========================================================================
+	self waittill pain
+	level.playerAttacking = 1
+
+}end
+
+//=========================================================================
+truckGuys: {
+//=========================================================================
+	println "unloading the truck guys"
+	$truckGuys waitthread UnloadGuyFromTruck
+	$theTruck thread global/vehicles_thinkers.scr::UnloadPassengers	
+}end
+
+//=========================================================================
+UnloadGuyFromTruck: {
+//=========================================================================
+	self waitthread maps/e3l2.scr::EnableGuy
+	self exec global/stand.scr
+	self exec global/enable_ai.scr
+	self favoriteenemy $player
+}end
+
+// Wounded Think routine
+//=========================================================================
+woundedThink: {
+//=========================================================================
+	// keep prisoner from being killed by the gaurds
+	self.health = 10
+
+	local.starttime = level.time
+	//local.vec = angles_toforward(self.angles)
+	//local.vec = vector_normalize(local.vec)
+	//local.vec = vector_scale local.vec 20
+	//self.origin += local.vec
+	//self setmotionanim A_32_Escort_walk
+
+	while (isalive self) {
+		self setanim walk_injured_forward
+				
+		// adjusting this will make the prisoner walk fast or slow
+		wait 0.5
+
+		if (level.playerAttacking != 0) {
+			goto runForCover
+		}
+
+		//if ((level.time - local.starttime) > 2.0)
+		//	goto iSeePlayer
+	
+		if (vector_length(self.origin - $theTruck.origin) < 300) {
+			goto iSeePlayer
+		}
+	}
+
+// Prisoner notices the player, then ducks for cover
+iSeePlayer:
+	self setanim walk_injured_forward
+	println "i see player!"
+	self lookat $player
+	wait 0.5
+	self setanim walk_injured_forward
+	//self lookat NULL
+	wait 0.5
+
+runForCover:
+	//radio guy runs to the player, then gets a rifle and joins the fight
+	println "running for cover"
+	level.playerAttacking = 1
+
+	self exec global/disable_ai.scr
+	self thread maps/e3l2.scr::doRunTo $PrisonerRunForCoverNode
+	self waittill movedone
+	self exec global/LoopAnim.scr::LoopAnim unarmed_crouch_alert
+	self turnto $player
+
+	while (level.prisonerSceneGuysAlive > 0) {
+		waitframe
+	}
+	
+	self nodamage
+	self exec global/LoopAnim.scr::LoopAnimStop
+	waitframe
+
+	self turnto $player
+
+	// run to player
+	self.movedoneradius = 200
+	self runto $player
+	self waittill movedone
+
+	/*
+	self waittill turndone
+	self lookat $player
+	*/
+
+	self anim A_32_PvtScottTalk_01
+	self waittill animdone
+	self say A_32_Terry_1A
+	self waittill saydone
+	wait 0.5
+
+	self say A_32_Terry_1B
+	self waittill saydone
+	level.marching_prisoner_saved = 1
+
+	if ($HomeStretchCompTarg0) {
+		waitthread global/ObjMgr.scr::SetObjCompassTarg "findPOWs" $HomeStretchCompTarg0
+	}
+	else {
+		waitthread global/ObjMgr.scr::SetObjCompassTarg "findPOWs" $FinalPowsCompassTarg
+	}
+
+	waitthread global/ObjMgr.scr::SetCurrObj "findPOWs"
+	self lookat NULL
+	self turnto NULL
+
+	//	local.home_point = spawn script_origin
+	//	local.home_point.origin = ( 4151 23 -127 )
+	//	self thread maps/e3l2.scr::doRunTo local.home_point
+
+	self thread maps/e3l2.scr::doRunTo $PrisonerRunForHomeNode
+	local.runThread = parm.previousthread
+
+	while (1) {
+		if (!(vector_within self.origin $player.origin 2000)) {
+			break
+		}
+		wait 2
+	}
+
+	local.runThread remove
+	self hide
+	self ai_off
+}end
+
+//=========================================================================
+mustLive: {
+//=========================================================================
+	self waittill death
+	iprintln "You failed to protect the prisoner’s escape."
+	wait 1
+	iprintln "Mission Failed."
+	wait 1
+	missionfailed
+}end
+
+//=========================================================================
+HomeStretchCompassTargetingThread: {
+//=========================================================================
+	if (!$HomeStretchCompFinalTrigger) {
+		end
+	}
+
+	thread HomeStretchCompassTrigger_Thread $HomeStretchCompTrigger0 $HomeStretchCompTarg0
+	thread HomeStretchCompassTrigger_Thread $HomeStretchCompTrigger1 $HomeStretchCompTarg1
+	thread HomeStretchCompassTrigger_Thread $HomeStretchCompTrigger2 $HomeStretchCompTarg2
+
+	while (1) {
+		$HomeStretchCompFinalTrigger waittill trigger
+
+		if (level.marching_prisoner_saved == 1) {
+			waitthread global/ObjMgr.scr::SetObjCompassTarg "findPOWs" $FinalPowsCompassTarg
+		}
+	}
+}end
+
+//=========================================================================
+HomeStretchCompassTrigger_Thread local.trig local.targ: {
+//=========================================================================
+	while (1){
+		local.trig waittill trigger
+
+		if (level.marching_prisoner_saved == 1) {
+			waitthread global/ObjMgr.scr::SetObjCompassTarg "findPOWs" local.targ
+		}
+	}
+}end

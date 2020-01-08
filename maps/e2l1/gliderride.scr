@@ -1,0 +1,858 @@
+// gliderride.scr
+
+//============================================================================
+StartRide: {
+//============================================================================
+	thread maps/e2l1/fog.scr::setFog level.fogDistanceTow level.fogBiasTow level.fogColorTow
+	self physics_off
+
+	if (level.stickPlayerAtGlider == 1) {
+		// debug hack to put player near the glider, for debugging
+		self.origin = $glider.origin
+		self notsolid
+	}
+
+	level.skipDialogue 	 = 0
+	level.dialogueFinished	 = 0
+	level.gliderDetached 	 = 0
+	level.gliderPilotShot 	 = 0
+	level.gliderDescentBegun = 0
+	level.gliderRideOver 	 = 0
+	level.gliderCrashOver	 = 0
+	level.gliderTakingFire	 = 0
+
+	thread handlePilot
+	thread handlePassengers
+	thread handleCamera
+	thread handleC47
+	thread handleDialogue
+	thread handleGlider
+	thread maps/e2l1/pocketflash.scr::DoGliderFlak $flak_left 3
+	//thread RestrictView
+
+	if (level.skipFadeIn == 0) {
+		waitthread fadeIn
+	}
+
+	waitthread handleCrash
+}end
+
+//============================================================================
+handlePassengers: {
+//============================================================================
+	spawn script_model model models/human/Sc_AL_US_CORP.tik targetname gliderDude1 
+	spawn script_model model models/human/Sc_AL_US_ltPALIA.tik targetname gliderDude2
+
+	//scaling hack, these guys are too big for the glider
+	$gliderDude1 scale .9
+	$gliderDude2 scale .9
+
+       //misc stuff
+	$gliderDude1 physics_off
+	$gliderDude2 physics_off
+	$gliderDude1 nodamage
+	$gliderDude2 nodamage
+	$gliderDude1 notsolid
+	$gliderDude2 notsolid
+	
+	//adjust passengers to fit in the seats
+	$gliderDude1 attach $glider passenger1 1 (0 0 0)   //here is the vector voodoo-> (left/right front/back up/down) 	
+	$gliderDude2 attach $glider passenger2 1 (0 0 0)
+	waitframe 
+
+	$gliderDude1 thread handlePassenger1Idle
+	$gliderDude2 thread handlePassenger2Idle
+
+	// wait for the pilot to get shot
+	while (level.gliderPilotShot == 0) {
+		waitframe
+	}
+
+	// wait for the scene to end and delete the passengers
+   	while (level.gliderRideOver == 0) {
+		waitframe
+   	}
+
+	delete $gliderDude1
+	delete $gliderDude2
+}end
+
+//============================================================================
+doPanicSound local.sound: {
+//============================================================================
+	wait 0.1
+	self playsound local.sound
+}end
+
+//============================================================================
+handlePassenger1React: {
+//============================================================================
+	while (level.gliderTakingFire == 0) { 
+		wait 0.1
+	}
+
+	// how long to wait before reacting
+	wait 2.9
+	$gliderDude1 thread doPanicSound snd_den_pain_generic
+
+	// animate the dudes to react
+	$gliderDude1 anim A_21_passenger1_panic
+	$gliderDude1 waittill animdone
+	$gliderDude1 thread handlePassenger1FreakedOut
+}end
+
+//============================================================================
+handlePassenger1Idle: {
+//============================================================================
+	// keep looping the flying animation until the pilot gets shot
+	thread handlePassenger1React
+
+	while (level.gliderTakingFire == 0) {
+		$gliderDude1 anim A_21_passenger1_idleA
+		$gliderDude1 waittill animdone
+	}
+}end
+
+//============================================================================
+handlePassenger2React: {
+//============================================================================
+	while (level.gliderTakingFire == 0) {
+		wait 0.1
+	}
+
+	// how long to wait before reacting
+	wait 2.5	
+	$gliderDude2 thread doPanicSound snd_den_pain_generic
+
+	// animate the dudes to react
+	$gliderDude2 thread doPanicSound snd_den_pain_generic
+	$gliderDude2 anim A_21_passenger2_death
+	$gliderDude2 waittill animdone
+}end
+
+//============================================================================
+handlePassenger2Idle: {
+//============================================================================
+	// keep looping the flying animation until the pilot gets shot
+	thread handlePassenger2React
+
+	while (level.gliderTakingFire == 0) {
+		$gliderDude2 anim A_21_passenger2_idle
+		$gliderDude2 waittill animdone
+	}
+}end
+
+//============================================================================	
+handlePassenger1FreakedOut: {
+//============================================================================
+	// keep looping until the glider crashes
+	while (level.gliderRideOver == 0)  {
+		$gliderDude1 anim  A_21_passenger1_idleB
+		$gliderDude1 waittill animdone
+	}
+}end
+
+//============================================================================
+KillPassengersOnDeath: {
+//============================================================================
+	self waittill death
+	local.ent = self QueryDriverSlotEntity 0
+    local.ent remove
+    
+	for ( local.i = 0; local.i <= 6; local.i++ ) {
+		local.ent = self QueryPassengerSlotEntity local.i
+
+		if ( local.ent != NULL) {
+            self DetachPassengerSlot local.i local.ent.origin
+			local.ent exec global/bullethit.scr (0 0 20) 5000 0 1
+		}
+	}
+
+	self thread global/vehicles_thinkers.scr::truck_killed 
+}end
+
+//============================================================================
+WaitToStartTruck: {
+//============================================================================
+	level.starttruckonce = 0
+
+	switch (level.skill) {
+	case 0:
+		wait 50.0
+		break;
+	case 1:
+		wait 40.0
+		break;
+	case 2:
+		wait 20.0
+		break;
+	}
+	thread startTruck
+}End
+
+//============================================================================
+MyTruckThink local.hp local.passengers local.passengertype: {
+//============================================================================
+	if (local.hp == NIL) {
+		self.health = 4000
+	}
+	else {
+		self.health = local.hp
+	}
+
+	// println "truck health: " self.health
+	thread global/vehicles_thinkers.scr::truck_INIT
+
+	if ( (local.passengers != NIL) && (local.passengers != 0) ) {
+		self waitthread maps/e3l3/scene1.scr::MyTruckLoad local.passengers local.passengertype "carcano"
+	}
+    
+    //$starttruck waitthread global/vehicle_thinkers.scr::truck_load local.passengers local.guy_type local.special local.passenger_name local.driver_name:
+
+	self.driver.usegun = "beretta"
+	self waittill death
+	self stop
+	self.collisionent disconnect_paths
+}end
+
+//============================================================================
+startTruck: {
+//============================================================================
+	if (level.starttruckonce == 0) {
+		level.starttruckonce = 1
+		level.starttruckguy = 0
+
+		exec global/spotlight.scr::corona $starttruck "light left" // Turn on headlight coronas
+		exec global/spotlight.scr::corona $starttruck "light right"
+
+		$starttruck.unloaddelay = 1.0				// wait after truck stops
+		$starttruck.unloaddriverdelay = 1.0			// wait after passengers unload
+		$starttruck thread KillPassengersOnDeath
+		$starttruck thread global/vehicles_thinkers.scr::enemy_truck_think level.truck1_health 1 NIL NIL NIL "models/human/sc_ax_ital_inf" NIL "starttruckguy" "starttruckdriver"
+		$starttruck waitthread global/vehicles_thinkers.scr::LoadPassenger 5 "models/human/sc_ax_ital_inf" NIL starttruckguy
+		$starttruck waitthread global/vehicles_thinkers.scr::LoadPassenger 6 "models/human/sc_ax_ital_inf" NIL starttruckguy
+		$starttruck waitthread global/vehicles_thinkers.scr::LoadPassenger 3 "models/human/sc_ax_ital_inf" NIL starttruckguy
+		waitframe
+
+		$starttruckdriver.usegun = "beretta"
+		$starttruckdriver nodamage
+		$starttruckguy waitthread truckWeapon
+		$starttruckdriver.targetname = "starttruckguy"
+		//$starttruck waitthread global/vehicles_thinkers.scr::truck_drive $starttruckpath
+		$starttruck waitthread global/vehicles_thinkers.scr::truck_drive_fullspec $starttruckpath 400 400 256 256 $starttruck.unloaddelay
+		$starttruckguy thread TruckGuyGoToCrashSite
+
+		/*
+		$starttruck drive $starttruckpath 400 400 256 256  //path speed accel ??  
+		$starttruck thread MyTruckThink level.truck1_health 4 "models/human/Sc_AX_Ital_Inf.tik" 
+		$starttruck waittill drive //detect when truck stops
+		$starttruck fullstop
+
+		waitframe //waits one frame
+        if ($starttruck && isalive $starttruck) {
+		    $starttruck waitthread global/vehicles_thinkers.scr::truck_unload
+			$deleteguy waitthread Rename "starttruckguy"
+			level.starttruckguy = 0
+			$starttruckguy thread TruckGuyGoToCrashSite
+		}
+		*/
+	}
+}end
+
+//============================================================================
+truckWeapon: {
+//============================================================================
+	self gun "carcano"
+	self weaponcommand mainhand weaponsubtype 17
+	self.truckexitdelay = 0.25 + randomfloat(0.5)
+}end
+
+//============================================================================
+Rename local.newname: {
+//============================================================================
+	self.targetname = local.newname
+}end
+
+// run to the crash site if we don't have an enemy...
+//============================================================================
+TruckGuyGoToCrashSite: {
+//============================================================================
+	while ( self && self.done_unloading==0 ) {
+		wait 0.2
+	}
+
+	if ( self && self.enemy==NULL ) {
+		level.starttruckguy++
+		self.mood = curious
+
+		switch ( level.starttruckguy ) {
+		case	1:
+			self waitthread global/SafeMoveTo.scr::reach $troop_desitnation_1
+			break;
+		case	2:
+			self waitthread global/SafeMoveTo.scr::reach $troop_desitnation_2
+			break;
+		case	3:
+			self waitthread global/SafeMoveTo.scr::reach $troop_desitnation_3
+			break;
+		case	4:
+			self waitthread global/SafeMoveTo.scr::reach $troop_desitnation_4
+			break;
+		case	5:
+			self waitthread global/SafeMoveTo.scr::reach $troop_desitnation_5
+			break;
+		default:
+			self waitthread global/SafeMoveTo.scr::reach $troop_desitnation_5
+			break;
+		}
+	}
+
+	if ( isAlive self ) {
+		self turnto $player
+	}
+}end
+
+//============================================================================
+handleCrash: {
+//============================================================================
+	$dead_dude1 anim dead_pose1		
+	$dead_dude2 anim dead_pose2
+	$dead_dude1 notsolid
+	$dead_dude2 notsolid
+
+	while (level.gliderRideOver == 0) {
+		waitframe
+	}
+
+	//	thread UnrestrictView
+	musicvolume 1.0 3.0
+
+	// this is where we hit the tree
+	$gliderCamera playsound e2l1_crash2
+	thread doEarthquake 1.1 20 1 0
+
+	//waitthread global/objectives.scr::add_objectives 2 2 "Locate your squad" local.waypoint1a
+	wait 1
+
+	$player playsound e2l1_crash1
+	level.gliderCrashOver = 1
+	thread HandleSearchParty
+
+	// find out what 75% of health is
+	local.newHealth = 0.90*self.max_health
+
+	// set current health to that
+	self healthonly local.newHealth
+
+	// tell the player to eject from the glider
+	wait 3
+	local.usekey = getboundkey1 "+use"
+	local.msg = (loc_convert_string "Press ") + local.usekey + (loc_convert_string " to eject from the glider.")
+	thread global/throbtext.scr::throbtext local.msg 0
+	
+	exec global/autosave.scr 1
+
+	while (!$player.useheld && $player.health > 0) {
+		waitframe
+	}
+
+	waitthread global/items.scr::add_item "explosives" noprint
+	drawhud 1
+	waitthread maps/e2l1/objectives.scr::transition "start"
+
+	$player useweaponclass rifle
+	thread global/throbtext.scr::throbtext "" 0
+
+	//time to roll up the truck
+    thread WaitToStartTruck   
+
+	self physics_on
+	$searchparty thread EnableAI
+
+	//wait 1
+	level.abortSearchParty = 1
+}end
+
+//============================================================================
+HandleSearchParty: {
+//============================================================================
+	level.abortSearchParty = 0
+	$searchparty[1] runto $searchpartyrunto1
+	$searchparty[2] runto $searchpartyrunto2
+
+	wait 2
+	if (level.abortSearchParty == 0) {
+		$searchparty[1] say den_E2L1_ITALIAN1
+		$searchparty[1] waittill saydone
+	}
+
+	if (level.abortSearchParty == 0) {
+		$searchparty[1] say den_E2L1_ITALIAN2
+		$searchparty[1] waittill saydone
+	}
+
+	if (level.abortSearchParty == 0) {
+		$searchparty[2] say den_E2L1_ITALIAN3
+		$searchparty[2] waittill saydone
+	}
+
+	if (level.abortSearchParty == 0) {
+		$searchparty[1] say den_E2L1_ITALIAN4
+		$searchparty[1] waittill saydone
+	}
+
+	wait 2
+	if (level.abortSearchParty == 0) {
+		$searchparty thread GetPlayer
+  	}
+}End
+
+//============================================================================
+GetPlayer: {
+//============================================================================
+	// wake up the patrollers
+	self waitthread EnableAI
+	self turnto $player
+	self lookat $player
+}end
+
+//============================================================================
+EnableAI: {
+//============================================================================
+	self exec global/enable_ai.scr
+}end
+
+//============================================================================
+fadeIn: {
+//============================================================================
+	exec global/fadein.scr
+	waitframe
+	waitthread global/fadein.scr::DoFadeIn e2l1_1 e2l1_2 e2l1_3 NIL 0
+}end
+
+//============================================================================
+handleDialogue: {
+//============================================================================
+	// this is where the scene is choriographed up until the final descent starts
+	// wait for the scene to open...
+	if (level.allowSkipGliderDialogue != 0) {
+		thread detectDialogueSkip
+	}
+
+	if (level.skipFadeIn == 0) {
+		wait 7
+	}
+	else {
+		wait 2
+	}
+		
+	if (level.skipDialogue == 0) {
+		// "Look at this soup! ..."
+		$gliderCamera playsound dfr_E2L1_C471_01 //dfr_E2L1_C471 
+		wait 7
+	}
+
+	if (level.skipDialogue == 0) {
+		// "Thanks for the cheery observation..."
+		$gliderPilot upperanim AA_pilot_talk1
+		$gliderPilot waittill upperanimdone		
+	}
+
+	// the right-o line doesn't exist in uberdialog, c472 is a line that occurs later...
+	//if (level.skipDialogue == 0) {
+	//	// "Right-O Sir..."
+	//	$gliderCamera playsound dfr_E2L1_C472
+	//	wait 4
+	//}
+
+	if (level.skipDialogue == 0) {
+		// "Looks like we're coming up on it right now..."
+		$gliderCamera playsound dfr_E2L1_C473   
+
+		wait 4
+	}
+
+	if (level.skipDialogue == 0) {
+		// "Ready for detachment..."
+		$gliderCamera playsound dfr_E2L1_C474
+		wait 2.4
+	}
+
+	if (level.skipDialogue == 0) {
+		// "Roger that, detachment ready..."
+		$gliderPilot upperanim AA_pilot_talk2
+		$gliderPilot waittill upperanimdone		
+		wait 2.5
+	}
+
+	if (level.skipDialogue == 0) {
+		// "detaching now..."
+		$gliderCamera playsound dfr_E2L1_C475
+		wait 1.6
+	}
+
+	// detach the glider from the C47
+	level.gliderDetached = 1
+	thread doEarthquake 0.3 1 1 0
+
+	// gentle earthquake at start of flying
+	if (level.skipDialogue == 0) {
+		thread doEarthquake 28 0.2 1 1
+	}
+	else {
+		thread doEarthquake 14 0.2 1 1
+	}
+
+	wait 3
+	if (level.skipDialogue == 0) {
+		// "We are clear, Two-Four"
+		$gliderPilot upperanim AA_pilot_talk3
+		$gliderPilot waittill upperanimdone		
+		wait 1.5
+	}
+
+	if (level.skipDialogue == 0) {
+		// "Roger that, Two-Five..."
+		$gliderCamera playsound dfr_E2L1_C472
+		wait 5
+	}
+
+	if (level.skipDialogue == 0) {
+		// "Sergent Baker, you might want to hold onto..."
+		$gliderPilot upperanim AA_pilot_talk4
+		$gliderPilot waittill upperanimdone
+	}
+
+	level.dialogueFinished = 1
+
+	// now begin the descent
+	level.gliderDescentBegun = 1
+	level.gliderTakingFire = 1
+	wait 2
+
+	//level.gliderTakingFire = 1
+
+	// wait until the pilot gets shot
+	waitthread cockpitBulletHit 0.2  0.1 mp44_snd_fire1  0.2	5
+	$glider anim shot
+	waitthread cockpitBulletHit 0.5  0.1 snd_bh_wood1  0.1 2 
+	waitthread cockpitBulletHit 0.3  0.1 snd_bh_wood2  0.1 2 
+	level.gliderPilotShot = 1
+
+	waitthread cockpitBulletHit 0.2  0.1 snd_bh_wood3  0.1 2 
+	waitthread cockpitBulletHit 0.2  0.1 snd_bh_metal01  0.1 2 
+	waitthread cockpitBulletHit 0.25  0.1 snd_bh_metal01  0.1 2 
+	waitthread cockpitBulletHit 0.15  0.1 snd_bh_metal01  0.1 2 
+	waitthread cockpitBulletHit 0.2  0.3 panzerschreck_snd_fire  0.4	10
+	waitthread cockpitBulletHit 0.6  0.1 snd_bh_flesh1 0.2 4 
+	waitthread cockpitBulletHit 0.2  0.1 mp44_snd_fire1  0.2	5
+	waitthread cockpitBulletHit 0.25 0.1 snd_bh_flesh1 0.1 2 
+	//wait 1.7
+
+	//even more shots
+	waitthread cockpitBulletHit 0.5  0.1 snd_bh_wood1  0.1 2 
+	waitthread cockpitBulletHit 0.2  0.1 mp44_snd_fire1  0.2	5
+	waitthread cockpitBulletHit 0.15  0.1 snd_bh_metal01  0.1 2 
+	waitthread cockpitBulletHit 0.2  0.1 mp44_snd_fire1  0.2	5
+	waitthread cockpitBulletHit 0.2  0.1 snd_bh_metal01  0.1 2 
+	waitthread cockpitBulletHit 0.2  0.1 snd_bh_metal01  0.1 2 
+	waitthread cockpitBulletHit 0.3  0.1 snd_bh_wood2  0.1 2 
+	waitthread cockpitBulletHit 0.2  0.1 mp44_snd_fire1  0.2	5
+	waitthread cockpitBulletHit 0.2  0.3 panzerschreck_snd_fire  0.4	10
+	waitthread cockpitBulletHit 0.25  0.1 snd_bh_metal01  0.1 2 
+	
+	thread maps/e2l1/fog.scr::setFog level.fogDistanceDescent level.fogBiasDescent level.fogColorDescent
+
+	// hit some trees
+	wait 1.2
+	$gliderCamera playsound e2l1_tree1
+	$glider anim bank_left
+	thread doEarthquake 0.25 2 1 0
+	
+	wait 0.5
+	$gliderCamera playsound e2l1_tree2
+	$glider anim bank_right
+	thread doEarthquake 0.5 4 1 0
+}end
+
+//============================================================================
+detectDialogueSkip: {
+//============================================================================
+	while (level.dialogueFinished == 0 && level.skipDialogue == 0) {
+		if ($player.useheld) {
+			level.skipDialogue = 1
+		}
+		waitframe
+	}
+}end
+
+//============================================================================
+cockpitBulletHit local.wait local.lightFlashTime local.sound local.shakeTime local.shakeMag: {
+//============================================================================
+	if (local.wait > 0) {
+		wait local.wait
+	}
+
+	if (local.lightFlashTime > 0) {
+		thread gliderLightFlash local.lightFlashTime
+	}
+
+	$gliderPilot playsound local.sound
+	thread doEarthquake local.shakeTime local.shakeMag 1 0
+}end
+
+//============================================================================
+handleCamera: {
+//============================================================================
+	spawn Camera targetname gliderCamera
+	$gliderCamera showquakes 1
+	$gliderCamera attach $glider seat 1 ( 0 0 40 )
+
+	if (level.stickPlayerAtGlider != 1) {
+		cuecamera $gliderCamera
+	}
+	
+	level.oldPlayerAngles = $player.viewangles
+
+	// don't start synching the angles until after the fade in has happened
+	local.deltaAngles = $player.viewangles - level.oldPlayerAngles
+	$gliderCamera.angles = $glider.angles + local.deltaAngles
+
+	if (level.allowSkipGliderDialogue == 0) {
+		wait 8
+	}
+
+	while (level.gliderRideOver == 0) {
+		local.deltaAngles = $player.viewangles - level.oldPlayerAngles
+		$gliderCamera.angles = $glider.angles + local.deltaAngles
+		waitframe
+	}
+
+	while (level.gliderCrashOver == 0) {
+		waitframe
+	}
+
+	cueplayer
+	thread maps/e2l1/fog.scr::setFog level.fogDistanceGround level.fogBiasGround level.fogColorGround
+	delete $gliderCamera
+}end
+
+//============================================================================
+cameraLookatPilot: {
+//============================================================================
+	local.y = -160 + $glider.angles[1] + $player.viewangles[1]
+	local.x = -10 + $glider.angles[0] + $player.viewangles[0]
+	level.oldPlayerAngles = ( local.x local.y 0 )
+}end
+
+//============================================================================
+handleGlider: {
+//============================================================================
+	// snap the glider to the starting position, at the first spline path node
+	$glider.origin = $gliderpath.origin
+	thread gliderIdle
+	$glider light 1 1 1 1000
+	$glider lightOff
+
+	// play the wind sound
+	$glider loopsound e2l1_glider_snd_idle
+
+	// stick a jeep inside the glider
+	spawn models/vehicles/e2l1_jeep_glider targetname gliderJeep
+	$gliderJeep attach $glider jeep_tag	1 ( -40 0 0 ) 
+
+	// bob the glider around until we're detached from the C47
+	waitthread gliderBob
+	$glider playsound e2l1_c47_snd_teather
+
+	// wait for the signal for the glider start the final descent
+	while (level.gliderDescentBegun == 0) {
+		waitframe
+	}
+
+	// don't want the flak anymore...
+	thread maps/e2l1/pocketflash.scr::StopGliderFlak
+
+	// start the glider on the descent path, and wait for it to finish
+	$glider anim descent
+	$glider.origin = $gliderpath.origin
+	$glider flypath gliderpath 1200 200 500
+	$glider waitmove	
+
+	// give the signal for the camera to give control back to the player
+	level.gliderRideOver = 1
+	$glider stoploopsound
+	$gliderJeep delete
+
+	// get rid of the glider so it isn't spewing particles and hogging
+	// cpu cycles
+	wait 10
+	$glider delete
+}end
+
+//============================================================================
+gliderIdle: {
+//============================================================================
+	// the idle animation spews the fog particles
+	while (level.gliderDescentBegun == 0) {
+		$glider anim idle
+		$glider waittill animdone
+	}
+}end
+
+//============================================================================
+gliderBob: {
+//============================================================================
+	local.vz = 0
+	local.az = 50
+	local.lastTime = level.time
+	local.z = 0
+	local.minZ = 20
+	local.maxZ = 40
+
+	while (level.gliderDetached == 0) {
+		local.dTime = level.time - local.lastTime
+		local.lastTime = level.time
+
+		if ((local.az > 0 && local.z > local.maxZ) || (local.az < 0 && local.z < local.minZ)) {
+			local.az = -local.az
+		}
+
+		local.vz += local.az*local.dTime
+		if (local.vz > 30.0) {
+			local.vz = 30.0
+		}
+
+		if (local.vz < -30.0) {
+			local.vz = -30
+		}
+
+		local.dz = local.vz*local.dTime
+		local.z += local.dz
+		$glider.origin += ( 0 0 local.dz )
+		waitframe
+	}
+}end
+
+//============================================================================
+gliderLightFlash local.duration: {
+//============================================================================
+	$glider lightOn
+	wait local.duration
+	$glider lightOff
+}end
+
+//============================================================================
+handleC47: {
+//============================================================================
+	// move the C47 to it's first spline path node
+	$c47.origin = $c47Path.origin
+	
+	// the c47 make engine noise
+	$c47 loopsound e2l1_c47_snd_idle
+	$c47 anim no_props
+	
+	// spawn the teather, and attach it to the C47
+	spawn models/vehicles/CG4Aglider_tether targetname c47Teather
+	$c47Teather attach $c47 Origin
+	$c47Teather.angles = ( 0 90 0 )
+	$c47Teather anim idle
+
+	// wait for the detach signal
+	while (level.gliderDetached == 0) {
+		waitframe
+	}
+
+	// play the teather detach animation
+	$c47Teather anim detach
+
+	// fly fly away
+	$c47 flypath c47Path 600 300 256
+	$c47 waitmove
+}end
+
+//============================================================================
+handlePilot:{
+//============================================================================
+	// initialize the glider pilot, start him in the flying animation
+	//spawn models/human/allied_oss_man_disguised targetname gliderPilot
+	//spawn models/human/allied_usa_c47-paratrooper1 targetname gliderPilot
+	//spawn models/human/allied_pilot targetname gliderPilot
+	spawn models/human/sc_al_us_pilot targetname gliderPilot
+	$gliderPilot physics_off
+	$gliderPilot nodamage
+	$gliderPilot notsolid
+	$gliderPilot attach $glider seat 1 ( -8 53.5 -47 )
+	$gliderPilot holster
+	$gliderPilot thread handlePilotIdle
+
+	// wait for the pilot to get shot
+	while (level.gliderPilotShot == 0) {
+		waitframe
+	}
+
+	// animate the his death
+	$gliderPilot anim AA_pilot1_death2
+	$gliderPilot playsound dfr_E2L1_PILOT_DEATH
+	$gliderPilot waittill animdone
+	$gliderPilot ai_off
+
+	// wait for the scene to end and delete the pilot
+   	while (level.gliderRideOver == 0) {
+		waitframe
+   	}
+
+	delete $gliderPilot
+}end
+
+//============================================================================
+handlePilotIdle: {
+//============================================================================
+	// keep looping the flying animation until the pilot gets shot
+	while (level.gliderPilotShot == 0) {
+		self anim AA_pilot1
+		self waittill animdone
+	}
+}end
+	
+//============================================================================
+doEarthquake local.duration local.magnitude local.no_rampup local.no_rampdown: {
+//============================================================================
+	earthquake local.duration local.magnitude local.no_rampup local.no_rampdown
+}end
+
+//	Make sure player can't do 360s...
+//============================================================================
+RestrictView: {
+//============================================================================
+	// don't let player mess with the mouse while we do this...
+	level.restrict = spawn models/statweapons/camera_restrict.tik
+	level.restrict.origin = $player.origin
+	level.restrict notsolid
+	level.restrict.angles = "90 0 0"
+	level.restrict hide
+	level.restrict turnspeed 1000
+	level.restrict startyaw -90	// turn us a bit...
+	level.restrict maxyawoffset 180
+	level.restrict pitchcaps "-80 50 0"
+	level.restrict viewjitter .5
+	level.restrict name ""
+	level.restrict pickupsound ""
+	level.restrict setPlayerUsable 1
+	level.restrict maxuseangle 180	// make sure the doUse command works!
+	level.restrict doUse $player
+	level.restrict setPlayerUsable 0
+	//level.restrict glue $playerspot_plane
+}end
+
+//	allow player to look normally when they detach from the
+//	parachute...
+//============================================================================
+UnrestrictView: {
+//============================================================================
+	level.restrict setPlayerUsable 1
+	level.restrict doUse $player
+	level.restrict setPlayerUsable 0
+	level.restrict delete
+	level.restrict = NULL
+}end

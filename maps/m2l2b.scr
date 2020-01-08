@@ -1,0 +1,630 @@
+//chrissstrahl - fix
+//the sub has some weapon models and antena models missing, but the clip does still exist for them, respawn these models and align them in place
+
+
+//=========================================================================
+main:{
+//=========================================================================
+	level.coop_aaMap = 1					//chrissstrahl - let global scripts know this is a AA level
+	level.coopPrevMap = "m2l2a"				//chrissstrahl - set previouse map (for mom voteing)
+	level.coopNextMap = "m2l2c"				//chrissstrahl - set next map (for mom voteing)
+	//level.coop_playerHasDisguise = 1		//chrissstrahl - 
+	level.coop_disableSpawnWarper = TRUE	//chrissstrahl - disable respawning at where players spawned
+	thread coop_mod/main.scr::main 		//chrissstrahl - start coop mod extensions
+	
+	//chrissstrahl - setup stuff that is needed
+	if(level.gametype != 0){
+		//chrissstrahl - add them now only in mp, to avoid the spam at start add them before players are on the server - sp see further below
+		waitthread global/objectives.scr::add_objectives 1 2 "Plant the bombs [2 left]." level.bombtoplant
+		waitthread global/objectives.scr::add_objectives 2 2 "Escape." $exit.origin
+		waitthread global/objectives.scr::current_objectives 1
+		
+		spawn trigger_multiple targetname coop_exit setthread coop_exitthesub origin (5030 -6714 183)
+	}
+
+	exec global/loadout.scr maps/m2l2b.scr
+level waittill prespawn
+//	exec global/alarmlight.scr
+
+	exec global/ambient.scr m2l2b
+	level.subspawned1 = waitthread global/spawner.scr::spawner_create $subspawned1
+	level.subspawned2 = waitthread global/spawner.scr::spawner_create $subspawned2
+level waittill spawn
+	$world northyaw -90
+	level.skillz = getcvar(skill)
+	thread musicstuff
+	level.alarmlights = 0	
+	level.alarm = 0
+	level.bombtoplant = $bombplanted
+	
+	if(level.gametype == 0){ //chrissstrahl - do now in sp, in mp we do it before any player is on server
+		waitthread global/objectives.scr::add_objectives 1 2 "Plant the bombs [2 left]." level.bombtoplant
+		waitthread global/objectives.scr::add_objectives 2 2 "Escape." $exit.origin
+		waitthread global/objectives.scr::current_objectives 1
+	}
+	
+	$exit nottriggerable
+	thread exitthesub
+	thread endlevelthread
+	thread wavesounds
+	thread enigmamedal
+	level.bombcount = 0
+	waitframe	//chrissstrahl - make sure this works in mp
+
+	$bombplanted hide
+	$bomb2planted hide
+	$subback hide
+	$subfront hide
+	$subback notsolid
+	$subfront notsolid
+	$bridgebroken hide
+	$bridgebroken notsolid
+	$bridgeclip notsolid
+	
+	
+	$waterplode1.model = animate/fx_explosion_tank.tik
+	$waterplode2.model = animate/fx_explosion_tank.tik
+	thread denyexit
+	thread gatesound
+	waitthread global/items.scr::add_item "explosives"
+	waitframe	//chrissstrahl - make sure this works in mp
+
+	$subguy2 type_attack "alarm"
+	$subguy1 type_attack "alarm"
+	$wrenchman1 exec coop_mod/replace.scr::holster	//chrissstrahl - make this work in coop
+
+//   $wrenchman1 type_attack "alarm"
+	thread cometolife
+	level.gatecount = 0
+	for(local.i = 1; local.i <= $counterguys.size; local.i ++)
+	{
+		$counterguys[local.i] thread countdeaths
+		$counterguys[local.i] noticescale 200
+	}
+	if(isalive $welderguy2)
+	{
+		$welderguy2 thread countdeaths3
+		$welderguy2 noticescale 200
+	}
+	if(isalive $wrenchman1)
+	{
+		$wrenchman1 thread countdeaths
+		$wrenchman1 noticescale 200
+	}
+	waitthread global/items.scr::add_item "papers_level1" 1
+	waitthread global/items.scr::add_item "uniform" 1
+	
+	$coop_exit setsize ( -10 -10 -10 ) ( 10 10 10 )	//chrissstrahl - spawn coop exit trigger to handle each player
+	$coop_exit nottriggerable	//chrissstrahl - do not allow triggering until 
+	
+//remove
+//$player stufftext "notarget"
+//$player stufftext "noclip"
+//$player.origin = "-2400 -4140 -485" //at the end
+//$player.origin = "-3760 -805 -495" //start of pens (outside)
+//$player.origin = "-2683 -3616 -511" //just outside of sub
+//$player.origin = $waterplode1.origin
+//wait 2
+//thread blowhshtuffup
+
+//	$player.has_disguise = 1
+}end
+
+easyskill:
+	if(level.skillz != "0")
+	end
+	if(self.health > 50)
+		self.health = (self.health / 2)
+//	println self.targetname "'s health is " self.health
+	self noticescale 1000
+//	println self.targetname "'s noticescale is " self.noticescale
+	self accuracy (self.accuracy / 3)
+end
+
+musicstuff:
+	waitframe
+	exec coop_mod/replace.scr::tmstop	//chrissstrahl - coop compatibility
+	exec coop_mod/replace.scr::tmstart "sound/music/mus_17a_mystery.mp3"	//chrissstrahl - coop compatibility
+end
+
+countdeaths:
+	level.gatecount++
+	self thread easyskill
+	self waittill death
+	level.gatecount--
+	if(level.gatecount == 0)
+		thread gateopen
+end
+gatesound:
+	waitframe
+	$gatenlocked waittill trigger
+	$gatenlocked playsound gate_metal_locked_clue
+	wait 1
+	goto gatesound
+end
+
+gateopen:
+	$gatenlocked nottriggerable
+	level.gate2hasopened = 1 
+	$gaten playsound fence_roll_open
+	$gaten movesouth 240
+	$gaten waitmove
+	wait 1
+//	$gaten connect_paths
+end
+
+cometolife:
+	if(game.m2l2welderdead == 0)
+		$welderguy2 thread welding
+	else
+	{
+		spawn script_model model "models/miscobj/welding_tank.tik" targetname "weldertank"
+		"weldertank" notsolid
+		$weldertank.origin = $welderguy2.origin
+		$weldertank.angles = $welderguy2.angles
+		$weldertank anim tank_death 
+		$welderguy2 remove
+	}
+	if(game.m2l2sledgedead == 0)
+		thread hammerguy1
+	else
+		$sledgehammerguy remove
+	if(game.m2l2wrenchdead == 0)
+		$wrenchman1 thread wrenchman1
+	else
+		$wrenchman1 remove
+/*
+                         sledgehammercarry:
+                         	game.m2l2sledgedead = 0
+                         	self waittill death
+                         	game.m2l2sledgedead = 1	
+                         end
+                         
+                         wrenchycarry:
+                         	game.m2l2wrenchdead = 0                  <-------- code from previous level
+                         	self waittill death
+                         	game.m2l2wrenchdead = 1	
+                         end
+                         
+                         weldercarry:
+                         	game.m2l2welderdead = 0
+                         	self waittill death
+                         	game.m2l2welderdead = 1	
+                         end
+*/
+end
+
+wrenchman1:
+	local.wrenchspot = spawn script_origin
+	local.wrenchspot.origin = ($wrench1spot1.origin + ( -18 0 0)) 
+	while(level.alarm != 1 && isalive $wrenchman1)
+	{
+		$wrenchman1 waitthread global/wrenching.scr::wrench local.wrenchspot wrench1look1
+	}
+end
+wavesounds:
+	for(local.i = 1;local.i <= $wavelaps.size;local.i++)
+     	{
+			$wavelaps[local.i] loopsound wave_laps .1
+		}
+end
+
+
+
+
+/////////////////////////////////
+///////////SETUSUPTHEBOMB////////
+/////////////////////////////////
+
+
+plantthebomb:
+	if(level.bombPlanted1 != NIL){ end } //chrissstrahl - bugfix
+	level.bombPlanted1 = 1 //chrissstrahl - bugfix
+	
+	level.bombtoplant = $bomb2planted
+	thread bombcount
+	$bombplanted show
+	$bombplanted playsound plantbomb //chrissstrahl - made coop compatible
+	if(level.playerticking != 1)
+	{
+		$bombplanted loopsound bombtick
+		level.playerticking = 1
+	}
+	$bombplant remove
+	local.theguy = waitthread global/spawner.scr::spawner_activate level.subspawned1
+end
+
+plantthebomb2:
+	if(level.bombPlanted2 != NIL){ end } //chrissstrahl - bugfix
+	level.bombPlanted2 = 1 //chrissstrahl - bugfix
+	
+	level.bombtoplant = $bombplanted
+	thread bombcount
+	$bomb2planted show
+	$bomb2planted playsound plantbomb
+	if(level.playerticking != 1)
+	{
+		$bombplanted loopsound bombtick //chrissstrahl - made coop compatible
+		level.playerticking = 1
+	}
+	$bomb2plant remove
+	local.theguy = waitthread global/spawner.scr::spawner_activate level.subspawned2
+
+end
+bombcount:
+	level.bombcount++
+	if(level.bombcount == 1)
+	{
+      	waitthread global/objectives.scr::add_objectives 1 2 "Plant the bombs [1 left]." level.bombtoplant.origin
+     	waitthread global/objectives.scr::current_objectives 1
+		if(level.gametype == 0){//chrissstrahl - sp only
+			$player.has_disguise = 0
+		}
+     	waitthread global/items.scr::remove_item "papers_level1"
+     	waitthread global/items.scr::remove_item "uniform"
+     	wait 1
+     	iprintlnbold "Your cover has been blown."
+		if(level.skillz == "0")
+		{
+     		iprintlnbold "75 seconds to escape the sub"			
+			wait 20
+		}
+		exec coop_mod/replace.scr::stopwatch 55
+		wait 55
+		thread blowhshtuffup
+	}
+	if(level.bombcount == 2)
+	{
+		thread subtrap
+		thread objective1
+	}
+end
+
+objective1:
+ 	waitthread global/objectives.scr::add_objectives 1 3 "Plant the bombs." level.bombtoplant.origin
+	waitthread global/objectives.scr::current_objectives 2
+	waitthread global/items.scr::remove_item "explosives" nomessage
+
+end
+objective2:
+	waitthread global/objectives.scr::add_objectives 2 3 "Eliminate opposition and escape." $endlevel.origin
+	exec global/missioncomplete.scr m2l2c 1
+
+end
+subtrap:
+	$exitdeny nottriggerable
+	$exit triggerable
+	thread coop_updateSpawn
+end
+
+denyexit:
+	$exitdeny waittill trigger
+	iprintln "You have not completed the objective."
+	wait 3
+	goto denyexit
+end
+
+attacknowthing:
+	
+end
+
+
+playalarmsound:
+	level.alarmlights = 1
+	for(local.i = 1;local.i <= $alarm_sound.size;local.i++)
+	{
+		$alarm_sound[local.i] loopsound m2l2_alarm
+	}	
+end
+
+blowhshtuffup:
+	if(level.blownup != 1)
+	{
+		$bombplanted stoploopsound	//chrissstrahl - coop compatible
+     	level.blownup = 1
+		$bridgefatty hide
+		thread blowuptheinside
+//		thread playalarmsound
+//		$subfront show
+//		$subback show
+		$subfront remove
+		$subback remove
+//		$bridge notsolid
+//		$bridge hide
+		$bridgekill volumedamage 2000
+		$bridgebroken show
+		$bridgebroken solid
+		$bridgebroken thread breakbridge
+		thread subkill
+		$bridgeclip solid
+     	exec global/earthquake.scr .5 1 0 0
+     	$waterplode1 anim start
+     	$waterplode1 playsound explode_sub
+     	$spray1 thread spraychain
+     //	$tankeffect1 anim start
+     	wait .1
+     	$spray2 thread spraychain
+     	$waterplode2 anim start
+     	$waterplode2 playsound explode_water
+		wait 1
+     	$waterplode3 anim start
+     	$waterplode3 playsound explode_water
+		wait 1
+     	$waterplode2 anim start
+     	$waterplode2 playsound explode_water
+     	wait 1
+     	$waterplode3 anim start
+     	$waterplode3 playsound explode_water
+		level.alarmlights = 1
+		
+		//chrissstrahl - allow players now to respan at their death pos
+		//was off to prevent players from respawning on the blowing boat
+		wait 3
+		level.coop_disableSpawnWarper = false
+	}
+end
+
+subkill:
+	while(1)
+	{
+		$subdamage volumedamage 2000
+		wait 1
+	}
+end
+breakbridge:
+ 	self time .1
+	self followpath $bridgepath 
+	self move
+	wait 2.3
+	$bridgesplash2 anim start
+	$bridgesplash1 anim start
+	wait .5
+	$bridgesplash2 anim stop
+	$bridgesplash1 anim stop
+	
+end
+
+
+blowuptheinside:
+	if(level.playerisnotinsub != 1)
+	{
+     	$firechain1 thread firechain
+     	$firechain2 thread firechain
+     	$firechain3 thread firechain
+	}
+end
+spraychain:
+local.spray = self.targetname
+while(local.spray)
+{
+	local.spray thread spray
+	local.spray = local.spray.target
+	wait .22
+}
+end
+
+spray:
+	self anim start
+	wait 1 
+	self anim stop
+end
+
+guygo local.spot:
+	self exec global/walkto.scr $(self + "spot" + local.spot)
+end
+
+endlevelthread:
+	$endlevel waittill trigger
+	if(level.gametype == 0){//chrissstrahl - only do this in sp, in mp we don't need that kind of precision to the spawn
+		game.m2l2position = $player.origin
+	}
+	thread objective2
+
+end
+
+officerdead:
+	thread blowhshtuffup
+	wait 5
+end
+
+////////////////////////////////////////////////////////////
+//////////**********************////////////////////////////
+//////////**SLEDGHAMMER GUYS!!!*****////////////////////////
+//////////**********************////////////////////////////
+////////////////////////////////////////////////////////////
+
+hammerguy1:
+	$sledgehammerguy thread sledgehammering
+end
+
+sledgehammering:
+	self gun "walter p38"
+	self  exec coop_mod/replace.scr::holster	//chrissstrahl - make this work in coop
+	self type_attack "alarm"
+	self anim sledgehammer_init
+	self alarmthread sledgecower
+	self.health = 1
+	wait 5
+	while(!self.stophammering)
+	{
+		self anim sledge_hammer_action
+		if(self.stophammering)
+			end
+		wait (randomint(10))
+		self anim sledge_hammer_idle
+		self waittill animdone
+	}
+stophammering:
+	self anim sledge_hammer_stop
+end
+
+sledgecower:
+	self.stophammering = 1
+	self exec global/disable_ai.scr
+	self waittill animdone
+	self anim sledge_hammer_stop
+	self exec coop_mod/replace.scr::unholster	//chrissstrahl - make this work in coop
+	self exec global/enable_ai.scr
+	self attackplayer
+end
+
+
+////////////////////////////////////////////////////////////
+//////////**********************////////////////////////////
+//////////**WELDING GUYS!!!*****////////////////////////////
+//////////**********************////////////////////////////
+////////////////////////////////////////////////////////////
+
+welding:
+//	self waittill animdone
+	self forceactivate
+	self thread welderdeath
+	self.health = 1
+	self exec global/setdeathanim.scr "welding_death"
+	self anim welding_init
+	self type_attack alarm
+	self alarmthread maps/m2l2a.scr::weldinginterupt
+	wait 5
+	while (level.alarm == 0)
+	{
+		self anim welding_start
+		self waittill animdone
+		self anim welding_action
+		wait (randomint(10) + 5)
+		self anim welding_end
+		self waittill animdone
+		self anim welding_idle
+		wait (randomint(10) + 10)
+	}
+	self thread weldinginterupt
+end
+
+weldinginterupt:
+	if(self.inturpupted == 1)
+		end
+	self thread welderbreak
+	self exec global/disable_ai.scr
+	self.interupted = 1
+	wait .1
+	self anim welding_stop
+	self waittill animdone
+	wait .1
+	self gun "walter p38"
+	self exec global/enable_ai.scr
+end
+
+welderbreak:
+	spawn script_model model "models/miscobj/welding_tank.tik" targetname (self.targetname + "big1")
+	$(self.targetname + "big1") notsolid
+	$(self.targetname + "big1").origin = self.origin
+	$(self.targetname + "big1").angles = self.angles
+	$(self.targetname + "big1") anim tank_death 
+end
+
+welderdeath:
+	if(self.ded != 1)
+	{
+		self waittill death
+		self thread welderbreak
+	}	
+	self.ded = 1
+end
+
+//////////////////////////////
+//////   Breaking guys
+//////////////////////////////
+//"wrencherattack"
+wrencherattack:
+	self.interupted = 1
+end
+
+firechain:
+	local.fire = self
+	while(local.fire)
+	{
+		local.firespawned = spawn animate/adam-hallfire2.tik
+		local.firespawned.origin = local.fire.origin
+		local.firespawned thread flameage
+		local.fire volumedamage 2000
+		local.fire.target volumedamage 2000
+//		local.fire playsound something
+		local.fire = local.fire.target
+		wait .75
+	}
+end
+
+flameage:
+	self anim start 
+	wait 1
+	self anim stop
+end
+
+enigmamedal:
+	$enigmatrig waittill trigger
+	setcvar g_medal4 "1"
+//	$enigma.model = "animate/enigmaopen.tik"
+//	wait 1
+	$enigma hide
+	//$player playsound pickup_papers	//chrissstrahl
+	$enigma playsound pickup_papers		//chrissstrahl - coop compatible
+	iprintlnbold "Manifest stolen"
+end
+
+exitthesub:
+	$exit waittill trigger
+	
+	//chrissstrahl allow ubot exit only once
+	if(level.ubotausstiegausgeloest != NIL ){
+		end
+	}
+	level.ubotausstiegausgeloest = 1
+	
+	
+	//chrissstrahl - do only in sp
+	if(level.gametype == 0){
+		level.playerisnotinsub = 1
+		fadeout 1.5 0 0 0 1
+		$world northyaw 0
+		wait .5
+	
+		$player unattachfromladder
+		wait 1.1
+		$player.origin = $haxtteleportlocation1.origin	
+	}else{
+		$coop_exit triggerable
+	}
+	
+	for(local.i = 1; local.i <= $counterguys.size; local.i++){
+		$counterguys exec coop_mod/replace.scr::turnto	//chrissstrahl - coop compatibility
+	}
+	
+	thread playalarmsound
+	
+	//chrissstrahl - do only in sp
+	if(level.gametype == 0){
+		fadein 2 0 0 0 1
+	}
+	
+	waitthread global/objectives.scr::add_objectives 2 2 "Eliminate opposition and escape." $endlevel.origin	
+	thread attacknowthing
+end
+
+//coop exit sub
+//=========================================================================
+coop_updateSpawn:{
+//=========================================================================
+	thread coop_mod/spawnlocations.scr::m2l2b_update1
+}end
+
+//coop exit sub
+//=========================================================================
+coop_exitthesub:{
+//=========================================================================
+	parm.other unattachfromladder
+	parm.other.origin = $haxtteleportlocation1.origin
+	thread coop_mod/main.scr::playerMakeSolidAsap (waitexec coop_mod/main.scr::getPlayerId parm.other)
+	wait 2
+}end
+
+
+

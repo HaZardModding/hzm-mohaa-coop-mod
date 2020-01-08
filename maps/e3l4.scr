@@ -1,0 +1,299 @@
+//=========================================================================
+main:
+//=========================================================================
+{
+	setcvar "debugMessages" "0"			// Shut off debug output
+	dprintln "-----------------------------------------------"
+	dprintln "E3L4"
+	dprintln "-----------------------------------------------"
+
+	exec global/auto.scr e3l4
+	exec global/ambience.scr e3l4
+	waitexec maps/e3l4/hacks.scr
+
+	level waittill prespawn
+
+	waitexec global/fadein.scr
+
+	level waittill spawn
+
+	//add in our clip brushes
+	local.clipbrush = spawn script_object
+	local.clipbrush.origin = ( 3004 -1632 768 )
+	local.clipbrush setsize ( 0 0 0 ) ( 68 72 32 )
+	local.clipbrush solid
+	
+	thread maps/e3l4/Bunker1.scr::InitBunker1
+	thread maps/e3l4/Bunker2.scr::InitBunker2
+	thread maps/e3l4/Bunker3.scr::InitBunker3
+	thread maps/e3l4/Bunker4.scr::InitBunker4
+	thread maps/e3l4/Tunnel.scr::Tunnel
+	thread maps/e3l4/Castle.scr::InitCastle
+	thread maps/e3l4/Tower.scr::InitTower
+	thread maps/e3l4/Escape.scr::InitEscape
+	thread maps/e3l4/Outro.scr::InitOutro
+	thread maps/e3l4/CastleAmbient.scr::InitCastleAmbient
+	waitthread InitLevel
+
+	// Bunker1
+	waitthread maps/e3l4/Bunker1.scr::DoIntro
+	waitthread global/objectives.scr::add_objectives 		level.ObjDeliverSupplies 2 "Deliver Supplies to Able Bunker" $startjeep
+	waitthread global/objectives.scr::current_objectives 	level.ObjDeliverSupplies
+	waitthread maps/e3l4/Bunker1.scr::ObjectiveDeliverSuppliesBunker1
+	waitthread global/objectives.scr::add_objectives 		level.ObjDeliverSupplies 3
+
+	// Bunker2
+	waitthread global/objectives.scr::add_objectives 		level.ObjDefendBunker2 2 "Deliver Supplies to Baker Bunker" $bunker2deliverytrigger
+	waitthread global/objectives.scr::current_objectives 	level.ObjDefendBunker2
+	waitthread maps/e3l4/Bunker2.scr::ObjectiveGoToBunker2
+	waitthread global/objectives.scr::add_objectives 		level.ObjDefendBunker2 2 "Repel the Attack on Baker Bunker" $bunker2deliverytrigger
+	waitthread global/objectives.scr::current_objectives 	level.ObjDefendBunker2
+	waitthread maps/e3l4/Bunker2.scr::ObjectiveDefendBunker2
+	waitthread global/objectives.scr::add_objectives 		level.ObjDefendBunker2 3
+	
+	// Bunker3
+	waitthread global/objectives.scr::add_objectives 		level.ObjDefendBunker3 2 "Reinforce Charlie Bunker" $bunker3
+	waitthread global/objectives.scr::current_objectives 	level.ObjDefendBunker3
+	waitthread maps/e3l4/Bunker3.scr::ObjectiveRetreatToBunker3
+	waitthread global/objectives.scr::add_objectives 		level.ObjDefendBunker3 3
+	waitthread global/objectives.scr::add_objectives 		level.ObjDefendBunker3 2 "Repel the Attack on Charlie Bunker" $bunker3
+	waitthread global/objectives.scr::current_objectives 	level.ObjDefendBunker3
+	waitthread maps/e3l4/Bunker3.scr::ObjectiveDefendBunker3
+	waitthread global/objectives.scr::add_objectives 		level.ObjDefendBunker3 3
+
+	// Bunker4 / Tunnel
+	thread maps/e3l4/Bunker4.scr::Bunker4Battle
+	thread maps/e3l4/Tunnel.scr::CleanupTunnels
+	waitthread global/objectives.scr::add_objectives 		level.ObjRegroupInCastle 2 level.ObjRegroupInCastleText
+	waitthread global/objectives.scr::current_objectives 	level.ObjRegroupInCastle
+	thread UpdateRegroupInCastleObjective
+	level.dontdropweapons = 0
+	waitthread maps/e3l4/Castle.scr::ObjectiveRegroupInCastle
+	waitthread global/objectives.scr::add_objectives 		level.ObjRegroupInCastle 3
+
+	// Tower
+	waitthread global/objectives.scr::add_objectives 	 level.ObjGoToRadio 		2 level.ObjGoToRadioText
+	waitthread global/objectives.scr::current_objectives level.ObjGoToRadio
+	thread UpdateGoToRadioObjective
+	waitthread maps/e3l4/Tower.scr::ObjectiveGoToRadio
+
+	waitthread global/objectives.scr::add_objectives 	 level.ObjGoToRadio 		3
+	waitthread global/objectives.scr::add_objectives 	 level.ObjDefendTower 		2 "Defend the Communications Tower" $radiotower
+	waitthread global/objectives.scr::current_objectives level.ObjDefendTower
+	waitthread maps/e3l4/Tower.scr::ObjectiveDefendTower
+
+	waitthread global/objectives.scr::add_objectives 	 level.ObjDefendTower 		3
+	waitthread global/objectives.scr::add_objectives 	 level.ObjConfirmAirstrike 	2 "Confirm the Airstrike" $deskradio
+	waitthread global/objectives.scr::current_objectives level.ObjConfirmAirstrike
+	waitthread maps/e3l4/Tower.scr::ObjectiveConfirmAirstrike
+
+	waitthread global/objectives.scr::add_objectives 	 level.ObjConfirmAirstrike 	3
+	waitthread maps/e3l4/Tower.scr::CleanupSceneTower
+
+	// Escape
+	/*
+	waitthread global/objectives.scr::add_objectives level.ObjEscapeCastle 2 level.ObjEscapeCastleText
+	waitthread global/objectives.scr::current_objectives level.ObjEscapeCastle
+	thread UpdateEscapeObjective
+	waitthread maps/e3l4/Escape.scr::ObjectiveEscapeCastle
+	waitthread global/objectives.scr::add_objectives level.ObjEscapeCastle 3
+	waitthread maps/e3l4/Escape.scr::CleanupSceneEscape
+	*/
+
+	waitthread maps/e3l4/CastleAmbient.scr::CleanupSceneCastleAmbient
+
+	// Outro
+	waitthread GiveMedals
+	level.currentobjective = -1
+	waitthread maps/e3l4/Outro.scr::DoOutro
+
+	//	exec global/missioncomplete.scr  briefing/briefingt3 1	// 1 means skip fade...
+}end
+
+//=========================================================================
+startMusic_e3l4_main:
+//=========================================================================
+{
+	waitthread global/music.scr::PlaySongLoop "sound/music/Last_Rites.mp3" 2.0
+}end
+
+//=========================================================================
+startMusic_e3l4_Tunnel:
+//=========================================================================
+{
+	waitthread global/music.scr::StopSong 3
+	waitthread global/music.scr::PlaySongLoop "sound/music/mus_10a_action.mp3"
+}end
+
+//=========================================================================
+startMusic_e3l4_tower:
+//=========================================================================
+{
+	waitthread global/music.scr::StopSong 2
+	waitthread global/music.scr::PlaySongLoop "sound/music/mus_11b_action.mp3"
+}end
+
+//=========================================================================
+InitLevel:
+//=========================================================================
+{
+	level.script = "maps/e3l4.scr"
+	level.music  = "e3l4"
+
+	$player heal 1
+	setcvar g_mission 3
+
+	waitthread InitWeather
+	waitthread InitObjectives
+	waitthread InitFriends
+
+	$world northyaw 210 
+
+	waitthread Fadein
+	waitexec global/loadout.scr
+
+	// control ai drops
+	level.nodrophealth	= 1
+	level.nodropweapons	= 1
+	
+	// set ai prone & crouch chances (percentage)
+	level.aipronechance	 = 60
+	level.aicrouchchance = 70
+}end
+
+//=========================================================================
+InitFriends:
+//=========================================================================
+{
+	$jeepdriver exec global/disable_ai.scr
+	$jeepdriver.angles = (0 0 0)
+	$jeepdriver attach $startjeep driver 1
+	$jeepdriver thread global/LoopAnim.scr::LoopAnim A_22_driver_idle
+	$jeepdriver physics_off
+
+	$jeeppassenger exec global/disable_ai.scr
+	$jeeppassenger.angles = (0 0 0)
+	$jeeppassenger attach $startjeep passenger0 1
+	$jeeppassenger thread global/LoopAnim.scr::LoopAnim A_31_GetIn_jeepidle
+	$jeeppassenger physics_off
+}end
+
+//=========================================================================
+Fadein:
+//=========================================================================
+{
+	//$player.origin = $startjeep.origin + (0 100 100)
+	waitthread global/fadein.scr::DoFadeIn e3l4_1 e3l4_2 e3l4_3 NIL 1
+}end
+
+//=========================================================================
+InitWeather:
+//=========================================================================
+{
+	exec global/weather.scr
+
+	//	level.rain_speed = "32"
+	//	level.rain_speed_vary = "16"
+	//	level.rain_length = "2"
+	//	level.rain_width = "1"
+	//	level.rain_density = ".2"
+	//	level.rain_slant = "250"
+	//	level.rain_min_dist = "1800"
+	//	level.rain_numshaders = 12
+	//	level.rain_shader = "textures/rain"
+}end
+
+//=========================================================================
+InitObjectives:
+//=========================================================================
+{
+	level.ObjDeliverSupplies 	= 1
+	level.ObjDefendBunker2 		= 2
+	level.ObjDefendBunker3 		= 3
+	level.ObjRegroupInCastle 	= 4
+	level.ObjGoToRadio 			= 5
+	level.ObjDefendTower 		= 6
+	level.ObjConfirmAirstrike 	= 7
+	level.ObjEscapeCastle 		= 8
+
+	waitthread global/objectives.scr::add_objectives 1 1
+	waitthread global/objectives.scr::add_objectives 2 1
+	waitthread global/objectives.scr::add_objectives 3 1
+	waitthread global/objectives.scr::add_objectives 4 1
+	waitthread global/objectives.scr::add_objectives 5 1
+	waitthread global/objectives.scr::add_objectives 6 1
+	waitthread global/objectives.scr::add_objectives 7 1
+	waitthread global/objectives.scr::add_objectives 8 1
+
+	level.ObjRegroupInCastleText = "Regroup with Allied Forces in the Castle"
+	level.ObjGoToRadioText 		 = "Send a Distress Signal from the Castle Tower"
+	level.ObjEscapeCastleText 	 = "Escape the Castle"
+}end
+
+//=========================================================================
+UpdateRegroupInCastleObjective:
+//=========================================================================
+{
+	while (level.currentobjective == level.ObjRegroupInCastle){
+		local.pointto = $player waitthread maps/e3l4/friendly.scr::FindClosestNodeOnPath $objretreattocastlestart
+		if (local.pointto.target){
+			local.pointto = $(local.pointto.target)
+		}
+
+		waitthread global/objectives.scr::add_objectives level.ObjRegroupInCastle 2 level.ObjRegroupInCastleText $(local.pointto)
+		waitthread global/objectives.scr::current_objectives level.ObjRegroupInCastle
+		wait 1
+	}
+}end
+
+//=========================================================================
+UpdateGoToRadioObjective:
+//=========================================================================
+{
+	while (level.currentobjective == level.ObjGoToRadio){
+		local.pointto = $player waitthread maps/e3l4/friendly.scr::FindClosestNodeOnPath $objsnipertowerstart
+		if (local.pointto.target){
+			local.pointto = $(local.pointto.target)
+		}
+
+		waitthread global/objectives.scr::add_objectives level.ObjGoToRadio 2 level.ObjGoToRadioText $(local.pointto)
+		waitthread global/objectives.scr::current_objectives level.ObjGoToRadio
+		wait 1
+	}
+}end
+
+//=========================================================================
+UpdateEscapeCastleObjective:
+//=========================================================================
+{
+	while (level.currentobjective == level.ObjEscapeCastle){
+		local.pointto = $player waitthread maps/e3l4/friendly.scr::FindClosestNodeOnPath $objescapestart
+		if (local.pointto.target){
+			local.pointto = $(local.pointto.target)
+		}
+
+		waitthread global/objectives.scr::add_objectives level.ObjEscapeCastle 2 level.ObjEscapeCastleText $(local.pointto)
+		waitthread global/objectives.scr::current_objectives level.ObjEscapeCastle
+		wait 1
+	}
+}end
+
+//=========================================================================
+GiveMedals:
+//=========================================================================
+{
+	//E3 Specific Medal, the Victory Medal
+	setcvar "g_medal5" "1" //Victory Medal
+	//Campaign Medal Based on Skill
+
+	level.medal = getcvar (skill)
+	if (level.medal == "0"){ 
+	    setcvar "g_medal2"  "1" //Bronze Star
+	}
+	else if (level.medal == "1"){
+	    setcvar "g_medal1"  "1" //Silver Star 
+	}
+	else if (level.medal == "2"){ 
+	    setcvar "g_medal0"  "1" //Distinguished Service Cross
+	}
+}end

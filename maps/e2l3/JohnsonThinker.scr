@@ -1,0 +1,270 @@
+//============================================================================
+Init: {
+//============================================================================
+}end
+
+//============================================================================
+Think: {
+//============================================================================
+	self.metWithPlayer = 0
+	self.tankCowardMode = 0
+	self.MGCowardMode = 0
+	self.doTanksAreComing = 0
+	self.jumpToFinalHouse = 0
+	self.doTanksWarning = 0
+	self.congradulatePlayer = 0
+	self.maxhealth = 10000
+	self.health = 10000
+	self immune explosion
+	self immune rocket
+
+	while (IsAlive self) {
+		if (self.metWithPlayer == 0) {
+			self waitthread MeetWithPlayer
+		}
+
+		// Town Thoughts
+		self waitthread ConsiderTank
+		self waitthread ConsiderMG42
+
+		// Final Battle Thoughts
+		if (self.doTanksAreComing > 0) {
+			self waitthread FinalBattleWarning
+		}
+
+		if (self.jumpToFinalHouse != 0) {
+			self waitthread JumpToFinalHouse
+		}
+
+		if (self.congradulatePlayer != 0) {
+			self waitthread CongradulatePlayer
+		}
+
+		if (self.health < self.maxhealth) {
+			self.health = self.maxhealth
+		}
+
+		if (self.health < 10000) {
+			self.maxhealth = 10000
+			self.health = 10000
+		}
+		wait 0.1
+	}
+
+	dprintln ( "ERROR: " + self.targetname + " DIED!!!!" )
+}end
+
+//============================================================================
+CongradulatePlayer: {
+//============================================================================
+	self turnto $player
+	self lookat $player
+	self runto $player
+	self waittill movedone
+	self upperanim A_23_Johnson_5
+	self waittill upperanimdone
+	self upperanim A_23_Johnson_6
+	self waittill upperanimdone
+	self.congradulatePlayer = 0
+}end
+
+//============================================================================
+JumpToFinalHouse: {
+//============================================================================
+	self.origin = ( 6439 -2663 -410 )
+	self.destination = $player
+	self.distance = 100
+	self.friendtype = 1
+	self thread global/friendly.scr::friendlythink
+	self.jumpToFinalHouse = 0
+}end
+
+//============================================================================
+FinalBattleWarning: {
+//============================================================================
+	if (self.doTanksAreComing == 1) {
+		self thread global/squad.scr::leave_squad
+		self thread global/friendly.scr::friendlystop
+		self exec global/disable_ai.scr
+		self.doTanksAreComing = 2
+		self avoidplayer 1
+		self.destination = $tankHouseRadio
+		self.distance = 250
+		self runto $tankHouseRadio
+	}
+
+	if (self.doTanksAreComing == 2) {
+		self gun "none"
+
+		local.dist = vector_length ( $tankHouseRadio.origin - self.origin )
+		if (local.dist < 250) {
+			self turnto $player
+			self lookat $player
+			self runto NULL
+		}
+
+		if (self.doTanksWarning) {
+			wait 1.5
+			self turnto $player
+			self lookat $player
+			self upperanim A_23_Johnson_3
+			self waittill upperanimdone
+			self upperanim A_23_Johnson_4
+			self waittill upperanimdone
+			self.doTanksAreComing = 3
+			self turnto $tankHouseRadio
+			self lookat $tankHouseRadio
+			self runto $tankHouseRadio
+		}
+		end
+	}
+
+	local.dist = vector_length ( $tankHouseRadio.origin - self.origin )
+	if (local.dist < 70 && self.doTanksWarning != 0) {
+		self turnto $tankHouseRadio
+		self exec global/stand.scr
+		self thread global/LoopAnim.scr::LoopAnim A_13_ClausTalk10_idle
+		self.doTanksAreComing = 0
+	}
+	else {
+		self thread global/standrunto.scr::start $tankHouseRadio
+	}
+}end
+
+//============================================================================
+ConsiderMG42: {
+//============================================================================
+	if ($player istouching $endTownMG) {
+		if (self.MGCowardMode == 0) {
+			self thread global/friendly.scr::friendlystop
+			self exec global/disable_ai.scr
+
+			thread global/standrunto.scr::start $endTownMG_Cover
+			local.dist = vector_length ( $endTownMG_Cover.origin - self.origin )
+			if (local.dist < 60) {
+				self exec global/crouch.scr
+				self.MGCowardMode = 1
+			}
+		}
+	}
+	else {
+		if (self.MGCowardMode == 1) {
+			self exec global/stand.scr
+			self exec global/enable_ai.scr
+			self thread global/friendly.scr::friendlythink
+			self.destination = $player
+			self.distance = 250
+			self.friendtype = 1
+			self.MGCowardMode = 0
+		}
+	}
+}end
+
+//============================================================================
+ConsiderTank: {
+//============================================================================
+	if ( (IsAlive $townTank) && $townTank.inTown != NIL && $townTank.inTown == 1) {
+		if (self.tankCowardMode == 0) {
+			self thread global/friendly.scr::friendlystop
+			self exec global/disable_ai.scr
+
+			if (self.tankCowardSpot == NIL || self.tankCowardSpot == NULL) {
+				self.tankCowardSpot = self waitthread GetClosestCowardSpot
+			}
+
+			thread global/standrunto.scr::start self.tankCowardSpot
+			local.dist = vector_length ( self.tankCowardSpot.origin - self.origin )
+			if (local.dist < 60) {
+				self exec global/crouch.scr
+				self.tankCowardMode = 1
+			}
+			//self thread global/friendly.scr::friendlystop
+			//self exec global/disable_ai.scr
+			//self.tether = self waitthread GetClosestCowardSpot
+			//self.leash = 25
+		}
+	}
+	else {
+		if (self.tankCowardMode == 1) {
+			self.tankCowardMode = 0
+			self exec global/stand.scr
+			self exec global/enable_ai.scr
+			self thread global/friendly.scr::friendlythink
+			self.destination = $player
+			self.distance = 250
+			self.friendtype = 1
+		}
+	}
+}end
+
+//============================================================================
+GetClosestCowardSpot: {
+//============================================================================-
+	for (local.i = 1; local.i <= 3; local.i++) {
+		local.spotString = "cowardSpot" + local.i
+		local.spot = $(local.spotString)
+		local.dist = vector_length ( local.spot.origin - self.origin )
+
+		if (local.i == 1 || local.dist < local.minDist) {
+			local.cowardSpot = local.spot
+			local.minDist = local.dist
+		}
+	}
+}end local.cowardSpot
+
+//============================================================================
+MeetWithPlayer: {
+//============================================================================
+	local.v = $player.origin - self.origin
+	local.v[2] = 0
+	local.dist = vector_length ( local.v )
+
+	if (local.dist < 75) {
+		thread DoObjectives
+		self.destination = $player
+		self.distance = 250
+		self.friendtype = 1
+		self thread global/friendly.scr::friendlythink
+		self.metWithPlayer = 1
+	}
+	else {
+		waitthread global/ObjMgr.scr::SetObjCompassTarg "assist82nd" self
+	}
+}end
+
+//============================================================================
+DoObjectives: {
+//============================================================================
+	level.joinUpWith82nd = 1;
+
+	self turnto $player
+	self lookat $player
+	self runto $player
+	self waittill movedone
+	self upperanim A_23_Johnson_1
+	self waittill upperanimdone
+
+	wait 1
+	thread updateObjectives
+
+	self upperanim A_23_Johnson_2
+	self waittill upperanimdone
+	self turnto NULL
+	self lookat NULL
+	self runto NULL
+	self waittill movedone
+}end
+
+//============================================================================
+updateObjectives: {
+//============================================================================-
+	waitthread global/ObjMgr.scr::CompleteObj "assist82nd"
+	waitthread global/ObjMgr.scr::RevealObj "clearTown"
+	waitthread global/ObjMgr.scr::SetCurrObj "clearTown"
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "townTank"
+	waitthread global/ObjMgr.scr::SetObjCompassTarg "clearTown" local.trigger
+	level.met82nd = 1
+
+	// auto save
+	waitthread maps/e2l3/saves.scr::DoAutoSave "town"
+}end

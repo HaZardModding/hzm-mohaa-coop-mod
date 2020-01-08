@@ -1,0 +1,114 @@
+//=========================================================================
+main:{
+//=========================================================================
+	level.coopPrevMap = "m1l3c"						//chrissstrahl - set previouse map (for mom voteing)
+	level.coopNextMap = "m2l1"					//chrissstrahl - set next map (for mom voteing)
+	thread coop_mod/main.scr::main 				//chrissstrahl - start coop mod extensions
+	spawn script_origin targetname coop_playsound origin (0 0 0)	//chrissstrahl - spawn general sound entity
+	level waittill prespawn
+	drawhud 0
+
+	level waittill spawn
+	
+	if( level.gametype == 0){//chrissstrahl - sp only
+		exec global/briefing_save.scr
+		// prevent the player from trying to move around
+		$player physics_off
+	}
+	
+	waitthread coop_mod/replace.scr::waitForPlayer	//chrissstrahl - wait for any player to join
+	thread freezeplayerview
+	// spawn the thread that will allow the player to skip the briefing
+	thread briefingskip
+
+	//starts music track for mission briefing
+
+	$coop_playsound playsound mb2_music	//chrissstrahl - made coop compatible
+	$coop_playsound playsound slide_advance	//chrissstrahl - made coop compatible
+	showmenu briefing2a 1
+	wait 1
+
+	$coop_playsound playsound mb_201	//chrissstrahl - made coop compatible
+	wait 3
+	
+	$coop_playsound playsound slide_advance	//chrissstrahl - made coop compatible
+	showmenu briefing2b 1
+	hidemenu briefing2a 1
+	wait 18
+
+	$coop_playsound playsound slide_advance	//chrissstrahl - made coop compatible
+	showmenu briefing2b2 1
+	hidemenu briefing2b 1
+
+	$coop_playsound playsound mb_202	//chrissstrahl - made coop compatible
+	wait 13
+
+	$coop_playsound playsound slide_advance	//chrissstrahl - made coop compatible
+	showmenu briefing2b3 1
+	hidemenu briefing2b2 1
+	wait 30
+
+	$coop_playsound playsound slide_advance	//chrissstrahl - made coop compatible
+	showmenu briefing2b4 1
+	hidemenu briefing2b3 1
+	$coop_playsound playsound mb_203	//chrissstrahl - made coop compatible
+	wait 11.5
+
+	$coop_playsound playsound slide_advance	//chrissstrahl - made coop compatible
+	showmenu briefing2b5 1
+	hidemenu briefing2b4 1
+	wait 4.5
+
+	$coop_playsound playsound slide_advance	//chrissstrahl - made coop compatible
+	showmenu briefing2b6 1
+	hidemenu briefing2b5 1
+	wait 11
+
+	$coop_playsound playsound slide_advance	//chrissstrahl - made coop compatible
+	showmenu briefing2e 1
+	hidemenu briefing2b6 1
+	$coop_playsound playsound mb_204 wait	//chrissstrahl - made coop compatible
+	$coop_playsound waittill sounddone	//chrissstrahl - made coop compatible
+
+	$coop_playsound playsound slide_advance	//chrissstrahl - made coop compatible
+	showmenu briefing2f 1
+	hidemenu briefing2e 1
+	$coop_playsound playsound mb_205 wait	//chrissstrahl - made coop compatible
+	$coop_playsound waittill sounddone	//chrissstrahl - made coop compatible
+	wait 3
+
+	thread endbriefing
+}end
+
+//=========================================================================
+endbriefing:{
+//=========================================================================
+	if( level.gametype == 0){//chrissstrahl - sp only
+		$player stufftext "spmap m2l1"
+	}else{
+		exec global/missioncomplete.scr "m2l1"
+	}
+}end
+
+//=========================================================================
+briefingskip:{
+//=========================================================================
+	waitexec coop_mod/replace.scr::skip //chrissstrahl - wait for player vote to skip cinematic
+	thread endbriefing
+}end
+
+//=========================================================================
+freezeplayerview:{
+//=========================================================================
+	while(1){//chrissstrahl - modified for coop
+		if(level.gametype != 0){
+			for (local.i = 1;local.i <= $player.size;local.i++){
+				local.player =  $player[local.i]
+				if( local.player != NULL){
+					local.player.viewangles = (0 0 0)
+				}
+			}
+		}
+		waitframe
+	}
+}end

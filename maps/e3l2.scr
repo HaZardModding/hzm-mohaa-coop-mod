@@ -1,0 +1,425 @@
+// level e3l2
+
+waitexec maps/e3l2/e3l2_hacks.scr
+
+//=========================================================================
+main: {
+//=========================================================================
+	println "-----------------------------------------------------------"
+	println "-----------------------------------------------------------"
+	println "-----------------------------------------------------------"
+
+	exec global/auto.scr
+	exec maps/e3l2/light_e3l2.scr
+	exec global/exploder.scr
+	exec global/machinegunner.scr
+
+	level.script = "maps/e3l2.scr"
+	level.music  = "e3l2"
+	level waittill prespawn
+
+	fadeout .001 0 0 0 1
+	drawhud 0
+
+	// Ramping Difficulty Variables
+	//level.nodrophealth = 1
+	//level.nodropweapons = 1
+	//level.aipronechance = 55
+	//level.aicrouchchance = 65
+
+	level waittill spawn
+
+	exec global/ambience.scr e3l2
+	exec global/weather.scr
+
+	//add in our clip brushes
+	local.clipbrush = spawn script_object
+	local.clipbrush.origin = ( -1708 1180 -220 )
+	local.clipbrush setsize ( -20 -100 -228 ) ( 20 100 228 )
+	local.clipbrush solid
+
+	//waitthread InitPlayer
+	waitthread InitFriends
+	waitthread maps/e3l2/objectives.scr::InitObjectives
+	waitthread InitSnipers
+	waitthread InitMG42s
+
+
+	$player stufftext "tmstop"
+	wait 2	
+
+	$player stufftext "tmstartloop sound/music/Kleveburg.mp3"
+	thread global/music.scr::SetVolume 2
+	
+	setcvar g_mission 3
+	//exec global/autosave.scr 1	//"Starting"			???
+
+	level.dangerousness = 0
+	level.killedCannon1 = 0
+	level.killedCannon2 = 0
+	level.killedCannon3 = 0
+	level.num_cannons_remaining = 3
+	thread PlayerUseKeyThread
+
+	// facilitate debug "section warping"
+
+	if (level.warp_to_section == "TankPinDown") {
+		$player.origin = (2432 -5520 -64)
+		$player.angles = (0 90 0)
+		$player.viewangles = (0 90 0)
+		$medic.origin = (2496 -5600 -64)
+		$medic.angles = (0 90 0)
+	}
+	else if (level.warp_to_section == "MiniCourtyard") {
+		$player.origin = (1240 -3872 -432)
+		$player.angles = (0 180 0)
+		$player.viewangles = (0 180 0)
+
+		$medic.stop_thinking = 1
+
+		spawn "models/human/2nd-ranger_private.tik" targetname "BarneyPinned1_warp" origin (1248 -4072 -432) angles (0 90 0)
+		spawn "models/human/2nd-ranger_private.tik" targetname "BarneyPinned2_warp" origin (1248 -4172 -432) angles (0 90 0)
+
+		$BarneyPinned1_warp.destination = $player
+		$BarneyPinned1_warp.friendtype = 1
+		$BarneyPinned1_warp.distance = 225
+		$BarneyPinned1_warp thread global/friendly.scr::friendlythink
+		$BarneyPinned1_warp.targetname = "Barney"
+
+		$BarneyPinned2_warp.destination = $player
+		$BarneyPinned2_warp.friendtype = 1
+		$BarneyPinned2_warp.distance = 250
+		$BarneyPinned2_warp thread global/friendly.scr::friendlythink
+		$BarneyPinned2_warp.targetname = "Barney"
+	}
+	else if (level.warp_to_section == "PrisonerAtGunpoint") {
+		//$player.origin = (560 240 -432)
+		$player.origin = ( 1084 328 -455 )
+		$player.angles = (0 180 0)
+		$player.viewangles = (0 180 0)
+		$medic.stop_thinking = 1
+	}
+	else if (level.warp_to_section == "TankModeloRace") {
+		$player.origin = (1327 -914 -315)
+		$player.angles = (0 0 0)
+		$player.viewangles = (0 0 0)
+		$medic.stop_thinking = 1
+	}
+	else if (level.warp_to_section == "PrisonerRescue") {
+		$player.origin = ( -1984 -1466 -455)
+		$player.angles = (0 180 0)
+		$player.viewangles = (0 180 0)
+		$medic.stop_thinking = 1
+	}
+	else if (level.warp_to_section == "SecondModello") {
+		$player.origin = ( -1984 -1466 -455)
+		$player.angles = (0 180 0)
+		$player.viewangles = (0 180 0)
+		$medic.stop_thinking = 1
+	}
+	else if (level.warp_to_section == "FinalScene" || level.warp_to_section == "FinalSceneGetaway") {
+		$player.origin = ( -2088 1168 -453 )
+		$player.angles = (0 90 0)
+		$player.viewangles = (0 90 0)
+		$medic.stop_thinking = 1
+		level.num_cannons_remaining = 1
+
+		if (level.warp_to_section == "FinalSceneGetaway") {
+			$player.origin = ( -871 4102 -453 )
+			$prisoner.origin = ( -1085 4087 -453 )
+		}
+	}
+
+	// initialize stuff
+	waitthread maps/e3l2/cannons.scr::InitCannons
+
+	// initialize sections
+	waitthread maps/e3l2/AirplaneBomb_Section.scr::InitSection
+	waitthread maps/e3l2/TankPinDown_Section.scr::InitSection
+	waitthread maps/e3l2/MiniCourtyard_Section.scr::InitSection
+	waitthread maps/e3l2/Church_Section.scr::InitSection
+	waitthread maps/e3l2/cannon_section_1.scr::InitSection
+	waitthread maps/e3l2/prisoner_section_1.scr::InitSection
+	waitthread maps/e3l2/tank_section.scr::InitSection
+	waitthread maps/e3l2/PreFinal_Section.scr::InitSection
+	waitthread maps/e3l2/final_section.scr::InitSection
+	waitthread maps/e3l2/vehicleVisibility.scr::InitSection
+	waitthread maps/e3l2/effectVisibility.scr::InitSection
+
+	if (level.warp_to_section == "TankModeloRace") {
+		level.MC_guys_rescued = 1
+	}
+	else if (level.warp_to_section == "FinalScene") {
+		waitthread global/ObjMgr.scr::RevealObj "findPOWs"
+		waitthread global/ObjMgr.scr::RevealObj "killModellos"
+		waitthread global/ObjMgr.scr::CompleteObj "killModellos" 1
+		waitthread global/ObjMgr.scr::CompleteObj "killModellos" 2
+		waitthread global/ObjMgr.scr::SetObjCompassTarg "findPOWs" $finalScenePOWSpawner[1]
+		waitthread global/ObjMgr.scr::SetCurrObj "findPOWs"
+	}
+	else if (level.warp_to_section == "FinalSceneGetaway") {
+		waitthread global/ObjMgr.scr::RevealObj "findPOWs"
+		waitthread global/ObjMgr.scr::RevealObj "killModellos"
+		waitthread global/ObjMgr.scr::RevealObj "protectPOWs"
+		waitthread global/ObjMgr.scr::CompleteObj "findPOWs"
+		waitthread global/ObjMgr.scr::CompleteObj "killModellos" 1
+		waitthread global/ObjMgr.scr::CompleteObj "killModellos" 2
+		waitthread global/ObjMgr.scr::SetCurrObj "protectPOWs"
+	}
+}end
+
+// Inits
+//=========================================================================
+InitPlayer: {
+//=========================================================================
+	$player heal 1
+	waitexec global/loadout.scr
+	waitthread global/items.scr::add_item "explosive"	noprint // Show explosive inventory icon
+}end
+
+//=========================================================================
+InitFriends: {
+//=========================================================================
+	$medic thread maps/e3l2/medic_think.scr::MedicInit
+	level.wounded_guy_threat_radius = 1536
+}end
+
+// Misc
+//=========================================================================
+PlayerUseKeyThread: {
+//=========================================================================
+	level.player_use_held = 0
+	level.player_use_just_pressed = 0
+
+	while (1) {
+		local.last_use_held = level.player_use_held
+
+		if ($player.useheld && !local.last_use_held) {
+			level.player_use_just_pressed = 1
+		}
+		else {
+			level.player_use_just_pressed = 0
+		}
+
+		level.player_use_held = $player.useheld
+		wait 0.1
+	}
+}end
+
+//=========================================================================
+NextLevel: {
+//=========================================================================
+	exec global/missioncomplete.scr e3l3 1
+}end
+
+//=========================================================================
+Cannon1DestructionThread: {
+//=========================================================================
+	level.num_cannons_remaining--
+
+	waitthread global/ObjMgr.scr::CompleteObj "killModellos" 1
+	//waitthread maps/e3l2/objectives.scr::Transition "KilledCannon1"
+	waitthread global/ObjMgr.scr::SetObjCompassTarg "findPOWs" $prisoner 1
+	waitthread global/ObjMgr.scr::SetCurrObj "findPOWs"
+
+	level.killedCannon1 = 1
+
+	$Cannon1 waitthread maps/e3l2/cannons.scr::SetupDeadCannonCollision
+	$Cannon1_Use delete
+
+	if (level.num_cannons_remaining <= 0) {
+		waitthread global/ObjMgr.scr::SetObjDesc "killModellos" "Destroy Enemy Artillery"
+	}
+}end
+
+//=========================================================================
+Cannon2DestructionThread: {
+//=========================================================================
+	level.num_cannons_remaining--
+
+	waitthread global/ObjMgr.scr::CompleteObj "killModellos" 2
+	//	waitthread maps/e3l2/objectives.scr::Transition "KilledCannon2"
+	waitthread global/ObjMgr.scr::SetObjCompassTarg "findPOWs" $finalScenePOWSpawner[1]
+	waitthread global/ObjMgr.scr::SetCurrObj "findPOWs"
+
+	level.killedCannon2 = 1
+
+	$Cannon2 waitthread maps/e3l2/cannons.scr::SetupDeadCannonCollision
+	$Cannon2_Use delete
+
+	if (level.num_cannons_remaining <= 0) {
+		waitthread global/ObjMgr.scr::SetObjDesc "killModellos" "Destroy Enemy Artillery"
+	}
+}end
+
+//=========================================================================
+Cannon3DestructionThread: {
+//=========================================================================
+	level.num_cannons_remaining--
+
+	waitthread global/ObjMgr.scr::CompleteObj "killModellos" 3
+	//	waitthread maps/e3l2/objectives.scr::Transition "KilledCannon3"
+
+	if ((level.nextPOWInTruck != NIL) && (level.nextPOWInTruck > 3)) {
+		waitthread global/ObjMgr.scr::SetCurrObj "escape"
+	}
+
+	level.killedCannon3 = 1
+
+	$Cannon3 waitthread maps/e3l2/cannons.scr::SetupDeadCannonCollision
+	$Cannon3_Use delete
+
+	if (level.num_cannons_remaining <= 0) {
+		waitthread global/ObjMgr.scr::SetObjDesc "killModellos" "Destroy Enemy Artillery"
+	}
+}end
+
+//=========================================================================
+InitSnipers: {
+//=========================================================================
+	$sniper2 ai_off
+	$sniper3 ai_off
+
+	waitthread global/balconyGuy.scr::InitAllBalconyGuys
+	waitthread global/balconyGuy.scr::InitAllFallers
+}end
+
+// InitMG42s
+//=========================================================================
+InitMG42s: {
+//=========================================================================
+	for (local.i=1;local.i<$mg42.size+1;local.i++) {
+		$mg42[local.i] burstfiresettings 1 3 1.5 3
+		$mg42[local.i] maxyawoffset 60.0
+		$mg42[local.i] pitchcaps "-20 20 0"
+		$mg42[local.i] convergetime 0.25
+
+		switch (level.skill) {
+			case 0:
+				$mg42[local.i] aibulletspread 450 275
+				break
+			case 1:
+				$mg42[local.i] aibulletspread 400 225
+				break
+			case 2:
+				$mg42[local.i] aibulletspread 300 125
+				break
+		}
+	}
+}end
+
+// This gets called by a setthread
+//=========================================================================
+startsniper2: {
+//=========================================================================
+	println "start sniper 2 trigger hit"
+	$sniper2 show
+	$sniper2 ai_on
+	//$sniper2 waitexec global/enable_ai.scr
+	$sniper2 favoriteenemy $player
+}end
+
+// doWalkTo
+//=========================================================================
+doWalkTo local.entity local.distance: {
+//=========================================================================
+	if (local.distance == NIL) {
+		local.distance = 256
+	}
+
+	while (1) {
+		self runto local.entity
+		self waittill movedone
+
+		if (vector_within self.origin local.entity.origin local.distance) {
+			break
+		}
+		wait 0.25
+	}
+}end
+
+// doRunTo
+//=========================================================================
+doRunTo local.entity local.distance: {
+//=========================================================================
+	if (local.distance == NIL) {
+		local.distance = 256
+	}
+
+	while (1) {
+		self runto local.entity
+
+		if (vector_within self.origin local.entity.origin local.distance) {
+			break
+		}
+		wait 0.25
+	}
+}end
+
+// ASExplode
+//=========================================================================
+ASExplode local.delay: {
+//=========================================================================
+	wait local.delay;
+	self thread Air_Strike_Explode_Start
+}end
+
+// Air_Strike_Explode_Start
+//=========================================================================
+Air_Strike_Explode_Start: {
+//=========================================================================
+	if (self.exploder_set != NIL) {
+		exec global/exploder.scr::explode self.exploder_set
+	}
+	
+	if (self.explosion_fx != NIL) {
+		self thread spawn_fx self.explosion_fx
+	}
+	
+	if (self.explosion_sound != NIL) {
+		self playsound self.explosion_sound
+	}
+
+	if (self.target != NIL && self.target != NULL && self.target != "") {
+		self.target thread blow_up
+		waitframe
+	}
+	
+	radiusdamage self.origin level.bomb_damage level.bomb_explosion_radius
+	
+	if (self.killarea != NIL) {
+		self.killarea volumedamage 1000
+	}
+	
+	self hide
+	self.live = 0
+	self.exploded = 1	
+}end
+
+// spawn_fx
+//=========================================================================
+spawn_fx local.fx: {
+//=========================================================================
+	local.temp = spawn script_model model local.fx
+	local.temp.origin = self.origin
+	local.temp anim start
+	wait 5
+
+	local.temp remove
+}end
+
+// DisableGuy
+//=========================================================================
+DisableGuy: {
+//=========================================================================
+	self hide
+	self ai_off
+}end
+
+// EnableGuy
+//=========================================================================
+EnableGuy: {
+//=========================================================================
+	self show
+	self ai_on
+}end

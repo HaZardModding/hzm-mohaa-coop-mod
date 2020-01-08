@@ -1,0 +1,253 @@
+//=========================================================================
+InitCastleAmbient:
+//=========================================================================
+{
+	// Start up each of the threads
+	$battlezone1allied.totalguys = 6
+	$battlezone2allied.totalguys = 6
+	$battlezone3allied.totalguys = 4
+
+	thread BattleZone 1 $battlezone1 $battlezone1allied $battlezone1tanks
+	thread BattleZone 2 $battlezone2 $battlezone2allied $battlezone2tanks $castlemortargroup2
+	thread BattleZone 3 $battlezone3 $battlezone3allied $battlezone3tanks $castlemortargroup3
+}end
+
+//=========================================================================
+CleanupSceneCastleAmbient:
+//=========================================================================
+{
+	// Tell all the main loops to bail and cleanup
+	level.battlezonedelete[1] = 1
+	level.battlezonedelete[2] = 1
+	level.battlezonedelete[3] = 1
+}end
+
+//=========================================================================
+StartBattleZone:
+//=========================================================================
+{
+	//dprintln "STARTBATTLEZONE"
+	// Unpause them
+	switch (self.zone){
+		case 1:
+			waitthread StartBattleZonePrivate 1 $battlezone1 $battlezone1allied $battlezone1tanks
+			break
+		case 2:
+			waitthread StartBattleZonePrivate 2 $battlezone2 $battlezone2allied $battlezone2tanks
+			trigger $startcastlemortars
+			break
+		case 3:
+			waitthread StartBattleZonePrivate 3 $battlezone3 $battlezone3allied $battlezone3tanks
+			trigger $startcastleexteriormortars
+			break
+	}
+}end
+
+//=========================================================================
+StopBattleZone:
+//=========================================================================
+{
+	// dprintln "STOPBATTLEZONE"
+	// Pause each parade
+	switch (self.zone){
+		case 1:
+			waitthread StopBattleZonePrivate 1 $battlezone1 $battlezone1allied $battlezone1tanks
+			break
+		case 2:
+			waitthread StopBattleZonePrivate 2 $battlezone2 $battlezone2allied $battlezone2tanks
+			trigger $stopcastlemortars
+			break
+		case 3:
+			waitthread StopBattleZonePrivate 3 $battlezone3 $battlezone3allied $battlezone3tanks
+			trigger $stopcastleexteriormortars
+			break
+	}
+}end
+
+//=========================================================================
+StopWhenParadeDone local.allies local.index:
+//=========================================================================
+{
+	while ($(local.allies).spawndead < $(local.allies).spawncount){
+		waitframe
+	}
+
+	//	dprintln "ABORTING"
+	self thread global/parade.scr::DeleteParade
+	self.mortarson = 0
+}end
+
+//=========================================================================
+BattleZone local.index local.axis local.allies local.tanks local.mortars:
+//=========================================================================
+{
+	// dprintln "BATTLEZONE"
+	// Initialized, when set to 1, will drop out of loop and delete entities
+	level.battlezonedelete[local.index] = 0
+
+	// Initialized, when set to 1, the main loop will do its think
+	level.battlezoneon[local.index] = 0
+
+	// The nazi parades are keep going until the allied as dead
+	$(local.axis).totalguys = NULL
+
+	// The parades will start paused
+	$(local.axis).pause   = 1
+	$(local.allies).pause = 1
+
+	// Start the parades
+	$(local.axis) thread global/parade.scr::RunParade
+	$(local.allies) thread global/parade.scr::RunParade
+
+	// Start up the mortar thread
+	if (local.mortars){
+		thread doMortars local.index local.mortars 6 8 
+	}
+	waitframe
+
+	waitthread StopBattleZonePrivate local.index local.axis local.allies local.tanks
+
+	// Set up the names of the parade guys
+	local.axisguys   = $(local.axis + "_paradeguys")
+	local.alliedguys = $(local.allies + "_paradeguys")
+	local.axis thread StopWhenParadeDone local.allies local.index
+
+	// Main loop, drop out when delete is set to 1
+	while (level.battlezonedelete[local.index] == 0){
+		if (level.battlezoneon[local.index] == 1 && level.battlezonedelete[local.index] == 0){					
+			for (local.i=1; local.i<=$(local.axisguys).size; local.i++){
+				if ($(local.axisguys)[local.i]){
+					$(local.axisguys)[local.i] runto $(local.axisguys)[local.i].target
+
+					if (vector_length($(local.axisguys)[local.i].origin - $(local.axisguys)[local.i].target.origin) < 30){
+						$(local.axisguys)[local.i] remove
+					}
+				}
+			}
+		}
+		
+		wait 0.5
+	}
+
+	// We are done, Clean everything up
+	for (local.i=1; local.i<=$(local.axisguys).size; local.i++){
+		$(local.axisguys)[local.i] remove
+	}
+
+	for (local.i=1; local.i<=$(local.alliedguys).size; local.i++){
+		$(local.alliedguys)[local.i] remove
+	}
+
+	for (local.i=1; local.i<=$(local.tanks).size; local.i++){
+		$(local.tanks)[local.i].turret = $(local.tanks)[local.i] QueryTurretSlotEntity 0
+		$(local.tanks)[local.i].turret remove
+		$(local.tanks)[local.i] remove
+	}
+}end
+
+//=========================================================================
+StartBattleZonePrivate local.index local.axis local.allies local.tanks:
+//=========================================================================
+{
+	// Unpause the parade
+	local.axis.pause   = 0
+	local.allies.pause = 0
+
+	// Set up the guy names
+	local.axisguys   = $(local.axis + "_paradeguy")
+	local.alliedguys = $(local.allies + "_paradeguy")
+
+	// Turn on the existing guys
+	for (local.i=1; local.i<=local.axisguys.size; local.i++){
+		local.axisguys[local.i] ai_on
+		local.axisguys[local.i] solid
+		local.axisguys[local.i] physics_on
+		local.axisguys[local.i] show
+	}
+
+	for (local.i=1; local.i<=local.alliedguys.size; local.i++){
+		local.alliedguys[local.i] ai_on
+		local.alliedguys[local.i] solid
+		local.alliedguys[local.i] physics_on
+		local.alliedguys[local.i] show
+	}
+	
+	local.axis.mortarson = 1
+
+	// Tell the main loop to start thinking again
+	level.battlezoneon[local.index] = 1
+}end
+
+//=========================================================================
+StopBattleZonePrivate local.index local.axis local.allies local.tanks:
+//=========================================================================
+{
+	// Pause the parades
+	local.axis.pause   = 1
+	local.allies.pause = 1
+
+	// Set up the guy names
+	local.axisguys   = $(local.axis.targetname + "_paradeguy")
+	local.alliedguys = $(local.allies.targetname + "_paradeguy")
+
+	// Turn off the existing guys
+	for (local.i=1; local.i<=local.axisguys.size; local.i++){
+		local.axisguys[local.i] ai_off
+		local.axisguys[local.i] notsolid
+		local.axisguys[local.i] physics_off
+		local.axisguys[local.i] hide
+	}
+
+	for (local.i=1; local.i<=local.alliedguys.size; local.i++){
+		local.alliedguys[local.i] ai_off
+		local.alliedguys[local.i] notsolid
+		local.alliedguys[local.i] physics_off
+		local.alliedguys[local.i] hide
+	}
+
+	//turn off mortars
+	local.axis.mortarson = 0
+		
+	// Tell the main loop to stop thinking for the moment
+	level.battlezoneon[local.index] = 0
+}end
+
+//=========================================================================
+doMortars local.index local.mortarGroup local.lowDelay local.highDelay:
+//=========================================================================
+{
+	local.arraySize 	= local.mortarGroup.size
+	local.delaySpread 	= local.highDelay - local.lowDelay + 1
+
+	while (level.battlezonedelete[local.index] == 0){
+		while (level.battlezoneon[local.index] == 1 && level.battlezonedelete[local.index] == 0){
+			local.delayTime 	= (randomint local.delaySpread) + local.lowDelay
+			local.impactChoice 	= randomint local.arraySize + 1
+			local.impactPoint 	= local.mortarGroup[local.impactChoice]
+			local.impactPoint thread mortarFx
+			wait local.delayTime		
+		}
+		waitframe
+	}
+}end
+
+//=========================================================================
+mortarFx:
+//=========================================================================
+{
+	local.soundLoc = spawn script_origin
+	local.soundLoc.origin = self.origin
+	local.soundLoc playsound arty_leadin05
+	wait 1.8
+	
+	local.explosion = spawn "models/emitters/tehao_vineyardExplosion.tik"
+	local.explosion.origin = self.origin
+	local.explosion anim start
+	local.explosion notsolid
+	local.explosion playsound arty_exp_sand
+	radiusdamage self.origin 200 100
+	wait 5
+
+	local.explosion delete
+	local.soundLoc delete
+}end

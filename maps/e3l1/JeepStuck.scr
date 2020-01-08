@@ -1,0 +1,585 @@
+
+//=========================================================================
+InitJeepStuck: {
+//=========================================================================
+	$woundedguy ai_off
+	$woundedguy hide
+	$woundedguy gun "none"
+
+	level.pillar1 = waitthread global/FindTrigger.scr::FindTrigger "pillarexp1"
+	level.pillar2 = waitthread global/FindTrigger.scr::FindTrigger "pillarexp2"
+	level.pillar1 nottriggerable
+	level.pillar2 nottriggerable
+	level.pillar1 nodamage
+	level.pillar2 nodamage
+	
+	level.pillar1.maxhealth = 1000
+	level.pillar1.health = 1000
+	level.pillar2.maxhealth = 1000
+	level.pillar2.health = 1000
+	level.paradetrucktrigger = waitthread global/FindTrigger.scr::FindTrigger "paradetrucktrigger"
+	level.chasetrucktrigger = waitthread global/FindTrigger.scr::FindTrigger "chasetrucktrigger"
+	level.JeepStuckParade = waitthread global/FindTrigger.scr::FindTrigger "JeepStuckParade"
+	level.planecrashtrigger = waitthread global/FindTrigger.scr::FindTrigger "planeexplosion"
+	level.jeepstucktrigger = waitthread global/FindTrigger.scr::FindTrigger "exploderjeepstuck"
+	level.jeepstuck2trigger = waitthread global/FindTrigger.scr::FindTrigger "exploderjeepstuck2"
+	level.planecrashtrigger nottriggerable
+	level.jeepstucktrigger nottriggerable
+	level.jeepstuck2trigger nottriggerable
+	level.planecrashtrigger nodamage
+	level.jeepstucktrigger nodamage
+	level.jeepstuck2trigger nodamage
+	$planefly10.bombtrigger = NULL
+	
+	//$planefly11.followpath = 1
+    $planefly10.shooting = 1
+	$RightGuysBoss rendereffects "+dontdraw"
+}end
+
+//=========================================================================
+main: {
+//=========================================================================
+	$jeep stop
+
+	//$medic turnto $player
+	$medic waitthread global/loopanim.scr::LoopAnimStop
+
+	//TEMP VO
+	//iprintln "(DFRUS_E3L1_PW2313) Watch our backs while I help this soldier."
+	$medic say A_31_MedTalk_06
+	$medic waittill saydone
+
+	// $jeep disconnect_paths
+	thread getMedicToWounded
+	$medic.direction = 4
+
+	waitthread handleParadeStuff	
+	$jeep connect_paths
+	$woundedguy.no_idle = 1 
+
+	thread getWoundedToJeep
+	waitthread getMedicToJeep
+	$medic.direction = 3
+	waitthread isWoundedInJeep
+
+	$planefly10 thread SpinPlane "planefly10" 16
+	$citybomb2.myexplodertrigger = waitthread global/FindTrigger.scr::FindTrigger "planeexplosion"
+	$citybomb thread global/autoplane.scr::TriggerPlaneDropBomb $planefly10
+	$citybomb2 thread TriggerPlaneDropBomb $planefly10
+	trigger level.chasetrucktrigger
+	waitframe
+
+	$planefly10 playsound plane_by
+
+	for(local.i = 1; local.i <= $chasetruck.size; local.i++) {
+		$chasetruck[local.i] thread ManageTruckFire local.i
+	}
+
+	thread CleanUpdeletenowagainguys
+	wait 2.0
+}end
+
+//=========================================================================
+CleanUpdeletenowagainguys: {
+//=========================================================================
+	if($AAgunDestroyed) {
+		$AAgunDestroyed remove
+	}
+
+	if($deletenowagain) {
+		$deletenowagain waittill trigger
+	}
+	else {
+		println "CleanUpdeletenowagainguys"
+	}
+	
+	if($deletenowagainguys) {
+		for(local.i = 1; local.i <= $deletenowagainguys.size; local.i++) {
+			$deletenowagainguys[local.i] delete
+		}
+	}
+
+	if($deletenowagainguys2) {
+		for(local.i = 1; local.i <= $deletenowagainguys2.size; local.i++) {
+			$deletenowagainguys2[local.i] delete
+		}
+	}
+
+	$JeepStuckParade waitthread global/parade.scr::DeleteParade 100
+	$RightGuysBoss waitthread global/parade.scr::DeleteParade 100
+}end
+
+//=========================================================================
+ManageTruckFire local.num: {
+//=========================================================================
+	self.driver nodamage
+	self.originalhealth = self.health
+	self takedamage
+	self.health = 10000000
+
+	while(self.health == 10000000) {
+		waitframe
+	}
+	
+	if ( self.smoke==NIL ) {
+		self.smoke = spawn "models/emitters/linger_smoke.tik" targetname (self.targetname  + "smoke" + local.num)
+		self.smoke notsolid
+		self.smoke anim start
+		self.smoke attach self "engine1" 1	(0 0 10)			
+		thread global/EntityCleanup.scr::EntityCleanup ("chasetrucksmoke" + local.num) 2000
+	}				// 10000000
+}end
+
+//=========================================================================
+handleParadeStuff: {
+//=========================================================================
+	if($deletenowagainguys) {
+		for(local.i = 1; local.i <= $deletenowagainguys.size; local.i++) {
+			$deletenowagainguys[local.i] delete
+		}
+	}
+	
+	thread JeepParade
+	// PUT BACK IN TIME
+	wait 30.0
+	// wait 60.0
+	$jeep anim idle
+}end
+
+//=========================================================================
+isWoundedInJeep: {
+//=========================================================================
+	while (level.woundedInJeep != 1){
+		waitframe
+	}
+}end
+
+//=========================================================================
+getMedicToWounded: {
+//=========================================================================
+	$medic threatbias ignoreme
+	local.newMedicAngles = (0 0 0) //(0 0 90)
+	
+	//	$medic.angles = (0 0 0)
+	$medic.direction = 4
+	$medic.enableEnemy = 0
+	waitthread DriverGetOutJeep $jeep $medic
+	$medic thread global/LoopAnim.scr::LoopAnimStop
+	$medic runto $medicpath
+	wait 2.0
+
+	$medic solid	
+	$medic waittill movedone
+	
+	local.woundedPos = $woundedguy gettagposition "Bip01 Neck" 
+	local.offset =  ( 40 40 0 )
+	local.medicRunToWounded = local.woundedPos + local.offset
+
+	$medic thread global/LoopAnim.scr::LoopAnimStop
+	$medic crouchto local.woundedPos
+	$medic turnto local.woundedPos
+	$medic thread global/LoopAnim.scr::LoopAnimStop
+	thread medicHealWounded
+}end
+
+//=========================================================================
+DriverGetOutJeep local.jeep local.driver: {
+//=========================================================================
+	local.driver thread global/LoopAnim.scr::LoopAnimStop
+	local.driver physics_on
+	local.driver notsolid
+	local.driver detach
+	local.driver.angles = local.jeep.angles
+	local.driver anim_noclip A_31_Med_leavejeep2
+	local.driver waittill animdone
+	//	local.driver exec global/enable_ai.scr
+	local.driver = NULL
+}end
+
+//=========================================================================
+getMedicToJeep: {
+//=========================================================================
+	$medic.enableEnemy = 0
+	$medic exec global/disable_ai.scr
+	$medic solid
+	$medic runto $medicreturn
+	$medic waittill movedone
+	//$medic runto local.medicHealPos
+	//$medic waittill movedone
+	$medic turnto $player
+
+	waitthread medicHealPlayer
+	$jeep anim idle
+	$medic.enableEnemy = 0
+
+	waitthread global/jeepanim.scr::DriverGetInJeep $jeep $medic
+	$medic.enableEnemy = 0
+	$medic.no_idle = 1
+	//	$medic thread global/LoopAnim.scr::LoopAnim A_22_driving_idle
+	$medic.enableEnemy = 0
+}end
+
+//=========================================================================
+medicHealWounded: {
+//=========================================================================
+	println "medicHealWounded"
+	$medic thread global/LoopAnim.scr::LoopAnimStop
+	$medic.no_idle = 0
+	$medic exec global/crouch.scr
+	$medic thread global/LoopAnim.scr::LoopAnimStop
+	//	$medic thread global/LoopAnim.scr::LoopAnim KneelingCycle
+
+	// PUT BACK IN TIME
+	wait 30.0
+	//	wait 60
+	$medic exec global/stand.scr
+}end
+
+//=========================================================================
+medicHealPlayer: {
+//=========================================================================
+	$medic upperanim pass_canteen_start
+	$medic waittill upperanimdone
+	$player heal 0.5
+	$player playsound med_canteen
+	$medic upperanim pass_canteen_end 
+	$medic waittill upperanimdone
+}end
+
+//=========================================================================
+getWoundedToJeep: {
+//=========================================================================
+	level.woundedInJeep = 0
+	$woundedguy exec global/disable_ai.scr
+	$woundedguy holster
+	$woundedguy.health = 100
+	$woundedguy takedamage
+	$woundedguy exec global/bullethit.scr (0 0 0) 95 0 14
+	$woundedguy exec global/disable_ai.scr
+	$woundedguy solid
+	$woundedguy nodamage
+	$woundedguy runto $woundedguypath
+	$woundedguy waittill movedone
+	waitthread PassengerGetInJeep $jeep $woundedguy  // special case so I can use special hurt animation
+
+	//$woundedguy solid
+	level.woundedInJeep = 1
+}end
+
+// special case so I can use special hurt get in animation
+//=========================================================================
+PassengerGetInJeep local.jeep local.passenger: {
+//=========================================================================
+	local.passenger holster
+	local.dest = local.jeep gettagposition "passenger_enter"
+	
+	if (vector_length(local.passenger.origin - local.dest) > 70) {
+		local.passenger.movedoneradius = 70
+		local.passenger runto local.dest
+		local.passenger waittill movedone
+	}
+
+	if (vector_length(local.passenger.origin - local.dest) > 20) {
+		local.passenger.movedoneradius = 20
+		local.passenger walkto local.dest
+		local.passenger waittill movedone
+	}
+
+	local.passenger notsolid
+	local.passenger nodamage
+
+	// NOTE: anim_noclip will translate the origin but will not hold onto rotations made in the animation.
+	// Thus, anims using anim_noclip need to start and end with the same set of angles.
+	local.passenger.origin = local.jeep gettagposition "passenger_enter"
+	local.passenger.angles = local.jeep.angles
+	local.passenger anim_noclip A_31_Wounded_Getin_jeep
+	local.passenger waittill animdone
+	local.passenger.angles = (0 0 0)
+	local.passenger attach local.jeep passenger_seat 1
+	local.passenger thread global/LoopAnim.scr::LoopAnim A_31_Wounded_Getin_jeepidle
+	local.passenger physics_off
+}end
+
+//=========================================================================
+handleWoundedWonder: {
+//=========================================================================
+	$woundedguy ai_on
+	$woundedguy show
+	$woundedguy threatbias ignoreme
+	$woundedguy nodamage
+	$woundedguy exec global/disable_ai.scr
+	$woundedguy thread global/LoopAnim.scr::LoopAnim 23A825_InjuredCycle
+}end
+
+//=========================================================================
+JeepParade: {
+//=========================================================================
+	trigger level.paradetrucktrigger
+	thread TriggerParade
+
+	if($RightGuysBoss) {
+		$RightGuysBoss thread global/parade.scr::RunParade
+	}
+
+	thread OpenDoor
+}end
+
+//=========================================================================
+triggerwatch: {
+//=========================================================================
+	self thread triggerwatch2
+
+	while(self.health > 30) {
+		waitframe	
+	}
+
+	trigger self
+	self.triggered = 1
+}end
+
+//=========================================================================
+triggerwatch2: {
+//=========================================================================
+	self waittill trigger
+	local.soundmaker = spawn script_model model "fx/dummy.tik"  origin (self.origin + (0 0 20))
+	local.soundmaker playsound stonelarge
+	self.triggered = 1
+	local.soundmaker waittill sounddone
+	local.soundmaker remove
+}end
+
+//=========================================================================
+OpenDoor:{
+//=========================================================================
+	while($nazidoor && level.woundedInJeep != 1) {
+		if($dooropenguy[1] && $nazidoor) {
+			$nazidoor open $dooropenguy[1]  
+			$dooropenguy[1] runto $dooropentarget
+			$dooropenguy[1] waittill death 
+		}
+		waitframe
+	}
+}end
+
+// Used to start parade 15 seconds after the other guys spawn
+//=========================================================================
+TriggerParade: {
+//=========================================================================
+	wait 15.0
+	trigger level.JeepStuckParade
+}end
+
+//=========================================================================
+DontDropHealth: {
+//=========================================================================
+	self waittill death
+	self takeall                      // IMPORTANT PART
+}end
+
+//=========================================================================
+JeepStuckCleanup: {
+//=========================================================================
+	if($JeepParade[1]) {
+		thread global/EntityCleanup.scr::EntityCleanup $JeepParade[1].targetname 1000
+	}
+
+	if($paradetruck_passenger[1]) {
+		thread global/EntityCleanup.scr::EntityCleanup $paradetruck_passenger[1].targetname 1000
+	}
+
+	if($paradetruck[1]) {
+		thread global/EntityCleanup.scr::EntityCleanup $paradetruck[1].targetname 1000
+	}
+
+	if($badguys6538[1]) {
+		thread global/EntityCleanup.scr::EntityCleanup $badguys6538[1].targetname 1000
+	}
+
+	if($friendly[1]) {
+		thread global/EntityCleanup.scr::EntityCleanup $friendly[1].targetname 1000
+	}
+
+	if($bridgetank[1]) {
+		thread global/EntityCleanup.scr::EntityCleanup $bridgetank[1].targetname 1000
+	}
+}end
+
+// self is the plane
+//=========================================================================
+SpinPlane local.triggername local.rotationamount: {
+//=========================================================================
+	self.scale = 0.5
+	self notsolid
+	local.trigger = waitthread global/FindTrigger.scr::FindTrigger local.triggername   // "planefly10"
+	local.trigger waittill trigger
+
+	//	"planefly10"
+	while(level.ridedone != 1 && self) {
+		self.angles = self.angles + (0 0 local.rotationamount)
+		waitframe
+	}
+}end
+
+//=========================================================================
+WarningShot: {
+//=========================================================================
+	level.pillar1 thread triggerwatch
+	level.pillar2 thread triggerwatch2
+	
+	if(!level.pillar1) {
+		end
+	}
+
+	local.i = 0
+	level.pillar1.health = 40
+	level.pillar1 triggerable
+	level.pillar1 takedamage
+
+NaziPillarDestroyer:
+	if(!$PillarBazookaGuyStart) {
+		spawn script_origin targetname "PillarBazookaGuyStart"
+		$PillarBazookaGuyStart.origin = (758 616 625)
+	}
+	
+	if(!$PillarBazookaGuyShootLoc) {
+		spawn script_origin targetname "PillarBazookaGuyShootLoc"
+		$PillarBazookaGuyShootLoc.origin = (639 388 624)
+	}
+	
+	local.guy = spawn "models/human/german_waffenss_shutze" targetname "PillarBazookaGuy" origin $PillarBazookaGuyStart.origin
+	local.guy gun "panzerschrek"
+	local.guy.accuracy = 100
+	local.guy exec global/disable_ai.scr
+	local.guy runto $PillarBazookaGuyShootLoc.origin
+	local.guy waittill movedone
+	//	iprintln "Done Moving"
+
+	while(local.guy && isalive local.guy && level.pillar1.triggered != 1) {
+		local.guy exec global/aimat.scr level.pillar1
+		local.guy setaimtarget level.pillar1
+		wait 0.5
+
+		// iprintln "Shoot"
+		local.guy waitthread global/improvedshootatloop.scr::start level.pillar1 NIL 1 1
+	}
+	
+	if(level.pillar1.triggered != 1) {
+		local.i++
+		goto NaziPillarDestroyer
+	}
+
+	local.guy exec global/enable_ai.scr
+}end
+
+//=========================================================================
+spawn_fx local.fx local.scale local.origin: {
+//=========================================================================
+	local.temp = spawn script_model model local.fx "scale" local.scale
+	local.temp notsolid
+
+	if(self == NIL && local.origin != NIL) {
+		local.temp.origin = self.origin
+	}
+	else {
+		local.temp.origin = local.origin
+	}
+
+	local.temp anim start
+	local.temp notsolid
+	wait 5
+
+	local.temp remove
+}end
+
+//local.collision = thread damaged_collision local.angles local.origin local.brushmodel
+//local.damaged = thread spawn_damaged_new local.model local.angles local.origin
+//=========================================================================
+spawn_damaged local.model local.origin local.scale: {
+//========================================================================= 
+	local.damaged = spawn script_object model local.model scale local.scale
+	local.damaged.origin = self.origin
+	local.damaged.angles = self.angles
+	local.damaged notsolid
+}end local.damaged
+
+//=========================================================================
+TriggerPlaneDropBomb local.plane: {
+//=========================================================================
+	//	if(self.theexplodertrigger)
+	//		self.myexplodertrigger = waitthread global/FindTrigger.scr::FindTrigger self.theexplodertrigger
+
+	local.origin = self.myexplodertrigger.origin
+	local.node = spawn script_origin model "fx/dummy.tik" origin local.origin
+	level.planecrashtrigger thread PlayWhenTriggered local.node
+
+	while ( local.plane && !(local.plane istouching self) ) {
+		waitframe
+	}
+
+	if (!local.plane) {
+		end
+	}
+
+	// create bomb
+	local.ent = spawn script_model "spawnflags" "2"
+	local.ent.origin = local.plane gettagposition "tag_bomb"
+	local.ent.angles = local.plane.angles
+	local.ent model "ammo/stuka_bomb.tik"
+	local.ent notsolid
+	local.ent scale 1
+	local.ent targetname (local.plane.targetname + "bomb")
+
+	// have stuka play its bomb animation
+	local.plane anim bomb
+	local.ent playsound drop_bomb
+
+	// set the bomb on its way
+	local.ent flypath self.target 1500 20000 500
+	local.ent waitmove
+	
+	if(self.myexplodertrigger != NIL && self.myexplodertrigger != NULL) {
+        local.name = self.myexplodertrigger.targetname
+		local.origin = self.myexplodertrigger.origin
+		level.planecrashtrigger triggerable
+		level.planecrashtrigger takedamage
+
+		trigger level.planecrashtrigger
+		thread spawn_fx models/fx/fx_truck_explosion.tik 2 local.origin
+
+		// iprintln "BLOWUPBUILDING"
+		$jeep_turret0 viewjitter 20
+		$jeep_turret0 dojitter
+		println ("BLAMO: custom building blow up trigger " + local.name + " went off")
+		//$(local.plane.myexplodertrigger) remove
+	}
+
+	trigger self 
+
+	// we are done, so remove the bomb
+	if(local.ent) {
+		local.ent remove
+
+		// do the explosion FX and damage
+		local.explosion = spawn "models/emitters/mortar_dirt.tik"
+		local.explosion.origin = local.ent.origin
+		local.explosion anim idle
+		local.explosion notsolid
+		wait 3
+
+		local.explosion anim stop
+		local.explosion delete
+	}
+	$jeep_turret0 viewjitter 0.4
+}end
+
+//=========================================================================
+PlayWhenTriggered local.wheretoplaysound: {
+//=========================================================================
+	self waittill trigger
+	local.wheretoplaysound playsound explode_building_large
+
+	// iprintln ("Radius Damage, this dist from player: " + vector_length($player.origin - local.origin))
+	radiusdamage (656 4663 424) 200 200 // local.origin 5000 2000
+	local.wheretoplaysound waittill sounddone
+	local.wheretoplaysound remove
+}end

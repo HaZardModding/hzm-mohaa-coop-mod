@@ -1,0 +1,595 @@
+//--------------------------------------------------
+InitBritHQ:
+//--------------------------------------------------
+	level.playerInJeep = 0
+
+	$commander exec global/disable_ai.scr
+//		$commander gun "colt 45"
+	$commander gun "webley revolver"
+	$commander holster
+	$commander nodamage
+	$commander.avoidplayer = 0
+	$commander.interval = 200
+	$jeep anim idlehide_cutter
+	$jeep lock
+	$medic.no_idle = 1
+	local.medicSeatOffset =  (0 0 0) // (0 0.5 0)
+
+	//*********************************************************
+	$medic[1] physics_off
+	$medic[1] notsolid
+	$medic[1] nodamage
+
+	waitthread attachToJeep $medic driver_seat local.medicSeatOffset
+	spawn script_model model models/items/map_for_e3L1.tik targetname "TheMap" "origin" $jeep.origin
+	waitthread attachToJeep $TheMap driver_seat local.medicSeatOffset	
+	$jeep[1] nodamage
+	$jeep[1] setcollisionentity $jeepcollide
+	$medic thread global/LoopAnim.scr::LoopAnim A_31_Whittaker_1A_idle
+
+	//*********************************************************
+
+	level.gunShootRadius = 700
+
+	$aagun thread StartAAGun $aagun_turret0 $aagunguy NULL NULL 0 //aagun
+
+	$jeeptrigger nottriggerable
+	$medic ai_off
+	$commander ai_off
+	thread BritCampBattle
+	if($alliedcampparade2ndorigin)
+		$alliedcampparade2ndorigin rendereffects "+dontdraw"
+end
+//--------------------------------------------------
+DoObjectiveFindBritHQ:
+//--------------------------------------------------
+	
+	if (level.skipobjFindBritHQ	== 1)
+	{
+		$player.origin = $commander.origin + (0 -30 0)
+		$medic ai_on
+		$commander ai_on
+		$TheMap remove
+		$aagun.destroyed = 1`
+		end
+	}
+
+	level.TalkedToCommander = 0
+	$medic thread TellPlayerSeeCommander
+
+
+	$HQTrigger waittill trigger
+	level.TalkedToCommander = 1
+
+	// Field Commander gives instructions for the rest of the mission
+	$commander turnto $player
+	$commander lookat $player
+	$commander waittill turndone
+	$aagun.stopfiring = 1
+	$TheMap remove
+	$medic thread global/LoopAnim.scr::LoopAnim A_31_driver_lookidle
+
+	$commander anim A_31_CommTalk_01
+	$commander waittill animdone
+/*
+	$commander upperanim A_31_Morrisey_1A
+	//iprintln "(DFRUK_E3L1_NM3211) Good to see you, Sgt. Baker."
+	$commander waittill upperanimdone
+	$commander upperanim A_31_Morrisey_1B // "The attack on Monte Cassino has stalled.  American and British troops are pulling back to regroup."
+	$commander waittill upperanimdone
+	$commander upperanim A_31_Morrisey_1C // "However, we have a squad unit trapped by enemy fire."
+	$commander waittill upperanimdone
+*/
+	$commander turnto NULL
+	$aagun.stopfiring = 0
+	level.aagunplanetrigger = waitthread global/FindTrigger.scr::FindTrigger "aagunplanetrigger"
+	trigger level.aagunplanetrigger
+	wait 3
+
+	$player nodamage
+
+	$aagun.stopfiring = 1
+	$aagun.destroyed = 1
+	$aagunguy exec global/setdeathanim.scr "death_mortar_twist"
+	$aagunguy physics_on
+	$aagunguy solid
+	$aagunguy takedamage
+	waitframe
+	$aagunguy exec global/bullethit.scr (0 -1 0) 1000 0 0
+	$aagun waitthread DestroyAAGun
+	$aagunplanebomb remove
+	local.attackfrombehindtrigger = waitthread global/FindTrigger.scr::FindTrigger "attackfrombehindtrigger"
+	trigger local.attackfrombehindtrigger
+
+	$player takedamage
+
+	thread CommanderRunAway
+
+	$jeeptrigger triggerable
+
+end
+
+TellPlayerSeeCommander:
+	while(level.TalkedToCommander != 1)
+	{
+		while(vector_length($player.origin - self.origin) > 100)
+			wait 0.1
+		if(level.TalkedToCommander == 1)
+			End
+		self thread global/LoopAnim.scr::LoopAnimStop
+		self anim A_31_Whittaker_1A
+		self waittill animdone
+		
+		//iprintln "(TEMP) Go check in with the commander."
+		if(level.TalkedToCommander == 1)
+			End
+		//self anim A_31_Whittaker_1A_idle
+		self thread global/LoopAnim.scr::LoopAnim A_31_Whittaker_1A_idle
+		wait 2.0
+		while(vector_length($player.origin - self.origin) > 100)
+			wait 0.1
+		if(level.TalkedToCommander == 1)
+			End
+		self thread global/LoopAnim.scr::LoopAnimStop
+		self anim A_31_Whittaker_1B
+		self waittill animdone
+		// self anim A_31_Whittaker_1A_idle
+		// iprintln "(TEMP) Go check in with the commander."
+		if(level.TalkedToCommander == 1)
+			End
+		self thread global/LoopAnim.scr::LoopAnim A_31_Whittaker_1A_idle
+	}
+End
+
+
+//--------------------------------------------------
+CommanderRunAway:
+//--------------------------------------------------
+	$commander turnto NULL
+	$commander lookat NULL
+	$commander thread global/LoopAnim.scr::LoopAnim AA_huddle2
+	wait 1.5
+	$commander thread global/LoopAnim.scr::LoopAnimStop
+
+	$commander exec global/moveto.scr anim/crouch_run.scr $commanderhidepoint
+
+	$commander unholster
+
+	$player physics_on
+/*
+	local.distance = 1000
+	while ($commander && local.distance > 50)
+	{
+		wait 0.1  // added to make this not go a billion times in the first second
+		local.distance = vector_length ($commanderhidepoint.origin - $commander.origin)
+	}
+*/
+	$commander.stopcrouching = 1
+	$commander runto NULL
+	$commander walkto NULL
+	$commander exec global/stand.scr
+	$commander exec global/enable_ai.scr
+
+end
+//--------------------------------------------------
+DoObjectiveGetOnJeep:
+//--------------------------------------------------
+	if (level.skipobjGetOnJeep == 1)
+	{
+         if (level.skipobjMedicReachGoal == 0)
+		   thread StartPlayerMedicRide
+		 iprintln "KILLING WALL"
+		 killclass CrateObject
+	     end
+	}
+
+	local.usekey = getboundkey1 "+use"
+	local.msg = (loc_convert_string "Press ") + local.usekey + (loc_convert_string " to get on the jeep.")
+	waitexec global/DistanceUse.scr $jeep 200 local.msg
+
+	thread StartPlayerMedicRide
+
+end
+//--------------------------------------------------
+medicDriveAnim:
+//--------------------------------------------------
+	$medic anim A_22_driver_idle
+end
+
+//--------------------------------------------------
+medicIdleAnim:
+//--------------------------------------------------
+//	$medic thread global/LoopAnim.scr::LoopAnim med_sit
+	$medic notsolid
+	$medic waitthread global/LoopAnim.scr::LoopAnimStop
+//	$medic thread global/LoopAnim.scr::LoopAnim A_31_Whittaker_1A_idle
+	$medic thread global/LoopAnim.scr::LoopAnim A_22_driver_idle
+//	$medic anim jeep_idle_still
+end
+
+//------------------------------------------------------
+attachToJeep local.attachMe local.seatName local.offset:
+//------------------------------------------------------
+	local.angles = $jeep.angles
+
+	local.attachMe physics_off
+	local.attachMe notsolid
+	local.attachMe nodamage
+	local.attachMe angles (0 0 0)
+	local.attachMe attach $jeep local.seatName 1  local.offset 
+	local.attachMe exec global/disable_ai.scr
+end
+//--------------------------------------------------
+StartMedicRide:
+//--------------------------------------------------
+	//iprintln "(DFRUS_E3L1_PW2301) Ready when you are, Sarge."
+	$medic thread global/LoopAnim.scr::LoopAnimStop
+	$medic.direction = 5
+	waitframe
+	$medic anim A_31_MedTalk_01
+	$medic waittill animdone
+	$medic.direction = 3
+
+	if (level.playerInJeep == 0)
+		$medic waitthread medicIdleAnim
+
+end
+
+//--------------------------------------------------
+StartPlayerMedicRide:
+//--------------------------------------------------
+	
+	//*******************
+	thread medicDriveAnim
+	//*******************
+
+	$player physics_on
+	$player takedamage
+
+	//unlock the jeep and turret
+	$jeep.turret = $jeep queryturretslotentity 0
+	$jeep unlock
+	$jeep.turret unlock
+
+	$jeep attachturretslot 0 $player
+	
+
+	$jeep.turret lock
+	$jeep lock
+
+	wait 1.5
+
+	level.playerInJeep = 1
+
+	exec global/autosave.scr level.autosave	//"British HQ"
+	level.autosave++
+
+	thread MedicBriefing
+	
+end
+
+MedicBriefing:
+	$medic thread global/LoopAnim.scr::LoopAnimStop
+	$medic.direction = 5
+	$medic anim A_31_MedTalk_02
+	$medic waittill animdone
+	$medic anim A_31_MedTalk_03
+	$medic waittill animdone
+	$medic.direction = 2
+	thread maps/e3l1/JeepRidePart1.scr::driverTurnStraight
+//	$medic exec global/LoopAnim.scr::LoopAnim A_22_driving_idle
+End
+
+
+
+
+//--------------------------------------------------
+CleanupBritHQ:
+//--------------------------------------------------
+end
+
+
+
+
+// ------------------------------------
+DestroyAAGun:
+
+	exec global/earthquake.scr .2 4 0 0
+				 
+	self thread spawn_fx models/fx/fx_truck_explosion.tik
+
+	local.destroyed	= spawn self.destroyedmodel 
+	local.destroyed.origin = self.origin
+	local.destroyed.angles = self.turret.angles
+	$aagun_collision scale 0.01
+	local.destroyed.collisionent = $aagun_turret_collision_ai
+	local.destroyed targetname "AAgunDestroyed"
+	// make the new thing immobile
+	local.destroyed mass 100000
+	local.destroyed.collisionent = $aagun_collision
+	self remove
+
+end
+
+// ------------------------------------
+StartAAGun local.turret local.driver local.charge local.shottrigger local.flak:
+	self lock
+//	self.turret.lock
+
+	self.flak = local.flak
+	self.shottrigger = local.shottrigger
+	self.driver = local.driver
+	self.driver.AAGun = self
+	self.driver.pain = 0
+	self.turret = local.turret
+	self.charge = local.charge
+	self.aimat = spawn script_origin "origin" self.origin
+	self.movevec = (0 0 0)
+	self.stopfiring = 0
+	self.breaktime = level.time+5
+	self.oldtime = level.time
+	self.aimingatplayer = 0
+
+	self.collisionent = $aagun_collision
+//	self.turret.collisionent = $aagun_turret_collision_ai
+	self.destroyedmodel = "models/statweapons/p_aagun_d.tik"
+	self.destroyedcollision = $aagun_destroyed_collision
+
+	if (local.driver)
+	{
+		local.driver nodamage
+		local.driver anim AV_use_AA_gun
+		local.driver gun holster
+		local.driver exec global/disable_ai.scr
+		local.driver physics_off
+		local.driver notsolid
+
+		local.driver.origin = self.turret gettagposition "tag_seat"
+		local.driver.angles = self.turret gettagangles "tag_seat"
+	
+
+		self thread AAGunFire
+
+		self thread AAGunThink
+		
+	}
+
+	self nodamage
+	self.turret nodamage
+
+	//CR  Deadlines aproach, bring out yer' hacks
+	level waittill spawn
+	
+End
+
+
+
+// ------------------------------------
+AAGunThink:
+
+	while (self.destroyed != 1)
+	{
+		self.driver.origin = self.turret gettagposition "tag_seat"
+		self.driver.angles = self.turret gettagangles "tag_seat"
+		waitframe
+	}
+
+	self.turret setaimtarget NULL
+
+	//self unlock
+
+	//self.charge explosioneffect "models/fx/demodamage_flak88.tik"
+	//self.charge setusethread charge_used
+
+End
+
+
+// ------------------------------------
+AAGunFire:
+
+	self thread adjustFireDirection
+
+	self.breaktime = level.time+5
+	while (self && self.destroyed != 1)
+	{
+	
+        if (self.stopfiring == 0)
+			self.turret anim fire_1
+        else if(!self) 
+            End
+		wait 0.15
+        if (self  && self.stopfiring == 0)
+			self.turret anim fire_2
+        else if(!self) 
+            End
+		wait 0.15
+		if (self  && self.stopfiring == 0)
+			self.turret anim fire_3
+        else if(!self) 
+            End
+		wait 0.15
+        if(self  && self.stopfiring == 0)
+			self.turret anim fire_4
+        else if(!self)
+             End
+		wait 0.15
+
+		if (self && self.breaktime < level.time)
+		{
+			wait (1+randomint(2))
+			if(self)
+				self.breaktime = level.time+6+randomint(4)
+		}
+		if !(self)
+			End
+	}
+//	if(self.stopfiring == 1)
+//	iprintln "Guns Turn off?"		
+End
+
+adjustFireDirection:
+	self.aimat = spawn script_origin
+	while (self.destroyed != 1)
+	{
+		if(!$hoveringplane[1])
+		{
+			waitframe
+			continue
+		}
+		if($hoveringplane[1].origin[2] < (self.origin[2] + 10))		
+			self.aimat.origin = $hoveringplane[1].origin + (0 0 200)
+		else
+			self.aimat.origin = $hoveringplane[1].origin
+		
+		if (self.breaktime < level.time)
+		{			
+			waitthread SetAAGunTarget self.aimat
+		}
+
+		
+/*
+		if (level.lastplanespawned != NULL)
+			self.aimat.origin = level.lastplanespawned.origin
+
+
+		
+		local.offset = self.aimat.origin - self.origin
+		
+		if (local.offset[0] > level.gunShootRadius) local.offset[0] = level.gunShootRadius
+		if (local.offset[0] < -level.gunShootRadius) local.offset[0] = -level.gunShootRadius
+		if (local.offset[1] > level.gunShootRadius) local.offset[1] = level.gunShootRadius
+		if (local.offset[1] < -level.gunShootRadius) local.offset[1] = -level.gunShootRadius
+		self.aimat.origin = self.origin + local.offset
+*/
+		self.oldtime = level.time
+		waitframe
+	}
+end
+
+// ------------------------------------
+SetAAGunTarget local.guntarget:
+
+	self.oldtime = level.time
+
+	if (self.destroyed != 1)
+	{
+		self.turret setaimtarget local.guntarget
+		self.driver lookat local.guntarget
+	}
+
+End
+
+
+spawn_fx local.fx:
+	local.temp = spawn script_model model local.fx
+	local.temp notsolid
+	local.temp.origin = self.origin
+	local.temp anim start
+	local.temp notsolid
+	wait 5
+	local.temp remove
+end
+
+
+// ------------------------------------
+BritCampBattle:
+// ------------------------------------
+
+	// find the appropriate trigger(s)
+	local.spawntrigger = waitthread global/FindTrigger.scr::FindTrigger "spawncampguys2nd"
+
+	// wait until the Brits are spawned
+	local.spawntrigger waittill trigger 
+	waitframe
+	for(local.i = 1; local.i <= $friendly.size; local.i++)
+		$friendly[local.i] thread spawnedFriendlyWatch
+	// wait until the PC gets close to the battle
+	$takedamageaxis waittill trigger
+	if($alliedcampparade2ndorigin)
+		$alliedcampparade2ndorigin thread global/parade.scr::RunParade
+	$medic ai_on
+	$commander ai_on
+	waitframe
+	for(local.i = 1; local.i <= $friendly.size; local.i++)
+		$friendly[local.i] thread enableFriendlies
+
+
+end
+
+// ------------------------------------
+spawnedFriendlyWatch:
+// ------------------------------------
+
+    self nodamage
+	self.homeorigin = self.origin
+	self.health = 100000
+	local.originalhealth = self.health
+	while(self && isalive self && self.takedamage != 1)
+	{
+		if(self.health < (local.originalhealth / 2) && isalive self)
+			self.health = local.originalhealth		
+		waitframe
+	}
+end
+
+// ------------------------------------
+enableFriendlies:
+// ------------------------------------
+	// self.takedamage = 1
+	self.interval = 200
+	self takedamage
+//	iprintln "DOES THIS HAPPEN?"
+	self.rifle_crouch = 0
+	while (self && isalive self)
+	{
+
+		wait 0.25
+		if !(self)
+			End
+		local.count = 0
+		if($deleteguy2)
+		{
+		
+			for(local.i = 1; local.i <= $deleteguy2.size; local.i++)
+				if(isalive $deleteguy2[local.i])
+					local.count++
+				
+			if(local.count == 0 && self.rifle_crouch == 0)
+			{
+				self runto self.homeorigin
+				self waittill movedone
+				
+				if(self.rifle_crouch == 0)
+					{
+				//		iprintln "rifle_crouch1"
+						self turnto $alliedaimat
+				//		self anim rifle_standtocrouch_run
+				//		self waittill animdone
+						self thread global/LoopAnim.scr::LoopAnim rifle_crouch_alert
+						self.rifle_crouch = 1
+						self.enableEnemy = 0
+					}
+			}
+			else if(local.count > 0)
+			{	
+				//iprintln "STOP ANIMATING"	
+				self turnto NULL
+				self thread global/LoopAnim.scr::LoopAnimStop
+				self.rifle_crouch = 0
+				self.enableEnemy = 1
+				self favoriteenemy $deleteguy2[1]
+			}
+		} 
+		else if(self.rifle_crouch == 0)
+			{	
+				//iprintln "rifle_crouch2"
+				self turnto $alliedaimat
+			//	self anim rifle_standtocrouch_run
+			//	self waittill animdone
+				self thread global/LoopAnim.scr::LoopAnim rifle_crouch_alert
+				self.rifle_crouch = 1
+				self.enableEnemy = 0
+			}
+	}
+
+end

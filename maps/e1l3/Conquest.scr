@@ -1,0 +1,1293 @@
+//chrissstrahl - modified for coop on 2019.09.09
+//chrissstrahl - completed coopification on 2019.09.18
+
+// Conquest
+//=========================================================================
+init:
+//=========================================================================
+{
+	//chrissstrahl - this is for debug, we can keep it as it is
+	if (level.warpTo == "conquest") {
+		// hack warp section
+		waitthread maps/e1l3/Objectives.scr::catchup "freedBrits"
+
+		// warp to the jail break to avoid spawning
+		// a bunch of guys
+		
+		//chrissstrahl - keep for sp
+		if(level.gametype == 0){
+			$player.origin 	 = (730 -2416 149)
+			local.a 		 = $player.angles
+			local.a[1] 		+= 180
+			$player.angles 	 = local.a
+			$player ammo smg 400
+			$player ammo mg 400
+			$player item weapons/uk_w_vickers.tik
+			$player use vickers
+		}
+
+		// let out all the prisoners
+		trigger $PlayerNearBlastHole_Trigger
+	}
+
+	// initialization
+	level.all_conquest_enemies_are_dead = 0
+	level.conquest_done = 0
+	spawn trigger_relay "targetname" "StartConquestSectionTrigger"
+	thread BalconyDoorThread
+
+	// spawn work thread
+	thread DoWork
+
+	if ($CourtyardTank != NULL){
+		$CourtyardTank remove
+	}
+
+	$mg thread initMg42
+}end
+
+//=========================================================================
+DoWork:
+//=========================================================================
+{
+	level.reportdeath =1
+
+	thread doGunnersAttackPlayer
+	local.startroomsweep = waitthread global/FindTrigger.scr::FindTrigger "Court1Trigger"
+	local.court2 	= waitthread global/FindTrigger.scr::FindTrigger "Court2Trigger" 
+	local.room1 	= waitthread global/FindTrigger.scr::FindTrigger "Room1"
+	local.room2 	= waitthread global/FindTrigger.scr::FindTrigger "Room2"
+	local.room3 	= waitthread global/FindTrigger.scr::FindTrigger "Room3"
+	local.room4 	= waitthread global/FindTrigger.scr::FindTrigger "Room4"
+	local.room5 	= waitthread global/FindTrigger.scr::FindTrigger "Room5"
+	local.courtexit = waitthread global/FindTrigger.scr::FindTrigger "MainCourtYardExit"
+	local.tankgate 	= waitthread global/FindTrigger.scr::FindTrigger "gate_exploder"
+
+	// wait for the player to walk out into the armory
+	local.spawner_start_health 		= 100
+	local.spawner_health_increase 	= 40 // amount of health to add to spawners when player runs ahead
+	local.spawner_start_accuracy 	= 50
+	local.spawner_accuracy_increase = 10 // amount of accuracy to add to spawners if player runs ahead
+
+	// wait for guys to get their guns
+	$StartConquestSectionTrigger waittill trigger
+
+	println "CONQUEST >>> starting conquest !!!!"
+
+	$parkedtruck.collisionent = $parkedtruck.target
+	$parkedtruck.collisionent disconnect_paths
+	$parkedtruck nodamage
+	$parkedtruck vehicleanim idlenolights
+
+	thread ConquestCompassTargThread
+
+	//local.SpecialEdFinalSpot = $CourtyardTank.origin
+	local.SpecialEdFinalSpot = $BritRallyPt.origin
+
+	// setup special ed, he's 'special' invulner, friendly follow ect.
+	$Prisoner1.targetname = "SpecialEd"
+	waitframe
+	
+	//chrissstrahl - remove stuff once ed is dead
+	thread coop_mod/butler.scr::e1l3_waitforedtobedead
+
+	$SpecialEd ammo mg 300
+	$SpecialEd.movedoneradius = 128
+	
+	//chrissstrahl - keep for sp
+	if(level.gametype == 0){
+		$SpecialEd thread MyFriendly $player 256 1024 256
+	}else{
+		//wait until a valid player is there
+		local.playerReturn = NULL
+		while(local.playerReturn == NULL){
+			local.playerReturn = waitthread coop_mod/replace.scr::player_anyValid
+			waitframe
+		}
+		$SpecialEd thread MyFriendly local.playerReturn 256 1024 256
+	}
+	$SpecialEd nodamage
+
+	if ($Prisoner2 && (isalive $Prisoner2)){
+		$Prisoner2 health 200
+		$Prisoner2 lookat NULL
+		$Prisoner2 turnto NULL
+		$Prisoner2 sight 1000
+		$Prisoner2 hearing 1000
+		$Prisoner2.movedoneradius = 228
+		$Prisoner2.enableEnemy = 1
+		$Prisoner2 thread MyFriendly $SpecialEd (256 + 128) 1024 (256 + 128)
+		$Prisoner2.targetname = "ConquestGuy"
+	}
+
+	if ($Prisoner3 && (isalive $Prisoner3)){
+		$Prisoner3 health 10			//200
+		$Prisoner3 lookat NULL
+		$Prisoner3 turnto NULL
+		$Prisoner3 sight 1000
+		$Prisoner3 hearing 1000
+		$Prisoner3.movedoneradius = 228
+		$Prisoner3.enableEnemy = 1
+		$Prisoner3 thread MyFriendly $SpecialEd (256 + 2*128) 1024 (256 + 2*128)
+		$Prisoner3.targetname = "ConquestGuy"
+	}
+
+//	// Find all of my guys and rename them just in case
+//	local.i = 1
+//	local.leash_spacer = 128
+//	local.movedone_spacer = 128		//32
+//	while (1)
+//	{
+//		local.guy = $("Prisoner" + local.i)
+//		local.i++
+//
+//		if (!local.guy)
+//			continue
+//	
+//		if (isalive local.guy)
+//		{
+//			local.guy.targetname = "ConquestGuy"
+//
+//			local.guy health 200
+//			local.guy lookat NULL
+//			local.guy turnto NULL
+//
+//			local.guy sight 1000
+//			local.guy hearing 1000
+//			local.guy.movedoneradius = (100 + (local.i * local.movedone_spacer))
+//			local.guy.enableEnemy = 1
+//
+//			local.guy thread MyFriendly $SpecialEd (256 + (local.i * local.leash_spacer)) 1024 (256 + (local.i * local.leash_spacer))
+//		}
+//	}
+
+	$ConquestGuy thread ReportDeath "English Prisoner"// print a message when these guys die
+//	$BoatGuyLeader thread InitDragalongGuy		//InitConquestGuy
+//	$BoatGuy thread InitDragalongGuy				//InitConquestGuy
+
+//		--- all this moved above
+//	// setup special ed, he's 'special' invulner, friendly follow ect.
+//	$ConquestGuy[1].targetname = "SpecialEd"
+//
+//	$SpecialEd ammo mg 300
+//	$SpecialEd thread MyFriendly 256 1024 256
+////	$SpecialEd.distance = 384
+////	$SpecialEd.friendtype = 1
+////	$SpecialEd thread global/Friendly.scr::friendlythink
+//	$SpecialEd nodamage
+
+	level.court1guycount   = 0
+	level.court2guycount   = 0
+	level.room1guycount    = 0
+	level.room2guycount    = 0
+	level.room3guycount    = 0
+	level.room4guycount    = 0
+	level.room5guycount    = 0
+	level.court1guySpawned = 0
+	level.court2guySpawned = 0
+	level.room1guySpawned  = 0
+	level.room2guySpawned  = 0
+	level.room3guySpawned  = 0
+	level.room4guySpawned  = 0
+	level.room5guySpawned  = 0
+
+	local.alldead = spawn trigger_relay
+	thread DoConquestAI local.alldead
+
+	// handle guys in courtyard 1
+	waitframe
+	$Court1Guys thread DoCourt1Guys local.spawner_start_health local.spawner_start_accuracy
+	level.court1guySpawned = 1
+
+	// handle guys in courtyard 2
+	local.court2 waittill trigger
+	waitframe
+	$Court2Guys thread DoCourt2Guys local.spawner_start_health local.spawner_start_accuracy
+	level.court2guySpawned = 1
+
+	// handle guys in room 1
+	local.room1 waittill trigger
+	waitframe
+	$Room1Guys thread DoRoom1Guys local.spawner_start_health local.spawner_start_accuracy
+	level.room1guySpawned  = 1
+
+	// handle guys in room 2
+	local.room2 waittill trigger
+	if (level.room1guycount > 0){
+		local.spawner_start_accuracy += local.spawner_accuracy_increase
+		local.spawner_start_health 	 += local.spawner_health_increase
+	}
+	waitframe
+
+	$Room2Guys thread DoRoom2Guys local.spawner_start_health local.spawner_start_accuracy
+	level.room2guySpawned  = 1
+
+	// handle guys in room 3
+	local.room3 waittill trigger
+	if (level.room2guycount > 0) {
+		local.spawner_start_accuracy += local.spawner_accuracy_increase
+		local.spawner_start_health 	 += local.spawner_health_increase
+	}
+	waitframe
+
+	$Room3Guys thread DoRoom3Guys local.spawner_start_health local.spawner_start_accuracy
+	if (level.room3guycount > 0) {
+		local.spawner_start_accuracy += local.spawner_accuracy_increase
+		local.spawner_start_health += local.spawner_health_increase
+	}
+	level.room3guySpawned  = 1
+
+	// handle guys in room 4
+	local.room4 waittill trigger
+	waitframe
+
+	$Room4Guys thread DoRoom4Guys local.spawner_start_health local.spawner_start_accuracy
+	level.room4guySpawned  = 1
+
+	// handle guys in courtyard 5
+	local.room5 waittill trigger
+	waitframe
+
+	$Room5Guys thread DoRoom5Guys local.spawner_start_health local.spawner_start_accuracy
+	level.room5guySpawned  = 1
+	wait 2
+
+	// wait for the last of them to be dead
+	local.alldead waittill trigger
+	local.alldead remove
+	level.all_conquest_enemies_are_dead = 1
+	waitframe
+
+	waitthread global/ObjMgr.scr::SetObjCompassTarg "takeFort" $takeFortCompassPoint
+
+
+	// room sweep complete
+	// the place is secure, wait for player to get in the big trigger,
+	$CourtyardObjectiveTrigger waittill trigger
+	level.conquest_done = 1
+
+	// the brit delivers his line
+	waitthread britDeliversLine
+
+	//$SpecialEd thread SpecialEdLast local.SpecialEdFinalSpot local.battleovertrig 
+	wait 3.5
+
+	// oh crap, here comes the truck
+	local.truckTrigger = waitthread global/FindTrigger.scr::FindTrigger "CourtyardTruckTrigger"
+	trigger local.truckTrigger
+	
+	//local.paradestart = waitthread global/FindTrigger.scr::FindTrigger "StartCourtyardParadeTrigger"
+	//local.paradeend   = waitthread global/FindTrigger.scr::FindTrigger "CourtyardParadeEnd"
+
+	if ($ConquestGuy){
+		$ConquestGuy thread ThrowGrenades
+	}
+	wait 4
+
+	waitthread global/ai.scr::spawnset 451 "OutsideGateSpawners"
+	//	trigger local.paradestart
+
+	if ($wall_mg_attacker){
+		$wall_mg_attacker thread doRemove
+	}
+
+	$ConquestGuy thread DoNothing
+
+	//	if ($BoatGuyLeader)
+	//		$BoatGuyLeader thread DoNothing
+
+	if ($BoatGuy){
+		$BoatGuy thread DoNothing
+	}
+
+	thread maps/e1l3/Briefing.scr::RestartWallBattle
+	waitthread LastBattle local.battleovertrig 
+
+	thread maps/e1l3.scr::MusicMeetingClaus
+	thread alliesHuddleUp
+	wait 1
+
+	// if player goes to claus, then go ahead and delete
+	$ClausTrigger waittill trigger
+	level.specialedflag = 1
+
+	// rename special ed and setup cleanup thread
+	$SpecialEd targetname "ConquestGuy"
+	thread maps/e1l3/aicleanup.scr::CleanupThread NULL "ConquestGuy" 1000
+
+	if ($OutsideGateSpawners != NULL){
+		$OutsideGateSpawners thread doRemove
+	}
+	level.reportdeath = 0
+}end
+
+//=========================================================================
+doRemove:
+//=========================================================================
+{
+	self remove
+}end
+
+//=========================================================================
+ConquestCompassTargThread:
+//=========================================================================
+{
+	if (!$FortCompassTarget1){
+		end
+	}
+
+	while (level.all_conquest_enemies_are_dead == 0){
+		waitthread global/ObjMgr.scr::SetObjCompassTarg "takeFort" $FortCompassTarget1
+		$FortCompassTrigger1 waittill trigger
+
+		if (level.all_conquest_enemies_are_dead == 1){
+			break
+		}
+
+		waitthread global/ObjMgr.scr::SetObjCompassTarg "takeFort" $FortCompassTarget2
+		$FortCompassTrigger2 waittill trigger
+
+		if (level.all_conquest_enemies_are_dead == 1){
+			break
+		}
+
+		waitthread global/ObjMgr.scr::SetObjCompassTarg "takeFort" $FortCompassTarget3
+		$FortCompassTrigger3 waittill trigger
+
+		if (level.all_conquest_enemies_are_dead == 1){
+			break
+		}
+
+		waitthread global/ObjMgr.scr::SetObjCompassTarg "takeFort" $FortCompassTarget4
+		$FortCompassTrigger4 waittill trigger
+
+		if (level.all_conquest_enemies_are_dead == 1){
+			break
+		}
+
+		if ($FortCompassLoopTrigger && $FortCompassLoopNode){
+			waitthread global/ObjMgr.scr::SetObjCompassTarg "takeFort" $FortCompassLoopNode
+			$FortCompassLoopTrigger waittill trigger
+		}
+		else{
+			waitthread global/ObjMgr.scr::SetObjCompassTarg "takeFort" $FortOutsidePoint
+			$CourtyardObjectiveTrigger waittill trigger
+		}
+	}
+	waitthread global/ObjMgr.scr::SetObjCompassTarg "takeFort" $takeFortCompassPoint
+}end
+
+//=========================================================================
+britDeliversLine:
+//=========================================================================
+{
+	$SpecialEd.my_friendly_turn_off = 1
+	while ($SpecialEd.my_friendly_is_running == 1){
+		waitframe
+	}
+
+	//iprintlnbold "brit delivering line"
+	// play dialog animation
+	//	$SpecialEd waitthread global/friendly.scr::friendlystop
+
+	$SpecialEd.enableEnemy 		= 0
+	$SpecialEd.movedoneradius 	= 128
+	
+	
+	//chrissstrahl - keep for sp
+	if(level.gametype == 0){
+		$SpecialEd waitthread MyRunTo $player 1
+	}else{
+		//wait until a valid player is there
+		local.playerReturn = NULL
+		while(local.playerReturn == NULL){
+			local.playerReturn = waitthread coop_mod/replace.scr::player_anyValid
+			waitframe
+		}
+		$SpecialEd waitthread MyRunTo local.playerReturn 1
+	}
+
+	//	$SpecialEd waitthread global/SafeMoveTo.scr::SafeRunTo_Wait $player 128
+	//	$SpecialEd runto $player
+	//	$SpecialEd waittill movedone
+
+	$SpecialEd exec coop_mod/replace.scr::lookat
+	$SpecialEd exec coop_mod/replace.scr::turnto
+	thread britDeliversLine_threadling
+}end
+
+//=========================================================================
+britDeliversLine_threadling:
+//=========================================================================
+{
+	$SpecialEd say A_13_Brit_captalk04
+	$SpecialEd waittill saydone
+
+	// the fort is clear
+	waitthread maps/e1l3/Objectives.scr::transition "tookFort"
+
+	$SpecialEd say A_13_Brit_captalk05
+	$SpecialEd waittill saydone
+	$SpecialEd.enableEnemy = 1
+	$SpecialEd takedamage
+	//wait 1
+
+	$SpecialEd lookat NULL
+	$SpecialEd turnto NULL
+	self waitthread global/SafeMoveTo.scr::SafeRunTo $Courtyard2RallyPt[1]
+	//$SpecialEd runto $Courtyard2RallyPt[1]
+}end
+
+//=========================================================================
+LastBattle local.trig2:
+//=========================================================================
+{
+	level.room_guys = 0
+	local.trig = spawn trigger_relay
+
+	if ($reanimated_attacker){
+		//iprintln "CONQUEST >>> there are " $reanimated_attacker.size " left!!!!"
+		$reanimated_attacker thread WaitDeath local.trig
+		wait 2
+
+		local.trig waittill trigger
+	}
+
+	local.trig delete
+	trigger local.trig2
+}end
+
+//-----------------------------------------------------------------------------
+
+//InitConquestGuy:
+//	self targetname "ConquestGuy"
+//	//self health 500
+//	
+//	self lookat NULL
+//	self turnto NULL
+//
+//	self sight 1000
+//	self hearing 1000
+//
+//	self takedamage
+//
+//	self.destination = $player
+//	self.enableEnemy = 1
+//	self.friendtype = 1
+//	self.distance = 256			//384 + (randomfloat 256)
+//	self thread global/friendly.scr::friendlythink
+//
+//	self thread ReportDeath "American friendly"
+//end
+
+//-----------------------------------------------------------------------------
+
+//InitDragalongGuy:
+//
+//	//self targetname "JustCallMeDragalong"
+//	//self health 500
+//
+//	self lookat NULL
+//	self turnto NULL
+//
+//	self sight 1000
+//	self hearing 1000
+//
+//	self takedamage
+//	self health 10
+//	self.distance = 512
+//	self.destination = $player
+//	self.friendtype = 1
+//	self thread global/friendly.scr::friendlythink
+////	self exec global/disable_ai.scr
+////
+////	wait 10
+//
+//	self exec global/enable_ai.scr
+//
+//end
+
+// These threads handle counting the number of guys alive in each room
+//=========================================================================
+DoCourt1Guys local.health local.accur:
+//=========================================================================
+{
+	if (!self || !(isalive self)){
+		end
+	}
+
+	self.health = local.health
+	self accuracy local.accur
+
+	level.court1guycount++
+	self waittill death
+	level.court1guycount--
+}end
+
+//=========================================================================
+DoCourt2Guys local.health local.accur:
+//=========================================================================
+{
+	if (!self || !(isalive self)){
+		end
+	}
+	
+	self.health = local.health
+	self accuracy local.accur
+
+	level.court2guycount++
+	self waittill death
+	level.court2guycount--
+}end
+
+//=========================================================================
+DoRoom1Guys local.health local.accur:
+//=========================================================================
+{
+	if (!self || !(isalive self)){
+		end
+	}
+
+	self.health = local.health
+	self accuracy local.accur
+
+	level.room1guycount++
+	self waittill death
+	level.room1guycount--
+}end
+
+//=========================================================================
+DoRoom2Guys local.health local.accur:
+//=========================================================================
+{
+	if (!self || !(isalive self)){
+		end
+	}
+
+	self.health = local.health
+	self accuracy local.accur
+
+	level.room2guycount++
+	self waittill death
+	level.room2guycount--
+}end
+
+//=========================================================================
+DoRoom3Guys local.health local.accur:
+//=========================================================================
+{
+	if (!self || !(isalive self)){
+		end
+	}
+
+	self.health = local.health
+	self accuracy local.accur
+
+	level.room3guycount++
+	self waittill death
+	level.room3guycount--
+}end
+
+//=========================================================================
+DoRoom4Guys local.health local.accur:
+//=========================================================================
+{
+	if (!self || !(isalive self)){
+		end
+	}
+
+	self.health = local.health
+	self accuracy local.accur
+
+	level.room4guycount++
+	self waittill death
+	level.room4guycount--
+}end
+
+//=========================================================================
+DoRoom5Guys local.health local.accur:
+//=========================================================================
+{
+	if (!self || !(isalive self)){
+		end
+	}
+
+	self.health = local.health
+	self accuracy local.accur
+
+	level.room5guycount++
+	self waittill death
+	level.room5guycount--
+}end
+
+// This thread handles sending the friendlies from room to room as
+//    the player progesses through the castle
+//=========================================================================
+DoConquestAI local.alldeadtrigger:
+//=========================================================================
+{
+	local.court2delay = 2 // if player doesn't enter court 2 in 2 seconds, start the battle anyway
+
+	// courtyard 1
+	thread transitionMessage "Going to courtyard 1"
+	thread RoomTransition $Courtyard1RallyPt
+
+	while (level.court1guySpawned == 0){
+		waitframe
+	}
+	wait 1
+
+	while (level.court1guycount > 0) {
+		wait 1.0
+   	}
+	
+	// courtyard 2
+	thread transitionMessage "Going to courtyard 2"
+	thread RoomTransition $Courtyard2RallyPt
+	local.t = level.time
+
+	//while (level.court2triggered != 1 && ((level.time - local.t) < local.court2delay))
+	//	wait 1.0
+
+	while (level.court2guySpawned == 0){
+		waitframe
+	}
+	wait 1
+
+	while (level.court2guycount > 0){
+		wait 1.0
+	}
+
+	// Room 1
+	thread transitionMessage "Going to room 1"
+	thread RoomTransition $Room1RallyPt
+
+	while (level.room1guySpawned == 0){
+		waitframe
+	}
+	wait 1
+
+	while (level.room1guycount > 0){
+		wait 1.0
+	}
+
+	// Room 2
+	thread transitionMessage "Going to room 2"
+	thread RoomTransition $Room2RallyPt
+
+	while (level.room2guySpawned == 0){
+		waitframe
+	}
+	wait 1
+
+	while (level.room2guycount > 0){
+		wait 1.0
+	}
+
+	// Room 3
+	thread transitionMessage "Going to room 3"
+	thread RoomTransition $Room3RallyPt
+
+	while (level.room3guySpawned == 0){
+		waitframe
+	}
+	wait 1
+
+	while (level.room3guycount > 0){
+		wait 1.0
+	}
+
+	// Room 4
+	thread transitionMessage "Going to room 4"
+	thread RoomTransition $Room4RallyPt
+
+	while (level.room4guySpawned == 0){
+		waitframe
+	}
+	wait 1
+
+	while (level.room4guycount > 0){
+		wait 1.0
+	}
+
+	// Room 5
+	thread transitionMessage "Going to room 5"
+	thread RoomTransition $Room5RallyPt
+
+	while (level.room5guySpawned == 0){
+		waitframe
+	}
+	wait 1
+
+	while (level.room5guycount > 0){
+		wait 1.0
+	}
+
+	// everybody is dead
+	trigger local.alldeadtrigger
+}end
+
+//=========================================================================
+transitionMessage local.msg:
+//=========================================================================
+{
+	//iprintlnbold local.msg
+}end
+
+//=========================================================================
+ThrowGrenades:
+//=========================================================================
+{
+	self.movedoneradius = 1
+	local.rand = 1 + randomint $BalconyRallyPt.size
+	self runto $BalconyRallyPt[local.rand]
+	self waittill movedone
+	self.movedoneradius = 100
+
+	self ammo_grenade 5
+	self type_attack balcony_grenade
+	self.enableEnemy = 1 
+}end
+
+// --------------------------------------------------------------------
+// --------------------------------------------------------------------
+// --------------------------------------------------------------------
+//KillTank local.target local.rallypt:
+//
+//	self waitthread global/Friendly.scr::friendlystop
+//
+//	self.movedoneradius = 5
+//
+//	local.oldgun = self.gun
+//	local.old = self.movedoneradius
+//	self.movedoneradius = 20
+//	self.enableEnemy = 0
+//	self runto local.rallypt
+//	self waittill movedone
+//	
+//	self accuracy 90
+//
+//	self turnto local.target
+//	self lookat local.target
+//	self ammo heavy 6
+//	self gun bazooka
+//
+//	wait 4.0
+//
+//	while (local.target && isalive local.target)
+//	{
+//		self aimat local.target
+//		self setaimtarget local.target 1
+//		wait 2.0
+//
+//		//println "animating"
+//		//self anim bazooka_shoot
+//		//self waittill animdone
+//		self exec global/shoot.scr
+//		wait (1 + randomint 3)
+//	}
+//
+//	self thread global/Friendly.scr::friendlythink
+//	self.movedoneradius = local.old
+//	self gun local.oldgun
+//	self lookat NULL
+//	self turnto NULL
+//
+//end
+
+// --------------------------------------------------------------------
+// --------------------------------------------------------------------
+// --------------------------------------------------------------------
+/*
+TankGo local.deadtrig:
+	self takedamage
+	self thread TrackDamage local.deadtrig
+	self.turret = $(self.targetname + "_turret0")
+	//iprintln "CONQUEST >>> self.turret = " self.turret
+
+	local.pathnum = 0
+	
+	while (self && isalive self)
+	{
+		local.pathnum ++
+		local.path = $("CourtyardTankPath" + local.pathnum)
+
+		if (!local.path)
+			break
+
+		//println "CONQUEST >>> " self " found " local.path
+
+		local.speed = 300 + randomint 200
+
+		self drive local.path local.speed 30 200 100
+		self waittill drive
+		self stop
+
+		wait (2 + randomint 3)
+	}
+
+	//iprintln "CONQUEST >>> Tank go thread over"
+end
+*/
+
+//=========================================================================
+TankFire local.array:
+//=========================================================================
+{
+	self.gun = self QueryTurretSlotEntity 0
+	self.gun pitchcaps (60 -60 0)
+	local.script_o = spawn script_origin
+	local.script_o.origin = self.origin + "-1000 0 50"
+	self.stop_firing = 0
+
+	wait 3
+
+	while (self && (isalive self) && self.stop_firing == 0){
+		self.gun setaimtarget local.script_o
+
+		if (local.array){		
+			local.rand 		 = 1 + randomint local.array.size
+			local.origin 	 = local.array[local.rand].origin
+			local.origin[0] += (50 - randomint 100)
+			local.origin[1] += (50 - randomint 100)
+			local.origin[2] += (50 - randomint 100)
+		}
+		else{
+			local.origin = $player.origin
+		}
+
+		local.script_o.origin = local.origin
+		self.gun waittill ontarget
+		self.gun anim fire
+		wait 1.0
+
+		local.script_o thread maps/e1l3/TankRide.scr::TankHit
+		wait (2 + randomint 3)
+	}
+	local.script_o remove
+}end
+
+//=========================================================================
+TrackDamage local.deadtrig:
+//=========================================================================
+{
+	local.health = self.health
+	self.health += 10000
+
+	while (self){
+		self waittill damage
+		local.ang  = self.angles
+		local.orig = self.origin
+
+		if (self.health <= 10000){
+			self hide
+			self.gun hide
+			self.stop_firing = 1
+			self thread spawn_damaged vehicles/tigertank_d.tik
+			self thread bigexplosion
+			trigger local.deadtrig // signal theat tank is dead
+			end
+		}
+	}
+}end
+
+//=========================================================================
+spawn_damaged local.model:
+//=========================================================================
+{
+	local.damaged = spawn script_model model local.model
+	local.damaged.origin = self.origin
+	local.damaged.angles = self.angles
+}end
+
+// track all the room guys
+//=========================================================================
+WaitDeath local.trig:
+//=========================================================================
+{
+	if (!self || !isalive self){
+		end
+	}
+
+	//println "waiting for " self
+	level.room_guys ++
+	self waittill death
+	level.room_guys --
+
+	if (level.room_guys <= 0){
+		trigger local.trig
+	}
+}end
+
+// transition all guys to rally ptr
+//=========================================================================
+RoomTransition local.rallypts:
+//=========================================================================
+{
+end
+	if ($ConquestGuy){
+		for (local.i=1; local.i<=$ConquestGuy.size; local.i++){
+			if ($ConquestGuy[local.i] && isalive $ConquestGuy[local.i]){
+				local.rand = 1 + randomint local.rallypts.size
+				$ConquestGuy[local.i] runto local.rallypts[local.rand]
+			}
+		}
+	}
+}end
+
+// Run, don't walk, do not stop to fight ect.
+//=========================================================================
+Run local.pt:
+//=========================================================================
+{
+	//self.enableEnemy = 0
+	self runto local.pt
+	self waittill movedone
+	//self.enableEnemy = 1
+}end
+
+//=========================================================================
+ReportDeath local.who:
+//=========================================================================
+{
+	/*
+	self waittill death
+	if (level.reportdeath == 1)
+		//iprintlnbold "A soldier has been killed."
+	*/
+}end
+
+//=========================================================================
+DoNothing:
+//=========================================================================
+{
+	self.my_friendly_turn_off = 1
+	//self waitthread global/friendly.scr::friendlystop
+	//self exec global/disable_ai.scr
+    self type_attack "turret"
+}end
+
+//=========================================================================
+balconyJump local.dir:
+//=========================================================================
+{
+	if (!local.dir){
+		local.dir = angles_toforward(self.angle)
+	}
+
+	//local.dir = vector_normalize local.dir
+	local.dir = vector_scale local.dir 50
+
+	// wait till the enmy is hit
+	self notsolid
+	//self physics_off
+	self.enableEnemy = 0
+
+	local.turnto = spawn script_origin
+	local.turnto.origin = self.origin + local.dir
+
+	self turnto local.turnto
+	self waittill turndone
+	self anim_noclip Capthopsbalc
+	self waittill animdone
+	//self physics_on
+	wait 2
+
+	self solid
+	local.turnto remove
+}end
+
+
+// ------------- EXPLOSION CODE -------------------------------------------------------------------------
+
+
+// make a biggie
+//=========================================================================
+bigexplosion local.flash:
+//=========================================================================
+{
+	local.origin 	= self.origin
+	local.hold 		= local.origin
+	local.rand 		= 3 + randomint 3
+	
+	//chrissstrahl - keep for sp
+	if(level.gametype == 0){
+		local.toplayer  = $player.origin - local.origin
+	}else{
+		//wait until a valid player is there
+		local.playerReturn = NULL
+		while(local.playerReturn == NULL){
+			local.playerReturn = waitthread coop_mod/replace.scr::player_anyValid
+			waitframe
+		}
+		local.toplayer  = local.playerReturn.origin - local.origin
+	}
+	local.toplayer  = vector_normalize(local.toplayer)
+
+	//local.toplayer = vector_scale local.toplayer 400
+	local.origin += (local.toplayer * 400)
+	exec global/earthquake.scr (.5 + (randomfloat 1)) (0.3 + randomfloat 1) 0 0
+
+	for (local.i = 0; local.i < local.rand; local.i++){
+		local.origin = local.hold
+		waitframe
+
+		local.origin[0] += (randomint 200) - 100
+		local.origin[1] += (randomint 200) - 100
+		local.origin[2] += (randomint 80) 
+		thread explosion local.origin models/fx/fx_tank_explosion.tik
+
+		if (local.flash == 0){
+			thread pocketFlashFx models/fx/fx_pocketflash.tik local.origin
+		}
+
+		thread explosion local.origin models/emitters/tehao_explosionWall.tik
+		wait (0.1 + randomfloat .5)
+	}
+}end
+
+// Start an emitter
+//=========================================================================
+MortarEmitter local.origin local.emitter:
+//=========================================================================
+{
+	//local.ent = spawn "models/emitters/mortar_dirt_nosound.tik"
+	//local.ent = spawn "models/emitters/mortar_dirt_nebelwerfer.tik"
+	//local.ent = spawn "models/emitters/mortar_dirt.tik"
+	//local.ent = spawn "models/emitters/mortar_dirt_higgins.tik"
+	// "models/emitters/mortar_dirt_dustcloud.tik"
+
+	local.ent = spawn local.emitter 
+	local.ent.origin = local.origin
+	local.ent anim idle
+	local.ent notsolid
+	wait 4
+
+	local.ent anim stop
+	local.ent delete
+}end
+
+//=========================================================================
+explosion local.origin local.fx:
+//=========================================================================
+{
+	local.temp = spawn script_model model local.fx
+	local.temp notsolid
+	local.temp.origin = local.origin  
+	local.temp anim start
+	local.temp notsolid
+	local.temp playsound flakk88_hit
+	radiusdamage local.origin 300 300
+	wait 2
+
+	local.temp remove
+}end
+
+//=========================================================================
+pocketFlashFx local.fx local.origin:
+//=========================================================================
+{
+	local.temp = spawn script_model model local.fx
+	local.temp notsolid
+	local.temp.origin = local.origin  
+	local.temp anim start
+	local.temp notsolid
+	waitframe
+
+	local.temp remove
+}end
+
+//=========================================================================
+initMg42:
+//=========================================================================
+{
+	// level.spot_burstmin level.spot_burstmax level.spot_burstdownmin level.spot_burstdownmax	
+	self burstfiresettings 1 3 1.5 3
+	self maxyawoffset 60.0
+	self pitchcaps "-20 20 0"
+	self convergetime 0.25
+
+	switch (level.skill){
+		case 0:
+			self aibulletspread 450 275
+			break;
+		case 1:
+			self aibulletspread 400 225
+			break;
+		case 2:
+			self aibulletspread 300 125
+			break;
+	}
+}end
+
+//=========================================================================
+BalconyDoorThread:
+//=========================================================================
+{
+	if (!$BalconyDoor || !$BalconyDoorTrigger){
+		end
+	}
+
+	$BalconyDoor lock
+	$BalconyDoorTrigger waittill trigger
+	$BalconyDoor unlock
+}end
+
+//=========================================================================
+doGunnersAttackPlayer:
+//=========================================================================
+{
+	$GunnersAttackPlayer waittill trigger
+
+	waitexec global/EntityIterateCommand.scr "cover_fire_guy" threatbias ignoreme
+	waitexec global/EntityIterateCommand.scr "boat_guy" threatbias ignoreme
+	waitexec global/EntityIterateCommand.scr "ambientBattleGuy" threatbias ignoreme
+
+	$reanimated_attacker thread doAttackPlayer
+}end
+
+//=========================================================================
+doAttackPlayer:
+//=========================================================================
+{
+	wait (0.2 + (randomfloat 1))
+
+	self exec global/disable_ai.scr
+	self exec coop_mod/replace.scr::turnto
+	self waittill turndone
+	self turnto NULL
+	self exec global/enable_ai.scr
+	//chrissstrahl - don't do this in coop
+	if(level.gametype == 0){
+		self favoriteenemy $player
+	}
+	self attackplayer
+}end
+
+//=========================================================================
+alliesHuddleUp:
+//=========================================================================
+{
+	//iprintlnbold "huddling"
+	level.runningToHuddleNo = 0
+	level.runningToHuddle   = 0
+
+	$ambientBattleGuy thread doHuddleUp
+	if ($cover_fire_guy){
+		$cover_fire_guy	thread doHuddleUp
+	}
+}end
+
+//=========================================================================
+doHuddleUp:
+//=========================================================================
+{
+	self nodamage
+	self.enableEnemy = 0
+	self interval 12
+	level.runningToHuddle++
+	level.runningToHuddleNo++
+	self waitthread doRunTo $huddleUpNode[level.runningToHuddleNo] 500 10
+	level.runningToHuddle--
+
+	self turnto $huddleUpNodeLookat
+
+	while (level.runningToHuddle > 0) {
+		wait 0.5
+	}
+	wait 5
+
+	self waitthread doRunTo $huddleUpRunToNode 200 60
+	self remove
+}end
+	
+//=========================================================================
+doRunTo local.node local.distance local.giveUpTime:
+//=========================================================================
+{
+	local.startTime = level.time
+
+	while (self != NULL && level.time - local.startTime < local.giveUpTime)	{
+		self runto local.node
+
+		if (vector_within self.origin local.node.origin local.distance){
+			break
+		}
+		wait 0.25
+	}
+}end
+
+//=========================================================================
+MyFriendly local.dest local.leash_dist local.far_dist local.catchup_dist:
+//=========================================================================
+{
+	self interval 256
+	self.destination = local.dest
+	self.friendtype  = 1
+	self.distance    = 256
+
+	self thread global/friendly.scr::friendlythink
+	self.my_friendly_is_running = 1
+	self.my_friendly_turn_off   = 0
+
+	while (self && (isalive self) && (level.conquest_done == 0) && (self.my_friendly_turn_off == 0)){
+		while (self && (isalive self) && (level.conquest_done == 0) && (self.my_friendly_turn_off == 0) &&
+					(vector_within self.origin local.dest.origin local.far_dist)){
+			wait 0.5
+		}
+
+		if (!self || !(isalive self) || (level.conquest_done == 1) || (self.my_friendly_turn_off == 1)){
+			break
+		}
+
+		self waitthread global/friendly.scr::friendlystop
+		wait 0.5
+
+		self exec global/disable_ai.scr
+		self waitthread MyRunTo local.dest 1
+		//self waitthread global/SafeMoveTo.scr::SafeRunTo_Wait local.dest local.catchup_dist
+		self exec global/enable_ai.scr
+		self thread global/friendly.scr::friendlythink
+		wait 0.5
+	}
+	self thread global/friendly.scr::friendlystop
+	wait 0.5
+
+	self.my_friendly_is_running = 0
+}end
+
+//=========================================================================
+MyRunTo local.dest local.retry_period:
+//=========================================================================
+{
+	local.time_before_retry = local.retry_period
+	local.prev_time = level.time
+	
+	//chrissstrahl - stop spamming console
+	if(level.gametype != 0){
+		if(self == NIL || self == NULL || local.dest == NIL || local.dest == NULL){
+			end
+		}
+	}
+	
+	while (!(vector_within self.origin local.dest.origin self.movedoneradius)){
+		local.dt 				= level.time - local.prev_time
+		local.prev_time 		= level.time
+		local.time_before_retry = (local.time_before_retry - local.dt)
+
+		if (local.time_before_retry <= 0){
+			local.time_before_retry = local.retry_period
+			self runto local.dest
+		}
+		waitframe
+		//chrissstrahl - stop spamming console
+		if(level.gametype != 0){
+			if(self == NIL || self == NULL || local.dest == NIL || local.dest == NULL){
+				end
+			}
+		}
+	}
+	self runto self.origin
+}end
+
+

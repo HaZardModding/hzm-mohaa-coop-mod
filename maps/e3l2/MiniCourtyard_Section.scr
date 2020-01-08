@@ -1,0 +1,255 @@
+// InitSection
+//=========================================================================
+InitSection: {
+//=========================================================================
+	$MiniCourtTruck.collisionent = $MiniCourtTruck.target
+	$MiniCourtTruck vehicleanim idlenolights
+	$MiniCourtTruck nodamage
+
+	waitthread global/ManSpawnNamed.scr::Init "superman" 
+	waitthread global/ManSpawnNamed.scr::Init "MCAxis"
+	waitthread global/ManSpawnNamed.scr::Init "MCpow1"
+	waitthread global/ManSpawnNamed.scr::Init "MCpow2"
+	waitthread global/ManSpawnNamed.scr::Init "MCpow3"
+	thread JailKeysAndDoorThread
+
+	level.MC_guys_rescued = 0
+	level.MC_jail_door_unlocked = 0
+
+	if ($pow1_door) {
+		$pow1_door lock
+	}
+
+	thread DoSection
+}end
+
+// DoSection
+//=========================================================================
+DoSection: {
+//=========================================================================
+	$MCStepOutTrigger waittill trigger
+
+	for (local.i=1; local.i<=level.enemyspawners; local.i++) {
+		if (level.enemyspawner[local.i].enemyname == "modsquadgenguy") {
+			level.enemyspawner[local.i].set = 1001001
+		}
+	}
+
+	waitthread global/ManSpawnNamed.scr::Spawn "superman"
+	waitthread global/ManSpawnNamed.scr::Spawn "MCAxis"
+	waitthread global/ManSpawnNamed.scr::Spawn "MCpow1"
+	waitthread global/ManSpawnNamed.scr::Spawn "MCpow2"
+	waitthread global/ManSpawnNamed.scr::Spawn "MCpow3"
+	waitframe
+
+	$MCpow1 exec global/disable_ai.scr
+	$MCpow1 threatbias ignoreme
+	$MCpow1 nodamage
+	$MCpow1 exec global/crouch.scr
+	$MCpow1 avoidplayer 0
+
+	$MCpow2 exec global/disable_ai.scr
+	$MCpow2 threatbias ignoreme
+	$MCpow2 nodamage
+	$MCpow2 exec global/crouch.scr
+	$MCpow2 avoidplayer 0
+
+	$MCpow3 exec global/disable_ai.scr
+	$MCpow3 threatbias ignoreme
+	$MCpow3 nodamage
+	$MCpow3 exec global/crouch.scr
+	$MCpow3 avoidplayer 0
+
+	thread TalkToPrisoners
+
+	// cleanup
+	exec global/EntityRemoveOnTrigger.scr $startMarchingTrigger "MCpow1" "MCpow2" "MCpow3" "MCAmbushGuys" "MCAxis" "modsquadgenguy" "superman"
+}end
+
+//=========================================================================
+TalkToPrisoners: {
+//=========================================================================
+	if (!$MCJailPowsActiveTrigger) {
+		end
+	}
+
+	$MCJailPowsActiveTrigger waittill trigger
+	waitframe
+
+	$MCJailGuard waittill death
+	// waitexec global/MultiDeathWait.scr "MCJailGuard" "modsquadguy"
+
+	while (level.MC_jail_door_unlocked == 0) {
+		waitframe
+	}
+
+	while !(vector_within $player.origin $MCpow1 250) {
+		waitframe
+	}
+
+	// local.prisoner_dest_pos = $player.origin
+
+	waitthread global/ai.scr::spawnset 1001001 "modsquadgenguy"
+	waitthread global/ai.scr::spawnset 666 "MCAmbushGuys"
+
+	$MCpow1 exec global/stand.scr
+	$MCpow1 waittill animdone
+	$MCpow1.movedoneradius = 200
+
+	// $MCpow1 walkto local.prisoner_dest_pos
+	// $MCpow1 waittill movedone
+	$MCpow1 turnto $player
+	//	wait 1
+
+	$MCpow1 anim A_32_PvtJohansTalk_01 		// "Finally, a friendly face ...."
+	$MCpow1 waittill animdone
+	$MCpow1 anim A_32_PvtJohansTalk_02    	//Keep Going down this road...
+	$MCpow1 waittill animdone
+	$MCpow1 anim A_32_PvtJohansTalk_03    	//I dont know how long they...
+	wait 3									// it's a long, long road
+	// $MCpow1 waittill animdone
+
+	level.MC_guys_rescued = 1
+
+	if ($CornerHouseCompTarg0) {
+		waitthread global/ObjMgr.scr::SetObjCompassTarg "findPOWs" $CornerHouseCompTarg0
+	}
+	else {
+		waitthread global/ObjMgr.scr::SetObjCompassTarg "findPOWs" $hideSpot
+	}
+
+	if ($pow1_door) {
+		$pow1_door unlock
+		waitframe
+		$pow1_door open $player
+
+		if ($pow1_door_fakelock) {
+			$pow1_door_fakelock delete
+		}
+	}
+
+	//	waitframe
+	//	spawn trigger_relay "targetname" "AmbushGuysDeadTrigger"
+	//	thread global/MultiDeathWait.scr::MultiDeathTrigger $AmbushGuysDeadTrigger "MCAmbushGuys" "MCAxis" "modsquadgenguy"
+	//
+	//	// prisonerthinks
+	//
+	//	if ($MCPow1HuddlePoint)
+	//		$MCpow1 thread PowThink $MCPow1HuddlePoint
+	//	else
+	//		$MCpow1 thread PowThink $MCPow2EscapePos
+	//
+	//	if ($MCPow2HuddlePoint)
+	//		$MCpow2 thread PowThink $MCPow2HuddlePoint
+	//	else
+	//		$MCpow2 thread PowThink $MCPow2EscapePos
+	//
+	//	if ($MCPow3HuddlePoint)
+	//		$MCpow3 thread PowThink $MCPow3HuddlePoint
+	//	else
+	//		$MCpow2 thread PowThink $MCPow3EscapePos
+
+}end
+
+
+//PowThink local.huddle_point:
+//
+//	self nodamage
+//	self exec global/disable_ai.scr
+//	if (local.huddle_point)
+//		self waitthread global/SafeMoveTo.scr::SafeRunTo_Wait local.huddle_point
+//	self exec global/crouch.scr
+//	self turnto $player
+//
+//	$AmbushGuysDeadTrigger waittill trigger
+//
+//	self exec global/stand.scr
+//	self waittill animdone
+//
+//end
+
+
+//JailKeysAndDoorThread
+//=========================================================================
+JailKeysAndDoorThread: {
+//=========================================================================
+	if (!$MCJailDoor || !$MCJailKeys || !$MCJailKeysUseTrigger) {
+		$MCStepOutTrigger waittill trigger
+		waitthread global/ObjMgr.scr::SetObjCompassTarg "findPOWs" $MCpow1
+		end
+	}
+
+	$MCJailDoor lock
+	$MCJailDoor wait -1
+
+	$MCJailKeysUseTrigger waittill trigger
+	waitthread global/items.scr::add_item "keys"
+	$MCJailKeys delete
+
+	waitthread global/ObjMgr.scr::SetObjCompassTarg "findPOWs" $MCpow1
+
+	// $MCJailDoor unlock
+
+	$MCJailDoorUseTrigger waittill trigger
+	$MCJailDoorUseTrigger playsound keys_use
+	$MCJailDoor unlock
+	$MCJailDoor open $player
+	$MCJailDoorUseTrigger delete
+	level.MC_jail_door_unlocked = 1
+
+	waitthread global/items.scr::remove_item "keys"
+}end
+
+// MCPow1RunToBriefing
+//=========================================================================
+MCPow1RunToBriefing: {
+//=========================================================================
+	self threatbias ignoreme
+	self nodamage
+	self exec global/enable_ai.scr
+	self runto $mc_pow_briefing_node
+
+	while (vector_length(self.origin - $mc_pow_briefing_node.origin) > 40) {
+		waitframe
+	}
+
+	self turnto $player
+	self exec global/disable_ai.scr
+	self exec global/LoopAnim.scr::LoopAnim A_32_PvtJohansTalk_idle
+	
+	// Wait till the player comes back up the stairs
+	$mc_pow_briefing_trigger waittill trigger
+
+	self exec global/LoopAnim.scr::LoopAnimStop
+	self anim A_32_PvtJohansTalk_02    //Keep Going down this road...
+	self waittill animdone
+	self anim A_32_PvtJohansTalk_03    //I dont know how long they...
+	self waittill animdone
+	self thread MCPowEscape $mc_pow_leave_waypoint
+}end
+
+// MCPowEscape
+//=========================================================================
+MCPowEscape local.escapepoint: {
+//=========================================================================
+	if (self && (isalive self)) {
+		self threatbias ignoreme
+		self nodamage
+		self runto local.escapepoint
+		self exec global/disable_ai.scr
+
+		//	self exec global/enable_ai.scr
+		//	self waitthread maps/e3l2.scr::doRunTo local.escapepoint 512
+		//	while ($player cansee self 60 3000) {
+		//		waitframe
+		//	}
+		//	self delete
+	}
+}end
+
+// gate locked sound thingy
+//=========================================================================
+pow1_door_fakesound: {
+//=========================================================================
+	$pow1_door_fakelock playsound picket_fence_locked
+}end

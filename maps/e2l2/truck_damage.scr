@@ -1,0 +1,73 @@
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+// gags/t2l2_supply_truck_damage.scr
+//
+// author: Michael Goodwin
+//
+// run the main thread on the level object as follows:
+//
+//   exec gags/t2l2_supply_truck_damage.scr $truckobject
+//
+// everything from that point on is handled in this script
+//
+// description:
+//
+// TODO:
+//
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+//============================================================================
+main local.truck: {
+//============================================================================
+	local.truck thread supply_truck_health_check
+}end
+
+// this thread runs on the allied supply truck
+//============================================================================
+supply_truck_health_check: {
+//============================================================================
+	// set the thresholds between damage states
+	local.thresh1 = 2500		// apply first damage state below this level
+	local.thresh2 = 1500		// apply second damage state below this level
+	local.thresh3 = 1000		// apply third damage state below this level
+
+	local.lasthealth = self.health
+	while ( isAlive self ) {
+		if ( self.health != local.lasthealth ) {
+			if ( (self.health < local.thresh1) && (local.lasthealth >= local.thresh1) ) {
+				// switch windshield skins
+				self surface opelwindows "+skin1"
+			}
+
+			if ( (self.health < local.thresh2) && (local.lasthealth >= local.thresh2) ) {
+				self damagesounds 1
+			}
+
+			if ( (self.health < local.thresh3) && (local.lasthealth >= local.thresh3) ) {
+				local.org = ((self gettagposition "engine1") + (0 0 20))
+				self waitthread create_smoke local.org
+
+				local.org = ((self gettagposition "engine2") + (0 0 20))
+				self waitthread create_smoke local.org
+			}
+			local.lasthealth = self.health
+		}
+		wait 0.1
+	}
+}end
+
+// this thread runs on the truck
+//============================================================================
+create_smoke local.org: {
+//============================================================================
+	// local.smoke = spawn "models/emitters/firesmoke.tik"
+	local.smoke = spawn "models/fx/SupplyTruck_dmg.tik"
+	local.smoke notsolid
+	local.smoke anim start
+	local.smoke.origin = local.org
+	local.smoke.angles = (0 0 0)
+	local.smoke bind self
+}end
+

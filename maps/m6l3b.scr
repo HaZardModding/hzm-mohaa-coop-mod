@@ -1,0 +1,164 @@
+///////////////////////////////////////
+//
+//  MoH: Allied Assault Script File  
+//  Level: M6L3b "Storming Fort Schmerzen - Inner Facility" 
+//  Script Written By: Ned
+//  Level Geometry By: Benson, Ned, Adam
+//
+///////////////////////////////////////
+//============================================================================
+main:{
+//============================================================================
+	level.coopNextMap = "m6l3c"			//Pasted by Criminal for coop comp. - set next map (for mom voteing)
+	level.coopPrevMap = "m6l3a"			//Pasted by Criminal for coop comp. - set previouse map (for mom voteing)
+	level.coop_aaMap = 1				//Pasted by Criminal for coop comp. - let global scripts know this is a AA level
+	level.coop_debugSpawn = 1 			//Pasted by Criminal for coop comp. - enable spawnpoint debug (make visible)
+	thread coop_mod/main.scr::main      //Pasted by Criminal for coop comp. - start coop mod extensions
+
+	thread global/exploder.scr::main
+	exec global/loadout.scr maps/m6l3b.scr
+	$elevator2_door_clip notsolid
+
+	level waittill prespawn
+
+	level.attacker1spawned = waitthread global/spawner.scr::spawner_create $gas_mask_attacker1
+	level.attacker2spawned = waitthread global/spawner.scr::spawner_create $gas_mask_attacker2
+	level.attacker3spawned = waitthread global/spawner.scr::spawner_create $gas_mask_attacker3	
+
+	exec global/ambient.scr m6l3b
+
+	$elevator_gate_2 movedown 70
+	$elevator_gate_2 waitmove
+
+	$elevator_switch2 bind $elevator_cab2
+	$elevator_switch2 anim off
+
+	$elevator_switch1 bind $elevator_cab1
+	$elevator_switch1 anim on
+
+	thread elevator1
+	thread elevator2
+	exec global/door_locked.scr::lock
+
+	level waittill spawn
+	waitthread global/items.scr::add_item "explosives" nomessage
+
+	//$player stufftext "tmstartloop sound/music/mus_Schmerzen_01a.mp3"			//Criminal.
+	exec coop_mod/replace.scr::tmstartloop "sound/music/mus_Schmerzen_01a.mp3"	//Criminal - coop comp.
+
+	/////// objectives 
+	waitthread global/objectives.scr::add_objectives 1 2 "Acquire a gas mask." $the_mask.origin
+	waitthread global/objectives.scr::add_objectives 2 2 "Make your way to the lower level." $obj2.origin
+	wait 2
+
+	waitthread global/objectives.scr::current_objectives 1
+}end
+
+//============================================================================
+level_end_trigger:{
+//============================================================================
+	iprintlnbold "You have not completed your objectives."	
+}end
+
+//============================================================================
+end_of_level:{
+//============================================================================
+	waitthread global/objectives.scr::add_objectives 2 3
+}end
+
+// elevator threads
+//============================================================================
+elevator1:{
+//============================================================================
+	// Elevator Speeds
+	if(level.gametype == 0){//chrissstrahl - sp
+		$elevator_cab1 time 4
+		$elevator_cab1 playsound elevator_run
+		$elevator_cab1 moveto $elevator_way1
+		$elevator_cab1 waitmove
+	}else{//chrissstrahl - coop/mp
+		$elevator_cab1 time 0.01
+		$elevator_cab1 moveto $elevator_way1
+		//chrissstrahl we need to do this twice or it won't work ?!
+		$elevator_cab1 waitmove
+		$elevator_cab1 moveto $elevator_way1
+		
+		waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl - wait for player to spawn
+	}
+	
+	
+	$elevator_gate_1 time 0.75
+	$elevator_gate_1 playsound elevator_gate
+	$elevator_gate_1 movedown 70
+	$elevator_gate_1 waitmove
+
+	$elevator_switch1 anim off	
+}end
+
+//============================================================================
+elevator2:{
+//============================================================================
+	// Elevator Speeds
+	$elevator_cab2 time 4
+	$elevator_gate_2 time 0.75
+
+	//$elevator_reset1 waittill trigger
+	asdf: 
+	$elevator_top2 waittill trigger
+
+	if (level.objective1complete != 1){
+		iprintlnbold "You have not completed your objectives."
+		goto asdf
+	}
+
+	$elevator2_door_clip solid
+	$elevator_switch2 anim turn
+	$elevator_switch2 anim waittill animdone
+	$elevator_switch2 anim on
+
+	$elevator_gate_2 playsound elevator_gate
+	$elevator_gate_2 moveup 70
+	$elevator_gate_2 waitmove
+	wait 1
+
+	$elevator_cab2 playsound elevator_start wait
+	wait .5
+
+	$elevator_cab2 playsound elevator_run
+	$elevator_cab2 moveto $elevator_way10
+	$elevator_cab2 waitmove
+	end
+
+	$papers2 playsound pickup_papers
+	$papers2 remove
+
+	z_mask:
+	$the_mask playsound pickup_gasmask
+	$the_mask remove
+	waitthread global/items.scr::add_item "gasmask"
+	level.objective1complete = 1
+
+	waitthread global/objectives.scr::add_objectives 1 3 "Acquire a gas mask." $the_mask.origin
+	waitthread global/objectives.scr::add_objectives 2 2 "Make your way to the lower level." $obj2.origin
+	waitthread global/objectives.scr::current_objectives 2
+
+	local.theguy2 = waitthread global/spawner.scr::spawner_activate level.attacker2spawned 
+	local.theguy1 = waitthread global/spawner.scr::spawner_activate level.attacker1spawned 
+	local.theguy3 = waitthread global/spawner.scr::spawner_activate level.attacker3spawned
+	waitframe
+	waitframe
+
+	local.theguy1 attackplayer
+	wait .4
+
+	local.theguy2 attackplayer
+	wait 2
+}end
+
+//============================================================================
+levelbluh:{
+//============================================================================
+	waitthread global/objectives.scr::add_objectives 2 3
+	exec global/missioncomplete.scr m6l3d 1
+}end
+

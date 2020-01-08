@@ -1,0 +1,339 @@
+
+
+InitSunkShip:
+
+//   setcvar g_playermodel "american_army" 
+    $player.has_disguise = 0
+    
+
+	level.onship = 1
+
+	level.maxTilt = 2.5
+	level.oldMaxTilt = 2.5
+	level.dampening = 1
+	
+	$explodeshiptrigger nottriggerable
+
+	$explodeEffectShip_1 thread HideEffect
+	$explodeEffectShip_2 thread HideEffect
+
+	$autotrucktrigger thread truckThreeGuyRunaway
+
+end
+
+//--------------------------------------------------------------------
+CleanupSunkShip:
+end
+
+
+//--------------------------------------------------------------------
+
+HideEffect:
+	//println self.targetname " hiding " self.model " e=" self.entnum
+	switch (self.model)
+	{
+		case "models/emitters/js_dust_puff.tik":
+			self anim idle
+			break
+		case "models/emitters/tehao_steampipe.tik":
+			self anim stop
+			break
+		case "models/emitters/generic_spark.tik":
+			self anim stop
+			break
+		default:
+			self anim idle
+			break
+	}
+end
+
+RollEffect:
+	//iprintlnbold self.targetname " rolling " self.model
+	switch (self.model)
+	{
+		case "models/emitters/js_dust_puff.tik":
+			self anim puff
+			break
+		case "models/emitters/tehao_steampipe.tik":
+			self anim start
+			break
+		case "models/emitters/generic_spark.tik":
+			self anim start 
+			break
+		default:
+			self anim start
+			break
+	}
+end
+
+KillEffect:
+	//println self.targetname " killing"
+	self remove
+end
+
+//--------------------------------------------------------------------
+
+playerBlacksOut:
+	local.blackOutTime = 0.7
+	local.startPos = $player.origin
+	local.endPos = $player.origin + ( 0 0 -80 )
+	local.startRoll = 0
+	local.endRoll = 100
+	local.startTime = level.time
+
+	$player physics_off
+	$player notsolid
+
+	// player blacks out
+	fadeout (local.blackOutTime + 0.5) 0 0 0 1
+
+	while (level.time < local.startTime + local.blackOutTime) {
+		local.t = (level.time - local.startTime)/local.blackOutTime
+
+		local.t1 = sin (local.t*180)
+		local.t1 = local.t1*local.t1
+		local.pitch = -50*local.t1
+
+		local.t = local.t*local.t
+		local.t0 = 1.0 - local.t
+		local.pos = (vector_scale local.endPos local.t) + (vector_scale local.startPos local.t0)
+		local.roll = (local.t*local.endRoll) + (local.t0*local.startRoll)
+
+
+		$player.origin = local.pos
+		$player.angles = ( ($player.angles[0] + local.pitch) $player.angles[1] local.roll )
+		$player.viewangles = $player.angles
+		waitframe
+	}
+end
+
+ExplodeShip:
+
+	if (level.skipescapeship == 1)
+	{
+		$player.origin = ( 3026 207 121 )
+		thread CleanUpFirstPart
+		end
+	}
+
+	$explodeshiptrigger triggerable
+	$explodeshiptrigger waittill trigger
+
+	// ship blows up now
+
+	$player playsound e1l4_ship_explodeA
+	wait 0.2
+	$player playsound e1l4_ship_explodeB
+	exec global/earthquake.scr 3.25 7.5 1 0
+	thread squeaks
+
+	//$siren thread maps/e1l4/ship.scr::PlayAlarmSound 1
+
+	// roll the particle effects
+	wait 0.5
+	$explodeEffectShip_1 thread RollEffect
+
+	// pipes burst
+	local.trigger = waitexec global/FindTrigger.scr "pipeFall"
+	trigger local.trigger
+
+	// knock the player on the head
+	wait 1.25
+	$player playsound e1l4_pipe_squeek
+	wait 0.5
+	$player playsound e1l4_pipe_thud
+	wait 0.1
+	$player playsound player_pain
+
+	waitthread playerBlacksOut
+	trigger $musicTransitionKnockedOut 
+	wait 4
+
+	// ship 1 effects go away, roll ship 2 effects 
+	$explodeEffectShip_1 thread KillEffect
+	$explodeEffectShip_2 thread RollEffect
+
+	//$player physics_on
+	$player.origin = $playerneworigin.origin
+
+	local.viewangles = $player.viewangles
+	local.viewangles[2] = 0
+	$player.viewangles = local.viewangles
+
+	thread CleanUpFirstPart
+	if($truckammo)
+		thread EndTruckAmmo
+	
+	$player solid
+	$player physics_on
+
+	exec global/earthquake.scr 4 0.4 1 0
+	fadein 10 0 0 0 1
+
+	thread maps/e1l4/SunkShip.scr::ShipShudder
+	thread maps/e1l4/SunkShip.scr::ShipTilt
+
+	local.triggerdeleteguy4 = waitthread global/FindTrigger.scr::FindTrigger "deleteguy4spawner"
+	if(local.triggerdeleteguy4)
+		local.triggerdeleteguy4 thread maps/e1l4/Ship.scr::GetridofGuns "deleteguy4"
+	local.triggerdeleteguy3 = waitthread global/FindTrigger.scr::FindTrigger "deleteguy3spawner"
+	if(local.triggerdeleteguy3)
+		local.triggerdeleteguy3 thread maps/e1l4/Ship.scr::GetridofGuns "deleteguy3"
+
+
+	if ($killShip2EffectsTrigger != NULL) {
+		$killShip2EffectsTrigger waittill trigger
+		wait 2
+		$explodeEffectShip_2 thread KillEffect
+	}
+end
+
+CleanUpFirstPart:
+// More guys to be added, after I get some names
+
+	thread global/EntityCleanup.scr::EntityCleanup "3fguys" 1
+	thread global/EntityCleanup.scr::EntityCleanup "deleteyguy3" 1
+	thread global/EntityCleanup.scr::EntityCleanup "deleteguy3" 1
+	thread global/EntityCleanup.scr::EntityCleanup "ai_alarm" 1
+	thread global/EntityCleanup.scr::EntityCleanup "maproomguy2" 1
+	thread global/EntityCleanup.scr::EntityCleanup "maproomdoorguy" 1
+	thread global/EntityCleanup.scr::EntityCleanup "maproomheyguy" 1
+	
+End
+
+EndTruckAmmo:
+	$truckammo.origin = $truckammoposition.origin
+	$truckammoposition delete
+End
+
+
+//------------------------------------------------------------------
+TiltTo local.angle local.time:
+
+	local.originalangles = $player.viewangles
+	local.viewangles = $player.viewangles
+	
+	local.starttime = level.time
+	local.endtime = level.time + local.time
+	
+	while (level.time < local.endtime)
+	{
+		local.timeElapsed = level.time - local.starttime
+		local.viewangles[2] = local.angle * ( local.timeElapsed / local.time )
+		$player.viewangles = local.viewangles
+		waitframe
+	}
+
+	$player.viewangles = local.originalangles
+End
+
+
+//------------------------------------------------------------------
+ShipTilt:
+	local.viewangles = $player.viewangles
+	local.viewangles[2] = level.maxTilt
+	$player.viewangles = local.viewangles
+	local.velocity = 0
+	local.constant = -.001
+	while (level.ontruck == 0)
+	{
+
+		//iprintln ("LASTVEL: " + local.velocity)
+		//iprintln ("VEL: " + local.velocity)
+		if (local.viewangles[2] > level.maxTilt && local.velocity > 0)
+		{
+			local.velocity = 0
+		}
+		else if (local.viewangles[2] < -level.maxTilt && local.velocity < 0)
+		{
+			local.velocity = 0
+		}
+
+		local.viewangles = $player.viewangles
+		local.velocity += local.constant * local.viewangles[2]
+
+		local.viewangles[2] += local.velocity
+
+		$player.viewangles = local.viewangles
+		waitframe
+	}
+
+	// Reset the players view
+	local.viewangles = $player.viewangles
+	local.viewangles[2] = 0
+	$player.viewangles = local.viewangles
+
+End
+
+//---------------------------------------------------------
+UpdateTilt:
+	//iprintln ("UPDATE TILT: " + self.maxTilt)
+	level.oldMaxTilt = level.maxTilt
+	level.maxTilt = self.maxTilt
+
+	if (self.maxTilt == 0)
+	{
+		level.onship = 0
+	}
+end
+
+ShipShudder:
+
+	// Wait 10-20 seconds
+	local.waittime = 5 + randomint 15
+	wait local.waittime
+
+	while (level.onship == 1)
+	{
+		local.quaketime = 1 + randomint 3
+		local.quakesize = (5.0 + randomfloat 5.0) / 50.0
+		// Trigger earthquake and shudder sound
+		exec global/earthquake.scr local.quaketime local.quakesize 1 1
+
+		$player playsound ship_metal_rumble
+
+		// Wait 10-20 seconds
+		local.waittime = 20 + randomint 10
+		wait local.waittime
+	}
+
+end
+
+UpdateObjective:
+
+	waitthread global/objectives.scr::add_objectives level.objReturnToSpy 2 level.objReturnToSpyText $(self.target).origin
+	waitthread global/objectives.scr::current_objectives level.objReturnToSpy
+
+End
+
+//-----------------------------------------------------------------------------
+
+truckThreeGuyRunaway:
+	wait 1
+	if (self.target.targetname != "docktruck3")
+		end
+
+	self waittill trigger
+	wait 1
+
+	local.driver = $docktruck3.driver
+
+	$docktruck3 waittill drive
+	wait 7
+	local.driver.enableEnemy = 0
+	local.driver waitthread global/safeMoveTo.scr::SafeRunTo_Wait $truck3DriverRunTo
+	local.driver remove
+end
+
+squeaks:
+	wait 1
+	local.interval = 0.05
+	local.dInterval = 0.15
+	while (level.onship == 1) {
+		$player playsound ship_squeak
+		wait local.interval
+		local.interval += local.dInterval
+		if (local.interval > 3.0)
+			local.interval = 3.0 + (randomfloat 2.0)
+	}
+end

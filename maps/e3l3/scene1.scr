@@ -1,0 +1,782 @@
+// Entity list
+// $dastruck_a           -- opel truck
+// $dastruck_b           -- opel truck
+// $dastruck_c           -- opel truck 
+// $dasbox               -- throbing box explosive
+// $dasdetonator         -- trigger_use with pulsating_detonator model
+// $dastruck_escape      -- vehicle trigger that makes the player lose when a truck reaches it
+
+//paths
+// $truckstart           -- path used by the trucks
+
+//=========================================================================
+InitScene1: {
+//=========================================================================
+	local.truckhealth     = 100000
+	local.explosivedamage = 200000
+	local.bombradius      = 512     //for the charge planted on the ground
+	local.chargeraduis    = 256     //for the charges planted on the trucks
+
+	level.trucksleft = 3
+	level.trucksdead = 0
+
+	$dastruck_a thread MyTruckThink local.truckhealth 0
+	$dastruck_b thread MyTruckThink local.truckhealth 2
+	$dastruck_c thread MyTruckThink local.truckhealth 3
+
+	if ( $dastruck_a_junk != NULL ) {
+		$dastruck_a_junk thread bind_junk $dastruck_a
+	}
+
+	if ( $dastruck_b_junk != NULL ) {
+		$dastruck_b_junk thread bind_junk $dastruck_b
+	}
+
+	if ( $dastruck_c_junk != NULL ) {
+		$dastruck_c_junk thread bind_junk $dastruck_c
+	}
+
+	wait .1
+
+	//todo -- make the guys on the trucks smart enough to stop the convoy when they spot you
+	$dasbox show
+	$dasbox setusethread DasBoxSet
+	$dasbox stopwatchduration 0
+	$dasbox Radius local.bombradius 
+	$dasbox SetDamage local.explosivedamage
+	$dasbox setsize "-24 -24 0" "24 24 24"
+
+	$dasdetonator show
+	$dasdetonator nottriggerable
+
+	$dastruck_escape setthread YouLose
+	$dastruck_escape nottriggerable
+
+	//hide the explosives
+	$dastruck_explosive_a hide
+	$dastruck_explosive_b hide
+	$dastruck_explosive_c hide
+
+	$dastruck_explosive_a attach $dastruck_a engine1
+	$dastruck_explosive_b attach $dastruck_b engine1
+	$dastruck_explosive_c attach $dastruck_c engine1
+
+	$dastruck_explosive_a Radius local.chargeraduis
+	$dastruck_explosive_b Radius local.chargeraduis
+	$dastruck_explosive_c Radius local.chargeraduis
+
+	$dastruck_explosive_a SetDamage local.explosivedamage
+	$dastruck_explosive_b SetDamage local.explosivedamage
+	$dastruck_explosive_c SetDamage local.explosivedamage
+
+	$doorlocked lock
+	$backdoorlocked lock
+
+	level.plungerguystrigger = waitthread global/FindTrigger.scr::FindTrigger "plungerguys"
+	level.frontdoorguystrigger = waitthread global/FindTrigger.scr::FindTrigger "frontdoorguys"
+	level.houseguystrigger = waitthread global/FindTrigger.scr::FindTrigger "houseguystrigger"
+	level.trucksgotaway = 0
+}end
+
+//=========================================================================
+DoObjective1: {
+//=========================================================================
+	// iprintln "Objective 1 started"
+	level.dasboxset = 0
+	level.dasdetonatorset = 0
+	thread DelayedTruckStart
+
+	$dastruck_escape triggerable
+	$dasdetonator triggerable
+	$dasdetonator setthread DasDetonatorSet
+	waitframe
+
+	$dastruck_a waittill drive
+
+	while (level.trucksgotaway == 1) {
+		wait 10
+	}
+}end
+
+//=========================================================================
+DoObjective2: {
+//=========================================================================
+	// iprintln "Doing Objective 2"
+	level.TwoDone = spawn trigger_relay targetname "TwoDone"
+	level.trucksleft = 0
+
+	//show the explosives
+	waitthread UpdateTrucks
+
+	//set their threads
+	$dastruck_explosive_a setthread Kerplow
+	$dastruck_explosive_b setthread Kerplow
+	$dastruck_explosive_c setthread Kerplow
+
+	//wait for all trucks destroyed
+	waitthread trucksdead
+	//thread maps/e3l3.scr::BriefingTwo
+	thread SecondAutosave
+}end
+
+//=========================================================================
+CleanupScene1: {
+//=========================================================================	
+	//	if ( level.dasboxset == 0 )
+	//		$dasbox remove
+
+	level.dasboxset = NIL
+	level.dasdetonatorset = NIL
+	level.TwoDone remove
+	level.TwoDone = NIL
+	level.stoptrucksonce = NIL
+}end
+
+//=========================================================================
+MyTruckThink local.hp local.passengers: {
+//=========================================================================
+	if (local.hp == NIL) {
+		self.health = 4000
+	}
+	else {
+		self.health = local.hp
+	}
+
+	// println "truck health: " self.health
+	thread global/vehicles_thinkers.scr::truck_INIT
+
+	if ( local.passengers != NIL ) {
+		waitthread MyTruckLoad local.passengers "models/human/german_wehrmact_soldier"
+	}
+
+	self waittill death
+	self stop
+	self.collisionent disconnect_paths
+
+	thread global/vehicles_thinkers.scr::truck_killed local.type
+	self thread TruckSmoke 1048  // 1048 being the distance from player
+}end
+
+//This is wacky and loads from the back
+//=========================================================================
+MyTruckLoad local.passengers local.guy_type local.gun_type: {
+//=========================================================================
+	self waitthread LoadDriver local.guy_type
+
+	switch ( local.passengers ){
+		case 6:
+			self waitthread LoadPassenger 4 local.guy_type local.gun_type
+		case 5:
+			self waitthread LoadPassenger 1 local.guy_type local.gun_type
+		case 4:
+			self waitthread LoadPassenger 5 local.guy_type local.gun_type
+		case 3:
+			self waitthread LoadPassenger 2 local.guy_type local.gun_type
+		case 2:
+			self waitthread LoadPassenger 6 local.guy_type local.gun_type
+		case 1:
+			self waitthread LoadPassenger 3 local.guy_type local.gun_type
+		default:
+	}
+}end
+
+//=========================================================================
+LoadDriver local.guy_type: {
+//=========================================================================
+	if ( local.guy_type == NIL ) {
+		local.guy_type = "models/human/german_wehrmact_soldier"
+	}
+
+	local.driver = spawn local.guy_type "gun" "none" "health" "65"
+	local.driver targetname "deleteguy"
+	local.driver physics_off
+	local.driver.origin = self.origin
+	local.driver rendereffects "-shadow"
+
+	self AttachDriverSlot 0 local.driver
+	local.driver exec global/disable_ai.scr
+	local.driver anim 00A004_driversitstill
+
+	self.driver = local.driver
+	self.driver.driving = 1
+	self.driver.done_unloading = 0
+
+	local.driver exec global/setdeathanim.scr "opel_driver_death"
+	local.driver nodamage
+}end
+
+//=========================================================================
+LoadPassenger local.slot local.guy_type local.gun: {
+//=========================================================================
+	if (local.guy_type == NIL) {
+		local.guy_type = "models/human/german_afrika_private"
+	}
+
+	if ( local.gun == NIL ) {
+		local.gun = "Mauser KAR 98K"
+	}
+
+	local.guy = spawn local.guy_type "gun" local.gun "health" "65"
+	local.guy.origin = self.origin
+	local.guy targetname "deleteguy"
+	local.guy rendereffects "-shadow"
+	local.guy.done_unloading = 0
+
+	// don't prone while on vehicle!
+	local.guy.ainoprone = 1
+	local.guy.ainocrouch = 1
+
+	self.passenger[local.slot]	= local.guy
+	if ( local.passenger_name!=NIL ) {
+		local.guy.targetname = local.passenger_name
+	}
+
+	if (level.dontdropweapons == 1) {
+		local.guy dontdropweapons
+	}
+
+	self AttachPassengerSlot local.slot local.guy
+	local.guy type_attack "cover"
+	local.guy leash 0
+	local.guy fixedleash 1
+	local.guy physics_off
+	local.guy hearing 1024
+	local.guy sight   1536
+		
+	switch (local.slot) {
+		case 1:
+			local.guy exec global/setdeathanim.scr "death_headpistol"
+			break
+		case 2:
+			local.guy exec global/setdeathanim.scr "death_crotch"
+			break
+		case 3:
+			local.guy exec global/setdeathanim.scr "death_left"
+			break
+		case 4:
+			local.guy exec global/setdeathanim.scr "death_run"
+			break
+		case 5:
+			local.guy exec global/setdeathanim.scr "death_shoot"
+			break
+		case 6:
+			local.guy exec global/setdeathanim.scr "death_right"
+			break
+		default:
+			local.guy exec global/setdeathanim.scr "death_collapse"
+			break
+	}
+
+	local.guy thread StopTrucksOnPain
+	local.guy thread StopTrucksOnDeath
+}end
+
+//=========================================================================
+DelayedTruckStart local.delay: {
+//=========================================================================
+	if ( local.delay == NIL ){
+		local.delay = 15
+	}
+
+	// println "ready to roll!"
+	wait local.delay
+	// println "movin' out"
+	waitthread StartTrucksOnce
+}end
+
+//=========================================================================
+StartTrucksOnce: {
+//=========================================================================
+	if (level.convoymoving == 1) {
+		end
+	}
+
+	level.convoymoving = 1
+	$dastruck_a thread local_truck_drive $truckstart	
+	$dastruck_b thread local_truck_drive $truckstart	
+	$dastruck_c thread local_truck_drive $truckstart
+
+	exec global/spotlight.scr::corona $dastruck_a "light left" // Turn on headlight coronas
+	exec global/spotlight.scr::corona $dastruck_a "light right"
+	exec global/spotlight.scr::corona $dastruck_b "light left" // Turn on headlight coronas
+	exec global/spotlight.scr::corona $dastruck_b "light right"
+	exec global/spotlight.scr::corona $dastruck_c "light left" // Turn on headlight coronas
+	exec global/spotlight.scr::corona $dastruck_c "light right"	
+}end
+
+//=========================================================================
+local_truck_drive local.path: {
+//=========================================================================
+	local.speed = 200
+	local.accel = 50
+	local.lookahead = 256
+
+	self drive local.path local.speed local.accel 200 local.lookahead
+	self waitTill drive
+	self.collisionent disconnect_paths
+	self stop
+	wait 0.75
+
+	thread global/vehicles_thinkers.scr::truck_unload 1
+}end
+
+//=========================================================================
+DasBoxSet: {
+//=========================================================================
+	level.dasboxset = 1
+
+	if (level.currentobjective == 2) {
+		waitthread global/objectives.scr::add_objectives 2 2 NIL $dasdetonator.origin
+		waitthread global/objectives.scr::current_objectives 2
+	}
+
+	if ( level.dasdetonatorset == 1 ) {
+		local.randomwait = randomint (3) + 4
+		thread DelayedTruckStart local.randomwait	
+		$dasdetonator setthread Kablooy	
+	}
+}end
+
+//=========================================================================
+DasDetonatorSet: {
+//=========================================================================
+	level.dasdetonatorset = 1
+	$dasdetonator nottriggerable
+	$dasdetonator.model = "miscobj/detonator.tik"
+	waitthread global/items.scr::remove_item "plunger" noprint
+	$dasdetonator playsound plunger_plant
+	waitframe
+
+	if ( level.dasboxset == 1 ) {
+		local.randomwait = randomint (3)
+		thread DelayedTruckStart local.randomwait
+	}
+
+	thread WaitForUseRelease	
+}end
+
+//=========================================================================
+WaitForUseRelease: {
+//=========================================================================
+	while ( $player.useheld ) {
+		waitframe
+	}
+
+	$dasdetonator triggerable
+
+	if ( level.dasboxset == 1 ) {
+		$dasdetonator setthread Kablooy
+	}
+	else {
+		$dasdetonator setthread Fizzle
+	}
+}end
+
+//=========================================================================
+Kablooy: {
+//=========================================================================
+	local.gotone = 0
+	$dasdetonator anim "fire"
+	$dasdetonator nottriggerable
+	$player playsound plunger
+	$dastruck_a takedamage
+	$dastruck_b takedamage
+	$dastruck_c takedamage
+	wait 0.45
+
+	$dasbox explode
+	thread global/exploder.scr::explode 117
+	waitframe
+
+	if ( $dastruck_a.health <= 0.0 ) {
+		local.gotone++
+		$dastruck_a thread PassengersDie
+
+		local.loc = $dastruck_a gettagposition "passenger1"
+		thread cargoexplosion local.loc 3.0
+		local.loc = $dastruck_a gettagposition "passenger2"
+		thread cargoexplosion local.loc 3.5
+		local.loc = $dastruck_a gettagposition "passenger4" + (0 0 50)
+		thread cargoexplosion local.loc 3.0
+		local.loc = $dastruck_a gettagposition "passenger5" + (0 0 50)
+		thread cargoexplosion local.loc 3.8
+	}
+
+	if ( $dastruck_b.health <= 0.0 ) {
+		local.gotone++
+		$dastruck_b thread PassengersDie
+	}
+	if ( $dastruck_c.health <= 0.0 ) {
+		local.gotone++
+		$dastruck_c thread PassengersDie
+	}
+
+	trigger level.plungerguystrigger
+
+	if (local.gotone > 0) { 
+		waitthread UpdateTrucks
+		waitthread StopTrucks
+	}
+	else {
+		$dastruck_a.driver playsound DENGM_E3L3_G45804    //Keep going, move move move
+		//$dastruck_a.driver playsound DENGM_E3L3_G45805  //Hold them off
+	}
+
+	wait 4
+	$dasdetonator setthread Fizzle
+}end
+
+//=========================================================================
+UpdateTrucks: {
+//=========================================================================
+	waitframe
+	local.livetrucks = 0
+
+	if ( $dastruck_a.health > 0.0 ) {	
+		$dastruck_explosive_a show
+		local.livetrucks++
+	}
+	else {	
+		if ($dastruck_explosive_a != NULL) {
+			$dastruck_explosive_a hide
+		}
+	}
+
+	if ( $dastruck_b.health > 0 ) {	
+		$dastruck_explosive_b show
+		local.livetrucks++
+	}
+	else {	
+		if ($dastruck_explosive_b != NULL) {
+			$dastruck_explosive_b hide
+		}
+	}
+
+	if ( $dastruck_c.health > 0 ) {	
+		$dastruck_explosive_c show
+		local.livetrucks++
+	}
+	else {	
+		if ($dastruck_explosive_c != NULL) {
+			$dastruck_explosive_c hide
+		}
+	}
+
+	if ( local.livetrucks > 0 ) {
+		waitthread global/objectives.scr::add_objectives 2 2 NIL
+	}
+	else {
+		waitthread global/objectives.scr::add_objectives 2 3 NIL
+	}
+}end
+
+//=========================================================================
+Fizzle: {
+//=========================================================================
+	$dasdetonator anim "fire"
+	$dasdetonator nottriggerable
+	$player playsound plunger
+	wait 2
+
+	$dasdetonator anim "idle"
+	$dasdetonator triggerable
+}end
+
+//=========================================================================
+PassengersDie: {
+//=========================================================================	
+	local.ent = NULL
+	for ( local.i = 1; local.i <= 6; local.i++ ) {
+		local.ent = self QueryPassengerSlotEntity local.i
+		
+		if ( local.ent != NULL) {
+			local.ent exec global/bullethit.scr (0 0 20) 5000 0 1
+		}
+	}
+}end
+
+//=========================================================================
+YouLose: {
+//=========================================================================
+	level.trucksgotaway = 1
+	$dastruck_escape nottriggerable	
+	$player physics_off
+	$player takeall
+	$dasdetonator nottriggerable
+	iprintln  "You failed to stop the Munitions Convoy."
+	wait 2
+	missionfailed
+}end
+
+//=========================================================================
+Kerplow: {
+//=========================================================================
+	self SetDamage 200000
+	self Radius 256
+	thread UpdateTrucks
+}end
+
+//=========================================================================
+trucksdead: {
+//=========================================================================	
+	if ( $dastruck_a.health > 0.0 ) {
+		// iprintln "Waiting for truck a to die"
+		waitthread global/objectives.scr::add_objectives 2 2 NIL  $dastruck_explosive_a.origin
+		waitthread global/objectives.scr::current_objectives 2		
+		$dastruck_a waittill death
+		//$dastruck_a thread TruckSmoke 1000
+	}
+
+	if ( $dastruck_b.health > 0.0 ) {	
+		// iprintln "Waiting for truck b to die"
+		waitthread global/objectives.scr::add_objectives 2 2 NIL  $dastruck_explosive_b.origin
+		waitthread global/objectives.scr::current_objectives 2		
+		$dastruck_b waittill death
+		//$dastruck_b thread TruckSmoke 1000
+	}
+
+	if ( $dastruck_c.health > 0.0 ) {	
+		// iprintln "Waiting for truck c to die"
+		waitthread global/objectives.scr::add_objectives 2 2 NIL  $dastruck_explosive_c.origin
+		waitthread global/objectives.scr::current_objectives 2		
+		$dastruck_c waittill death
+		//$dastruck_c thread TruckSmoke 1000
+	}	
+
+	level.frontdoorguystrigger triggerable
+}end
+
+//=========================================================================
+StopTrucks: {
+//=========================================================================
+	if ( level.stoptrucksonce == 1 ) {
+		end
+	}
+
+	if (level.dasboxset == 0) {
+		//		$dasbox remove
+	}
+
+	if (level.dasdetonatorset == 0) {
+		//		$dasdetonator remove
+	}
+
+	//	$dastruck_a thread truckveer
+	$dastruck_b thread truckveer
+	$dastruck_c thread truckveer
+	//	$dastruck_escape nottriggerable	
+
+	level.stoptrucksonce = 1
+}end
+
+//=========================================================================
+StopTrucksOnPain: {
+//=========================================================================
+	self waittill pain
+	if ( level.stoptrucksonce == 1 ) {
+		self solid
+		end
+	}
+
+	self playsound DENGM_E3L3_G45801 //Ambush!
+	waitthread StopTrucks
+	self solid
+}end
+
+//=========================================================================
+StopTrucksOnDeath: {
+//=========================================================================	
+	self waittill death
+
+	if ( level.stoptrucksonce == 1 ) {
+		end
+	}
+
+	self playsound DENGM_E3L3_G45801 //Ambush!
+	waitthread StopTrucks
+}end
+
+//=========================================================================
+bind_junk local.what: {
+//=========================================================================
+	self bind local.what
+}end
+
+//=========================================================================
+SecondAutosave: {
+//=========================================================================
+	$autosave2 waittill trigger
+	$autosave2 remove
+	exec global/autosave.scr 2	//"Done with the convoy"
+}end
+
+//=========================================================================
+TriggerHouseGuys: {
+//=========================================================================
+	trigger level.houseguystrigger
+}end
+
+// Local.dist is the distance you want the player to get from the smoke before it deletes itself
+// if not set defaults to 2048
+//=========================================================================
+TruckSmoke local.dist: {
+//=========================================================================
+	// iprintlnbold "TruckSmoke"
+	// self.damaged anim smoke
+	// self.damaged anim sizzle
+
+	if(local.dist == NIL || local.dist == NULL) {
+		local.dist = 2048
+	}
+	
+	if ( self.smoke==NIL ) {
+		self.smoke = spawn "models/emitters/linger_smoke.tik"
+		self.smoke notsolid
+		self.smoke anim start
+		local.place = self gettagposition "engine1"
+		self.smoke.origin = local.place //+ (0 10 0)  (local.place + (0 0 80))
+		//self.smoke glue self
+	}
+	
+	self.smoke thread DeleteSmoke local.dist
+}end
+
+// Delete Smoke
+// local.dist describes how far for the smoke is for the user before it is deleted
+// if no local.dist passed in then it defaults to 2048
+// it also will only delete if the user is turned around
+//=========================================================================
+DeleteSmoke local.dist: {
+//=========================================================================
+	local.result = 0
+	local.count = 0
+		
+	if(local.dist == NIL || local.dist == NULL) {
+		local.dist = 2048
+	}
+		
+	local.distance = vector_length($player.origin-self.origin)
+	// println("Player distance from Smoke = " + local.distance )
+
+	local.flag 		= 0
+	local.flag 		= vector_length($player.origin-self.origin) > local.dist 
+	local.vObjDir	= vector_subtract self.origin $player.origin
+	local.vObjDir	= vector_normalize local.vObjDir
+	local.vForward  = angles_toforward ( $player.angles )
+	local.dot		= vector_dot local.vForward local.vObjDir
+		
+	// println("dot angle: " + local.dot)
+	if ( local.dot < 0.707 ) {
+		local.result = 1
+	}
+	else {
+		local.result = 0
+	}
+
+	if(local.result == 1 && local.flag == 1) {
+		// println( " Deleting Smoke ")
+		self delete
+		local.count++
+		end
+	}
+
+	
+	if(local.count != 1 || self != NIL) {// this is giving me the infinite loop problem
+		// iprintlnbold "Does this go forever?"
+		wait 4.0	
+		goto DeleteSmoke local.dist
+	}
+}end
+
+//=========================================================================
+frontdoorguys: {
+//=========================================================================
+	self remove
+	$doorlocked unlock
+	$doorlocked open $player
+	$backdoorlocked unlock
+
+	for (local.i=1;local.i<=$frontdoorguys.size;local.i++) {
+		$frontdoorguys[local.i] sight 1
+		$frontdoorguys[local.i].hearing = 1
+	}
+	wait 1
+
+	for (local.i=1;local.i<=$frontdoorguys.size;local.i++) {
+		$frontdoorguys[local.i].movedoneradius = 500
+		$frontdoorguys[local.i] runto $frontdoorguys[local.i].target
+	}
+
+	for (local.i=1;local.i<=$frontdoorguys.size;local.i++) {
+		$frontdoorguys[local.i] sight 1000
+		$frontdoorguys[local.i].hearing = 1000
+	}
+
+	wait 1
+}end
+
+// make truck find a path to veer onto, or stop otherwise
+// or.... just make the truck slow to a stop
+//=========================================================================
+truckveer: {
+//=========================================================================
+	self modifydrive 50.0 200.0
+	wait 1.0
+	self modifydrive 0.0 500.0
+	wait 0.5
+	self stop
+	end
+
+	local.veercount = $truckveer.size
+	if ( ( self.health > 0 ) && ( local.veercount > 0 ) ) {
+		local.veernode = -1
+		local.veerdist = 6151970
+		local.fwd = angles_toforward( self.angles )
+
+		for ( local.i = 1; local.i <= local.veercount; local.i++ ) {
+			local.vnode = $truckveer[local.i].origin - self.origin
+			local.dnode = vector_length( local.vnode )
+			local.vnode = vector_normalize local.vnode
+			local.dot 	= vector_dot local.fwd local.vnode
+
+			if ( ( local.dot > 0 ) && ( local.dnode < local.veerdist ) ) {
+				local.veernode = local.i
+				local.veerdist = local.dnode
+			}
+		}
+
+		if ( local.veernode != -1 ) {
+			self drive $truckveer[local.veernode] 200 50 200 256
+			self stopatend
+		}
+		else {
+			self stop
+		}
+	}
+	else {
+		self stop
+	}
+}end
+
+// create secondary explosions for truck 1 cargo
+//=========================================================================
+cargoexplosion local.loc local.delay: {
+//=========================================================================
+	end		// sigh... disable this cool explosion
+
+	wait local.delay
+	local.ent = spawn script_origin origin local.loc
+	local.ent playsound explode_truck
+	exec global/earthquake.scr .2 4 0 0	
+
+	local.explosion1 = spawn script_model model models/fx/fx_truck_explosion.tik
+	local.explosion1.origin = local.ent.origin
+	local.explosion1 anim start
+	local.explosion1 notsolid
+
+	//radiusdamage self.origin level.bomb_damage level.bomb_explosion_radius
+	//	radiusdamage self.origin 200 200
+
+	wait 10
+	local.explosion1 remove
+}end

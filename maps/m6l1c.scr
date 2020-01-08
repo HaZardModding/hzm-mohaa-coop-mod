@@ -1,0 +1,932 @@
+// MP44 FACILITY
+// ARCHITECTURE: BENSON/NED
+// SCRIPTING: ME
+//============================================================================
+main:{
+//============================================================================
+	level.coopNextMap = "m6l2a"			//Pasted by Criminal for coop comp. - set next map (for mom voteing)
+	level.coopPrevMap = "m6l1b"			//Pasted by Criminal for coop comp. - set previouse map (for mom voteing)
+	level.coop_aaMap = 1				//Pasted by Criminal for coop comp. - let global scripts know this is a AA level
+	level.coop_debugSpawn = 1 			//Pasted by Criminal for coop comp. - enable spawnpoint debug (make visible)
+	thread coop_mod/main.scr::main      //Pasted by Criminal for coop comp. - start coop mod extensions
+	
+	//chrissstrahl - prevent ai from crouching and proneing, especially in tower
+	level.aipronechance = 0
+	level.aicrouchchance = 0
+	
+	thread global/exploder.scr::main
+	exec global/loadout.scr maps/m6l1c.scr
+	exec global/spotlight.scr
+	
+	level waittill prespawn
+
+	exec global/alarmlight.scr
+	//fadeout 0.1 0 0 0 1
+	exec global/ambient.scr m6l1c
+	
+	$world farplane_color ".2 .2 .3"
+	level.fogplane = 2000
+	$world farplane level.fogplane
+
+	//$player stufftext "tmstop"		//Criminal.
+	exec coop_mod/replace.scr::tmstop 	// Criminal - coop compabitility.
+
+//	level waitTill spawn //chrissstrahl
+	waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl - coop compabitility
+
+	waitthread global/items.scr::add_item "explosives" nomessage
+	local.spawnedhealth = spawn items/item_25_healthbox.tik
+	local.spawnedhealth.origin = ( -2984 1056 -6)
+	level.skillz = getcvar(skill)
+
+	if (gametype==0){//Criminal - Singleplayer.
+		$player useweaponclass pistol
+	}else{ //Criminal - Multiplayer.
+		for (local.i=1; local.i <= $player.size; local.i++){
+			local.player = $player[local.i]
+			if (local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0){ //chrissstrahl - dead players ain't no using any weapon
+				local.player useweaponclass pistol
+			}
+		}
+	}
+	
+	//chrissstrahl - have it on in mp
+	level.snowblow = 1
+	//chrissstrahl - handle right in sp
+	if(level.gametype == 0){
+		level.snowblow = getcvar(snowblow)
+	}
+	
+
+	level.ai_alarm_backup_time = 2
+	level.ai_alarm_backup_max = 4
+	level.alarm_sound = m6l3c_alarm
+	level.soldier1 = waitthread global/alarm_system.scr::find_guy "soldier1"
+	level.soldier2 = waitthread global/alarm_system.scr::find_guy "soldier2"
+	level.guy3 = waitthread global/alarm_system.scr::find_guy "guy3"
+	level.alarmsentry2guy = waitthread global/alarm_system.scr::find_guy "alarmsentry2guy"
+	level.alarmsentry1guy = waitthread global/alarm_system.scr::find_guy "alarmsentry1guy"
+	level.scientist1 = waitthread global/alarm_system.scr::find_guy "scientist1"
+	level.soldier4 = waitthread global/alarm_system.scr::find_guy "soldier4"
+	level.hasmp44 = 0
+	level.blueprints = 0
+	//	level.playerfart = spawn script_origin 
+	//	level.playerfart.origin = $player.origin
+
+	thread global/alarm_system.scr::alarm_system_setup
+
+	$frontturret thread global/mg42_active.scr::mg42 5000
+	$frontturret thread global/mg42_active.scr::disable
+	$rearturret thread global/mg42_active.scr::mg42 
+	$rearturret2 thread global/mg42_active.scr::mg42 
+	$rearturret3_gunner remove
+	$hallturret thread global/mg42_active.scr::mg42 
+	thread holstergunners
+
+	level.alarmlights = 0
+	level.papers = 0
+
+	thread exitsave
+	thread fogin
+	thread setusupthebomb
+	//fadein 2 0 0 0 1
+	thread sciencechatsequence
+	thread alarmsentry1thread
+	thread alarmsentry2thread
+	thread soldierchatsequence
+	thread giveobjectives
+	thread stealtheguns
+	thread spotlightstuff
+	thread endmission
+	thread hackstartzone
+	//thread hackresetaionguysoutside
+
+	$reargunnertrig thread simplechainspawn
+	$papers1.model = "animate/pulse_papers1.tik"
+	$papers2.model = "animate/pulse_papers2.tik"
+	$papers1.angles = "0 90 0"
+	$papers2.angles = "0 90 0"
+	$papers1.origin = ($papers1.origin + ( -8 0 0 ))
+	//$papers2.origin = ($papers2.origin + ( -8 0 0 ))	
+	level.alarm = 0
+
+	for (local.i = 1; local.i <= $snowmitter.size; local.i++){
+		$snowmitter[local.i] anim stop
+	}
+
+	if (level.snowblow == "1"){
+		thread snowmitter
+	}
+
+	//to be removed
+	//	$player.origin = "4835 5400 -665"
+	//	$player stufftext "notarget"
+	//	$player stufftext "pause"
+	
+	//stuff I don't know where to put
+	level.weaponssize = $weaponstoremove.size
+	$machinehum2 loopsound m6l1c_machine_loop1
+	$machinehum1 loopsound m6l1c_machine_loop1
+	//level.scientist1 holster
+	$lockedbunkdoor1 lock //door to bunks (and goodies)
+	$lockedgatedoor lock //gatedoor
+
+	thread asistweap1
+	thread asistweap2
+	
+	//chrissstrahl - coop test - move to ammonition room
+	//wait 10
+	//$player origin (4859 3111 -550)
+}end
+
+//============================================================================
+removeguysforescape:{
+//============================================================================
+//ai_alarm remove except for guys near alarm
+	for(local.i = 1; local.i <= $ai_alarm.size; local.i++){
+		if($ai_alarm[local.i].find_name != "soldier4" && $ai_alarm[local.i].find_name != "scientist1"){
+			$ai_alarm[local.i] thread checksighitandremove
+		}
+	}
+}end
+
+//============================================================================
+checksighitandremove:{
+//============================================================================
+	//if!(sighttrace ($player.origin + (0 0 50)) (self.origin + (0 0 50)) 1){ //chrissstrahl
+	if!((exec coop_mod/replace.scr::sighttrace (0 0 50) (self.origin + (0 0 50)) 1)){ //chrissstrahl - coop compabitility
+		println "sighttrace failed.. removing: " self
+		self remove
+	}
+}end
+
+//============================================================================
+exitsave:{
+//============================================================================
+	if(level.gametype==0){ //Criminal - Only in Singleplayer.
+		$endsave waittill trigger
+
+		local.skill = getcvar(skill)
+		if(local.skill == "0"){
+			local.health = 1500
+		}
+		if(local.skill == "1"){
+			local.health = 750
+		}
+		if(local.skill == "2"){
+			local.health = 250
+		}
+
+		local.health = local.health/3.0
+		local.health = local.health*2
+
+		
+		//chrissstrahl - need only do in sp
+		if(level.gametype == 0 && $player.health > local.health){
+			exec global/autosave.scr 2	
+		}
+	}	
+}end
+
+//============================================================================
+healthsave:{
+//============================================================================
+	//Criminal - Only in Singleplayer.
+	if (level.gametype == 0){
+		while($healthsaveitem){
+			wait .5
+		}
+		exec global/autosave.scr 2
+	}
+}end
+
+//============================================================================
+simplechainspawn:{
+//============================================================================
+	local.spawner = self.target
+	while(local.spawner){
+		local.spawner thread spawnwait self
+		local.spawner = local.spawner.target
+	}
+}end
+
+//============================================================================
+spawnwait local.trigger:{
+//============================================================================
+// this feels dirty.. yick it's here so the chain can finish before spawner.scr makes changes to variables.	
+	waitframe 
+	local.dude = waitthread global/spawner.scr::spawner_create self
+	local.trigger waittill trigger
+
+    local.spawneddude = waitthread global/spawner.scr::spawner_activate local.dude
+	//local.spawneddude thread easyskill
+    local.spawneddude attackplayer
+    wait 10
+
+    local.spawneddude = waitthread global/spawner.scr::spawner_activate local.dude
+	//local.spawneddude thread easyskill
+    local.spawneddude attackplayer
+}end
+	
+//============================================================================
+asistweap1:{
+//============================================================================
+//hack - asists player in pickup up weapons on top of crates (fixes bug about not being able to pickup weapons)
+	$weaponassist1 waittill trigger
+	thread playeruseifexist $weapon5
+	thread playeruseifexist $weapon6
+	thread playeruseifexist $weapon7
+	thread playeruseifexist $weapon8
+}end
+
+//============================================================================
+asistweap2:{
+//============================================================================
+	$weaponassist2 waittill trigger
+	thread playeruseifexist $weapon1
+	thread playeruseifexist $weapon2
+	thread playeruseifexist $weapon3
+	thread playeruseifexist $weapon4
+}end
+
+//============================================================================
+playeruseifexist local.thing:{
+//============================================================================
+//hack - picks up mp44's
+	if(local.thing != NULL){ end }
+	
+	iprintlnbold_noloc("DEV: playeruseifexist 1")
+	
+	if(level.gametype==0){ // Criminal - Singleplayer.
+		local.thing douse $player
+	}
+	else { // Criminal - Multiplayer.
+		local.force = 0 //chrissstrahl
+		for (local.i = 1; local.i <= $player.size; local.i++) {
+			local.player = $player[local.i]
+			if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0){
+				iprintlnbold_noloc("DEV: playeruseifexist 2")
+				local.thing douse local.player
+				break //chrissstrahl - we need only one to be valid, object can be used only once, I suppose
+			} // Use only if player does exist, is in whatever team and is alive.
+		}
+		iprintlnbold_noloc("DEV: playeruseifexist 3")
+		//chrissstrahl - force to all
+		for (local.i = 1; local.i <= $player.size; local.i++) {
+			local.player = $player[local.i]
+			if(local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0){
+				iprintlnbold_noloc("DEV: playeruseifexist 4")
+				exec coop_mod/main.scr::playerForcePrimary local.player "models/weapons/mp44.tik"
+			}
+		}
+	}
+}end
+
+//============================================================================
+holstergunners:{
+//============================================================================
+	$frontturret_gunner forceactivate
+	$rearturret2_gunner forceactivate
+    $rearturret_gunner forceactivate
+	$hallturret_gunner forceactivate
+	wait 1	
+
+	$frontturret_gunner holster
+    $rearturret_gunner holster
+    $rearturret2_gunner holster
+    $hallturret_gunner holster
+	$rearturret_gunner exec global/disable_ai.scr
+}end
+
+//============================================================================
+huddrawrefresh:{
+//============================================================================
+}end
+
+	/* holy great hacks batman!! I don't think this is needed anymore as alarm switches are no longer triggerable once bomb has been placed and ai is better now.
+	hackresetaionguysoutside:          ///// GERaatest haX0r evar!!  //leaches off all of bensons alarmzonetriggers to make two guys "react" to disguise better.. hah ahah.
+		level.hackresetaiguyoutsidecontinued = 0
+		for(local.i = 1; local.i <= $zone_trigger.size; local.i++)
+		{
+			if($zone_trigger[local.i].zone == "zone16")
+		{
+				$zone_trigger[local.i] thread hackresetaiguyoutsidecontinued 
+			}
+		}
+	end
+	hackresetaiguyoutsidecontinued:
+		self waittill trigger
+		if(level.hackresetaiguyoutsid != 1)
+		{
+			level.hackresetaiguyoutsidecontinued = 1
+			$haktoutsideguy1 exec global/disable_ai.scr
+			$haktoutsideguy2 exec global/disable_ai.scr
+			wait 2
+	          $haktoutsideguy1 exec global/enable_ai.scr
+	          $haktoutsideguy2 exec global/enable_ai.scr
+		}
+	end
+	*/
+
+//============================================================================
+hackstartzone:{
+//============================================================================
+	if (level.gametype==0){ // Criminal - do like that in SP.
+		for(local.i = 1; local.i <= $zone_trigger.size; local.i++){
+			if($zone_trigger[local.i].zone == "zone15"){
+				$zone_trigger[local.i] doactivate $player 
+				end
+			}	
+		}
+	}else{ // Criminal - Multiplayer.
+		for(local.i = 1; local.i <= $zone_trigger.size; local.i++){
+			for(local.a=1; local.a <= $player.size; local.a++){
+				local.bitch = $player[local.a]
+				if($zone_trigger[local.i].zone == "zone15" && local.bitch != NULL && local.bitch.dmteam != "spectator"){
+					$zone_trigger[local.i] doactivate local.bitch
+					end
+				}	
+			}	
+		}
+	}
+}end
+
+//////////**SPOTLIGHTSTUFF!!!!**////////////////////////////
+//============================================================================
+spotlightstuff:{
+//============================================================================
+	thread groupspot1
+}end
+
+//============================================================================
+groupspot1:{
+//============================================================================
+	while(level.spotplayer[1] == 0){
+		wait .25
+	}
+	$frontturret thread global/mg42_active.scr::enable
+}end
+
+//============================================================================
+alarmthread:{
+//============================================================================
+	println "***********"
+	println self " has bad alarmthread"
+	println "*************"
+}end
+
+//============================================================================
+snowmitter:{
+//============================================================================
+	for (local.i = 1; local.i <= $snowmitter.size; local.i++){
+		$snowmitter[local.i] anim start
+	}
+}end
+
+//============================================================================
+unholsterthread:{
+//============================================================================
+//for people who are holstered and get alarmed	
+	self unholster
+	//exec global/runto.scr $player 		// Criminal.
+	exec coop_mod/replace.scr::runtoClosest // Criminal - coop compabitility.
+}end
+
+//============================================================================
+endmission:{
+//============================================================================
+	$endmissiontrig waittill trigger
+	waitthread global/objectives.scr::add_objectives 5 3 "Exfiltrate the base." $endmissiontrig.origin
+	setcvar "g_m6l1" "1"
+	exec global/missioncomplete.scr m6l2a 1
+}end
+
+//============================================================================
+giveobjectives:{
+//============================================================================
+	waitthread global/objectives.scr::add_objectives 1 2 "Infiltrate the base (Hint: find a disguise)." $obj1.origin
+	waitthread global/objectives.scr::add_objectives 2 2 "Steal blueprints for StG44." $blueprints.origin
+	waitthread global/objectives.scr::add_objectives 3 2 "Steal an StG44." $weapon.origin
+	waitthread global/objectives.scr::add_objectives 4 2 "Destroy the weapons stockpile." $obj2.origin
+	waitthread global/objectives.scr::add_objectives 5 2 "Exfiltrate the base." $endmissiontrig.origin
+	waitthread global/objectives.scr::current_objectives 1
+}end
+
+//============================================================================
+suitpickup:{
+//============================================================================
+ //triggered by setthread
+	//$player stufftext "tmstartloop sound/music/mus_schmerzen_01a.mp3"			// Criminal.
+	exec coop_mod/replace.scr::tmstartloop "sound/music/mus_schmerzen_01a.mp3"	// Criminal.
+
+	waitthread global/items.scr::add_item "uniform"
+
+	$suit playsound pickup_uniform
+	$suit remove
+
+	if(local.gametype == 0){//Criminal - Singleplayer.
+		$player.has_disguise = 1
+	}
+	//chrissstrahl - let us not do this, the game is to easy this way
+	//else{//Criminal - Multiplayer.
+		//exec coop_mod/replace.scr::threatbias ignoreme
+	//} 
+
+	thread soldierwalk1
+	thread soldierwalk2
+}end
+
+//============================================================================
+soldierwalk1:{
+//============================================================================
+	level.soldier1 exec global/walkto.scr $soldier1spot1
+	level.soldier1 waittill movedone
+	level.soldier1 exec global/turnto.scr level.soldier2
+}end
+
+//============================================================================
+soldierwalk2:{
+//============================================================================
+	level.soldier2 exec global/walkto.scr $soldier2spot1
+	level.soldier2 waittill movedone
+	level.soldier2 exec global/turnto.scr level.soldier1
+}end
+
+//============================================================================
+papers2pickup:{
+//============================================================================
+	$papers2 playsound pickup_papers
+	$papers2 remove
+
+	if(level.papers == 1){
+		waitthread global/items.scr::remove_item "papers_level1"
+	}
+	waitthread global/items.scr::add_item "papers_level2"
+}end
+
+//============================================================================
+guygo local.spot:{
+//============================================================================
+	self exec global/walkto.scr $(self + "spot" + local.spot)
+}end
+
+//============================================================================
+sciencechatsequence:{
+//============================================================================
+//							local.talker    local.talker2     local.word      local.word2
+//	waitthread sciencesayto level.scientist1 level.soldier4 den_m6l1_SNT1 den_m6l1_SLD1
+	level.scientist1 anim den_m6l1_SNT1
+	level.soldier4 anim den_m6l1_SLD1
+
+	$sciencechat waittill trigger
+	waitthread sciencesayto level.scientist1 level.soldier4 den_m6l1_600f den_m6l1_SLD1
+	waitthread sciencesayto level.soldier4 level.scientist1 den_m6l1_601q den_m6l1_SNT1
+	waitthread sciencesayto level.scientist1 level.soldier4 den_m6l1_602f den_m6l1_SLD1
+	waitthread sciencesayto level.soldier4 level.scientist1 den_m6l1_603f den_m6l1_SNT1
+	waitthread sciencesayto level.scientist1 level.soldier4 den_m6l1_604q den_m6l1_SLD1
+	waitthread sciencesayto level.soldier4 level.scientist1 den_m6l1_605f den_m6l1_SNT1
+	waitthread sciencesayto level.scientist1 level.soldier4 den_m6l1_606q den_m6l1_SLD1
+	waitthread sciencesayto level.soldier4 level.scientist1 den_m6l1_607f den_m6l1_SNT1
+	waitthread sciencesayto level.scientist1 level.soldier4 den_m6l1_608q den_m6l1_SLD1
+	
+	if(level.soldier4.thinkstate != attack){
+		level.soldier4 anim den_m6l1_SLD2
+		level.soldier4 anim den_m6l1_609f
+	}
+
+	if(level.scientist1.thinkstate != attack){
+		level.scientist1 anim den_m6l1_SNT1
+	}
+
+	if(level.soldier4.thinkstate != attack){
+		level.soldier4 waittill animdone
+	}
+
+	waitthread sciencesayto level.scientist1 level.soldier4 den_m6l1_610q den_m6l1_SLD2
+	waitthread sciencesayto level.soldier4 level.scientist1 den_m6l1_611f den_m6l1_SNT1
+	waitthread sciencesayto level.scientist1 level.soldier4 den_m6l1_612q den_m6l1_SLD2
+	level.soldier4 anim den_m6l1_SLD3
+	
+	waitthread sciencesayto level.soldier4 level.scientist1 den_m6l1_613f den_m6l1_SNT1
+	level.soldier4 anim den_m6l1_SLD3
+	wait 2
+
+	level.soldier4 type_disguise "salute"
+	level.scientist1 type_disguise "salute"
+}end
+
+//============================================================================
+sciencesayto local.talker local.talker2 local.word local.word2:{
+//============================================================================
+	if((isalive local.talker) && local.talker.thinkstate != "attack"){
+		local.talker anim local.word
+	}
+
+	if((isalive local.talker2) && local.talker2.thinkstate != "attack"){
+		local.talker2 anim local.word2
+	}
+	local.talker waittill animdone
+}end	
+
+//============================================================================
+soldierchatsequence:{
+//============================================================================
+	$soldierchat waittill trigger
+	waitthread global/objectives.scr::add_objectives 1 3 "Infiltrate the base (Hint: find a disguise)." $obj1.origin
+	waitthread global/objectives.scr::current_objectives 2
+
+	level.soldier1.type_disguise = "none"
+	level.soldier2.type_disguise = "none"
+
+	waitthread soldiersayto level.soldier1 level.soldier2 $soldier2spot1 "den_m6l1_614r"
+	waitthread soldiersayto level.soldier2 level.soldier1 $soldier1spot1 "den_m6l1_615b" 
+	waitthread soldiersayto level.soldier1 level.soldier2 $soldier2spot1 "den_m6l1_616r"
+	waitthread soldiersayto level.soldier2 level.soldier1 $soldier1spot1 "den_m6l1_617b"
+	waitthread soldiersayto level.soldier1 level.soldier2 $soldier2spot1 "den_m6l1_618r"
+	waitthread soldiersayto level.soldier2 level.soldier1 $soldier1spot1 "den_m6l1_619b"
+	waitthread soldiersayto level.soldier1 level.soldier2 $soldier2spot1 "den_m6l1_620r"
+	waitthread soldiersayto level.soldier2 level.soldier1 $soldier1spot1 "den_m6l1_621b"
+	waitthread soldiersayto level.soldier1 level.soldier2 $soldier2spot1 "den_m6l1_622r"
+	waitthread soldiersayto level.soldier2 level.soldier1 $soldier1spot1 "den_m6l1_623b"
+	waitthread soldiersayto level.soldier1 level.soldier2 $soldier2spot1 "den_m6l1_624r"
+	waitthread soldiersayto level.soldier2 level.soldier1 $soldier1spot1 "den_m6l1_625b"  
+	waitthread soldiersayto level.soldier1 level.soldier2 $soldier2spot1 "den_m6l1_626r"
+	waitthread soldiersayto level.soldier2 level.soldier1 $soldier1spot1 "den_m6l1_627b"
+	waitthread soldiersayto level.soldier1 level.soldier2 $soldier2spot1 "den_m6l1_628r"
+	waitthread soldiersayto level.soldier2 level.soldier1 $soldier1spot1 "den_m6l1_629b"
+	wait 2
+
+	level.soldier1.type_disguise = "salute"
+	level.soldier2.type_disguise = "salute"
+	wait 2
+}end
+
+//============================================================================
+soldiersayto local.talker local.listener local.spot local.word:{
+//============================================================================
+	if((isalive local.talker) && local.talker.thinkstate != "attack"){
+		local.talker idlesay local.word
+		local.talker waittill saydone
+	}
+	if(local.listener){
+		local.listener exec global/walkto.scr local.spot
+	}
+}end	
+
+//============================================================================
+setusupthebomb:{
+//============================================================================
+	$explosiveplacementplaced hide
+	$explosiveplacement show
+	
+	bombdeny:
+	wait 1
+	$setusupthebomb waittill trigger
+	if(level.obj2complete != 1){
+		iprintlnbold "You have not completed the objective."
+		goto bombdeny
+	}
+	
+	$explosiveplacementplaced playsound plantbomb
+	//$player loopsound bombtick					// Criminal
+	exec coop_mod/replace.scr::loopsound bombtick	// Criminal - coop compabitility
+ 	$explosiveplacementplaced show
+	$explosiveplacement hide
+
+	iprintlnbold "5 seconds to clear the room"
+	//$player stopwatch 5					// Criminal
+	exec coop_mod/replace.scr::stopwatch 5	// Criminal - coop compabitility
+	wait 5
+
+	waitthread global/objectives.scr::add_objectives 4 3 "Destroy the weapons stockpile." $obj2.origin
+	waitthread global/objectives.scr::current_objectives 5
+
+	if (level.thebombhasexploded != 1){
+		thread blowstuffup
+	}
+}end
+
+//============================================================================
+blowstuffup:{
+//============================================================================
+	thread healthsave
+	thread removeguysforescape
+	level.thebombhasexploded = 1
+	thread global/exploder.scr::explode 1
+	thread removeguns 
+
+	//$player stoploopsound 					// Criminal 
+	exec coop_mod/replace.scr::stoploopsound 	// Criminal - coop compabitility.
+
+	$explosiveplacementplaced hide
+	$explosiveplacementplaced playsound m6l1c_stock_explode
+	
+	//chrissstrahl - reduce the number or error messages we get while debugging this script
+	if(level.scientist1 != NULL){ level.scientist1 attackplayer }
+	if(level.soldier4 != NULL){ level.soldier4 attackplayer }
+
+	//	centerprint ("player is in bombroom " + level.playerisinbombroom)
+	if(level.gametype == 0){ //chrissstrahl - do in sp only
+		if(level.playerisinbombroom == 1){
+			radiusdamage $player.origin 2000 800 
+		}
+	}
+	//chrissstrahl - multi player - kill players which are inside the room (radius)
+	else{
+		//radiusdamage (4790 2777 -550) (level.coop_health * 2) 580 //chrissstrahl
+		radiusdamage (4790 2777 -550) (level.coop_health * 2) 680
+	}
+
+	thread global/exploder.scr::explode 2
+	waitthread alarmall2
+
+	for(local.i = 1; local.i <= $alarm_switch_trigger.size; local.i++){
+		$alarm_switch_trigger[local.i] thread switchesnottriggerable
+	}
+
+	thread exfiltrate
+	wait 1
+	if(level.gametype==0){//Criminal - Singleplayer.
+		exec global/autosave.scr 1
+	}
+}end
+
+//============================================================================
+switchesnottriggerable:{
+//============================================================================
+	while(1){
+		waitframe
+		self waittill trigger
+		//self nottriggerable
+		wait 3
+
+		if(level.gametype==0){ //Criminal - Singleplayer.
+     		if(level.alarm != 1){
+        	  	$alarm_switch_trigger[1] douse $player
+        	  }
+		}else{ //Criminal - Multiplayer.
+			for (local.i = 1; local.i <= $player.size; local.i++) {
+				local.player = $player[local.i]
+				if(local.player != NULL && local.player.dmteam != "spectator" &&
+				   local.player.health > 0 && level.alarm!= 1){
+					$alarm_switch_trigger[1] douse local.player
+					break //chrissstrahl - exit the for loop, or we will have another player activating the switch again
+				}
+			}
+		}
+	}
+}end
+
+//============================================================================
+playerisinbombroom:{
+//============================================================================
+	level.playerisinbombroom = 1
+}end
+
+//============================================================================
+playerisnotinbombroom:{
+//============================================================================
+	level.playerisinbombroom = 0
+}end
+
+//============================================================================
+removeguns:{
+//============================================================================
+	thread removegun $weapon 
+	thread removegun $weapon1 
+	thread removegun $weapon2 
+	thread removegun $weapon3
+    thread removegun $weapon4
+    thread removegun $weapon5
+    thread removegun $weapon6
+    thread removegun $weapon7
+    thread removegun $weapon8
+}end
+
+//============================================================================
+removegun local.gunremove:{
+//============================================================================
+	if(local.gunremove){
+		local.gunremove remove
+	}
+}end
+
+//entrance fog toggle
+//============================================================================
+fogin:{
+//============================================================================
+	$fogintrig waittill trigger
+	thread fogramp 10000
+	thread fogout
+}end
+
+//============================================================================
+fogout:{
+//============================================================================
+	$fogouttrig waittill trigger
+	thread fogramp 3200
+	thread fogin
+}end
+
+//*******FOGRAMP***********
+// adjusts farplane when entering and exitting buildings
+//============================================================================
+fogramp local.rampto:{
+//============================================================================
+	if (level.fogplane == local.rampto){
+		end
+	}
+
+	if (level.fogplane < local.rampto){
+		for (local.bleh = level.fogplane; local.bleh < local.rampto; local.bleh += 100){
+			level.fogplane = local.bleh
+			$world farplane level.fogplane
+			wait .03
+		}
+		end
+	}
+
+	if (level.fogplane > local.rampto){
+		for (local.bleh = level.fogplane; local.bleh > local.rampto; local.bleh -= 100){
+			level.fogplane = local.bleh
+			$world farplane level.fogplane
+			wait .03
+		}
+		end
+	}
+}end
+
+
+
+//*** "sentry guys"
+//threads sentrys are set to disables triggers that alarm sentries
+//============================================================================
+letmeby:{
+//============================================================================
+	$letmeby1trig nottriggerable
+}end
+
+//============================================================================
+letmeby2:{
+//============================================================================
+	$letmeby2trig nottriggerable
+}end
+
+//alarm sentry deny triggers
+//============================================================================
+alarmsentry2thread:{
+//============================================================================
+	$letmeby2trig waittill trigger
+	if (isalive level.alarmsentry2guy){ 
+		level.alarmsentry2guy say den_alarm_01c
+		wait .25
+		level.alarmsentry2guy attackplayer
+
+		if(level.gametype==0){//Criminal - Singleplayer.
+     		$alarm_switch_trigger[1] douse $player
+		}else{//Criminal - Multiplayer.
+			for (local.i = 1; local.i <= $player.size; local.i++) {
+				local.player = $player[local.i]
+				if(local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0){
+					$alarm_switch_trigger[1] douse local.player
+					break //chrissstrahl - use only one player, otherwise we are toggeling or starting it multiple times
+				}
+			}
+		}
+	}
+}end
+
+//============================================================================
+alarmsentry1thread:{
+//============================================================================
+	$letmeby1trig waittill trigger
+	if (isalive level.alarmsentry1guy){ 
+		level.alarmsentry1guy say den_alarm_01c
+		wait 1
+		level.alarmsentry1guy attackplayer
+	}
+}end
+
+// triggered by settthread
+//============================================================================
+stealingpapers:{
+//============================================================================
+	$papers1 playsound pickup_papers
+	$papers1 remove
+
+	if(level.papers != 2){
+		waitthread global/items.scr::add_item "papers_level1"
+	}
+}end
+
+//============================================================================
+alarmall:{
+//============================================================================
+	if(level.allalarmed != 1)	{end}
+
+	level.allalarmed = 1
+	if(level.gametype==0){//Criminal - Singleplayer.
+		if(level.alarm != 1){
+     		$alarm_switch_trigger[1] douse $player
+     		thread openbunkdoor
+   		}	
+	}else{//Criminal - Multiplayer.
+		for (local.i = 1; local.i <= $player.size; local.i++) {
+			local.player = $player[local.i]
+			if(local.player.dmteam != "spectator" && local.player.health > 0 && 
+				local.player !=NULL && level.alarm!= 1){
+				$alarm_switch_trigger[1] douse local.player
+				thread openbunkdoor
+				break //chrissstrahl - use only one player, otherwise we are toggeling or starting it multiple times
+			}
+		}
+	}
+}end
+
+//============================================================================
+alarmall2:{
+//============================================================================
+	if(level.gametype==0){ //Criminal - Singleplayer.
+		if(level.alarm != 1){
+    	 	$alarm_switch_trigger[1] douse $player
+     	}
+	}else{ //Criminal - Multiplayer.
+		for (local.i = 1; local.i <= $player.size; local.i++) {
+			local.player = $player[local.i]
+			if(local.player.dmteam != "spectator" && local.player.health > 0 && 
+				local.player !=NULL && level.alarm!= 1){
+				$alarm_switch_trigger[1] douse local.player
+				break //chrissstrahl - use only one player, otherwise we are toggeling or starting it multiple times
+			}
+		}
+	}
+	thread openbunkdoor
+}end
+
+//============================================================================
+openbunkdoor:{
+//============================================================================
+	if(level.bunkerdooropen != 1){	
+		$lockedbunkdoor1 unlock
+		$lockedbunkdoor1 open $dooropener
+		level.bunkerdooropen = 1
+	}
+}end
+
+//============================================================================
+exfiltrate:{
+//============================================================================
+	$lockedgatedoor unlock
+	wait 1
+	$lockedgatedoor open $gateopener 
+}end
+
+//============================================================================
+metalgate:{
+//============================================================================
+	self playsound gate_metal_locked
+}end
+
+//============================================================================
+lockedmetaldoor:{
+//============================================================================
+	self playsound door_metal_locked1
+}end
+
+//============================================================================
+stealtheguns:{
+//============================================================================
+	$gunpickup waittill trigger
+	waitthread global/objectives.scr::add_objectives 3 3 "Steal an StG44." $weapon.origin
+	level.hasmp44 = 1
+
+	if(level.blueprints == 1){
+		waitthread global/objectives.scr::current_objectives 4
+		level.obj2complete = 1 
+	}else{
+		waitthread global/objectives.scr::current_objectives 2
+	}
+}end
+
+//============================================================================
+blueprintobj:{
+//============================================================================
+	waitthread global/objectives.scr::add_objectives 2 3 "Steal blueprints for StG44." $blueprints.origin
+	$blueprints playsound pickup_papers
+	$blueprints remove 
+	level.blueprints = 1
+
+	if(level.hasmp44 == 1){
+		waitthread global/objectives.scr::current_objectives 4
+		level.obj2complete = 1 
+	}else{
+		waitthread global/objectives.scr::current_objectives 3
+	}
+
+	//$plansguy exec global/turnto.scr $player //Criminal.
+	$plansguy exec coop_mod/replace.scr::turnto // Criminal - coop.
+	$plansguy waittill turndone
+	$plansguy attackplayer
+}end
+
+

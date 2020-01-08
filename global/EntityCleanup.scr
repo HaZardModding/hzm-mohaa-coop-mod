@@ -1,0 +1,106 @@
+//------------------------------------------------------------------
+//	Can call this to delete a group of AI by name.
+//  Also checks to see if distance for player
+//  example of it being called:
+//    	thread EntityCleanup $start_allies 1048
+//  
+//------------------------------------------------------------------
+//chrissstrahl - modified for coop on 2019.08.24
+
+EntityCleanup local.name local.dist:
+	local.count = 0
+	 // println ("Are you in DeleteAI and we are deleting " + local.name)
+	 // print   (" " + local.name.size + " guys")
+
+//chrissstrahl - keep original for singleplayer
+	if(level.gametype == 0){
+		while (local.count < $(local.name).size)
+		{
+			local.angles = $player.angles
+			if ($player.turret)
+			{
+				local.angles = local.angles + $player.turret.angles
+			}
+			else if ($player.vehicle)
+			{
+				local.angles = local.angles + $player.vehicle.angles
+			}
+
+			for (local.i=1;local.i<=$(local.name).size;local.i++)
+			{
+				local.distance = vector_length($player.origin-$(local.name)[local.i].origin)
+				//iprintlnbold("Player distance from guy = " + local.distance )
+
+				if(local.distance > local.dist)
+				{
+					
+					local.vObjDir	= vector_subtract $(local.name)[local.i].origin $player.origin
+					local.vObjDir	= vector_normalize local.vObjDir
+					local.vForward  = angles_toforward ( local.angles )
+
+					//println("foward direction" + local.vForward)
+					//println("direction: " + local.vObjDir)
+
+					local.dot		= vector_dot local.vForward local.vObjDir
+				
+					if(local.dot < 0.707)
+					{
+		//					iprintlnbold( " Deleting guy ")
+						$(local.name)[local.i] delete
+						local.count++
+					}
+				/*	
+					if (!($player cansee $(local.name)[local.i] 30))
+					{
+						$(local.name)[local.i] delete
+						local.count++
+					}
+					*/
+				}
+			}
+			wait 1.0
+		}
+		end //chrissstrahl - end here in singleplayer
+	}
+	
+//chrissstrahl - handle for multiplayer
+	while (local.count < $(local.name).size)
+	{
+		local.deleteEntity = 1
+
+		for (local.i=1;local.i<=$(local.name).size;local.i++){
+			for(local.iPlayer=1;local.iPlayer<=$player.size;local.iPlayer++){
+				local.player = $player[local.iPlayer]
+				if(local.player == NULL || local.player.dmteam == "spectator"){ continue }
+				
+				local.angles = local.player.angles
+				if (local.player.turret){
+					local.angles = local.angles + local.player.turret.angles
+				}
+				else if (local.player.vehicle){
+					local.angles = local.angles + local.player.vehicle.angles
+				}
+			
+				local.distance = vector_length((local.player.origin)-($(local.name)[local.i].origin))
+				if(local.distance > local.dist){					
+					local.vObjDir	= vector_subtract $(local.name)[local.i].origin local.player.origin
+					local.vObjDir	= vector_normalize local.vObjDir
+					local.vForward  = angles_toforward ( local.angles )
+
+					local.dot		= vector_dot local.vForward local.vObjDir
+				
+					if(local.dot > 0.707)
+					{
+						local.deleteEntity = 0
+					}
+				}
+				//delete entity if not seen by a active player
+				if( local.deleteEntity ){
+					$(local.name)[local.i] delete
+					local.count++
+				}
+			}
+		}
+		wait 1.0
+	}
+End

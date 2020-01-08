@@ -1,0 +1,702 @@
+// TANK DRIVE 1 
+// ARCHITECTURE: STEVE/ADAM/NATE
+// SCRIPTING: Z
+//============================================================================
+main:{
+//============================================================================
+	level.coopNextMap = "m5l2b"			//Pasted by Criminal for coop comp. - set next map (for mom voteing)
+	level.coopPrevMap = "m5l1b"			//Pasted by Criminal for coop comp. - set previouse map (for mom voteing)
+	level.coop_aaMap = 1				//Pasted by Criminal for coop comp. - let global scripts know this is a AA level
+	//level.coop_disableSpawnWarper = 1	//Chrissstrahl - prevent players from respawning where they died
+	thread coop_mod/main.scr::main		//Pasted by Criminal for coop comp. - start coop mod extensions
+
+	//chrissstrahl - prevent ai from crouching and proneing
+	level.aipronechance = 0
+	level.aicrouchchance = 0
+	
+	//chrissstrahl - maybe try making the expldables imune, in 2019 with the next update
+	/*
+	$realtruck immune bullet
+	$realtruck immune rocket
+	$realtruck immune explosion
+	$realtruck immune shotgun
+	$realtruck immune bash
+	$realtruck immune crush
+	$realtruck immune falling
+	$realtruck immune vehicle
+	*/
+	
+	level.script = "maps/m5l2a.scr"
+
+	thread global/exploder.scr::main
+	//thread global/exploder.scr::repeat
+
+	exec global/loadout.scr maps/m5l2a.scr
+	exec global/ai.scr
+	level.dontdropweapons = 1
+
+	level waitTill prespawn
+	println "z:        prespawn marker"
+	
+	level.bombnum = 0
+	level.tempnum = 0
+	//level.sightdistance = 4557
+	level.sightdistance = 3557
+
+	level.enemytankspeed = 200
+	level.halftrakspeed = 300
+	level.lookahead = 256
+	level.playertanktarget = 0
+	
+	level.fastspeed = 300
+	level.slowspeed = 160
+	
+	//chrissstrahl - make it a bit faster during testing
+	/*if(level.gametype != 0){
+		level.slowspeed = 1000
+		level.fastspeed = 2000
+	}*/
+	
+//chrissstrahl - deactivated for testing
+	$playertank waitthread global/vehicles_thinkers.scr::players_tank $playertank_trigger
+	$playertank vehiclespeed level.slowspeed
+	level.currently_fast = 0
+
+	//$truck1 		thread global/vehicles_thinkers.scr::enemy_truck_think
+	$s5_tank		thread global/vehicles_thinkers.scr::enemy_tank_think 0 panzer
+	$s10_tank1	thread global/vehicles_thinkers.scr::enemy_tank_think 0 panzer
+	$s10_tank2	thread global/vehicles_thinkers.scr::enemy_tank_think 0
+
+	$s3_flak88	thread global/vehicles_thinkers.scr::enemy_flak_think
+	$s5_flak88	thread global/vehicles_thinkers.scr::enemy_flak_think
+	$s3_halftrak thread global/vehicles_thinkers.scr::enemy_half-trak_think
+	//$panzerschreck 	thread global/vehicles_thinkers.scr::enemy_panzerschreck_think
+
+	$mg42_1 	thread global/mg42.scr::JEEP_SETUP $mg42_1_trigger1 $mg42_1_trigger2 $mg42_1_gunner level.playertanktarget
+	level.mg42_1 = parm.previousthread
+
+	$mg42_2 	thread global/mg42.scr::JEEP_SETUP $mg42_2_trigger1 $mg42_2_trigger2 $mg42_2_gunner level.playertanktarget
+	level.mg42_2 = parm.previousthread
+
+	thread global/barrel.scr::explosive_barrel
+	exec global/ambient.scr m5l2a
+
+	level waitTill spawn
+	println "z:        level waittill spawn marker"
+
+	//*** telling the AI to not drop health
+	level.nodrophealth = 1
+
+	//$player stufftext "tmstartloop sound/music/mus_TigerTank_01a.mp3"			//Criminal
+	exec coop_mod/replace.scr::tmstartloop "sound/music/mus_TigerTank_01a.mp3" 	//Criminal - coop compabitility.
+
+	//*** TEMP reset the Objectives portion of the HUD
+	//	waitthread global/objectives.scr::reset_objectives
+	//	waitthread global/objectives.scr::blank_objectives
+
+	waitthread global/objectives.scr::add_objectives 1 2 "Escape with the King Tiger tank." $level_end.origin
+	waitthread global/objectives.scr::current_objectives 1
+
+	thread start
+	
+	//chrissstrahl - coop mod manager making sure players don't get stuck or divate to far from the mission
+	thread coop_teleportMaster
+	
+	//chrissstrahl - clip to prevent players from falling - patch that is not solid right next to the entrace of the the town
+	spawn "script_model" "model" "models/fx/dummy.tik" "targetname" "coop_fixClip0"
+	waitframe
+	$coop_fixClip0 origin ( 1543 -477 170 )
+	$coop_fixClip0 setsize ( -200 -200 -100 ) ( 200 200 0 )
+	$coop_fixClip0 solid
+}end
+
+//============================================================================
+speedup:{
+//============================================================================
+	if (level.currently_fast == 1)	{end}
+	println  "z:        speeding up"
+
+	for (local.speed = level.slowspeed; local.speed <= level.fastspeed; local.speed += 1){
+		$playertank vehiclespeed local.speed
+		waitframe
+	}
+
+	println  "z:        done speeding up"
+	level.currently_fast = 1
+}end
+
+//============================================================================
+slowdown:{
+//============================================================================
+	if (level.currently_fast != 1)	{end}
+	println  "z:        slowing down"
+
+	for (local.speed = level.fastspeed; local.speed >= level.slowspeed; local.speed -= 1){
+		$playertank vehiclespeed local.speed
+		waitframe
+	}
+
+	println  "z:        done slowing down"
+	level.currently_fast = 0
+}end
+
+//============================================================================
+start:{
+//============================================================================
+	//chrissstrahl - this might need to be fixed up for mp
+	if(level.gametype != 0){ end }
+	wait 2
+	local.forward = getboundkey1 "+forward"
+	local.back = getboundkey1 "+back"	
+	local.left = getboundkey1 "+moveleft"
+	local.right = getboundkey1 "+moveright"
+	local.jump = getboundkey1 "+moveup"
+
+	iprintlnbold_noloc (loc_convert_string "Move the tank with your Forward key ( ") (loc_convert_string local.forward) (loc_convert_string " ) and Backward key. ( ") (loc_convert_string local.back) (loc_convert_string " )")
+	wait 3
+
+	iprintlnbold_noloc (loc_convert_string "Press STRAFE LEFT ( ") (loc_convert_string local.left) (loc_convert_string " ) to turn left and STRAFE RIGHT ( ") (loc_convert_string local.right) (loc_convert_string " ) to turn right.")
+	wait 3
+
+	iprintlnbold "Turn the turret with the Mouse."
+	wait 3
+
+	iprintlnbold_noloc (loc_convert_string "Hold your Jump key ( ") (loc_convert_string local.jump) (loc_convert_string " ) to align the base with the turret.")
+}end
+
+//============================================================================
+s3:{
+//============================================================================
+	//called by the BSP
+	//halftrak drives away
+	$s3_halftrak thread drive_path $s3_halftrakpath level.halftrakspeed remove
+}end
+
+//============================================================================
+s5:{
+//============================================================================
+	//called by the BSP
+	//first enemy tank comes around the corner and attacks
+	$s5_tank thread drive_path $s5_tankpath level.enemytankspeed
+}end
+
+//============================================================================
+s10:{
+//============================================================================
+	//called by the BSP
+	//two enemy tanks come around by the exit and attack
+	$s10_tank1 thread drive_path $s10_tankpath1 level.enemytankspeed
+	$s10_tank2 thread drive_path $s10_tankpath2 level.enemytankspeed
+}end
+
+//============================================================================
+ambush1:{
+//============================================================================
+	println "z:     ambush 1 starts: "
+	
+	local.ambush_spawns[1] = 1
+	local.ambush_spawns[2] = 2
+	local.ambush_spawns[3] = 3	// straight ahead building
+	local.ambush_spawns[4] = 4
+	local.ambush_spawns[5] = 5	// to the side of the mg42
+	local.ambush_spawns[6] = 6
+	local.ambush_spawns[0] = 7
+	
+	//exec global/randomorder.scr local.ambush_spawns
+
+	println "z:     ambush 1 spawn: " local.ambush_spawns[3]
+	thread global/ai.scr::spawn local.ambush_spawns[3]
+
+	println "z:     ambush 1 spawn: " local.ambush_spawns[5]
+	thread global/ai.scr::spawn local.ambush_spawns[5]
+	
+	if (getcvar(debug) == "1"){	
+		println "z:     ambush 1 spawn: " local.ambush_spawns[1]
+		thread global/ai.scr::spawn local.ambush_spawns[1]
+		println "z:     ambush 1 spawn: " local.ambush_spawns[2]
+		thread global/ai.scr::spawn local.ambush_spawns[2]
+		println "z:     ambush 1 spawn: " local.ambush_spawns[3]
+		thread global/ai.scr::spawn local.ambush_spawns[3]
+		println "z:     ambush 1 spawn: " local.ambush_spawns[4]
+		thread global/ai.scr::spawn local.ambush_spawns[4]
+		println "z:     ambush 1 spawn: " local.ambush_spawns[5]
+		thread global/ai.scr::spawn local.ambush_spawns[5]
+		println "z:     ambush 1 spawn: " local.ambush_spawns[6]
+		thread global/ai.scr::spawn local.ambush_spawns[6]
+		println "z:     ambush 1 spawn: " local.ambush_spawns[0]
+		thread global/ai.scr::spawn local.ambush_spawns[0]
+	}
+}end
+
+//============================================================================
+ambush2:{
+//============================================================================
+	println "z:     ambush 2 starts: "
+	
+	local.ambush_spawns[1] = 10
+	local.ambush_spawns[2] = 11
+	local.ambush_spawns[3] = 12
+	local.ambush_spawns[0] = 13
+	
+	exec global/randomorder.scr local.ambush_spawns
+	
+	println "z:     ambush 2 spawn: " local.ambush_spawns[1]
+	thread global/ai.scr::spawn local.ambush_spawns[1]
+	println "z:     ambush 2 spawn: " local.ambush_spawns[2]
+	thread global/ai.scr::spawn local.ambush_spawns[2]
+
+	if (getcvar(debug) == "1"){
+		println "z:     ambush 2 spawn: " local.ambush_spawns[3]
+		thread global/ai.scr::spawn local.ambush_spawns[3]
+		println "z:     ambush 2 spawn: " local.ambush_spawns[0]
+		thread global/ai.scr::spawn local.ambush_spawns[0]
+	}
+}end
+
+//============================================================================
+ambush3:{
+//============================================================================
+	println "z:     ambush 3 starts: "
+	
+	local.ambush_spawns[1] = 13
+	local.ambush_spawns[2] = 14
+	local.ambush_spawns[3] = 15
+	local.ambush_spawns[0] = 16
+	
+	exec global/randomorder.scr local.ambush_spawns
+	
+	println "z:     ambush 3 spawn: " local.ambush_spawns[1]
+	thread global/ai.scr::spawn local.ambush_spawns[1]
+	println "z:     ambush 3 spawn: " local.ambush_spawns[2]
+	thread global/ai.scr::spawn local.ambush_spawns[2]
+
+	if (getcvar(debug) == "1"){
+		println "z:     ambush 3 spawn: " local.ambush_spawns[3]
+		thread global/ai.scr::spawn local.ambush_spawns[3]
+		println "z:     ambush 3 spawn: " local.ambush_spawns[0]
+		thread global/ai.scr::spawn local.ambush_spawns[0]
+	}
+}end
+	
+//============================================================================	
+building1:{
+//============================================================================
+	if (level.building1 == 1)	{end}
+
+	level.building1 = 1
+	$building1_damage_volume volumedamage 1000
+	exec global/exploder.scr::explode 2
+}end
+
+//============================================================================	
+building2:{
+//============================================================================
+	if (level.building2 == 1)	{end}
+
+	level.building2 = 1
+	$building2_damage_volume volumedamage 1000
+	exec global/exploder.scr::explode 12
+}end
+
+//============================================================================
+building3:{
+//============================================================================
+	if (level.building3 == 1)	{end}
+
+	level.building3 = 1
+	$building3_damage_volume volumedamage 1000
+	exec global/exploder.scr::explode 11
+}end
+
+//============================================================================	
+building4:{
+//============================================================================
+	if (level.building4 == 1)	{end}
+
+	level.building4 = 1
+	$building4_damage_volume volumedamage 1000
+	exec global/exploder.scr::explode 16
+}end
+
+//============================================================================
+building5:{
+//============================================================================
+	if (level.building5 == 1)	{end}
+
+	level.building5 = 1
+	$building5_damage_volume volumedamage 1000
+	exec global/exploder.scr::explode 18
+}end
+
+//============================================================================	
+building6:{
+//============================================================================
+	if (level.building6 == 1) {end}
+
+	level.building6 = 1
+	$building6_damage_volume volumedamage 1000
+	exec global/exploder.scr::explode 12
+}end
+
+//============================================================================	
+kill_mg_1:{
+//============================================================================
+	//called by BSP
+	if (level.building7 == 1)	{end}
+
+	level.building7 = 1
+	exec global/exploder.scr::explode 23
+	thread kill_mg $mg42_1_gunner $mg42_1 $mg42_1_bipod 
+	level.mg42_1 delete
+}end
+
+//============================================================================
+kill_mg_2:{
+//============================================================================
+	//called by BSP
+	if (level.building8 == 1)	{end}
+
+	level.building8 = 1
+	exec global/exploder.scr::explode 15
+	thread kill_mg $mg42_2_gunner $mg42_2 $mg42_2_bipod 
+	level.mg42_2 delete
+}end
+
+//============================================================================
+kill_mg local.gunner local.gun local.bipod:{
+//============================================================================
+	local.gun remove
+	local.bipod remove
+
+	if (isAlive local.gunner){
+		local.gunner exec global/bullethit.scr (0 0 250) 500 0 1
+	}
+
+	if (isAlive local.gunner){
+		local.gunner delete
+	}
+}end
+
+//============================================================================	
+pole1:{
+//============================================================================
+//	println "z:       hit trigger pole1"
+	$pole1 thread pole_think
+}end
+
+//============================================================================	
+pole2:{
+//============================================================================
+//	println "z:       hit trigger pole2"
+	$pole2 thread pole_think
+}end
+
+//============================================================================	
+pole3:{
+//============================================================================
+//	println "z:       hit trigger pole3"
+	$pole3 thread pole_think
+}end
+
+//============================================================================
+pole_think:{
+//============================================================================
+	if (self.triggered == 1)	{end}
+
+	self.triggered = 1
+	println "z:         pole falls"
+	self playsound m5l2a_pole_fall
+	self notsolid
+	
+	//chrissstrahl - make sure this works in coop, no idea what it does...
+	local.player = NULL
+	if(level.coop_playerTank == NULL){
+		local.player = exec coop_mod/replace.scr::player_closestTo self
+	}
+	if(local.player == NULL){
+		local.player = $world
+	}
+	
+	local.angles = (vector_toangles (local.player.origin - self.origin)) //chrissstrahl
+	self.angles = (0 (local.angles[1]+90) 0)
+	self time 1
+	self rotatezdown 85
+	self waitmove
+}end
+
+//============================================================================	
+level_end:{
+//============================================================================
+	//called by the BSP
+	if (level.missionfailed == 1)	{end}
+
+	waitthread global/objectives.scr::add_objectives 1 3
+	exec global/missioncomplete.scr m5l2b bsp2bsp
+}end
+
+
+//============================================================================
+drive_path local.path local.speed local.remove:{
+//============================================================================
+// drive Vector position, speed, acceleration, reach_distance, look_ahead
+//println "z:              " local.path
+//println "z:              " local.speed
+	self.driving = 1
+	self drive local.path local.speed 30 200 level.lookahead
+	//self modifydrive level.fastspeed 50 level.lookahead
+	self waitTill drive
+
+	if (self){
+		self stop
+		self.driving = 0
+		if (local.remove == "remove"){
+			self remove
+		}
+	}
+}end
+
+//============================================================================
+cant_go_that_way:{
+//============================================================================	
+//called by the BSP
+	//chrissstrahl - coop disqualifier, only do this is tank is heading this way
+	local.player = parm.other
+	if(level.gametype == 0 || local.player == level.coop_playerTank ){
+		print("")
+	}else{
+		end
+	}
+	
+	if( level.drive == NIL || level.drive.size == 0){
+		level.drive[0] =  dfr_drive_01h_2
+		level.drive[1] =  dfr_drive_02h_1
+		level.drive[2] =  dfr_drive_04h_1
+		level.drive[3] =  dfr_drive_05h_1
+		level.drive[4] =  dfr_drive_07h_2
+		level.drive[5] =  dfr_drive_08h_1
+		level.drive[6] =  dfr_drive_09h_1
+		level.drive[7] =  dfr_drive_10h_2
+	
+		if (level.prev_drive != NIL){
+			for (local.i = 0; local.i < level.drive.size; local.i++){
+				if (level.drive[local.i] == level.prev_drive){
+					//println "before1: " level.drive.size
+					level.drive[local.i] = NIL
+					//println "after1: " level.drive.size
+					break
+				}
+			}
+		}
+	}
+
+	level.prev_drive = thread get_random_entry level.drive
+	//level.playertank playsound level.prev_drive
+	//$player playsound level.prev_drive					// Criminal
+	//exec coop_mod/replace.scr::playsound level.prev_drive	// Criminal - coop compabitility //chrissstrahl
+	local.player playsound level.prev_drive //chrissstrahl - coop
+}end
+
+//============================================================================
+get_random_entry local.entries:{
+//============================================================================
+	local.n = randomint (local.entries.size)
+	//println "XXX:" local.n
+	local.entry = 0	
+get_random_entry_loop:
+	local.result = local.entries[local.entry]
+
+	if (local.result == NIL){
+		local.entry++
+		goto get_random_entry_loop
+	}
+	if (local.n){
+		local.n--
+		local.entry++
+		goto get_random_entry_loop
+	}
+	
+	//println "result: " local.result
+
+local.entries[local.entry] = NIL
+}end local.result
+
+
+//chrissstrahl - executes the actual teleportation of the brothers in arms
+//============================================================================
+coop_teleportBrother local.origin local.angle local.message:{
+//============================================================================
+	if(local.origin != NIL){
+		local.origin[2] += 300 //from thy havens me angels shall fall
+		self origin local.origin //brother there lies your desteny
+		self droptofloor //like a fallen angel
+		if( local.angle != NIL ){
+			self face ( local.angle )//face your path chosen by your maker
+		}
+	}
+	if(local.message != NIL){	self iprint local.message 1	}
+}end //AMEN Brother!
+
+//chrissstrahl - this makes sure players stay on track, in the map, don't fall off or get stuck
+//============================================================================
+coop_teleportMaster:{
+//============================================================================
+	if(level.gametype == 0){ end }
+
+	local.message = "Return to Battle, your Brethren need you!"
+	while(1){
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.messagePrintout = NIL
+			local.player =  $player[local.i]
+			if( local.player != NULL ){
+				if( local.player != level.coop_playerTank && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+					local.plOrigin = local.player.origin
+					//if(vector_length(local.plOrigin - ()) < 2000){
+					
+					//level start area where the tank is
+					if(local.plOrigin[1] < -4580){
+						local.player thread coop_teleportBrother ( 3426 -3392 300) (0 120 0) local.message
+					}
+					//left side from entrace
+					//350 888
+					else if(local.plOrigin[0] < 1492 && local.plOrigin[0] > 700 && local.plOrigin[1] > -1140 && local.plOrigin[1] < 900 ){
+						local.player thread coop_teleportBrother ( 1980 -92 300 ) (0 12 0) local.message
+					}
+					//first group of building gaps, until curch(il)
+					else if(local.plOrigin[0] > 1476 && local.plOrigin[0] < 3090 && local.plOrigin[1] > 900 && local.plOrigin[1] < 2000 ){
+						local.player thread coop_teleportBrother ( 2872 433 260 ) (0 -6 0) local.message
+					}
+					//gap at the mg gunner right side facing mg
+					else if( vector_length( local.plOrigin - ( 4819 32 340 ) ) < 100 ){
+						local.player thread coop_teleportBrother ( 4566 164 325 ) (0 96 0) local.message
+					}
+					//first empty building left side while facing mg
+					else if( vector_length( local.plOrigin - ( 4898 671 344 ) ) < 60 ){
+						local.player thread coop_teleportBrother ( 4750 687 340 ) (0 107 0) local.message
+					}					
+					//destroyed building right side of town entrace
+					else if( local.plOrigin[0] < 4193 && local.plOrigin[0] > 3816 && local.plOrigin[1] < -290 && local.plOrigin[1] > -450 ){
+						local.player thread coop_teleportBrother ( 4030 -190 245 ) (0 80 0) local.message
+					}	
+					//second empty building left side while facing mg (destructible)
+					else if( local.plOrigin[0] > 4880 && local.plOrigin[0] < 5100 && local.plOrigin[1] < 1452 && local.plOrigin[1] > 1119){
+						local.player thread coop_teleportBrother ( 4778 1172 362 ) (0 112 0) local.message
+					}
+					//not visible gap after second empty building left side while facing mg, alongside the rock wall
+					else if( vector_length( local.plOrigin - ( 5135 1840 396 ) ) < 100 ){
+						local.player thread coop_teleportBrother ( 4900 2028 350 ) (0 128 0) local.message
+					}
+					//road paved with soon to be gravestones
+					else if( vector_length( local.plOrigin - ( 6000 4320 322 ) ) < 600 ){
+						local.player thread coop_teleportBrother ( 5449 3955 303 ) (0 174 0) local.message
+					}
+					//gap at flak gun
+					else if( vector_length( local.plOrigin - ( 4878 4557 346 ) ) < 50 ){
+						local.player thread coop_teleportBrother ( 4873 4035 286 ) (0 174 0) local.message
+					}
+					//gap at flak gun
+					else if(local.plOrigin[0] < 4804 && local.plOrigin[0] > 3900 && local.plOrigin[1] > 4490 && local.plOrigin[1] < 5100 ){
+						local.player thread coop_teleportBrother ( 4873 4035 286 ) (0 174 0) local.message
+					}
+					//ruin next to flak gun
+					else if(local.plOrigin[0] < 4804 && local.plOrigin[0] > 3900 && local.plOrigin[1] > 4490 && local.plOrigin[1] < 5100 ){
+						local.player thread coop_teleportBrother ( 4873 4035 286 ) (0 174 0) local.message
+					}
+					//gabs after flak gun buildings facing flak left side
+					else if(local.plOrigin[0] < 3868 && local.plOrigin[0] > 2980 && local.plOrigin[1] > 4844 && local.plOrigin[1] < 5100 ){
+						local.player thread coop_teleportBrother ( 3197 4670 402 ) (0 -151 0) local.message
+					}
+					//gabs close to flak
+					else if( vector_length( local.plOrigin - ( 5438 5026 228 ) ) < 60 ){
+						local.player thread coop_teleportBrother (  5449 3955 303 ) (0 174 0) local.message
+					}
+					//gab behind flak
+					else if( vector_length( local.plOrigin - ( 4901 4533 290 ) ) < 70 ){
+						local.player thread coop_teleportBrother (  5449 3955 303 ) (0 174 0) local.message
+					}
+					//second mg gunner
+					//else if( vector_length( local.plOrigin - ( 1850 4719 338 ) ) < 50 ){
+					else if( vector_length( local.plOrigin - ( 1785 4711 310 ) ) < 100 ){
+						local.player thread coop_teleportBrother ( 3197 4670 402 ) (0 -151 0) local.message
+					}
+					//gab next to second mg
+					else if( vector_length( local.plOrigin - ( 1200 4825 337 ) ) < 100 ){
+						local.player thread coop_teleportBrother ( 1116 4680 365 ) (0 -112 0) local.message
+					}
+					//gab behind church
+					else if( vector_length( local.plOrigin - ( 3008 2518 357 ) ) < 200 ){
+						local.player thread coop_teleportBrother ( 3114 2773 291 ) (0 101 0) local.message
+					}
+					//gab at brig wall town exit left side facing away from town exit
+					else if( vector_length( local.plOrigin - ( 612 956 412 ) ) < 60 ){
+						local.player thread coop_teleportBrother ( 410 856 356 ) (0 101 0) local.message
+					}
+
+					//print message if there is one set
+					if(local.messagePrintout != NIL){
+						local.player iprint local.messagePrintout 1
+					}
+				}
+			}
+		}
+		waitframe
+	}
+}end
+
+//chrissstrahl - make sure player does not spawn inside the tank
+//might be expanded later on, but right now I think this has to do or I am going crazy with work
+//=========================================================================
+coop_playerJustSpawned local.i:{
+//=========================================================================
+	local.player = $player[local.i]
+	if(local.player != NULL){
+	}
+}end
+
+//=========================================================================
+coop_playerJustSpawned1:{
+//=========================================================================
+	thread coop_playerJustSpawned 1
+}end
+
+//=========================================================================
+coop_playerJustSpawned2:{
+//=========================================================================
+	thread coop_playerJustSpawned 2
+}end
+
+//=========================================================================
+coop_playerJustSpawned3:{
+//=========================================================================
+	thread coop_playerJustSpawned 3
+}end
+
+//=========================================================================
+coop_playerJustSpawned4:{
+//=========================================================================
+	thread coop_playerJustSpawned 4
+}end
+
+//=========================================================================
+coop_playerJustSpawned5:{
+//=========================================================================
+	thread coop_playerJustSpawned 5
+}end
+
+//=========================================================================
+coop_playerJustSpawned6:{
+//=========================================================================
+	thread coop_playerJustSpawned 6
+}end
+
+//=========================================================================
+coop_playerJustSpawned7:{
+//=========================================================================
+	thread coop_playerJustSpawned 7
+}end
+
+//=========================================================================
+coop_playerJustSpawned8:{
+//=========================================================================
+	thread coop_playerJustSpawned 8
+}end
+

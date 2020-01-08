@@ -1,0 +1,125 @@
+TIKI
+setup
+{
+	//scale 0.52			// Set default scale to 16/30.5 since world
+						// is in 16 units per foot and model is in cm's
+	scale 0.52
+	path models/statweapons/mg42
+	skelmodel mg42.skd
+	surface mg421 shader mg42
+	surface mg422 shader mg42
+
+}
+
+init
+{
+	server
+	{
+		classname		TurretGun
+		weapontype		mg
+		name			"MG42"
+
+		// set to a fake turret by default
+		spawnflags 1
+
+		// turret settings
+		idleCheckOffset	"-56 0 0"
+//		viewOffset		"-32 0 8"
+		viewOffset		"-42 0 10"
+
+		// Primary fire type info
+		firetype		bullet
+//		ammotype		"MG"
+//		clipsize		20
+//		startammo		20
+//		ammorequired	1
+//		ammorequired	0
+//		tracerfrequency 5
+		meansofdeath	bullet
+		bulletcount		1
+		usenoammo		1
+		firedelay		0.06
+		bulletrange		4000
+		bulletdamage	45
+		bulletspread	40 40
+		tracerfrequency 3 // to compensate for the slower fire rate
+
+		//chrissstrahl, removed for BT
+		// DM Attributes
+	}
+	client
+	{
+		cache muzsprite.spr
+		cache models/fx/muzflash.tik
+		cache models/ammo/rifleshell.tik
+	}
+}
+
+
+animations
+{
+	idle	mg42.skc
+	fire	mg42.skc
+	{
+		server
+		{
+			entry shoot
+		}
+		client
+		{
+			//chrissstrahl - disabled this, because it did make framerates drop down to 4 fps on ohama beach
+			//chrissstrahl - and it did spam the console quite alot
+			//entry stopaliaschannel mg42_gun_fake_snd_fire
+			//entry sound mg42_gun_fake_snd_fire weapon .5 768 .9 .2
+
+			// muzzle flash
+			entry tagdlight tag_barrel 0.25 0.2 0.05 140 0.11
+			entry tagspawn tag_barrel
+			(
+				//spawnrangelinked 4096 //chrissstrahl - deactivated, was spamming console
+				scale 0.4
+				offsetalongaxis 1.5 0 0
+				count 1
+				model muzsprite.spr
+				angles 0 0 crandom 25
+				life 0.06
+			)
+			entry tagspawnlinked tag_barrel
+			(
+				spawnrange 4096
+				count 1
+				scalemin 0.9
+				scalemax 1.1
+				model models/fx/muzflash.tik
+				randomroll
+				life 0.04
+			)
+
+			// shell eject
+			entry commanddelay 0.1 tagspawn tag_eject
+			(
+				spawnrange 1024
+				count 1
+				model models/ammo/rifleshell.tik
+				scale 1.0
+				velocity 70
+				randvel crandom 10 crandom 10 random 20
+				emitterangles 0 0 0
+				avelocity crandom 90 crandom 90 0
+				accel 0 0 -800
+				physicsrate 20
+				life 2.0
+				fadedelay 1.7
+				collision
+				bouncefactor 0.2
+				bouncesoundonce snd_rifle_shell
+			)
+
+			//chrissstrahl - removed commented section // smoke puff
+		}
+	}
+}
+
+/*QUAKED turretweapon_german_mg42-fake (0.5 .25 0.25) (-8 -8 0) (8 8 16) FAKEBULLETS
+MG42 fake gun turret
+*/

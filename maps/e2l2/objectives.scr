@@ -1,0 +1,115 @@
+//
+// objectives.scr
+//
+
+//============================================================================
+init: {
+//============================================================================
+
+	level.destroyCommTower_no	= 1
+	level.getToJeep_no			= 2
+	level.reachAirfield_no		= 3
+	level.sabotageAirplanes_no	= 4
+	level.scrambleFighters_no	= 5		
+	level.escape_no				= 6
+
+	level.commTowerDestroyed	= 0
+	level.gotToJeep				= 0
+	level.reachedAirfield		= 0
+	level.airplanesSabotaged	= 0
+	level.scrambleFighters		= 0	
+	level.escapedTheBase		= 0
+	level.gotInJeep				= 0
+
+	level.curr_obj_num			= 0	
+	level.planes_to_sabotage	= 4
+
+	waitthread global/objectives.scr::add_objectives level.destroyCommTower_no 	2 "Destroy the Communications Tower" $KillRadioTower_TriggerTimer.origin		
+	waitthread global/objectives.scr::add_objectives level.getToJeep_no		 	1 NIL $GuardPostJeep.origin
+	waitthread global/objectives.scr::add_objectives level.reachAirfield_no 	1 "Reach the Airfield at Caltagirone" $gotha_music.origin		
+	waitthread global/objectives.scr::add_objectives level.sabotageAirplanes_no	1 ("Sabotage Italian Fighters  [" + level.planes_to_sabotage + " Remaining]")
+	waitthread global/objectives.scr::add_objectives level.scrambleFighters_no 	1 "Sound Alarm to Scramble the Fighters" $scramble_trigger.origin
+	waitthread global/objectives.scr::add_objectives level.escape_no 			1 "Locate the British Officer and Escape the Airfield" $FinalJeep.origin
+	waitthread SetCurrObj level.destroyCommTower_no
+}end
+
+//============================================================================
+transition local.key: {
+//============================================================================
+	// handle any objective state changes
+	switch (local.key) {
+		case "commTowerDestroyed":			
+			level.commTowerDestroyed = 1						
+			waitthread global/objectives.scr::add_objectives level.destroyCommTower_no 	3									
+			break
+
+		case "gottojeep":
+			level.gotToJeep = 1
+			break
+
+		case "reachedAirfield":
+			waitthread global/objectives.scr::add_objectives level.reachAirfield_no 	3
+			level.reachedAirfield = 1			
+			break
+
+		case "airplanesSabotaged":			
+			waitthread global/objectives.scr::add_objectives level.sabotageAirplanes_no	3
+			level.airplanesSabotaged = 1
+			break		
+
+		case "scrambledFighters":
+			level.scrambleFighters = 1
+			waitthread global/objectives.scr::add_objectives level.scrambleFighters_no	3
+			break
+
+		case "escapedTheBase":
+			level.escapedTheBase = 1
+			waitthread global/objectives.scr::add_objectives level.escape_no            3			
+			break	
+	}
+
+	// figure out what the current objective is
+	if (level.commTowerDestroyed == 0)  {
+		// first we must destroy the comm tower		
+		waitthread SetCurrObj level.destroyCommTower_no
+	}
+	else if( level.gotToJeep == 0 ) {
+		waitthread SetCurrObj level.getToJeep_no
+	}
+	else if (level.reachedAirfield == 0)  {			
+		// then we have to get to the airfield
+		waitthread SetCurrObj level.reachAirfield_no 		
+		waitthread global/objectives.scr::add_objectives level.reachAirfield_no 	2 NIL $gotha_music.origin		
+	}
+	else if (level.airplanesSabotaged == 0)  {			
+		//Sabotage the planes now				
+		waitthread SetCurrObj level.sabotageAirplanes_no
+		waitthread maps/e2l2/planeGags.scr::AirplaneObjCompass_Thread					
+	}
+	else if (level.scrambleFighters == 0 ) {
+		waitthread SetCurrObj level.scrambleFighters_no
+		waitthread global/objectives.scr::add_objectives level.scrambleFighters_no 	2 NIL $scramble_trigger.origin
+		$scramble_trigger thread maps/e2l2/planeGags.scr::ScrambleAirplanes
+	}	
+	else if (level.cappyMet == 0 && level.cappyMeet != 0) {
+		waitthread SetCurrObj level.meetCappy_no
+	}	
+	else if (level.escapedTheBase == 0) {
+		waitthread global/objectives.scr::add_objectives level.escape_no	2  NIL $FinalJeep.origin		
+		waitthread SetCurrObj level.escape_no
+	}
+}end
+
+//============================================================================
+move_curr_compass_point local.new_point: {
+//============================================================================
+	waitthread global/objectives.scr::add_objectives level.curr_obj_num 2 NIL local.new_point
+	waitthread SetCurrObj level.curr_obj_num
+}end
+
+//============================================================================
+SetCurrObj local.num: {
+//============================================================================
+	waitthread global/objectives.scr::current_objectives local.num
+	level.curr_obj_num = local.num
+}end

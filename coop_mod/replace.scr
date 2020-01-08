@@ -1,0 +1,2387 @@
+//chrissstrahl 23.06.2018
+//created to make some mohaa global scripts multiplayer compatible
+//this is largly based on the "HaZardModding Coop Script Mod" script solutions
+
+//	ORIGINAL							 	REPLACEMENT
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//	level waittill spawn					waitthread coop_mod/replace.scr::waitForPlayer
+//	level waittill prespawn					waitthread coop_mod/replace.scr::waitTillPrespawn
+//	$player.origin							local.vecOriginPlayerMultiplayer = exec coop_mod/replace.scr::player_origin
+//	$ent cansee $player 3500				( exec coop_mod/replace.scr::player_anyCanBeSeen $ent 3500 ) == TRUE
+//	local.player = $player[local.random]	local.player = exec coop_mod/replace.scr::player_random
+
+
+//chrissstrahl - the issue here is that this can't be used in global/ai.scr
+//it will return a error like no free edicts or cl_phrasegamestate bad byte
+//my best guess is it is the function call it self that is causing this
+//=========================================================================
+waitTillPrespawn:{
+//=========================================================================
+	//keep original handle for singeplayer
+	if(level.gametype == 0){
+		level waittill prespawn
+		end
+	}
+	level waittill prespawn
+	end
+	
+	//this does not really work out yet
+	//this does not really work out yet
+	//this does not really work out yet
+	//handle in coop 
+	if(level.coop_prespawn == NIL){
+		//enter this realm only once
+		level.coop_prespawn = 1
+		//spawn manager trigger
+		spawn trigger_relay targetname "coop_playerHasEnteredManager"
+		//make sure we give the trigger time to spawn
+		waitframe
+		level.coop_prespawn = 2
+		//use original code, if it works it's great for performance
+		level waittill prespawn
+		//wait until a player entered the game
+		while($player == NULL){
+			waitframe
+		}
+		/*//if all goes fast, and trigger can't be found, wait a extra frame
+		if($coop_playerHasEnteredManager == NULL){
+			waitframe
+		}*/
+		//if trigger is not there don't spam console with error
+		if($coop_playerHasEnteredManager != NULL){
+			trigger $coop_playerHasEnteredManager
+		}else{
+			println("COOP: waitTillPrespawn - could not find trigger, no clear-signal send for waiting threads")
+		}		
+		//clear prespawn phase var
+		level.coop_prespawn = 3
+	}
+	//all other calls will be handled here, unlike the first call
+	else{
+		if(level.coop_prespawn == NIL || level.coop_prespawn < 2 ){		
+			waitframe //wait extra here to keep the active loop count low
+			while(level.coop_prespawn == NIL || level.coop_prespawn < 2 ){
+				waitframe
+			}
+		}
+		//if trigger is no longer there don't spam console with error
+		if($coop_playerHasEnteredManager != NULL){
+			$coop_playerHasEnteredManager waittill trigger
+		}
+	}
+}end
+
+//chrissstrahl - wait until players are on the server and ready
+//notify players for about 6 times, stops then until a new player joins or a player leaves, then repeat all over
+//=========================================================================
+waitForPlayer:{
+//=========================================================================
+	//handle singleplayer
+	if(level.gametype == 0){
+		if ($player == NULL){
+			level waittill spawn
+		}
+		end
+	}
+
+	//if called again, this will only check for the script variable status
+	//this makes this function more efficent and will reduce the number of events this creates
+	if(level.coop_waitforPlayer != NIL){
+		while( level.coop_waitforPlayer ){
+			//wait 0.25//chrissstrahl
+			waitframe
+		}
+		end
+	}
+	
+	//if called for the first time this manages the waiting
+	level.coop_waitforPlayer	= 1
+	local.messageTime			= 1
+	local.messageRepeat			= 0
+	local.messagePlayers		= 0
+	while( !level.coop_playerReady ){
+		if( $player.size != NULL && $player.size > 0 ){
+			if(local.messageTime < level.time){
+				if( local.messageRepeat < 5 ){
+					iprintlnbold_noloc ( "HaZardModding Coop Mod is waiting for you to spawn." )
+					local.messageTime = ( level.time + 6 )
+					local.messageRepeat++
+					local.messagePlayers = $player.size
+				}else if( $player.size != local.messagePlayers ){
+					 local.messageRepeat = 0
+				}
+			}
+		}
+		wait 0.25
+	}
+	level.coop_waitforPlayer = 0
+}end
+
+//check if the given entity is of type player and a array
+//problems arise as soon as there is more than 1 player on the level
+//but if there are more - we need to take action, before "they breed like rabbits" that would be wie...-...chill
+//=========================================================================
+isPlayerArray local.entity:{
+//=========================================================================
+	//level.coop_singleplayer reads cvar g_gametype value upon level start once
+	//level.coop_svmaxclients reads cvar sv_maxclients value upon level start once
+	
+	//singeplayer or var is empty or entity is missing
+	if( level.gametype == 0 || local.entity == NIL || local.entity == NULL ){
+		end 0
+	}
+	
+	if( local.entity.size > 1 ){
+		for(local.i = 1;local.i <= local.entity.size;local.i++){
+			local.current =	local.entity[local.i]
+			//just to be perfectly paranoid:
+			//- make sure the player exists
+			//- make sure the player has the targetname player - removed, this is tottaly redundant and slow
+			//- make sure the player has the correct entity number 0 to sv_maxclients(-1) are reserved for players
+			if(local.current != NULL && local.current.entnum < level.coop_svmaxclients /*&& local.current.targetname == "player"*/ ){
+				end 1
+			}
+		}
+	}
+}end 0
+
+//this function is deprecated and should no longer be used
+//use .targetname == "player" comparison instead
+//=========================================================================
+isPlayer local.entity:{
+//=========================================================================
+	error ( "coop_mod/replace.scr::isPlayer - USED! Function is deprecated fall back to targetname comparison" ) 1000
+	/* deprecated */
+}end
+
+//checks if any player can seen ba this actor
+//=========================================================================
+player_anyCanBeSeen local.ent local.fov local.range:{
+//=========================================================================
+	if( local.ent == NIL || local.ent == NULL ){
+		end 0
+	}
+	if( local.fov == NIL ){
+		local.fov = 360
+	}
+	
+	//this fixes bad scripting/////////////////////
+	if( local.fov > 360 && local.range == NIL ){
+		 local.range = local.fov
+		 local.fov = 360
+	}
+	
+	//SINGLEPLAYER////////////////////////////
+	if( level.gametype == 0 ){
+		if( $player != NULL){
+			if( local.ent cansee $player local.range){
+				end 1
+			}
+		}
+	}
+	//MULTIPLAYER////////////////////////////
+	else{
+		local.player = NULL
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+			if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 ){
+				//NORANGE/////////////////
+				if( local.range == NIL ){
+					if( local.ent cansee local.player local.fov ){
+iprintlnbold_noloc ( "can see" )
+						end 1
+					}
+				}
+				//RANGE/////////////////
+				else{
+					if( local.ent cansee local.player local.fov local.range ){
+iprintlnbold_noloc ( "can see" )
+						end 1
+					}
+				}
+			}
+		}
+	}
+iprintlnbold_noloc ( "DEV: can not see" )
+}end 0
+
+//=========================================================================
+player_numActive:{
+//=========================================================================
+	local.active = 0
+	
+	//SINGLEPLAYER////////////////////////////
+	if( level.gametype == 0 ){
+		if( $player != NULL){
+			end 1
+		}
+	}
+	//MULTIPLAYER////////////////////////////
+	else{
+		local.player = NULL
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+
+			if( local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" ){ //local.player.flags["coop_isActive"] == 1
+				local.active++
+			}
+		}
+	}
+}end local.active
+
+//=========================================================================
+player_random:{
+//=========================================================================
+//this function is just a quick fix, this needs to be done right, look hzm coop mod for ef2 how to do this best in morpheus script
+	local.player = NULL
+	local.playerReturn = NULL
+	
+	local.playerReturn = exec coop_mod/replace.scr::player_anyValid
+}end local.playerReturn
+
+//=========================================================================
+player_anyValid:{
+//=========================================================================
+	local.player = NULL
+	local.playerReturn = NULL
+	
+	//SINGLEPLAYER////////////////////////////
+	if( level.gametype == 0 ){
+		if( $player != NULL){
+			end $player
+		}
+	}
+	//MULTIPLAYER////////////////////////////
+	else{
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+
+			if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 ){
+				local.playerReturn = local.player
+				end local.playerReturn
+			}
+		}
+	}
+}end local.playerReturn
+
+//=========================================================================
+player_anyPreferValid:{
+//=========================================================================
+	local.player = NULL
+	local.playerReturn = NULL
+	
+	//SINGLEPLAYER////////////////////////////
+	if( level.gametype == 0 ){
+		if( $player != NULL){
+			end $player
+		}
+	}
+	//MULTIPLAYER////////////////////////////
+	else{
+		local.checking = 2
+		while(local.checking > 0){
+			for (local.i = 1;local.i <= $player.size;local.i++){
+				local.player = $player[local.i]
+				if( local.player != NULL ){
+					if( local.checking == 2 && local.player.dmteam != "spectator" && local.player.health > 0 || local.player.health > 0){
+						local.playerReturn = local.player
+						end local.playerReturn
+					}
+				}
+			}
+			local.checking--
+		}
+	}
+}end local.playerReturn
+
+//returns player closest to...
+//if origin is set that will be used instead of object
+//if object and origin are not set any player will be returned
+//=========================================================================
+player_closestTo local.object local.origin:{
+//=========================================================================
+	//SINGLEPLAYER////////////////////////////
+	if( level.gametype == 0 ){ end $player }
+
+	//MULTIPLAYER////////////////////////////
+//this accepts eigther of both paramaters (enity, vector)
+//this function is just a quick fix, this needs adjustment
+	local.objectOrigin = ( 0 0 0 )
+	local.player = NULL
+	local.playerReturn = NULL
+	local.playerOrigin = (0 0 0)
+	local.closestDistance = 999999
+	
+	if( local.origin != NIL ){
+		local.objectOrigin = local.origin
+	}
+	else if( local.object == NULL || local.object == NIL){
+		//iprintlnbold_noloc("player_closestTo NIL/NULL")
+		local.playerReturn = exec coop_mod/replace.scr::player_anyValid
+	}
+	else{
+		//iprintlnbold_noloc("player_closestTo " + local.object.targetname )
+		local.objectOrigin = local.object.origin
+	}
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player = $player[local.i]
+		if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1){
+			if( vector_length( local.player.origin - local.objectOrigin ) < local.closestDistance ){
+				local.playerReturn		= local.player
+				local.closestDistance	= vector_length( local.player.origin - local.objectOrigin )
+			}
+		}
+	}
+
+}end local.playerReturn
+
+//=========================================================================
+player_origin:{
+//=========================================================================
+//this function might be expanded later on to sync with other functions, so they return all the same player
+//level.coopSyncPlayer = 1 //might read check and if invalid set a new player
+	local.player = NULL
+	local.playerOrigin = (0 0 0)
+	
+	//SINGLEPLAYER////////////////////////////
+	if( level.gametype == 0 ){
+		end $player.origin
+	}
+	//MULTIPLAYER////////////////////////////
+	else{
+		iprintlnbold_noloc("DEV: player_origin used, but func needs revision!")
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+
+			if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 ){
+				local.playerOrigin = local.player.origin
+				end local.playerOrigin
+			}
+		}
+	}
+}end local.playerOrigin
+
+//=========================================================================
+waittill_spawn:{
+//=========================================================================
+	//SINGLEPLAYER////////////////////////////
+	if( level.gametype == 0 ){
+		level waittill spawn
+	}
+	//MULTIPLAYER////////////////////////////
+	else{
+		while( $player == NULL || $player.size == 0 ){
+			waitframe
+			//iprintlnbold_noloc "waiting"
+		}
+	}
+}end
+
+//STOPWATCH
+//replaces $player stopwatch
+//=========================================================================
+stopwatch local.time:{
+//=========================================================================
+	if( local.time == NIL ){
+		error ( "coop_mod/replace.scr::stopwatch - parameter 1 was NIL" ) 1000
+		end
+	}
+	
+	if( level.gametype == 0 ){
+		$player stopwatch local.time
+		end
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player != NULL ){
+			//make sure 0 can be set always
+			if( local.time == 0 || local.player.dmteam != "spectator" ){
+				local.player stopwatch local.time
+			}
+		}
+	}
+}end
+
+//VIEWANGLES
+//replaces $player.viewangles = 
+//=========================================================================
+viewangles local.vecAngles:{
+//=========================================================================
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player != NULL ){
+			if(level.gametype != 0){
+				if( local.player.health <= 0 || local.player.dmteam == "spectator" ){
+					continue
+				}
+			}
+			local.player.viewangles = local.vecAngles
+		}
+	}
+}end
+
+//TMSTOP
+//replaces $player stufftext "tmstop"
+//=========================================================================
+tmstop:{
+//=========================================================================
+	if( level.gametype == 0 ){
+		$player stufftext "tmstop"
+		end
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player != NULL ){
+			local.player stufftext "tmstop"
+		}
+	}
+	level.coop_musicCommand = NIL
+}end
+
+//TMSTARTLOOP
+//replaces $player stufftext "tmstartloop ..."
+//[200] chrissstrahl - added parameter to allow stoping of current song
+//=========================================================================
+tmstartloop local.file local.stop:{
+//=========================================================================
+	if( local.file == NIL ){
+		error ( "coop_mod/replace.scr::tmstartloop - parameter 1 was NIL" ) 1000
+		end
+	}
+	
+	//[200] chrissstrahl - allow to add stop song command
+	local.command = ""
+	if(local.stop != NIL){
+		local.command = "tmstop;"
+	}
+	local.command += "tmstartloop "
+	//[200] end
+	
+	local.command += local.file
+	
+	if( level.gametype == 0 ){
+		$player stufftext ( local.command )
+		end
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player != NULL ){
+			local.player stufftext ( local.command )
+		}
+	}
+	level.coop_musicCommand = local.command
+	//level.coop_musicCommandLoop = local.command
+	//level.coop_musicCommandLoopIndx++
+}end
+
+
+//TMSTART
+//replaces $player stufftext "tmstart ..."
+
+//=========================================================================
+tmstart local.file:{
+//=========================================================================
+	if( local.file == NIL ){
+		error ( "coop_mod/replace.scr::tmstart - parameter 1 was NIL" ) 1000
+		end
+	}
+	
+	local.command = "tmstart "
+	local.command += local.file
+	
+	if( level.gametype == 0 ){
+		$player stufftext ( local.command )
+		end
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player != NULL ){
+			local.player stufftext ( local.command )
+		}
+	}
+	//register, so players entering later will also have that adjusted/send
+	level.coop_musicCommand = local.command
+	//level.coop_musicCommandIndx++
+}end
+
+//replaces $player stufftext "tmvolume ..."
+//=========================================================================
+tmvolume local.vol:{
+//=========================================================================
+	if( local.vol == NIL ){
+		error ( "coop_mod/replace.scr::tmvolume - parameter 1 was NIL" ) 1000
+		end
+	}
+	
+	local.command = "tmvolume "
+	local.command += local.vol
+	
+	if( level.gametype == 0 ){
+		$player stufftext ( local.command )
+		end
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player != NULL ){
+			local.player stufftext ( local.command )
+		}
+	}
+	//register, so players entering later will also have that adjusted/send
+	level.coop_musicCommandVol = local.command
+	//level.coop_musicCommandVolIndx++
+}end
+
+//LOOKAT
+//replaces $wooteva lookat $player
+//=========================================================================
+lookat:{
+//=========================================================================
+	if( self == NIL || self == NULL ){
+		error ( "coop_mod/replace.scr::lookat - needs to be executed by a actor" ) 1000
+		end
+	}
+	
+	if( level.gametype == 0 ){
+		self lookat $player
+		end
+	}
+	
+	local.player = exec coop_mod/replace.scr::player_closestTo self
+	self lookat local.player
+}end
+
+//EYESLOOKAT
+//replaces $wooteva eyeslookat $player
+//=========================================================================
+eyeslookat:{
+//=========================================================================
+	if( self == NIL || self == NULL ){
+		error ( "coop_mod/replace.scr::lookat - needs to be executed by a actor" ) 1000
+		end
+	}
+	
+	if( level.gametype == 0 ){
+		self eyeslookat $player
+		end
+	}
+	
+	local.player = exec coop_mod/replace.scr::player_closestTo self
+	self eyeslookat local.player
+}end
+
+//TURNTO
+//replaces $wooteva turnto $player
+//=========================================================================
+turnto:{
+//=========================================================================
+	if( self == NIL || self == NULL ){
+		error ( "coop_mod/replace.scr::turnto - needs to be executed by a actor" ) 1000
+		end
+	}
+	
+	if( level.gametype == 0 ){
+		self turnto $player
+		end
+	}
+	
+	local.player = exec coop_mod/replace.scr::player_closestTo self
+	self turnto local.player
+}end
+
+//ISTOUCHING
+//replaces $player isTouching $whateva
+//=========================================================================
+istouching local.touchMeBaby:{
+//=========================================================================
+	if( local.touchMeBaby == NIL ){
+		error ( "coop_mod/replace.scr::istouching - parameter 1 was NIL" ) 1000
+		end 0
+	}
+	if( local.touchMeBaby == NULL ){
+		error ( "coop_mod/replace.scr::istouching - parameter 1 was NULL" ) 1000
+		end 0
+	}
+	
+	if( local.touchMeBaby.size > 1 ){
+		error ( "coop_mod/replace.scr::istouching - parameter 1 was ARRAY" ) 1000
+		end 0
+	}
+	
+	if( level.gametype == 0 ){
+		if( $player isTouching local.touchMeBaby ){ end 1 }
+		end 0
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+			if( local.player isTouching local.touchMeBaby ){
+				end 1
+			}
+		}
+	}
+}end 0
+
+//GETTOUCHER
+//returns player touching given entity
+//=========================================================================
+getToucher local.touchMeBaby:{
+//=========================================================================
+	if( local.touchMeBaby == NIL ){
+		error ( "coop_mod/replace.scr::getToucher - parameter 1 was NIL" ) 1000
+		end NULL
+	}
+	if( local.touchMeBaby == NULL ){
+		error ( "coop_mod/replace.scr::getToucher - parameter 1 was NULL" ) 1000
+		end NULL
+	}
+	
+	if( local.touchMeBaby.size > 1 ){
+		error ( "coop_mod/replace.scr::getToucher - parameter 1 was ARRAY" ) 1000
+		end NULL
+	}
+	
+	if( level.gametype == 0 ){
+		if( $player isTouching local.touchMeBaby ){ end $player }
+		end NULL
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+			if( local.player isTouching local.touchMeBaby ){
+				end local.player
+			}
+		}
+	}
+}end NULL
+
+//AIMAT
+//replaces $wooteva aimat $player
+//=========================================================================
+aimat:{
+//=========================================================================
+	if( self == NIL || self == NULL ){
+		error ( "coop_mod/replace.scr::aimat - needs to be executed by a actor" ) 1000
+		end
+	}
+	
+	if( level.gametype == 0 ){
+		self aimat $player
+		end
+	}
+	
+	local.player = exec coop_mod/replace.scr::player_closestTo self
+	self aimat local.player
+}end
+
+//SET_HASDISGUISE
+//replaces $player.has_disguise
+//=========================================================================
+set_hasdisguise local.disguise:{
+//=========================================================================
+	error ( "deprecated - coop_mod/replace.scr::set_hasdisguise - use has_disguise instead" ) 1000
+}end
+
+//SET_HASDISGUISE
+//replaces $player.has_disguise
+//=========================================================================
+has_disguise local.disguise:{
+//=========================================================================
+	if( local.disguise == NIL ){
+		error ( "coop_mod/replace.scr::has_disguise - parameter 1 was NIL" ) 1000
+		end
+	}
+	level.coop_playerHasDisguise = local.disguise
+	//keep for sp
+	if(level.gametype == 0){
+		$player.has_disguise = local.disguise
+	}
+	//mp
+	else{
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player =  $player[local.i]
+			if( local.player != NULL ){
+				local.player.has_disguise = local.disguise
+			}
+		}
+	}
+}end
+
+
+//PLAYSOUND
+//replaces $player playsound
+//=========================================================================
+playsound local.sound:{
+//=========================================================================
+	if( local.sound == NIL ){
+		error ( "coop_mod/replace.scr::playsound - parameter 1 was NIL" ) 1000
+		end
+	}
+	
+	if( level.gametype == 0 ){
+		$player playsound local.sound
+		$player waittill sounddone
+		end
+	}
+	
+	local.playerWait = NULL
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+			local.player playsound local.sound
+			if(local.playerWait == NULL){
+				local.playerWait = local.player
+				//chrissstrahl - fixme debugme finetune
+				//check if we can use $world instead, because it won't disconnect
+				
+			}
+		}
+	}
+	if(local.playerWait != NULL){
+		local.playerWait waittill sounddone
+	}else{
+		wait 1
+	}
+}end
+
+//replaces $player ammo ...
+//=========================================================================
+ammo local.type local.amount local.sound:{
+//=========================================================================
+//gives ammo to all players
+	if( level.gametype == 0 ){
+		$player ammo local.type local.amount
+		if(local.sound != NIL){
+			$player playsound local.sound
+		}
+		end
+	}
+
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player = $player[local.i]
+		if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+			local.player ammo local.type local.amount
+			if(local.sound != NIL){
+				local.player playsound local.sound
+			}
+		}
+	}
+}end
+
+//chrissstrahl - updated function, the function was actually corrupted in logic
+//chrissstrahl - function was not using the supplied offest vectors
+//25.10.2018
+//=========================================================================
+sighttrace local.offset local.vec local.pass local.min local.max:{
+//=========================================================================
+	if(local.offset == NIL){
+		local.offset = (0 0 0)
+	}
+	
+	if( level.gametype == 0 ){
+		if(local.pass != NIL && local.min != NIL && local.max != NIL ){
+			end ( sighttrace ($player.origin + local.offset) local.vec local.pass local.min local.max )
+		}
+		else if(local.pass != NIL && local.min != NIL ){
+			end ( sighttrace ($player.origin + local.offset) local.vec local.pass local.min )
+		}
+		else if(local.pass != NIL ){
+			end ( sighttrace ($player.origin + local.offset) local.vec local.pass )
+		}
+		else{
+			end (sighttrace ($player.origin + local.offset) local.vec)
+		}
+	}
+
+	local.notBlocked = 0
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player = $player[local.i]
+		if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+			if(local.pass != NIL && local.min != NIL && local.max != NIL ){
+				if( sighttrace (local.player.origin + local.offset) local.vec local.pass local.min local.max ){
+					local.notBlocked = 1
+				}
+			}			
+			else if(local.pass != NIL && local.min != NIL ){
+				if( sighttrace (local.player.origin + local.offset) local.vec local.pass local.min ){
+					local.notBlocked = 1
+				}
+			}		
+			else if(local.pass != NIL ){
+				if( sighttrace (local.player.origin + local.offset) local.vec local.pass ){
+					local.notBlocked = 1
+				}
+			}
+			else{
+				if(sighttrace (local.player.origin + local.offset) local.vec){
+					local.notBlocked = 1
+				}
+			}
+		}
+	}
+}end local.notBlocked
+
+//=========================================================================
+item local.item local.use:{
+//=========================================================================
+//adds item to the item list
+//gives item to players
+	
+	if( level.gametype == 0 ){
+		$player item local.item
+		if(local.use != NIL && local.use == 1){
+			$player use local.item
+		}
+		end
+	}
+
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player = $player[local.i]
+		if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+			local.player item local.item
+			if(local.use != NIL && local.use == 1){
+				local.player use local.item
+			}
+		}
+	}	
+		
+	if(level.coop_playerItem1 == NIL ){
+		level.coop_playerItem1 = local.item
+		end
+	}
+	if(level.coop_playerItem2 == NIL ){
+		level.coop_playerItem2 = local.item
+		end
+	}
+	if(level.coop_playerItem3 == NIL ){
+		level.coop_playerItem3 = local.item
+		end
+	}
+	if(level.coop_playerItem4 == NIL ){
+		level.coop_playerItem4 = local.item
+		end
+	}
+}end
+
+//=========================================================================
+take local.item:{
+//=========================================================================
+//removes item from the item list
+//takes item from players
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player = $player[local.i]
+		if( local.player != NULL ){
+			local.player take local.item
+		}
+	}
+	
+	if( level.gametype == 0 ){ end }
+		
+	if(level.coop_playerItem1 == local.item ){ level.coop_playerItem1 = NIL }
+	if(level.coop_playerItem2 == local.item ){ level.coop_playerItem2 = NIL }
+	if(level.coop_playerItem3 == local.item ){ level.coop_playerItem3 = NIL }
+	if(level.coop_playerItem4 == local.item ){ level.coop_playerItem4 = NIL }
+}end
+
+//=========================================================================
+takeAll:{
+//=========================================================================
+//takes all weapons and items from the players
+	level.coop_noWeapon = 1
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player = $player[local.i]
+		if( local.player != NULL ){
+			local.player takeall
+		}
+	}
+	
+	if( level.gametype == 0 ){ end }
+		
+	level.coop_playerItem1 = NIL
+	level.coop_playerItem2 = NIL
+	level.coop_playerItem3 = NIL
+	level.coop_playerItem4 = NIL
+}end
+
+//checks if any player can see this actor
+//=========================================================================
+cansee local.fov local.range:{
+//=========================================================================
+	if( self == NIL || self == NULL ){
+		error ( "coop_mod/replace.scr::cansee - needs to be executed by a entity" ) 1000
+		end 0
+	}
+	
+	//SINGLEPLAYER////////////////////////////
+	if( level.gametype == 0 ){
+		if( $player != NULL){
+			if( local.range == NIL && local.fov == NIL){
+				if( $player cansee self ){ end 1 }
+			}else if( local.range == NIL && local.fov != NIL){
+				if( $player cansee self local.fov ){ end 1 }
+			}else{
+				if( $player cansee self local.fov local.range ){ end 1 }
+			}
+		}
+		end 0
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player = $player[local.i]
+		if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+		
+			if( local.range == NIL && local.fov == NIL){
+				if( local.player cansee self ){ end 1 }
+			}else if( local.range == NIL && local.fov != NIL){
+				if( local.player cansee self local.fov ){ end 1 }
+			}else{
+				if( local.player cansee self local.fov local.range ){ end 1 }
+			}
+		}
+	}
+}end 0
+
+//=========================================================================
+canseenoents local.fov local.range:{
+//=========================================================================
+//check if actor can se a player
+	if( self == NIL || self == NULL ){
+		error ( "coop_mod/replace.scr::canseenoents - needs to be executed by a entity" ) 1000
+		end 0
+	}
+	
+	//SINGLEPLAYER////////////////////////////
+	if( level.gametype == 0 ){
+		if( $player != NULL){
+			if( local.range == NIL && local.fov == NIL){
+				if( $player canseenoents self ){ end 1 }
+			}else if( local.range == NIL && local.fov != NIL){
+				if( $player canseenoents self local.fov ){ end 1 }
+			}else{
+				if( $player canseenoents self local.fov local.range ){ end 1 }
+			}
+		}
+		end 0
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player = $player[local.i]
+		if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+		
+			if( local.range == NIL && local.fov == NIL){
+				if( local.player canseenoents self ){ end 1 }
+			}else if( local.range == NIL && local.fov != NIL){
+				if( local.player canseenoents self local.fov ){ end 1 }
+			}else{
+				if( local.player canseenoents self local.fov local.range ){ end 1 }
+			}
+		}
+	}
+}end 0
+
+//=========================================================================
+playerCansee local.ent local.fov local.range:{
+//=========================================================================
+//check if player can see the entity
+	if( local.ent == NIL ){
+		error ( "coop_mod/replace.scr::playerCansee - parameter1 was NIL" ) 1000
+		end 0
+	}
+	if( local.ent == NULL ){
+		error ( "coop_mod/replace.scr::playerCansee - parameter1 was NULL" ) 1000
+		end 0
+	}
+	
+	//SINGLEPLAYER////////////////////////////
+	if( level.gametype == 0 ){
+		if( $player != NULL){
+			if( local.range == NIL && local.fov == NIL){
+				if( $player cansee local.ent ){ end 1 }
+			}else if( local.range == NIL && local.fov != NIL){
+				if( $player cansee local.ent local.fov ){ end 1 }
+			}else{
+				if( $player cansee local.ent local.fov local.range ){ end 1 }
+			}
+		}
+		end 0
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player = $player[local.i]
+		if( local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+			if( local.range == NIL && local.fov == NIL){
+				if( local.player cansee local.ent ){ end 1 }
+			}else if( local.range == NIL && local.fov != NIL){
+				if( local.player cansee local.ent local.fov ){ end 1 }
+			}else{
+				if( local.player cansee local.ent local.fov local.range ){ end 1 }
+			}
+		}
+	}
+}end 0
+
+//=========================================================================
+canseeGetClosest local.fov local.range:{
+//=========================================================================
+//check if actor can se a player
+	if( self == NIL ){
+		error ( "coop_mod/replace.scr::canseeGetClosest - NEEDS to be executed by a enity" ) 1000
+		end NULL
+	}
+	if( self == NULL ){
+		error ( "coop_mod/replace.scr::canseeGetClosest - Executing entity is NULL" ) 1000
+		end NULL
+	}
+	
+	//SINGLEPLAYER////////////////////////////
+	if( level.gametype == 0 ){
+		if( $player != NULL){
+			if( local.range == NIL && local.fov == NIL){
+				if( self cansee $player ){ end $player }
+			}else if( local.range == NIL && local.fov != NIL){
+				if( self cansee $player local.fov ){ end $player }
+			}else{
+				if( self cansee $player local.fov local.range ){ end $player }
+			}
+		}
+		end NULL
+	}
+	
+//this function is just a quick fix, this needs adjustment
+	//MULTIPLAYER////////////////////////////
+	local.origin = ( 0 0 0 )
+	local.player = NULL
+	local.playerReturn = NULL
+	local.playerOrigin = (0 0 0)
+	local.closestDistance = 999999
+
+	if( self == NULL || self == NIL){
+		end NULL
+	}else{
+		local.origin = self.origin
+	}
+
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player = $player[local.i]
+
+		if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1){
+			local.playerIsValid = 0
+			if( local.range == NIL && local.fov == NIL){
+				if( self cansee local.player ){ local.playerIsValid = 1}
+			}else if( local.range == NIL && local.fov != NIL){
+				if( self cansee local.player local.fov ){ local.playerIsValid = 1 }
+			}else{
+				if( self cansee local.player local.fov local.range ){ local.playerIsValid = 1 }
+			}
+			if(local.playerIsValid){
+				if( vector_length( local.player.origin - local.origin ) < local.closestDistance ){
+					local.playerReturn		= local.player
+					local.closestDistance	= vector_length( local.player.origin - local.origin )
+				}
+			}
+		}
+	}
+}end local.playerReturn
+
+//KILLZONE
+//replaces $player normal_damage
+//killes players touching a specific trigger(zone)
+//=========================================================================
+killzone:{
+//=========================================================================
+	if( self == NULL ){
+		error ( "coop_mod/replace.scr::killzone - Needs to be executed by a trigger entity" ) 1000
+		end
+	}
+	
+	if( level.gametype == 0 ){
+		$player normal_damage (local.player.health + 1)
+		end
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player != NULL && local.player isTouching self ){
+			if( local.player.dmteam != "spectator" && local.player.health > 0  /* && local.player.flags["coop_isActive"] == 1*/ ){
+				//terminate player
+				local.player normal_damage (local.player.health + 1)
+				//make sure player will not respawn inside killzone
+				exec coop_mod/main.scr::resetSpawn local.player
+			}
+		}
+	}
+}end
+
+
+//=========================================================================
+threatbias local.val:{
+//=========================================================================
+//used to set player threat bias, managed inside coop mod
+	level.coop_threatbias = local.val
+	
+	if( level.gametype == 0 ){
+		$player threatbias level.coop_threatbias
+		end
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+			local.player threatbias level.coop_threatbias
+		}
+	}
+}end
+
+
+//KILLPLAYER
+//=========================================================================
+killplayer:{
+//=========================================================================
+	if( level.gametype == 0 ){
+		$player damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+		end
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 ){
+			local.player damage $world 15000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+		}
+	}
+}end
+
+
+//GLUE
+//=========================================================================
+glue local.entity local.angle:{
+//=========================================================================
+	level.coop_playerGlue = 1
+
+	if( level.gametype == 0 ){
+		//$player notsolid
+		//$player hide
+		//$player physics_off
+		if(local.angle == NIL){
+			$player glue local.entity
+		}else{
+			$player glue local.entity local.angle
+		}
+		end
+	}
+	
+	//handle multiplayer
+	thread glueHandle local.entity local.angle
+}end
+
+//optimize glue so that it glues player only one
+//make sure we handle glueing of each player in a generalized
+//seperate thread fot this and new glue function
+//maybe glueing only once will stop shaking when glued while object is moving
+//
+//chrissstrahl - updated with 2.00
+//=========================================================================
+glueHandle local.glueTo local.angle:{
+//=========================================================================
+
+	//detect if it is a entity or a string, if it is a string we want each player to have a seperate spot
+	local.individualSpots = 0
+	if(local.glueTo.size > 1){
+		local.individualSpots = 1
+	}
+	
+	while(level.coop_playerGlue == 1){
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player =  $player[local.i]
+			if( local.player != NULL ){
+				if(local.individualSpots == 1){
+					local.entity = $(local.glueTo+local.i)
+				}else{
+					local.entity = local.glueTo
+				}
+				
+				//skip null entity
+				if(local.entity == NULL){
+					println("DEV: replace.scr glue - local.entity was NULL for $player["+local.i+"]")
+					continue
+				}
+				
+				local.player.flags["coop_glueAngle"] = local.angle
+				local.player.flags["coop_glue"] = local.entity
+				
+				if( local.player.dmteam != "spectator" && local.player.health > 0 ){
+					//if they all go on one spot we can't have them solid and visible
+					if(local.individualSpots == 0){
+						local.player notsolid
+						local.player physics_off
+						local.player hide
+					}
+					
+					if(local.entity == NIL){ iprintlnbold_noloc("DEV: local.ent is NIL")	}
+					if(local.player == NIL){ iprintlnbold_noloc("DEV: local.player is NIL")	}
+					
+					if(local.angle != NIL){
+						local.player glue local.entity local.angle
+					}else{
+						local.player glue local.entity
+					}
+				}
+			}
+		}
+		waitframe
+	}
+}end
+
+//UNGLUE
+//in some cases we don't want to show the player after unglue
+//this is why the show command is missing on purpose here
+//use coop_mod/replace.scr::show instead when you need it
+//=========================================================================
+unglue local.entity:{
+//=========================================================================
+	level.coop_playerGlue = 0
+
+	//local.entity keept only for compatibility reasons
+	if( level.gametype == 0 ){
+		$player unglue
+		$player show //not sure if that is right
+		end
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player != NULL ){
+			local.player solid
+			local.player unglue
+			local.player physics_on
+			local.player.flags["coop_glue"] = NIL
+			//added in ver 2.00 making sure unglued players don't get stuck in each other if they are at the same pos
+			thread coop_mod/main.scr::playerMakeSolidAsap local.i
+		}
+	}
+}end
+
+
+//PHYSICS_ON
+//=========================================================================
+physics_on:{
+//=========================================================================
+	level.coop_physicsOff = 0
+	if( level.gametype == 0 ){
+		$player physics_on
+		$player.flags["coop_physicsOff"] = 0
+		end
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player != NULL ){
+			local.player physics_on
+			local.player.flags["coop_physicsOff"] = 0
+		}
+	}
+}end
+
+//PHYSICS_OFF
+//=========================================================================
+physics_off:{
+//=========================================================================
+	level.coop_physicsOff = 1
+	if( level.gametype == 0 ){
+		$player physics_off
+		$player.flags["coop_physicsOff"] = 1
+		end
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player != NULL ){
+			local.player physics_off
+			local.player.flags["coop_physicsOff"] = 1
+		}
+	}
+}end
+
+//SHOW
+//=========================================================================
+show:{
+//=========================================================================
+	if( level.gametype == 0 ){
+		$player show
+		end
+	}
+	level.coop_playerHide = 0
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+			local.player show
+		}
+	}
+}end
+
+//HIDE
+//=========================================================================
+hide:{
+//=========================================================================
+	if( level.gametype == 0 ){
+		$player hide
+		end
+	}
+	level.coop_playerHide = 1
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 ){
+			local.player hide
+		}
+	}
+}end
+
+//FORCELEGSTATE
+//=========================================================================
+forcelegsstate local.state:{
+//=========================================================================
+	if( level.gametype == 0 ){
+		$player forcelegsstate local.state
+		end
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 ){
+			local.player forcelegsstate local.state
+		}
+	}
+}end
+
+//[200] chrissstrahl - can now handle vector or entity in parameter 1
+//WITHINDISTANCEOF
+//returns 1 if any player is within given distance of given entity
+//=========================================================================
+withinDistanceOf local.ent local.distance:{
+//=========================================================================
+	if( level.gametype == 0 ){
+		if( vector_length($player.origin - local.ent.origin) <= local.distance ){
+			end 1
+		}
+		end 0
+	}
+	
+	if( local.ent == NULL ){
+		error ( "coop_mod/replace.scr::withinDistanceOf - parameter1 was NULL" ) 1000
+		end 0
+	}
+	if( local.ent == NIL){
+		error ( "coop_mod/replace.scr::withinDistanceOf - parameter1 was NIL" ) 1000
+		end 0
+	}
+	
+	//[200] chrissstrahl - test
+	//println("local.ent[1].size: "+local.ent[1].size+"#")
+	//println("local.ent.size: "+local.ent.size+"#")
+	
+	//[200] chrissstrahl - added to detect arrays
+	if( int(local.ent.size) > 1 ){
+		error ( "coop_mod/replace.scr::withinDistanceOf - parameter1 was VECTOR or ENTITY-ARRAY" ) 1000
+		end 0
+	}
+
+	//[200] chrissstrahl - added to detect vector or entity
+	local.isEntity = 0
+	local.vOrigin = (0 0 0)
+	
+	local.varType = waitthread coop_mod/main.scr::returnVarType local.ent
+	if(local.varType == 3){
+		local.vOrigin = local.ent
+//println("is vector")
+	}else{
+		local.isEntity = 1
+//println("is entity")
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+			if(local.isEntity == 1){
+				if( vector_length(local.player.origin - local.ent.origin) <= local.distance ){
+					end 1
+				}
+			}
+			else{
+				if( vector_length(local.player.origin - local.vOrigin) <= local.distance ){
+					end 1
+				}	
+			}
+		}
+	}
+}end 0
+
+
+//WITHINDISTANCE
+//=========================================================================
+withinDistance local.vOrigin local.distance:{
+//=========================================================================
+//returns 1 if any player is within given distance of given origin
+	if( level.gametype == 0 ){
+		if( vector_length($player.origin - local.vOrigin) <= local.distance ){
+			end 1
+		}
+		end 0
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+			if( vector_length(local.player.origin - local.vOrigin) <= local.distance ){
+				end 1
+			}
+		}
+	}
+}end 0
+
+//LOOPSOUND
+//=========================================================================
+loopsound local.sound:{
+//=========================================================================
+//returns 1 if any player is within given distance of given entity
+	if( level.gametype == 0 ){
+		$player loopsound local.sound
+		end
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player != NULL && local.player.dmteam != "spectator" ){
+			local.player loopsound local.sound
+		}
+	}
+}end
+
+//STOPLOOPSOUND
+//=========================================================================
+stoploopsound local.sound:{
+//=========================================================================
+//returns 1 if any player is within given distance of given entity
+	if( level.gametype == 0 ){
+		$player loopsound local.sound
+		end
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player != NULL ){
+			local.player stoploopsound local.sound
+		}
+	}
+}end
+
+//RUNTOCLOESET
+//=========================================================================
+runto:{ //this is redudant, but it is easier to use runto as func
+//=========================================================================
+//runs to closest player - used for enemies to charge towards any player
+
+	if( self == NIL || self == NULL ){
+		error ( "coop_mod/replace.scr::runto - Needs to be executed by a actor" ) 1000
+		end
+	}
+	
+	local.player = exec coop_mod/replace.scr::player_closestTo self
+	self runto local.player
+}end
+
+//RUNTOCLOESET
+//=========================================================================
+runtoClosest:{
+//=========================================================================
+//runs to closest player - used for enemies to charge towards any player
+
+	if( self == NIL || self == NULL ){
+		error ( "coop_mod/replace.scr::runtoClosest - Needs to be executed by a actor" ) 1000
+		end
+	}
+	
+	local.player = exec coop_mod/replace.scr::player_closestTo self
+	self runto local.player
+}end
+
+//ORIGIN
+//=========================================================================
+origin local.ent:{
+//=========================================================================
+//get origin of closest player
+	local.vec = NIL
+	if( local.ent == NIL || local.ent == NULL ){
+		error ( "coop_mod/replace.scr::origin - Parameter 1 needs to be a entity" ) 1000
+		end
+	}
+	local.player = exec coop_mod/replace.scr::player_closestTo self
+	//if no player return 0 0 0
+	if(local.player == NULL){
+		end ( 0 0 0 )
+	}
+	local.vec = local.player.origin
+}end local.vec
+
+//=========================================================================
+holster:{
+//=========================================================================
+//chrissstrahl - this fixes problems we have in coop with ai (cardgame and so forth)
+	self.flags["coop_holsterGun"] = self.gun
+	self holster
+}end
+
+//=========================================================================
+unholster:{
+//=========================================================================
+	self gun self.flags["coop_holsterGun"]
+}end
+
+//=========================================================================
+spawnclip local.origin local.mins local.maxs local.targetname local.scale local.angle local.message local.requiredentity local.range:{
+//=========================================================================
+//chrissstrahl - spawns a clip preventing players from getting any further
+//idealy dsplaying a message why or what to do
+	if(local.targetname == NIL){ local.targetname = "coop_spawnedClip" }
+	if(local.scale == NIL){ local.scale = 0.5 }
+	if(local.angle == NIL){ local.angle = 0 }
+	
+	//local.entity = spawn script_model model models/fx/dummy.tik targetname local.targetname origin local.origin
+	//local.entity = spawn script_model model models/emitters/ddaysmoke2.tik targetname local.targetname origin local.origin
+	//local.entity = spawn script_model model models/miscobj/barbwire_long_pulse.tik targetname local.targetname origin local.origin
+	local.entity = spawn script_model model models/static/barbwire.tik targetname local.targetname origin local.origin
+	waitframe
+	if( local.entity == NULL ){ end }
+	
+	local.entity setsize local.mins local.maxs
+	local.entity scale local.scale
+	local.entity angle local.angle
+	local.entity solid
+	
+	if( local.message == NIL && local.requiredentity == NIL){
+		end
+	}
+	
+	local.entityrequired = 1
+	if(local.requiredentity == NIL || local.requiredentity == NULL){
+		if(local.requiredentity == NULL){
+			iprintlnbold_noloc("Coop: WARNING: spawnclip - NULL entity given")
+		}
+		local.entityrequired = 0
+	}
+	
+	while(local.entity){
+		//wait for required entity
+		if(local.entityrequired){
+			if(local.requiredentity == NULL || vector_length(local.requiredentity.origin - local.entity.origin) <= local.range){
+				local.entity remove
+				end
+			}
+		}	
+		//show info message
+		if(local.message != NIL){
+			if(exec coop_mod/replace.scr::istouching local.entity){
+				iprintlnbold_noloc(local.message)
+				wait 5
+			}
+		}
+		waitframe
+	}
+}end
+
+//waits until vehicle stops, optional self specifified delay time
+//=========================================================================
+waittilldrive local.delay local.wait:{
+//=========================================================================
+	if( local.delay != NIL){
+		wait local.delay
+	}
+	while(self != NULL){
+		local.origin = self.origin
+		
+		if( local.wait != NIL){
+			wait local.wait
+		}
+		else{
+			waitframe		
+		}
+		
+		if(self == NULL || self.origin == local.origin){
+			end
+		}
+	}
+}end
+
+
+//waits until self is in range of other
+//=========================================================================
+waittillRange local.other local.range:{
+//=========================================================================
+	while(self != NULL && local.other != NULL){
+		if(vector_length(self.origin - local.other.origin) <= local.range){
+			end
+		}
+		waitframe
+	}
+}end
+
+//waits until self is in range of vector
+//=========================================================================
+waittillRangeVector local.vector local.range:{
+//=========================================================================
+	while(self != NULL){
+		if(vector_length(self.origin - local.vector) <= local.range){
+			end
+		}
+		waitframe
+	}
+}end
+
+//used to move objects relative to their current origin
+//=========================================================================
+originOffset local.offset:{
+//=========================================================================
+	local.origin = self.origin
+	self origin (local.origin + local.offset)
+}end
+
+//SOLID
+//makes a entity solid and moves all players away, which would get stuck
+//if no away or landing position is set, players will be moved back to spawn position
+//=========================================================================
+solid local.awaypos:{
+//=========================================================================
+	if(self == NULL){ end }
+	self solid
+	
+// safesolid <- can this actually replace coop check routines ? Need to test
+// safesolid <- can this actually replace coop check routines ? Need to test
+// safesolid <- can this actually replace coop check routines ? Need to test
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player != NULL && local.player isTouching self){
+			if( local.player.dmteam != "spectator" && local.player.health > 0 ){
+				if(local.awaypos != NIL){
+					local.player origin local.awaypos
+					thread coop_mod/main.scr::playerMakeSolidAsap local.i
+				}
+				else{
+					thread coop_mod/main.scr::playerPlaceAtSpawn local.i
+				}
+			}
+		}
+	}
+}end
+
+//SOLIDASAP
+//makes a entity solid as soon as no player is inside it anymore
+//=========================================================================
+solidASAP:{
+//=========================================================================
+// safesolid <- can this actually replace coop check routines ? Need to test
+// safesolid <- can this actually replace coop check routines ? Need to test
+// safesolid <- can this actually replace coop check routines ? Need to test
+
+
+	//local.makeThisAIGreatAgain //ow, wrong slogan
+	local.makeThisAISolidAgain = 0
+	while(!local.makeThisAISolidAgain){
+		if(self == NULL){ end }
+		local.makeThisAISolidAgain = 1
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player =  $player[local.i]
+			if( local.player != NULL && local.player isTouching self){
+				if( local.player.dmteam != "spectator" && local.player.health > 0 ){
+					local.makeThisAISolidAgain = 0
+				}
+			}
+		}
+		waitframe
+	}
+	self solid
+}end
+
+//SKIPCINEMATIC
+//check if players vote(click) to skip current cinematic
+//=========================================================================
+skip local.useOnly:{
+//=========================================================================
+	level.coop_skip = 1 //level wide on purpose
+	local.coop_skipping = 0
+	local.coop_needed = 0
+	while(level.coop_skip){
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player =  $player[local.i]
+			if( local.player != NULL){
+				local.coop_needed++
+				if(local.player.flags["coop_wantsToSkip"] != NIL){
+					local.coop_skipping++
+				}
+				else if( local.player.dmteam != "spectator" && local.player.health > 0 && local.player.flags["coop_isActive"] == 1 ){
+					if( local.useOnly == NIL && local.player.fireheld || local.player.useheld ){
+						local.player.flags["coop_wantsToSkip"] = 1
+						local.coop_skipping++
+					}
+				}
+			}
+		}
+		//make sure it won't skip on its own
+		if( level.coop_playerReady ){
+			//println( local.coop_skipping + ":" + (local.coop_needed / 1.5) )
+			if( local.coop_skipping >= (local.coop_needed / 1.45)){
+				level.coop_skip = 0
+				end
+			}
+		}
+		
+		waitframe
+		local.coop_skipping = 0
+		local.coop_needed = 0
+	}
+}end
+
+
+//TELEPORTTOONTOUCH
+//teleports a player that is touching a specific origin
+//=========================================================================
+teleportToOnTouch local.ent local.vec local.offset:{
+//=========================================================================
+	if( self == NIL || self == NULL ){
+		error ( "coop_mod/replace.scr::teleportToOnTouch - needs to be executed by a entity" ) 1000
+		end
+	}
+	
+	if(self.flags["coop_teleportToOnTouch"] != NIL){
+		end
+	}
+	self.flags["coop_teleportToOnTouch"] = 1
+	
+	if( local.ent == NULL || local.ent == NIL && local.vec == NIL){
+		error ( "coop_mod/replace.scr::teleportToOnTouch - parameter 1 and 2 where empty, you need to set at lest one NOT to NIL" ) 1000
+		end
+	}
+	
+	while(self != NULL){
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+			if( local.player != NULL && local.player isTouching self ){
+				if(	local.player.dmteam != "spectator" && local.player.health > 0 &&local.player.flags["coop_isActive"] == 1){
+					local.pos = NIL
+					if(local.vec != NIL){
+						local.pos = local.vec
+					}
+					else if( local.ent != NULL && local.ent != NIL){
+						local.pos = local.ent.origin
+					}
+					else{
+						end
+					}
+					
+					if( local.offset != NIL ){
+						local.pos += local.offset
+					}
+					local.player origin local.pos
+					thread coop_mod/main.scr::playerMakeSolidAsap local.i
+				}
+			}
+		}
+		waitframe
+	}
+}end
+
+//INPVS
+//replaces $player inpvs $actor
+//i haven't the faintest what this pvs is suppose to do
+//=========================================================================
+inpvs local.ent:{
+//=========================================================================
+	if( local.ent == NIL ){
+		error ( "coop_mod/replace.scr::inpvs - parameter 1 was NIL" ) 1000
+		end
+	}
+	if( local.ent == NULL ){
+		error ( "coop_mod/replace.scr::inpvs - entity in parameter 1 was NULL" ) 1000
+		end
+	}	
+
+	if(level.gametype == 0){	//chrissstrahl - sp handle
+		if($player inpvs self){
+			end 1
+		}
+		end 0
+	}
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 &&local.player.flags["coop_isActive"] == 1){
+			if(local.player inpvs local.ent){
+				end 1
+			}
+		}
+	}
+}end 0
+
+//ONTOUCHKILL
+//=========================================================================
+onTouchKill:{
+//=========================================================================
+//kills players touching this entity
+	self thread killzone
+}end
+
+//SPECIALWEAPONPRIMARY
+//sets info that this player has aquired a special weapon he shall keep
+//makes player spawn with that weapon
+//=========================================================================
+specialweaponPrimary local.weapon:{
+//=========================================================================
+	if(self == NIL || self == NULL){ end }
+	self.flags["coop_specialWeaponPrimary"] = local.weapon
+}end
+
+//SPECIALWEAPONSECONDARY
+//sets info that this player has aquired a special weapon he shall keep
+//makes player spawn with that weapon
+//=========================================================================
+specialweaponSecondary local.weapon:{
+//=========================================================================
+	if(self == NIL || self == NULL){ end }
+	self.flags["coop_specialWeaponSecondary"] = local.weapon
+}end
+
+//SPECIALINVENTORY
+//sets info that this player has aquired a special item he shall keep
+//makes player spawn with that item
+//=========================================================================
+specialInventory local.weapon:{
+//=========================================================================
+	if(self == NIL || self == NULL){ end }
+	self.flags["coop_specialInventory"] = local.weapon
+}end
+
+//RADIUSFREEZE
+//freezes any player that comes within the radius
+//this is used to prevent rushers to fuck up the mission
+//by brainlessly rushing somewhere
+//=========================================================================
+radiusFreeze local.origin local.radius:{
+//=========================================================================
+	if(level.gametype == 0){ end }
+	
+	//used for debug, so we can see if it has been placed at the right pos
+	//spawn script_model model "models/items/Af_P_Lantern.tik" origin (local.origin) notsolid 1 scale 3
+	
+	level.coop_radiusFreeze = 1
+	while(level.coop_radiusFreeze){
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player =  $player[local.i]
+			if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 ){
+				if( vector_length( local.player.origin - local.origin) <= local.radius ){
+					if(local.player.flags["coop_radiusFreeze"] == NIL){
+						local.player.flags["coop_radiusFreeze"] = 1
+						thread freezeThisPlayer local.player
+					}
+				}
+			}
+		}
+		waitframe
+	}
+}end
+
+//STOPRADIUSFREEZE
+//stops radiusfreeze
+//=========================================================================
+stopRadiusFreeze:{
+//=========================================================================
+	level.coop_radiusFreeze = 0
+	waitframe
+	waitframe
+	waitframe
+}end
+
+//FREEZETHISPLAYER
+//freezes a player until a unfreeze event happens
+//=========================================================================
+freezeThisPlayer local.player:{
+//=========================================================================
+	local.origin = local.player.origin
+	local.player notsolid //make sure player does not block ai paths
+	while(level.coop_radiusFreeze){
+		if(local.player == NULL){ end }
+		if(local.player.dmteam == "spectator" || local.player.health <= 0){
+			local.player.flags["coop_radiusFreeze"] = NIL
+			break
+		}
+		if(local.player.origin != local.origin){
+			thread coop_mod/main.scr::printInfo local.player ("You are not allowed to move right now") 0 1
+		}
+		//local.player physics_off
+		local.player origin local.origin
+		waitframe
+	}
+	local.player.flags["coop_radiusFreeze"] = NIL
+	thread coop_mod/main.scr::playerMakeSolidAsap local.player
+}end
+
+//PLAYERCATCHUP
+//moves players to their spawnlocation that are where we do not want them to be
+//outside - player is outside of given distance (radial)
+//within - player is inside of given distance (radial)
+//above - player is above given z coords
+//below - player is below given z coords
+//=========================================================================
+playerCatchUp local.type local.origin local.distance :{
+//=========================================================================
+	if(local.type == NIL || local.distance == NIL || level.gametype == 0 ){ end }
+
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 ){
+			local.moveplayer = 0
+			local.playerOrigin = local.player.origin
+			if(local.type == "outside" && vector_length(local.playerOrigin - local.origin) > local.distance){
+				local.moveplayer = 1
+				//iprintlnbold_noloc("playerCatchUp outside")
+			}
+			else if(local.type == "within" && vector_length(local.playerOrigin - local.origin) <= local.distance){
+				local.moveplayer = 1
+				//iprintlnbold_noloc("playerCatchUp within")
+			}
+			else if(local.type == "above" && local.playerOrigin[2] > local.distance ){
+				local.moveplayer = 1
+				//iprintlnbold_noloc("playerCatchUp above")
+			}
+			else if(local.type == "below" && local.playerOrigin[2] < local.distance ){
+				local.moveplayer = 1
+				//iprintlnbold_noloc("playerCatchUp below")
+			}
+			if(local.moveplayer == 1){
+				thread playerPlaceAtSpawn local.i
+			}
+		}
+	}
+}end
+
+//PLAYERCATCHUP
+//kills players that are where we do not want them to be
+//outside - player is outside of given distance (radial)
+//within - player is inside of given distance (radial)
+//above - player is above given z coords
+//below - player is below given z coords
+//=========================================================================
+playerKillIf local.type local.origin local.distance :{
+//=========================================================================
+	if(local.type == NIL || local.distance == NIL ){ end }
+	
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player != NULL && local.player.health > 0){
+			//sp or valid coop
+			if(level.gametype == 0 || local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1){
+				local.playerOrigin = local.player.origin
+				local.killplayer = 0		
+				if(local.type == "outside" && vector_length(local.playerOrigin - local.origin) > local.distance){
+					local.killplayer = 1
+				}
+				else if(local.type == "within" && vector_length(local.playerOrigin - local.origin) <= local.distance){
+					local.killplayer = 1
+				}
+				else if(local.type == "above" && local.playerOrigin_z > local.distance ){
+					local.killplayer = 1
+				}
+				else if(local.type == "below" && local.playerOrigin_z < local.distance ){
+					local.killplayer = 1
+				}
+				if(local.killplayer == 1){
+					//terminate player
+					local.player normal_damage (local.player.health + 1)
+					//make sure player will not respawn inside killzone
+					thread coop_mod/main.scr::resetSpawn local.player
+				}
+			}
+		}
+	}
+}end
+
+//waits until a player is within the given distance
+//=========================================================================
+waitWithinDistance local.origin local.distance:{
+//=========================================================================
+	if(local.origin == NIL || local.distance == NIL ){ end }
+	while(!waitthread withinDistance ( local.origin ) local.distance ){
+		waitframe
+	}
+	iprintlnbold_noloc("DEV: distance:"+vector_length(local.origin-$player.origin))
+}end
+
+//needs accepted thread
+//grabs level, period and range from actor
+//=========================================================================
+actorWaitForPapers local.acceptRange local.acceptedThread local.file:{
+//=========================================================================
+	if( level.gametype == 0 ){ end }
+	if(self == NULL || self == NIL || local.file == NIL && local.acceptedThread == NIL){
+		error ( "coop_mod/replace.scr::??? - needs to be executed by a actor" ) 1000
+		end
+	}
+	
+	if(local.file == NIL){
+		local.file = level.script
+	}
+	
+	//self.disguise_period //not sure what it is used for
+	local.disguiseRange = self.disguise_range
+	local.disguiseLevel = self.disguise_level
+	while(self != NULL){
+		local.status = 0
+		local.player = waitthread player_closestTo self NIL
+		local.playerDistance = vector_length(local.player.origin-self.origin)
+
+//player comes into range, halt then asks for papers...
+		if(local.playerDistance <= local.disguiseRange){
+			//iprintlnbold_noloc("DEV: in disguise range")
+//salute if player has been already accepted
+			if(self.flags["coop_disguiseAccepted"] != NIL && self.flags["coop_disguiseAccepted"] == local.disguiseLevel){
+				//iprintlnbold_noloc("DEV: salute")
+				self waitexec anim/disguise_salute.scr
+				wait 10 //wait before next salute
+				break
+			}
+		
+			//play halting animation, play ask for papers animation, play waitanimation start accepting papers now
+			self waitexec anim/disguise_halt.scr //halting player if he comes into range ?
+			local.papersThread = self thread anim/disguise_papers.scr::main //asking for papers - for some reason the thread can not be ended
+			//self waitexec anim/disguise_wait.scr	//not sure what this is used for
+			
+			//check for the papers of player
+			//actor,acceptdistance
+			//level.papers
+			local.status = waitthread checkForPapers self local.acceptRange
+			if(local.papersThread != NIL){
+				iprintlnbold_noloc("DEV: Killing papers thread")
+				local.papersThread delete
+			}
+			
+			//reaction when player has shown papers
+			//0 - nothing/waiting
+			//1 - accepted
+			//2 - denied
+			//3 - enemy
+			//iprintlnbold_noloc("DEV: status returned: "+local.status)
+			if(local.status == 1){
+				//iprintlnbold_noloc("DEV: accepted")
+				self.flags["coop_disguiseAccepted"] = level.papers
+				self waitexec anim/disguise_accept.scr
+				//iprintlnbold_noloc("DEV: accepted - thread starting now")
+				self thread (local.file)::(local.acceptedThread)
+				wait 5
+				//iprintlnbold_noloc("DEV: accepted has ended")
+			}else if(local.status == 2){
+				iprintlnbold_noloc("DEV: deney")
+				self.flags["coop_disguiseAccepted"] = NIL
+				self waitexec anim/disguise_deny.scr
+			}else if(local.status == 3){
+				iprintlnbold_noloc("DEV: enemy")
+				self.flags["coop_disguiseAccepted"] = -1
+				self exec anim/disguise_enemy.scr
+				end			
+			}
+		}
+		//player out of range, relax again
+		//else{
+		//}		
+		waitframe
+	}
+}end
+
+//checks if player papers are valid, as long as ai exists and player is in range
+//=========================================================================
+checkForPapers local.actor local.acceptRange:{
+//=========================================================================
+	local.status = 0
+	local.playerInrange = 1
+	local.actorRange = self.disguise_range
+	local.maxentities = int(getcvar("maxentities"))
+	while(local.actor != NULL && local.playerInrange != 0){
+//set/reset values
+		local.playerInrange = 0
+		for (local.i = 1;local.i <= 8;local.i++){
+			level.flags["coop_player"+local.i+"HandTagOrigin"] = NIL
+		}
+//check if any player is in range, grab hand origin then
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+			//exists
+			//is alive
+			//is within accept range
+			//is not a spectator
+			//really is active (not in the weapon selection screen) in game
+			if( local.player != NULL &&
+				local.player.health > 0 &&
+				vector_length(local.player.origin - local.actor.origin) <= local.actorRange &&
+				local.player.dmteam != "spectator" &&
+				local.player.flags["coop_isActive"] == 1)
+			{
+				//iprintlnbold_noloc("DEV: in range 1")	
+				local.playerInrange = 1
+				if(vector_length(local.player.origin - local.actor.origin) <= local.acceptRange ){
+					level.flags["coop_player"+local.i+"HandTagOrigin"] = local.player gettagposition "tag_weapon_right"
+					local.playerInrange = 2
+					//iprintlnbold_noloc("DEV: in range 2")
+				}
+			}
+		}
+//a player is in range
+		if(local.playerInrange == 2){//local.status
+			//iprintlnbold_noloc("DEV: status 2")
+			for (local.i = 0; local.i < local.maxentities; local.i++) {
+				local.ent = getentbyentnum local.i
+				if ( local.ent != NULL && local.ent.model != NIL && local.ent.model == "models/items/papers.tik"){
+					
+					for (local.pl = 1;local.pl <= $player.size;local.pl++){
+						local.handTagOrigin = level.flags["coop_player"+local.pl+"HandTagOrigin"]
+						if(local.handTagOrigin != NIL && vector_length(local.handTagOrigin - local.ent.origin) < 2){
+							
+							//iprintlnbold_noloc("DEV: entity valid hand origin valid")
+							
+							local.player = $player[local.pl]
+							local.playerOrigin = local.player.origin
+							//iprintlnbold_noloc("player holding papers")
+							
+							if(vector_length(local.playerOrigin - local.actor.origin) <= local.acceptRange){
+								//iprintlnbold_noloc("player holding papers and within range")
+								
+								if(local.actor cansee local.player){
+									//iprintlnbold_noloc("actor can see player")
+
+									//if papers are closer than the player they are facing towards actor (this is still 180 degreeish)
+									local.papersMatchOrigin = local.handTagOrigin
+									local.papersMatchOrigin[2] = local.playerOrigin[2] //match papers and player z axis for comparison of distance
+									
+									local.papersActorDist = vector_length(local.papersMatchOrigin - local.actor.origin)
+									local.playerActorDist = vector_length(local.playerOrigin - local.actor.origin)
+									if(local.papersActorDist < local.playerActorDist){
+										local.dist = (local.playerActorDist-local.papersActorDist)
+										if( local.dist > 20 ){ //20 seams to be decent
+											if(level.papers >= self.disguise_level){
+												//iprintlnbold_noloc("right in your face: "+local.dist)
+												local.player iprint "Your papers have been accepted" 0
+												end 1											
+											}end{
+												//iprintlnbold_noloc("right in your face: "+local.dist)
+												local.player iprint "Your papers have been rejected" 0
+												end 2							
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		wait 0.25
+	}
+}end 0
+
+//waits until a player is within the given distance - returns player holding up the papers
+//actor - the actor the papers need to be shown to
+//distance - the maximum distance a player can ge away from this actor
+//thread - the thread this actor should start on succsess (must be complete script file path)
+//level - the level of the papers 1,2,3 etc (not build in yet)
+//=========================================================================
+waitForPapers local.actor local.distance local.thread local.level:{
+//=========================================================================
+
+//use disguise predefined scripts to show animations and stuff
+//use disguise predefined scripts to show animations and stuff
+//use disguise predefined scripts to show animations and stuff
+//use disguise predefined scripts to show animations and stuff
+//use disguise predefined scripts to show animations and stuff
+//use disguise predefined scripts to show animations and stuff
+//use disguise predefined scripts to show animations and stuff
+
+	if( level.gametype == 0 ){ end NULL }
+	
+	if(local.distance == NIL ){ local.distance = 128 }
+	
+	local.maxentities = int(getcvar("maxentities"))
+	while(local.actor != NULL){
+		//get all hand tag origins (where player holds weapons/papers)
+		waitthread grabAllPlayerHandTagOrigins
+		
+		local.playerInrange = 0
+		//see if a player could be in range, before we start the massive checking
+		
+		
+		
+		
+		
+		for (local.pl = 1;local.pl <= $player.size;local.pl++){
+			local.player = $player[local.pl]
+			if(vector_length(local.player.origin - local.actor.origin) <= local.distance){
+				if(level.flags["coop_player"+local.pl+"HandTagOrigin"] != NIL){
+					
+				}
+				local.playerInrange = 1
+			}
+		}
+
+		//see if a player holds papers in his hands
+		if(local.playerInrange){		
+			for (local.i = 0; local.i < local.maxentities; local.i++) {
+				local.ent = getentbyentnum local.i
+				if ( local.ent != NULL && local.ent.model != NIL && local.ent.model == "models/items/papers.tik"){
+					for (local.pl = 1;local.pl <= $player.size;local.pl++){
+						local.handTagOrigin = level.flags["coop_player"+local.pl+"HandTagOrigin"]
+						if(local.handTagOrigin != NIL && vector_length(local.handTagOrigin - local.ent.origin) < 2){
+							local.player = $player[local.pl]
+							local.playerOrigin = local.player.origin
+							//iprintlnbold_noloc("player holding papers")
+							
+							if(vector_length(local.playerOrigin - local.actor.origin) <= local.distance){
+								//iprintlnbold_noloc("player holding papers and within range")
+								
+								if(local.actor cansee local.player){
+									//iprintlnbold_noloc("actor can see player")
+
+									//if papers are closer than the player they are facing towards actor (this is still 180 degreeish)
+									local.papersMatchOrigin = local.handTagOrigin
+									local.papersMatchOrigin[2] = local.playerOrigin[2] //match papers and player z axis for comparison of distance
+									
+									local.papersActorDist = vector_length(local.papersMatchOrigin - local.actor.origin)
+									local.playerActorDist = vector_length(local.playerOrigin - local.actor.origin)
+									if(local.papersActorDist < local.playerActorDist){
+										local.dist = (local.playerActorDist-local.papersActorDist)
+										//if( local.dist < 0){
+											//local.dist = (local.dist * -1)
+										//}
+										
+										if( local.dist > 20 ){ //20 seams to be decent
+											//iprintlnbold_noloc("right in your face: "+local.dist)
+											
+											if( local.thread != NIL){
+												local.actor exec local.thread
+											}
+											local.player iprint "Your papers have been accepted" 0
+											end local.player
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		//papers are presented for about 3 secs, so waiting 1 sec here, this will have a positive impact on performance
+		wait 1			
+	}
+}end NULL
+
+//animates a actor and sets new animation only after current anim is over
+//this is designed to handle 2 animations one following imideatly the other
+actorAnimationForce local.animation:{
+	if(self == NULL){ end }
+	
+	iprintlnbold_noloc("1")
+	
+	if(self.flags["coop_actorAnimForceActive"] != NIL ){
+		self.flags["coop_actorAnimForceNew"] = local.animation
+		end
+	}
+	iprintlnbold_noloc("2")
+	
+	self.flags["coop_actorAnimForceActive"] = 1
+	
+	local.timeout = 2
+	while(local.timeout){
+		iprintlnbold_noloc("3")
+		if(local.animation != NIL ){
+			iprintlnbold_noloc("3a")
+			self setmotionanim local.animation
+			local.animation = NIL
+			self waittill flaggedanimdone
+		}
+		if(self.flags["coop_actorAnimForceNew"] != NIL ){
+			iprintlnbold_noloc("3b")
+			self setmotionanim self.flags["coop_actorAnimForceNew"]
+			self.flags["coop_actorAnimForceNew"] = NIL
+			self waittill flaggedanimdone
+		}
+		local.timeout--
+	}
+	iprintlnbold_noloc("4")
+	self.flags["coop_actorAnimForceActive"] = NIL
+}end
+
+
+//grabs the hand tag origin of every player
+//stores it in a level var, so we can use it
+//=========================================================================
+grabAllPlayerHandTagOrigins:{
+//=========================================================================
+	//reset old values
+	for (local.i = 1;local.i <= 8;local.i++){
+		level.flags["coop_player"+local.i+"HandTagOrigin"] = NIL
+	}
+	//grab new values
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player = $player[local.i]
+		if( local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1){
+			level.flags["coop_player"+local.i+"HandTagOrigin"] = local.player gettagposition "tag_weapon_right"
+		}
+	}
+}end
+
+//MISSIONFAILED
+//fails the mission and fades to black
+//=========================================================================
+missionfailed:{
+//=========================================================================
+	if( level.gametype == 0 ){ end }
+	missionfailed //keep this, as we do not know what else it might trigger and signal the mission status
+	
+	local.fadetime = 3
+	
+	//fadeout to red
+	fadeout 1 0.5 0 0 local.fadetime
+	wait (local.fadetime + 2)
+	
+	//the server will not allow us to load the map with the same name, so we have to hack a bit
+	//not sure if the $ hack will give us any troubles, load the map then again if we need to
+	//$ indicates a singleplayer spawn that is attached to the map, if empty it has no consequence to the spawnspot but the mapnames are no longer equal and we can load the same map
+	local.mapname = getcvar "mapname"
+	if(waitthread coop_mod/main.scr::containsText local.mapname "$"){
+		local.mapname = waitthread coop_mod/main.scr::cleanText local.mapname "$"
+	}else{
+		local.mapname = (local.mapname+"$")
+	}
+	exec global/missioncomplete.scr local.mapname 1
+}end
+
+notarget local.state:{
+	/*
+	if($player.flags["coop_notarget"] == NIL){
+		$player.flags["coop_notarget"] = 0
+	}
+	if(local.state == 1 || local.state == NIL && $player.flags["coop_notarget"] != 1){
+		$player.flags["coop_notarget"] = 1
+	}else{
+		$player.flags["coop_notarget"] = 0
+	}
+	*/
+	$player notarget
+}end
+//ignoreme
+//notarget
+//flags["+notarget"]
+//flags["-notarget"]

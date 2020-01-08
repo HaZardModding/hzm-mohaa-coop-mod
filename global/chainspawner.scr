@@ -1,0 +1,126 @@
+
+////////////////////////////////////////////////////////////
+//////////**********************////////////////////////////
+//////////******SPAWNERS!!!*****////////////////////////////
+//////////**********************////////////////////////////
+////////////////////////////////////////////////////////////
+
+
+init:
+	level.alarm = 1
+	$alarmtrig doactivate $world	//chrissstrahl - make sure this works always using world instead of player
+end
+
+
+spawners local.spawnexausted:
+	if(level.chainspawnwaittime == NIL)
+		level.chainspawnwaittime = 10
+	level.spawncount = 0
+	local.j = 1
+	spawn trigger_relay targetname "alarmtrig"
+	local.spawntrigger = $spawntrigger
+	for (local.i = 1; local.i <= $spawntrigger.size; local.i++)
+	{
+		local.spawnmatched = 0
+		for(local.k = local.i + 1; local.k <= $spawntrigger.size; local.k++)
+		{
+			if (local.spawntrigger[local.i].target == local.spawntrigger[local.k].target)
+    				local.spawnmatched = 1
+		}
+		if(local.spawnmatched == 0)
+		{	
+			local.spawnrelay[local.j] = local.spawntrigger[local.i].target
+			local.j++
+		}			
+
+	}
+	for (local.i = 1; local.i < local.j; local.i++)
+	{
+		local.spawnrelay[local.i] thread spawnersetup local.spawnexausted
+		local.spawnrelay[local.i] thread spawnerzoneloop
+	}
+end
+
+spawnerzoneloop:
+	self waittill trigger
+	level.chainspawnzone = self.targetname
+	goto spawnerzoneloop
+end
+
+spawnersetup local.spawnexausted:
+	if(self.target == NULL || self.target == NIL || self.target == "")
+	{
+		goto skipsetup
+	}
+	local.spawnername = self.target
+	while(local.spawnername)
+	{
+		local.radiantguy = $(local.spawnername)
+		local.nextspawnername = local.radiantguy.target
+
+		local.thespawner = waitthread global/spawner.scr::spawner_create local.radiantguy
+		local.thespawner.targetname = local.spawnername
+		local.thespawner.target = local.nextspawnername
+		
+		local.spawnername = local.nextspawnername
+	}
+loop:
+skipsetup:
+	if(level.alarm == 0)
+		$alarmtrig waittill trigger
+	if(level.chainspawnzone != self.targetname)
+		self waittill trigger
+//	level.chainspawnzone = self.targetname
+	if(self.target == NULL || self.target == NIL || self.target == "")
+	{
+		goto skiploop
+	}
+	else
+		local.spawnername = self.target
+	while(local.spawnername)
+	{
+		local.thespawner = $(local.spawnername)
+		local.theguyname = (local.spawnername + "spawned")
+		if(!(isalive $(local.theguyname)))
+		{
+			if(!local.thespawner.burncount)
+				local.thespawner.burncount = 0
+			if(local.thespawner.burncount >= local.spawnexausted)
+				local.thespawner.burnt = 1
+			if(local.thespawner.burnt != 1 && level.spawncount < level.maxspawn)
+			{	
+
+				local.thespawner.burncount++
+				local.theguy = waitthread global/spawner.scr::spawner_activate local.thespawner
+				local.theguy.targetname = local.theguyname
+
+//				local.randomnum = (randomint(100))  //redo sometime
+//				if(local.randomnum < 30)
+//					$(local.theguyname) item "items/item_25_healthbox.tik" 25
+
+				if(local.theguy.ammo_grenade > 0)
+					local.theguy item weapons/steilhandgranate.tik
+				local.theguyname thread deadguy
+				local.theguyname leash 9999
+//				local.theguyname.maxdist = 10000
+				level.spawncount = level.spawncount + 1
+				local.theguyname resetleash
+				local.theguyname forceactivate
+//				local.theguyname exec global/runto.scr $player
+				local.theguyname attackplayer
+				if(level.chainspawner_thread)
+					local.theguyname thread level.script::level.chainspawner_thread
+			}
+		}
+		local.spawnername = local.thespawner.target
+	}
+skiploop:
+	wait level.chainspawnwaittime
+	goto loop
+
+
+deadguy:
+	self waittill death
+	level.spawncount = level.spawncount - 1
+	self targetname ""
+end

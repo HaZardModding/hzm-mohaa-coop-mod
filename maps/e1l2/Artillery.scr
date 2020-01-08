@@ -1,0 +1,660 @@
+//=========================================================================
+InitArtillery:
+//=========================================================================
+{
+	level.barricade1Trigger = waitthread global/FindTrigger.scr::FindTrigger "barricade1"
+	level.barricade1Trigger nottriggerable
+	
+	$artillery1 thread InitGun $artillery1_turret0 $artillery1charge 38
+	$artillery2 thread InitGun $artillery2_turret0 $artillery2charge 90
+	$artillery3 thread InitGun $artillery3_turret0 $artillery3charge 40
+	waitframe
+
+	$artillery1 thread GunOrExplosive $artillery1charge
+	$artillery2 thread GunOrExplosive $artillery2charge
+	$artillery3 thread GunOrExplosive $artillery3charge
+
+	$sniperrifle setthread SniperRifle
+	thread artilleryStopOnProximity
+	
+	//initialize the landmines
+	thread global/landmine_sp.scr::initLandMines $tank2 325 1
+	$mg42guy2 thread WakeMe $wakemg42guy2
+}end
+
+//=========================================================================
+ChargeDamage local.origin:
+//=========================================================================
+{
+	//chrissstrahl - coop compatible
+	//	dprintln "charge damage!"
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		
+		if(local.player != NULL && local.player.health > 0 ){
+			if( vector_length( local.player.origin - local.origin ) < 256){
+				if( level.gametype == 0 || local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+					local.player damage $world 2500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+					//		dprintln "-----------killing player"
+				}
+			}
+		}	
+	}
+}end
+
+//=========================================================================
+WakeMe local.trigger:
+//=========================================================================
+{
+	self ai_off
+	local.trigger waittill trigger
+	self ai_on
+}end
+
+//=========================================================================
+ObjectiveArtillery:
+//=========================================================================
+{
+	if (level.hackArtillery == 1){ //chrissstrahl - developer, leave it
+		$artillery1charge thread ArtilleryDeath
+		$artillery2charge thread ArtilleryDeath
+		$artillery3charge thread ArtilleryDeath
+		thread destroyBarricade1
+		
+		$tank2.origin = $tank2path2.origin
+		$tank3.origin = $tank3path2.origin
+		$jeep.origin  = $tank4path2.origin
+
+		$player.origin = $artillery3.origin + (0 0 150)
+		end
+	}
+	
+	//chrissstrahl - coop compatible - sp only
+	//for coop this is in intro.scr, where the player is unglued
+	if(level.gametype == 0){
+		exec global/autosave.scr level.autosave // "destroy the Artillery"
+		level.autosave++
+	}
+
+	level.artilleryDestroyed = 0
+	
+	$artillery1 thread checkArtilleryDeath 
+	$artillery2 thread checkArtilleryDeath
+	$artillery3 thread checkArtilleryDeath
+	waitthread UpdateArtilleryObjective
+	wait 2.0
+
+	local.ambushtrigger = waitthread global/FindTrigger.scr::FindTrigger "ambushguystrigger"
+	trigger local.ambushtrigger
+	
+	while ($artillery1charge) {
+		waitframe
+	}
+
+	while ($artillery2charge) {
+		waitframe
+	}
+
+	level.fakeshooting = 0
+	thread TanksRollAfterArtillery
+
+	while ($artillery3charge){
+		waitframe	
+	}
+
+	level.artilleryDestroyed = 1
+		
+	thread CleanupArtillery	
+}end
+
+//=========================================================================
+artilleryStopOnProximity:
+//=========================================================================
+{
+	$deletetrigger1 waittill trigger
+	level.pinBackTanks = 0
+}end
+
+//=========================================================================
+checkArtilleryDeath:
+//=========================================================================
+{
+	self waittill death
+	self.charge waitthread DestroyArtillery
+}end
+
+//=========================================================================
+destroyBarricade1:
+//=========================================================================
+{
+	$shootbarricade1 waittill trigger
+	$shootbarricade1 delete
+	$tank2.shootingAtSomething = 1
+	wait .3
+	
+	level.barricade1Trigger triggerable
+	$tank2.gun setAimTarget level.barricade1Trigger
+	$tank2.gun waittill ontarget
+	$tank2.gun anim fire
+	waitframe
+
+	$tank2.gun anim idle
+	$tank2.shootingAtSomething = 0
+	
+	if (level.barricade1Trigger){
+		trigger level.barricade1Trigger	
+	}
+
+	$tank2.gun setAimTarget NULL
+	wait 1.0
+	
+	level.barricade1Trigger delete
+}end
+
+//=========================================================================
+ArtilleryDeath:
+//=========================================================================
+{
+	self thread ChargeDamage self.origin
+	self waitthread DestroyArtillery
+	waitframe
+
+	//	self delete
+	level.pinBackTanks = 0
+}end
+
+//=========================================================================
+UpdateArtilleryObjective:
+//=========================================================================
+{
+	local.numartillery = 0
+	local.target = NULL
+
+	if ($artillery3charge){
+		local.numartillery++
+		local.target = $artillery3charge
+	}
+
+	if ($artillery2charge){
+		local.numartillery++
+		local.target = $artillery2charge
+	}
+
+	if ($artillery1charge){
+		local.numartillery++
+		local.target = $artillery1charge
+	}
+
+	if (local.numartillery > 0){
+		waitthread global/objectives.scr::add_objectives level.ObjDestroyArtillery 2 ("Destroy Enemy Artillery [" + local.numartillery + " Remaining]") local.target
+		waitthread global/objectives.scr::current_objectives level.ObjDestroyArtillery
+	}
+}end
+
+//=========================================================================
+TanksRollAfterArtillery:
+//=========================================================================
+{
+	thread destroyBarricade1
+
+	$tank2.mineclearing anim start
+	$tank2.mineclearing waittill animdone
+	$tank2.minesweeperOn = 1
+	$tank2.mineclearing anim spin
+
+	$tank2 drive $tank2path2 20 200 256 256
+	wait 1
+
+	$tank3 drive $tank3path2 20 200 256 256
+	wait 3
+
+	$jeep drive $tank4path2 200 200 256 256
+	thread maps/e1l2/Intro.scr::jeepGo
+
+	//	$jeep anim start_wheels
+	//	$jeep_passenger thread global/LoopAnim.scr::LoopAnimStop
+	//	$jeep_passenger thread global/LoopAnim.scr::LoopAnim A_22_driving_idle
+
+	$jeep anim jeep_idle_drive
+	level.infantryfollow = $jeep
+	$jeep.stopped = 0
+	
+	$jeep thread maps/e1l2/Intro.scr::DontHitGuyInFront $tank3
+	$jeep thread maps/e1l2/Intro.scr::InfantryFollowingBehind $tank4path2 $mrinvisible2
+	$tank2 waittill drive
+	$tank2 fullstop
+	$tank2.mineclearing anim stop
+	$tank2.minesweeperOn = 0
+	wait 5
+
+	$tank3 fullstop
+	wait 7
+
+	$jeep fullstop
+	thread maps/e1l2/Intro.scr::jeepStop
+	//	$jeep anim stop_wheels
+	$jeep.stopped = 1
+	$jeep anim jeep_idle_still
+	
+	local.origin = $jeep.origin + ( -300 0 0)
+	$mrinvisible2.origin = local.origin
+	//	waitthread maps/e1l2.scr::UpdateFindCrabObjectiveLocation
+}end
+
+//=========================================================================
+CleanupArtillery:
+//=========================================================================
+{
+	$deletetrigger2 waittill trigger
+	thread global/EntityCleanup.scr::EntityCleanup "campguys" 1000
+	thread global/EntityCleanup.scr::EntityCleanup "tentguys" 1000
+	
+	$deletetrigger3 waittill trigger
+	thread global/EntityCleanup.scr::EntityCleanup "cannonguys" 1000
+	thread global/EntityCleanup.scr::EntityCleanup "t233_paradeguys" 1000	
+}end
+
+//=========================================================================
+minefieldautosave:
+//=========================================================================
+{
+	//chrissstrahl - coop compatible
+	if(level.gametype == 0){
+		exec global/autosave.scr level.autosave // "Minefield"
+		level.autosave++
+	
+		local.key = getboundkey1 "useweaponclass grenade"
+		local.msg = "Press " + local.key + " to use the Minedetector."
+		iprintlnbold (loc_convert_string local.msg)	
+	}else{
+		//iprintlnbold_noloc( "Make use of the Minedetector.")
+		//iprintlnbold_noloc("DEV: coop_updateSpawn3.2")
+		waitthread coop_mod/spawnlocations.scr::e1l2_update2
+	}
+}end
+
+//=========================================================================
+SniperRifle:
+//=========================================================================
+{
+iprintlnbold_noloc("DEV: Sniper")
+	//chrissstrahl - coop compatible
+	local.model = self.model
+	if(level.gametype == 0){
+		$player weapon local.model
+	}else{
+		//chrissstrahl - set sniper as primary weapon for respawn
+		level.coop_forcePrimary = local.model
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player =  $player[local.i]
+			if(local.player != NULL && local.player.health > 0 ){
+				if( level.gametype == 0 || local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+					exec coop_mod/main.scr::playerForcePrimary local.player local.model
+//					local.player weapon local.model
+				}
+			}
+		}
+		iprintlnbold_noloc("You have acquired KAR98 Sniper Rifle")
+	}
+	self remove
+	waitframe //chrissstrahl - we need to wait a moment in mp for the weapon to be accsessible
+	if(level.gametype == 0){
+		iprintln "You have acquired KAR98 Sniper Rifle"
+		$player use local.model
+	}
+}end
+
+
+// global attributes
+
+
+// "self" refers to the explosive on the static weapon         
+// "self.target" refers to the static weapon it's attached to  
+//=========================================================================
+DestroyArtillery:
+//=========================================================================
+{
+	local.name = self.target.targetname
+	exec global/earthquake.scr .2 4 0 0
+	radiusdamage self.origin 200 200
+				 
+	self thread spawn_fx models/fx/fx_truck_explosion.tik 15
+	self thread spawn_fx models/emitters/linger_smoke.tik 120
+	
+	local.destroyed			= spawn script_model model self.target.destroyedmodel 
+	local.destroyed.origin 	= self.target.origin
+	local.destroyed.angles 	= self.target.turret.angles
+
+	// make the new thing immobile
+	local.destroyed mass 100000
+	local.destroyed notsolid
+
+	local.col 		 = spawn script_object model self.target.destroyedcollision.brushmodel
+	local.col.origin = local.destroyed.origin
+	local.col.angles = local.destroyed.angles
+	local.col safesolid
+
+	self.target remove
+
+	if (local.name == "artillery3"){
+		level.tentTrigger = waitthread global/FindTrigger.scr::FindTrigger "bridgeparadetrigger"
+
+		if (level.tentTrigger){
+			trigger level.tentTrigger	
+		}
+	}
+
+	waitframe
+	waitthread UpdateArtilleryObjective
+}end
+
+//=========================================================================
+InitGun local.turret local.charge local.offset:
+//=========================================================================
+{
+	self lock
+	self maxuseangle 25
+	self.turret = local.turret
+	self.charge = local.charge
+	self.charge setthread ArtilleryDeath
+
+	self.exploded = 0
+	self rendereffects "+growradius"
+	self.turret rendereffects "+growradius"
+	//	self svflags "+broadcast"
+	//	self.turret svflags "+broadcast"
+	
+	self.collisionent = $15cm_collide_base
+	self.turret.collisionent = $15cm_collide
+	self.destroyedmodel = "statweapons/AX_W_15cmCannon_d.tik"
+	self.destroyedcollision = $15cm_d_collide
+	self.turret maxyawoffset local.offset
+	self.turret turnspeed 15
+	self.turret pitchspeed 15
+
+	//	self nodamage
+	//	self.turret nodamage
+	self.charge thread HoldChargePlace self.turret
+}end
+
+//chrissstrahl - keep track of player, and free gun if nessary
+//=========================================================================
+coop_trackUser local.player local.entturret local.entturret2:{
+//=========================================================================
+//THERE CAN ONLY BE ONE - Highlander
+//but make sure if that one loses his head another can take his place
+	
+	local.checkforplayer = 1
+	while(local.checkforplayer){
+		//chrissstrahl - i know this is not really clean but I am to lazzy right now, it will still work
+		if( local.player == NULL ||
+			local.entturret == NULL ||
+			local.entturret2 == NULL ||
+			vector_length (local.player.origin-local.entturret.origin) > 200 ||
+			local.player.health < 1 ||
+			local.player.dmteam == "spectator" ||
+			local.player.flags["coop_isActive"] != 1 ||
+			local.player.useheld == 1 ) //player pressing use, means he wants to exit
+		{
+			local.entturret.helpactiveturret	= 0
+			local.entturret.helpactiveexplosive	= 0
+			local.entturret.playerinturret		= 0
+			local.entturret unlock
+			local.entturret2 unlock
+			end
+		}
+		waitframe
+	}
+}end
+
+//=========================================================================
+GunOrExplosive local.charge:
+//=========================================================================
+{
+	//chrissstrahl - handle seperate for coop
+	if(level.gametype != 0){
+		self thread coop_handleArtillery
+		end
+	}
+
+	self.helpactiveturret = 0
+	self.helpactiveexplosive = 0
+	self.playerinturret = 0
+//	local.charge setusable 0
+	self.explosiveset = 0
+
+	// center our turret by default...
+	self.turret thread CenterTurret
+
+	
+	while (self)
+	{
+		local.canuse = self canuse $player
+		if (vector_length($player.origin-self.origin) < 200 && self.explosivesetself.explosiveset == 0)
+		{
+
+			if (self.playerinturret == 0)
+			{
+				if (vector_length($player.origin-self.charge.origin) < 100)
+				{
+					if (self.helpactiveexplosive == 0)
+					{
+						self.helpactiveturret = 0
+						self.helpactiveexplosive = 1
+						local.usekey = getboundkey1 "+use"
+						local.msg = (loc_convert_string ("Press " + local.usekey + " to set the explosive."))
+						thread global/throbtext.scr::throbtext local.msg 1000
+					}
+				}
+				else
+				{
+					if (local.canuse == 1)
+					{
+						if (self.helpactiveturret == 0)
+						{
+							self.helpactiveexplosive = 0
+							self.helpactiveturret = 1
+							local.usekey = getboundkey1 "+use"							
+							local.msg = (loc_convert_string ("Press " + local.usekey + " to use the cannon."))
+							thread global/throbtext.scr::throbtext local.msg 1000
+						}
+					}
+				}
+			}
+			if ($player.useheld)
+			{
+				if (self.helpactiveexplosive == 1)
+				{
+					self.explosiveset = 1
+//					self.charge setusable 1
+					self.charge doUse
+					thread global/throbtext.scr::throbtext_off
+					end
+				}
+				else if (self.helpactiveturret == 1)
+				{
+					self.helpactiveturret = 0
+					self.helpactiveexplosive = 0
+					thread global/throbtext.scr::throbtext_off
+					self.playerinturret = 1
+					self unlock
+					self.turret unlock
+					self doUse $player
+					self lock
+					self.turret lock
+					wait 1
+				}
+				else if (self.playerinturret == 1)
+				{
+					self.playerinturret = 0
+					// center our turret again since the player just moved it away from where the collisionent likes it....
+					self.turret thread CenterTurret
+					self unlock
+					self.turret unlock
+					self doUse $player
+					self lock
+					self.turret lock
+					wait 1
+				}
+			}
+		}
+		else
+		{
+			if (self.helpactiveturret == 1 || self.helpactiveexplosive == 1)
+			{
+				thread global/throbtext.scr::throbtext_off
+				self.helpactiveturret = 0
+				self.helpactiveexplosive = 0
+			}
+		}
+		waitframe
+	}
+}end
+
+//=========================================================================
+HoldChargePlace local.turret:
+//=========================================================================
+{
+	self attach local.turret recoil 1 ( -30 14 0 )
+}end
+
+//=========================================================================
+spawn_fx local.fx local.time:
+//=========================================================================
+{
+	local.temp = spawn script_model model local.fx
+	local.temp notsolid
+	local.temp.origin = self.target.origin
+	local.temp anim start
+	local.temp notsolid
+	wait local.time
+	local.temp remove
+}end
+
+//	Since we can't accurately represent the collision when the turret is pointing up,
+//  we re-center the pitch of the turret so that the collision will line up correctly.
+//=========================================================================
+CenterTurret:
+//=========================================================================
+{
+	//	dprintln "Centering turret:" self.targetname
+	if ( self.auto_center ){
+		self.auto_center delete
+		self.auto_center = NULL
+	}
+
+	local.vF 	= self.forwardvector
+	local.vF[2] = 0
+	local.o  	= self.origin
+	local.o[2] += 20
+	local.o  	= local.o + (local.vF * 100)
+
+	self.auto_center = spawn info_notnull origin local.o
+
+	if ( self.auto_center ){
+		self setaimtarget self.auto_center
+	}
+}end
+
+//chrissstrahl - this manages the Hillery for coop
+//=========================================================================
+coop_handleArtillery:{
+//=========================================================================
+// center our turret by default...
+	self.turret thread CenterTurret
+	
+//set state vars
+	self.explosiveset = 0
+	
+//loop while artillery exists
+	while(self != NULL){
+	//check each player if they validate
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player =  $player[local.i]
+			if(	local.player == NULL ||
+				local.player.health <= 0 ||
+				local.player.dmteam == "spectator" ||
+				local.player.flags["coop_isActive"] != 1 ||
+				vector_length (local.player.origin - self.origin) > 200){
+				continue
+			}
+		//valid player pressing use
+			if(local.player.useheld){
+				iprintlnbold_noloc("DEV: valid player pressing use key")
+		//valid player check if player is within range of explosive
+				if (vector_length(local.player.origin-self.charge.origin) < 100){
+		//valid player setting explosive
+					//self.charge doUse //chrissstrahl - presumably uses any close entity
+					self.charge doUse local.player //chrissstrahl
+					self.explosiveset = 1
+					iprintlnbold_noloc("DEV: setting charge")
+					end
+				}
+		//valid player in range of turret
+				else{
+		//valid player using, wait until player (gets) interrupt(ed)
+					iprintlnbold_noloc("DEV: useing turret")
+					self waitthread coop_handleArtillery_player local.player				
+				}
+			}
+		//valid player in range not pressing use
+			else{
+				if (vector_length(local.player.origin-self.charge.origin) < 100){
+					exec coop_mod/main.scr::printInfo local.player "Press use to set the explosive." 1 NIL
+				}
+				else if(self canuse local.player){
+					exec coop_mod/main.scr::printInfo local.player "Press use to to use the cannon." 1 NIL
+				}
+			}
+		}
+		waitframe
+	}
+}end
+
+//chrissstrahl - this manages the player inside Hillery for coop
+//=========================================================================
+coop_handleArtillery_player local.player:{
+//=========================================================================
+	iprintlnbold_noloc("DEV: useing turret thread")
+	self unlock
+	self.turret unlock
+	self doUse local.player
+	self lock
+	self.turret lock
+	wait 1		
+	while(1){//run forest run!
+//player left server - player dead - player changed team
+		if( local.player == NULL || local.player.health <= 0 || local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1){
+			iprintlnbold_noloc("DEV: left, team or dead")
+			self waitthread coop_handleArtillery_playerExit NULL
+			break
+		}
+//player out of reach(for what ever reason) - player pressing use (wants to exit)
+		else if(vector_length (local.player.origin - self.origin) > 200 || local.player.useheld || self.explosiveset == 1){
+			iprintlnbold_noloc("DEV: out of range, explosive set or pressed use")
+			self waitthread coop_handleArtillery_playerExit local.player local.playerAngles
+			break
+		}
+		waitframe
+	}
+}end
+
+//chrissstrahl - this manages the player leaving Hillery
+//=========================================================================
+coop_handleArtillery_playerExit local.player:{
+//=========================================================================
+	self.turret thread CenterTurret
+	self unlock
+	self.turret unlock
+	//unlock player from turret only if we really need to, or we can get a player stuck in a loop untill they kill them self
+	if(local.player != NIL && local.player != NULL){
+		self doUse local.player
+		waitframe
+	}
+	self lock
+	self.turret lock
+	wait 1
+}end
+
+
+

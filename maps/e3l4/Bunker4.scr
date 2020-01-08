@@ -1,0 +1,403 @@
+//=========================================================================
+InitBunker4:
+//=========================================================================
+{
+	level.Bunker4AxisParade = waitthread global/FindTrigger.scr::FindTrigger "bunker4axisparadetrigger" 
+		
+	$bunker4tank01.typeoftank = "panzer_desert"
+	$bunker4tank02.typeoftank = "panzer_desert"
+	$bunker4tank01.health 	  = 300
+	$bunker4tank02.health 	  = 300
+	$bunker4tank01.sighttrace = 0
+	$bunker4tank02.sighttrace = 0
+
+	$bunker4bazookaguy ai_off
+	$bunker4bazookaguy hide
+	$bunker4bazookaguy notsolid
+
+	for(local.i = 1; local.i <= $bunker4towerguy.size; local.i++){
+		$bunker4towerguy[local.i] ai_off
+		$bunker4towerguy[local.i] hide
+		$bunker4towerguy[local.i] nodamage
+		$bunker4towerguy[local.i] notsolid
+	}
+	
+	for(local.i = 1; local.i <= $alliedcliffguys.size; local.i++){
+		$alliedcliffguys[local.i] ai_off
+		$alliedcliffguys[local.i] hide
+		$alliedcliffguys[local.i] notsolid
+	}
+
+	$bunker4tank01.canfireatplayer = 1
+	$tank1targetplayer setthread Tank1TargetPlayer
+	$tank1idle setthread Tank1Idle
+	$tank2targetplayer setthread Tank2TargetPlayer
+	$tank2idle setthread Tank2Idle
+	$triggerB4Bazooka thread watchBunker4Bazooka
+}end
+
+//=========================================================================
+watchBunker4Bazooka:
+//=========================================================================
+{
+	$triggerB4Bazooka waittill trigger
+	$player item weapons/bazooka.tik // add shotgun to player's inventory
+	iprintln "You picked up a Bazooka."
+
+	$wpnB4Bazooka playsound bazooka_snd_pickup
+	$wpnB4Bazooka remove			// remove shotgun prop from world
+	$player use "Bazooka"			// make shotgun player's active weapon	
+}end
+
+//=========================================================================
+Bunker4Battle:
+//=========================================================================
+{
+	if (level.hackskipbunker4 == 1){
+		end
+	}
+
+	// Cleanup
+	thread pathToBunker4
+
+	$bunker4battlestart waittill trigger
+	thread Bunker4BackDoorBattle
+
+	$bunker4bazookaguy ai_on
+	$bunker4bazookaguy solid
+	$bunker4bazookaguy show
+	$bunker4bazookaguy threatbias 0
+
+	for(local.i = 1; local.i <= $bunker4towerguy.size; local.i++){
+		$bunker4towerguy[local.i] ai_on
+		$bunker4towerguy[local.i] solid
+		$bunker4towerguy[local.i] show
+		$bunker4towerguy[local.i] threatbias 0
+	}
+
+	if ($bunker2reinforcement){
+		$bunker2reinforcement thread maps/e3l4/friendly.scr::StopFollow
+	}
+
+	if ($jeepdriver){
+		$jeepdriver thread maps/e3l4/friendly.scr::StopFollow
+	}
+	
+	trigger level.Bunker4AxisParade
+
+	$bunker4tank01.tank_stunned_time = 0
+	$bunker4tank01.health = 600
+	local.Bunker4Tank 	  = waitthread global/FindTrigger.scr::FindTrigger "bunker4tanktrigger" 
+
+	trigger local.Bunker4Tank
+	$bunker4tank01.myenemy = NULL
+	
+	//	dprintln "DEBUG: ready to shoot at the tank"
+	//	$bunker4bazookaguy thread someoneShootAtTheDamnTank
+	//	$bunker4tank disconnect_paths
+	//	$bunker4arrivaltrigger waittill trigger
+	wait 5
+
+	thread maps/e3l4/bunker3.scr::CleanupSceneBunker3
+	$bunker4tank01 thread killBunker4
+	
+	thread CleanupSceneBunker3toBunker4
+	thread CleanupSceneBunker4
+}end
+
+//=========================================================================
+Bunker4BackDoorBattle:
+//=========================================================================
+{
+	// Just make sure the parade doesn't start until the tank has had a chance to go
+	local.bunker4backdoortanktrigger = waitthread global/FindTrigger.scr::FindTrigger "bunker4backdoortanktrigger"	
+	local.bunker4backdoortanktrigger waittill trigger
+	wait 7
+
+	$backdoorparade thread global/parade.scr::RunParade
+}end
+
+// Path
+//=========================================================================
+pathToBunker4:
+//=========================================================================
+{
+	thread TurnOnAllies
+	thread MountainPathAutoSave
+
+	$mortar1ontrigger thread doMortars $mortargroup1 6 8 $mortar1offtrigger	
+	$mortar2ontrigger thread doMortars $mortargroup2 6 8 $mortar2offtrigger	
+	$mortar3ontrigger thread doMortars $mortargroup3 1 3 $mortar3offtrigger
+
+	for (local.i=1;local.i<$pgenCanyon01.size;local.i++){
+		$pgenCanyon01[local.i] turnon
+	}
+}end
+
+//=========================================================================
+MountainPathAutoSave:
+//=========================================================================
+{
+	$canyonautosave waittill trigger
+	exec global/autosave.scr 5 // The Mountain Path	
+}end
+
+//=========================================================================
+TurnOnAllies:
+//=========================================================================
+{
+	local.cliffbattle = waitthread maps/e3l3.scr::FindTrigger "startcliffbattle"
+	local.cliffbattle waittill trigger
+
+	for(local.i = 1; local.i <= $alliedcliffguys.size; local.i++){
+		$alliedcliffguys[local.i] ai_on
+		$alliedcliffguys[local.i] solid
+		$alliedcliffguys[local.i] show
+		$alliedcliffguys[local.i] threatbias 0
+	}
+}end
+
+//=========================================================================
+doMortars local.mortarGroup local.lowDelay local.highDelay local.offtrigger:
+//=========================================================================
+{
+	while (1){
+		self waittill trigger
+		self thread StopMortars local.offtrigger
+
+		local.arraySize 	= local.mortarGroup.size
+		local.delaySpread 	= local.highDelay - local.lowDelay + 1
+		self.mortarsGoing 	= 1
+		
+		while (self.mortarsGoing == 1){
+			local.delayTime		= (randomint local.delaySpread) + local.lowDelay
+			local.impactChoice 	= randomint local.arraySize + 1
+			local.impactPoint 	= local.mortarGroup[local.impactChoice]
+			local.impactPoint thread mortarFx
+			wait local.delayTime		
+		}
+	}
+}end
+
+//=========================================================================
+StopMortars local.stopTrigger:
+//=========================================================================
+{
+	local.stopTrigger waittill trigger
+	self.mortarsGoing = 0		
+}end
+
+//=========================================================================
+mortarFx:
+//=========================================================================
+{
+	local.soundLoc = spawn script_origin
+	local.soundLoc.origin = self.origin
+	local.soundLoc playsound arty_leadin05
+	wait 1.8
+	
+	local.explosion = spawn "models/emitters/tehao_vineyardExplosion.tik"
+	local.explosion.origin = self.origin
+	local.explosion anim start
+	local.explosion notsolid
+	local.explosion playsound arty_exp_sand
+	radiusdamage self.origin 200 100
+	wait 5
+
+	local.explosion delete
+	local.soundLoc delete
+}end
+
+// self is the tank doing the killing
+//=========================================================================
+killBunker4:
+//=========================================================================
+{
+	if(self && isalive self){
+		wait 3.0
+		//dprintln "Aiming At Bunker4Exploder1"
+		local.bunker4wall = waitthread global/FindTrigger.scr::FindTrigger "bunker4boom1"
+		self.gun setAimTarget local.bunker4wall
+		self.gun waittill ontarget
+		wait 2.0
+
+		self.gun anim fire
+		
+		if(self && isalive self){
+			trigger local.bunker4wall // level.Bunker4Exploder1 waittill trigger
+			//dprintln "local.bunker4wall exploded"
+		}
+
+		for (local.i=1;local.i<=$bunker4towerguy.size;local.i++){
+			$bunker4towerguy[local.i].type_attack = "runandshoot"
+			$bunker4towerguy[local.i] runto $bunker4towerguy[local.i].target
+		}
+	}	
+	
+	if(self && isalive self)
+	{
+		wait 3.0
+		//dprintln "Aiming At bunker4boom2"
+		local.bunker4wall = waitthread global/FindTrigger.scr::FindTrigger "bunker4boom2"
+		self.gun setAimTarget local.bunker4wall
+		self.gun waittill ontarget
+		wait 2.0
+
+		self.gun anim fire
+
+		if(self && isalive self){
+			trigger local.bunker4wall // level.Bunker4Exploder1 waittill trigger
+			$bunker4bazookaguy exec global/bullethit.scr (0 -1 0) 1000 0 0
+			//dprintln "local.bunker4wall exploded"
+		}
+	}
+	
+	$bunker4towerguy[1] takedamage
+	if(self && isalive self && $bunker4towerguy[1] && (isalive $bunker4towerguy[1])){
+		wait 3.0
+		//dprintln "Aiming At bunker4towerguy[1]"
+		self.gun setAimTarget $bunker4towerguy[1]
+		self.gun waittill ontarget
+		wait 2.0
+
+		self.gun anim fire
+		wait 0.2
+
+		$bunker4towerguy[1] exec global/bullethit.scr (0 -1 0) 1000 0 0
+	}
+	
+	$bunker4towerguy[2] takedamage
+	if(self && isalive self && $bunker4towerguy[2] && (isalive $bunker4towerguy[2])){
+
+		wait 3.0
+		//dprintln "Aiming At bunker4towerguy[2]"
+		self.gun setAimTarget $bunker4towerguy[2]
+		self.gun waittill ontarget
+		wait 2.0
+
+		self.gun anim fire
+		wait 0.2
+
+		$bunker4towerguy[2] exec global/bullethit.scr (0 -1 0) 1000 0 0
+	}
+	
+	local.playertorso = spawn script_origin
+
+	while(self && isalive self){
+		wait 5.0
+		//dprintln "Aiming At player"
+		local.playertorso.origin = ($player.origin + (0 0 50))
+		self.gun setAimTarget local.playertorso
+		self.gun waittill ontarget
+		//wait 1.0
+
+		if (self.canfireatplayer == 1){
+			self.gun anim fire
+		}
+	}
+	local.playertorso remove
+}end
+
+/*
+//----------------------------------------------
+someoneShootAtTheDamnTank:
+//----------------------------------------------
+	self.lookingForTank = 1
+	while (self && isAlive self && isAlive $bunker4tank01)
+	{
+		dprintln "DEBUG: looking for the tank"
+		dprintln "DEBUG: looking for the tank"
+		local.view = self.origin + (0 0 100)
+		local.tank = $bunker4tank01.origin + (0 0 150)
+		local.cansee = sighttrace local.view local.tank
+		if (local.cansee == 1)
+		{
+			local.zcoord = 100
+			local.aimpoint = $bunker4tank01.origin + (0 0 local.zcoord)
+			self exec global/disable_ai.scr
+			self exec global/aimat.scr local.aimpoint
+			self setaimtarget local.aimpoint
+			wait 0.5
+			self exec global/shoot.scr
+		}
+		wait 3
+	}
+end
+*/
+
+//=========================================================================
+Tank1TargetPlayer:
+//=========================================================================
+{
+	if ($bunker4tank01 && isalive $bunker4tank01){
+		$bunker4tank01.canfireatplayer = 1
+	}
+}end
+
+//=========================================================================
+Tank1Idle:
+//=========================================================================
+{
+	if ($bunker4tank01 && isalive $bunker4tank01){
+		$bunker4tank01.canfireatplayer = 0
+	}
+}end
+
+//=========================================================================
+Tank2TargetPlayer:
+//=========================================================================
+{
+	if ($bunker4tank02 && isalive $bunker4tank02){
+		$bunker4tank02.myenemy = $player
+	}
+}end
+
+//=========================================================================
+Tank2Idle:
+//=========================================================================
+{
+	if ($bunker4tank02 && isalive $bunker4tank02){
+		$bunker4tank02.myenemy = NULL
+	}
+}end
+
+//=========================================================================
+CleanupSceneBunker4:
+//=========================================================================
+{
+	$bunker4cleanup waittill trigger
+
+	dprintln "CLEANUP"
+	if($bunker4tank01.smoke){
+		$bunker4tank01.smoke delete
+	}
+
+	thread global/EntityCleanup.scr::EntityCleanup $bunker4tank01 10
+
+	if($bunker4tank02.smoke){
+		$bunker4tank02.smoke delete
+	}
+
+	thread global/EntityCleanup.scr::EntityCleanup $bunker4tank02 10
+
+	$bunker4axisparadetrigger thread global/parade.scr::DeleteParade 10
+	$backdoorparade thread global/parade.scr::DeleteParade 10
+
+	thread global/EntityCleanup.scr::EntityCleanup $bunker2reinforcement 10
+	thread global/EntityCleanup.scr::EntityCleanup $jeepdriver 10
+	thread global/EntityCleanup.scr::EntityCleanup "bunker4inside" 10
+}end
+
+//=========================================================================
+CleanupSceneBunker3toBunker4:
+//=========================================================================
+{
+	thread global/EntityCleanup.scr::EntityCleanup "clifftopguys" 		2000
+	thread global/EntityCleanup.scr::EntityCleanup "alliedcliffguys" 	2000
+	thread global/EntityCleanup.scr::EntityCleanup "canyongroundguys" 	2000
+
+	for (local.i=1;local.i<$pgenCanyon01.size;local.i++){
+		$pgenCanyon01[local.i] turnoff
+	}
+}end
+

@@ -1,0 +1,1641 @@
+// Mackey was seen in this locale.	
+//============================================================================
+main:{
+//============================================================================
+	level.coopNextMap = "m5l2a"			//Pasted by Criminal for coop comp. - set next map (for mom voteing)
+	level.coopPrevMap = "m5l1a"			//Pasted by Criminal for coop comp. - set previouse map (for mom voteing)
+	level.coop_aaMap = 1				//Pasted by Criminal for coop comp. - let global scripts know this is a AA level
+	level.coop_debugSpawn = 1 			//Pasted by Criminal for coop comp. - enable spawnpoint debug (make visible)
+	level.coop_disableSpawnWarper = 1	//Chrissstrahl - prevent players from respawning where they died
+	thread coop_mod/main.scr::main     //Pasted by Criminal for coop comp. - start coop mod extensions
+	
+	thread coop_updatespawns			//chrissstrahl - update spawnpoints
+	
+	thread coop_spawnBazooka			//chrissstrahl - spawn bazooka for players to kill tank -782 -5153 110
+
+	exec global/ai.scr
+	exec global/exploder.scr
+	exec global/loadout.scr "maps/m5l1b.scr"
+	$intro_door notsolid
+
+	//	fadeout 0 0 0 0 1
+	fadeout .1 0 0 0 1
+
+	for (local.i=1;local.i<$tank_block.size+1;local.i++){
+		$tank_block[local.i] notsolid
+	}
+
+	level waittill prespawn
+
+	//	fadeout 0 0 0 0 1
+	fadeout .1 0 0 0 1
+	exec global/friendly.scr
+	exec global/cabinet.scr
+	exec global/door_locked.scr
+
+	level.farplane = 3500
+	level.farplanecolor = (0.333 0.333 0.359)
+
+	exec global/weather.scr
+	exec global/shutter.scr
+	exec global/ambient.scr m5l1b
+	exec global/bomber.scr
+
+	$dead_eng notsolid
+
+	//level waittill spawn //chrissstrahl
+	waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl - coop/mp wait for a player to spawn
+	
+	level.easyhealth = 850
+
+	if (getcvar(skill) == "1"){
+		level.hardhealth = 650
+	}else{
+		level.hardhealth = 500
+	}
+
+	//setcvar fast "2" //chrissstrahl - wtf!!! Left over developer vars ?
+
+	level.friendly1 thread deathmessage1
+	level.friendly2 thread deathmessage2
+	level.friendly3 thread deathmessage3
+	level.friendly1 gun "none"
+	thread fader
+
+	//chrissstrahl - wtf part 2
+	//if (getcvar(fast) == "1"){
+		//thread snipers
+	//}else if (getcvar(fast) == "2"){
+		thread snipersrange
+	//}
+
+	/*
+	if (getcvar(superfps) == "1")
+	{
+		local.gun = $tank QueryTurretSlotEntity 0
+		local.gun delete
+		$tank delete
+		for (local.i=1;local.i<$enemy.size+1;local.i++)
+		{
+			//			$enemy[local.i] thread diedie
+			$enemy[local.i] sight 1500
+			$enemy[local.i] hearing 0
+		}
+
+		end
+	}
+	*/
+
+	if (game.medic != NIL){
+		local.gun = $tank QueryTurretSlotEntity 0
+		local.gun delete
+		$tank delete
+		for (local.i=1;local.i<$enemy.size+1;local.i++){
+			$enemy[local.i] thread diedie
+		}
+		end
+	}
+
+	level.medic_preppers = 0
+
+	if (game.playerorigin != NIL){
+		thread continuegame
+	}
+
+	//$player stufftext "tmstart sound/music/mus_SniperTown_01b.mp3"		// Criminal.
+	exec coop_mod/replace.scr::tmstart "sound/music/mus_SniperTown_01b.mp3" // Criminal - coop compabitility.
+
+	level.deadsnipers = 0
+
+	$intro_door solid
+	for (local.i=1;local.i<$enemy.size+1;local.i++){
+		if ($enemy[local.i].sniper != NIL){
+			println $enemy[local.i].origin
+			$enemy[local.i] thread snipersetup
+		}
+	}
+
+	if (getcvar(dead) == "1"){
+		for (local.i=1;local.i<$enemy.size+1;local.i++){
+			$enemy[local.i] thread diedie
+		}
+	}
+
+	level.flags[tankcrewdead] = 0
+	level.flags[tankstart] = 0
+	level.flags[tankdead] = 0
+	level.flags[tankcrew] = 0
+	level.flags[cityhall] = 0
+
+	level.completeobjs = 0
+
+	set_objective_pos level.friendly2.origin
+	waitthread global/objectives.scr::add_objectives 1 2 "Find the tank crew." level.friendly2.origin
+	waitthread global/objectives.scr::add_objectives 2 2 "Defeat the Panzer tank." $tank.origin
+	waitthread global/objectives.scr::add_objectives 3 2 "Keep the tank crew alive and infiltrate city hall." $obj2.origin
+	waitthread global/objectives.scr::add_objectives 4 2 "Steal the King Tiger with the tank crew." $obj3.origin
+	waitthread global/objectives.scr::current_objectives 1
+
+	//	$player threatbias 5000
+	level.maxspawnedenemies = 8
+
+	/*
+    for (local.i=1;local.i<level.friendlys+1;local.i++)
+    {
+		if (isalive level.friendly[local.i])
+		{
+            level.friendly[local.i].health = 5000
+            level.friendly[local.i] exec global/friendly.scr::friendlythink
+		}
+			//			level.friendly[local.i] delete
+    }
+	*/
+
+	//chrissstrahl - make sure they don't die in coop
+	if (getcvar(alive) == "1" || level.gametype != 0){
+		//println "ALIVE" //chrissstrahl
+		level.friendly1 nodamage
+		level.friendly2 nodamage
+		level.friendly3 nodamage
+	}
+
+	level.friendly1.avoidplayer = 0
+	level.friendly2.avoidplayer = 0
+	level.friendly3.avoidplayer = 0
+
+	level.engineers = 0
+
+	level.friendly1 gun "weaponless"
+	level.friendly1 thread engstart
+	level.friendly2 thread engstart
+	level.friendly3 thread engstart
+	level.friendly2 thread chat
+	//	level.friendly4 damage $world 5500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0	
+
+	level.friendly2 leash 64
+	level.friendly3 leash 1000
+
+	level.friendly2 thread leashrun 10
+	level.friendly3 thread leashrun 8
+
+	//	LEVEL BEGINS
+	thread planesflyby
+	$tank setcollisionentity $tank.target
+	$kingtank setcollisionentity $kingtank.target
+
+	thread tankstartwait
+
+	wait 2
+	$intro_door time 1
+	$intro_door rotateydown 85
+	$intro_door waitmove
+	wait 1
+	level.friendly1.movedoneradius = 150
+	//level.friendly1 lookat $player 							//Criminal.
+	level.friendly1 exec coop_mod/replace.scr::lookat			// Criminal - coop compabitility.
+	//level.friendly1 runto $player 							//Criminal.
+	level.friendly1 exec coop_mod/replace.scr::runtoClosest		// Criminal - coop compabitility.
+	level.friendly1 waittill movedone
+	level.friendly1 exec global/stand.scr
+ 	level.friendly1 say dfr_m5l1_add01 // Come with me sir, the rest of the tank crew is holed up back here.
+	level.friendly1 waittill saydone
+
+	//chrissstrahl - do this only in sp
+	if(level.gametype == 0){
+		level.friendly1 waitthread global/friendly.scr::heal $player 
+	}
+
+	/*
+	wait 1
+	level.friendly1.friendtype = 5
+	level.friendly1 thread global/friendly.scr::friendlythink
+	level.friendly1.health = 10
+	level.friendly1.maxhealth = 100
+	level.friendly2.maxhealth = level.friendly2.health
+	level.friendly3.maxhealth = level.friendly3.health
+	end
+	*/
+
+	//	level.friendly1 damage $world 5500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0	
+	//	iprintln "Follow me"
+
+	if (game.skill == "easy"){
+		level.friendly1.health = level.easyhealth
+		level.friendly1.maxhealth = level.easyhealth
+		level.friendly2.maxhealth = level.easyhealth
+		level.friendly3.maxhealth = level.easyhealth
+	}else{
+		level.friendly1.health = level.hardhealth
+		level.friendly1.maxhealth = level.hardhealth
+		level.friendly2.maxhealth = level.hardhealth
+		level.friendly3.maxhealth = level.hardhealth
+	}
+
+	level.friendly1 runto destinationmedic
+}end
+
+//============================================================================
+fader:{
+//============================================================================
+	wait 0.5
+	fadein 2.5 0 0 0 1
+}end
+
+//============================================================================
+diedie:{
+//============================================================================
+	wait 1
+	if (self){
+		self damage $world 5500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	}
+}end
+
+//============================================================================
+deathmessage1:{
+//============================================================================
+	self waittill death
+	iprintlnbold "T/4 Medic Glenn has been killed in action."
+}end
+
+//============================================================================
+deathmessage2:{
+//============================================================================
+	self waittill death
+	iprintlnbold "Sergeant Hammon has been killed in action."
+}end
+
+//============================================================================
+deathmessage3:{
+//============================================================================
+	self waittill death
+	iprintlnbold "T/2 Engineer Campbell has been killed in action."
+}end
+
+//============================================================================
+killrandomfriendly:{
+//============================================================================
+	local.num = randomint(3) + 1
+	if (local.num == 1){
+		if (isalive level.friendly1){
+			level.friendly1 damage $world 5500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+		}
+	}else if (local.num == 2){
+		if (isalive level.friendly2){
+			level.friendly2 damage $world 5500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+		}
+	}else{
+		if (isalive level.friendly3){
+			level.friendly3 damage $world 5500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+		}
+	}
+}end
+
+//============================================================================
+tankstartwait:{
+//============================================================================
+	while (level.flags[tankstart] == 0){
+		wait 0.5
+	}
+
+	thread global/ai.scr::spawn 600
+
+	$tank thread tankdrive
+	//	level.friendly1 turnto $player
+
+	while ((level.flags[tankdead] == 0) || (level.flags[tankcrew] == 0)){
+		//chrissstrahl - don't do this shit in coop
+		if(level.gametype != 0){
+			wait 1
+			continue
+		}
+		
+		//chrissstrahl - won't be applies in coop
+		if (isalive level.friendly1){
+			if (vector_length ($player.origin - level.friendly1.origin) > 3400){
+				thread killrandomfriendly
+				wait randomfloat(1)
+			}
+		}else if (isalive level.friendly2){
+			if (vector_length ($player.origin - level.friendly2.origin) > 3400){
+				thread killrandomfriendly
+				wait randomfloat(1)
+			}
+		}else if (isalive level.friendly3){
+			if (vector_length ($player.origin - level.friendly3.origin) > 3400){
+				thread killrandomfriendly
+				wait randomfloat(1)
+			}
+		}
+		wait 1
+	}
+
+
+	level.lastcomment = level.time + 2
+	if (isalive level.friendly2){
+		level.friendly2 thread commentsC			
+		//level.friendly2 tether $player //chrissstrahl
+		level.friendly2 exec coop_mod/main.scr::tether //chrissstrahl - coop mod compatibility
+		level.friendly2 leash 650 // was 250
+		level.friendly2.health = level.hardhealth
+
+		if (game.skill == "easy"){
+			level.friendly2.health = level.easyhealth
+		}
+
+		level.friendly2.friendtype = 0
+		level.friendly2 exec global/enable_ai.scr
+		level.friendly2 exec global/friendly.scr::friendlythink
+		level.friendly2.mins = -50
+		level.friendly2.maxs = -30
+		level.friendly2.avoidplayer = 1
+	}
+
+	if (isalive level.friendly3){
+		level.friendly2 thread commentsM
+		//level.friendly3 tether $player //chrissstrahl
+		level.friendly3 exec coop_mod/main.scr::tether //chrissstrahl - coop mod compatibility
+		level.friendly3 leash 650 // was 250
+
+		level.friendly3.health = level.hardhealth
+	
+		if (game.skill == "easy"){
+			level.friendly3.health = level.easyhealth
+		}
+
+		level.friendly3.friendtype = 0
+		level.friendly3 exec global/enable_ai.scr
+		level.friendly3 exec global/friendly.scr::friendlythink
+		level.friendly3.mins = -40
+		level.friendly3.maxs = -20
+		level.friendly3.avoidplayer = 1
+	}
+
+	if (isalive level.friendly1){
+		level.friendly1	thread medicstart
+	}
+
+	//chrissstrahl - coop compatibility - get close to a player just to talk some shitt
+	//while ((isalive level.friendly2) && vector_length (level.friendly2.origin - $player.origin) > 500)){ //chrissstrahl
+	while ((isalive level.friendly2) && !(exec coop_mod/replace.scr::withinDistanceOf level.friendly2 500)){ //chrissstrahl - coop compabitility
+		wait 1
+	}
+
+	wait 1.5
+	if (isalive level.friendly2){
+		level.friendly2 say dfr_m5l1_501h
+	}
+}end
+
+//============================================================================
+commentsC:{
+//============================================================================
+	local.count = 0
+
+	while (isalive self){
+		while (level.time < level.lastcomment){
+			wait 2
+		}
+
+		//chrissstrahl - get close to player for a talk
+		//while (vector_length (self.origin - $player.origin) > 400){ //chrissstrahl
+		while (!(exec coop_mod/replace.scr::withinDistanceOf self 400)){ //chrissstrahl - coop compatibility
+			wait 2
+		}
+
+		if ((level.time > level.lastcomment) && (self.thinkstate != "attack"))
+		{
+			level.lastcomment = level.time + 5 + randomint(8)
+			local.count++
+			//println ("commentsC said " + local.count)
+			
+			if (local.count == 1){
+				self say dfr_follow_01c_2
+			}else if (local.count == 2){
+				self say dfr_follow_10c
+			}else if (local.count > 2){
+				self say dfr_follow_20c_2
+				local.count = 0
+			}
+		}
+		wait 1
+	}
+}end
+
+//============================================================================
+commentsM:{
+//============================================================================
+	local.count = 0
+
+	while (isalive self){
+		while (level.time < level.lastcomment){
+			wait 2
+		}
+
+		//chrissstrahl - get close to player for a talk
+		//while (vector_length (self.origin - $player.origin) > 400){ //chrissstrahl
+		while (!(exec coop_mod/replace.scr::withinDistanceOf self 400)){ //chrissstrahl - coop compatibility
+			wait 2
+		}
+
+
+		if ((level.time > level.lastcomment) && (self.thinkstate != "attack"))
+		{
+			level.lastcomment = level.time + 5 + randomint(8)
+
+			local.count++
+			//println ("commentsM said " + local.count)
+			if (local.count == 1){
+				self say dfr_follow_09m_2
+			}else if (local.count > 1){
+				self say dfr_follow_19m_2
+				local.count = 0
+			}
+		}
+		wait 1
+	}
+}end
+
+//============================================================================
+chat:{
+//============================================================================
+	//chrissstrahl - get close to player for a talk
+	//while ((isalive self) && (vector_length (self.origin - $player.origin) > 500)){ //chrissstrahl
+	while ((isalive self) && !(exec coop_mod/replace.scr::withinDistanceOf self 500)){ //chrissstrahl - coop compatibility
+		wait 1
+	}
+
+	if (isalive self){
+		self say dfr_m5l1_500
+	}
+}end
+
+//============================================================================
+sniperdeath local.range:{
+//============================================================================
+	self waittill death
+	level.deadsnipers++
+
+	if (level.deadsnipers > 1){
+		level.deadsnipers = 0
+		local.sniper = NIL
+		local.count = 0
+		for (local.i=1;local.i<$enemy.size+1;local.i++){
+			//if ((vector_length ($player.origin - $enemy[local.i].origin) < local.range) && (isalive $enemy[local.i]) && ($enemy[local.i].thinkstate != "attack"))
+			//if ((vector_length ($player.origin - $enemy[local.i].origin) < local.range) && (isalive $enemy[local.i])){ //chrissstrahl
+			if ((isalive $enemy[local.i]) && (exec coop_mod/replace.scr::withinDistanceOf $enemy[local.i] local.range)){ //chrissstrahl - coop compatible
+				local.count++
+				local.sniper[local.count] = $enemy[local.i]
+			}
+		}
+
+		if (local.sniper != NIL){
+			local.newsniper = NIL
+			local.count = 0
+			for (local.i=1;local.i<local.sniper.size+1;local.i++){
+				//chrissstrahl - original code
+				//if !(sighttrace ($player.origin + (0 0 50)) (local.sniper[local.i].origin + (0 0 50)) 1){
+					//local.count++
+					//local.newsniper[local.count] = local.sniper[local.i]	
+				//}
+				
+				//chrissstrahl - coop compatible
+				local.valid = 1
+				for (local.pl = 1;local.pl <= $player.size;local.pl++){
+					local.player = $player[local.pl]
+					if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 && local.player.flags["coop_isActive"] == 1){
+						if (sighttrace (local.player.origin + (0 0 50)) (local.sniper[local.i].origin + (0 0 50)) 1){
+							local.valid = 0
+						}
+					}
+				}
+				if(local.valid == 1){
+					local.count++
+					local.newsniper[local.count] = local.sniper[local.i]				
+				}
+				//chrissstrahl - end
+			}
+			if (local.newsniper != NIL){
+				local.newsniper[randomint (local.newsniper.size) + 1].origin = local.newsniper[randomint (local.newsniper.size) + 1].origin + (0 0 -1500)
+				local.newsniper[randomint (local.newsniper.size) + 1] damage $world 5500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+				//println "did kill a random sniper"
+			}
+		}
+	}
+}end
+
+//============================================================================
+snipers:{
+//============================================================================
+	wait 2
+	level.snipers = 0
+
+	while (1){
+		if (level.snipers < 5){
+			local.ent = -1
+			local.range = 3500
+			for (local.i=1;local.i<$snipers.size+1;local.i++){
+				local.player = exec coop_mod/replace.scr::player_closestTo $snipers[local.i] //chrissstrahl - coop compatibility
+				local.newrange = vector_length (locel.player - $snipers[local.i].origin)
+				//chrissstrahl - make sure it doesen't go nuts if server is empty
+				while($player == NULL || $player.size < 1){
+					wait 1
+				}
+				//chrissstrahl - end
+				if (local.newrange < local.range){
+					if !(sighttrace (local.player.origin + (0 0 60)) ($snipers[local.i].origin + (0 0 60)) 1){
+						local.range = local.newrange
+						local.ent = $snipers[local.i]
+					}
+				}
+			}
+
+			if (local.ent != -1){
+				local.newent = waitthread global/spawner.scr::spawner_activate local.ent
+				local.newent thread snipersetup2
+				local.ent delete
+			}
+		}
+		wait 0.5
+	}
+}end
+
+//============================================================================
+snipersrange:{
+//============================================================================
+	wait 2
+	local.num = 0
+	local.delete = 0
+	local.created = 0
+
+	while (1){
+		for (local.i=1;local.i<$snipers.size+1;local.i++){
+			local.player = exec coop_mod/replace.scr::player_closestTo $snipers[local.i] //chrissstrahl - coop compatibility
+			if (vector_length (local.player.origin - $snipers[local.i].origin) < 3000){
+				if (local.num > 2){
+					$snipers[local.i] delete
+					local.num = 0
+					local.i = $snipers.size + 1
+					local.delete++
+					println ("deleted is " + local.delete)
+				}
+			}else{	
+				local.num = local.num + randomint(2) + 1
+				local.ent = waitthread global/spawner.scr::spawner_activate $snipers[local.i]
+				local.ent thread snipersetup2
+				$snipers[local.i] delete
+				local.i = $snipers.size + 1
+				local.created++
+				println ("created is " + local.created)
+			}
+			waitframe
+		}
+		waitframe
+	}
+}end
+
+//============================================================================
+snipersetup:{
+//============================================================================
+	if (getcvar(fast) == "1"){
+		//println "SETUP SETUP"
+		wait randomfloat (2)
+		local.org = self.origin
+		local.spawnent = waitthread global/spawner.scr::spawner_create self
+		local.spawnent.targetname = "snipers"
+	}else if (getcvar(fast) == "2"){
+		//println "SETUP SETUP"
+		wait randomfloat (2)
+		local.org = self.origin
+		local.spawnent = waitthread global/spawner.scr::spawner_create self
+		local.spawnent.targetname = "snipers"
+	}else{
+		thread snipersetup2
+	}
+
+	/*
+	while (vector_length (local.org - $player.origin) > 2500)
+		wait 1
+
+	println "0000002"
+	wait 1
+	local.ent = waitthread global/spawner.scr::spawner_activate local.spawnent
+	local.ent thread snipersetup2
+	*/
+}end
+
+//============================================================================
+sniperdies:{
+//============================================================================
+	self waittill death
+	level.snipers--
+}end
+
+//============================================================================
+sniperdistance:{
+//============================================================================
+	while (isalive self){
+		//println ("My length is " + (vector_length (self.origin - $player.origin)))
+		local.player = exec coop_mod/replace.scr::player_closestTo self //chrissstrahl - coop compatibility
+		if (vector_length (self.origin - local.player.origin) > 4000){
+			//println "time to die!!!"
+			local.spawnent = waitthread global/spawner.scr::spawner_create self
+			local.spawnent.targetname = "snipers"
+			if (isalive self){
+				self delete
+			}
+		}else{
+			wait 1
+			self attackplayer
+		}
+	}
+	//println "died!!!"
+}end
+
+//============================================================================
+snipersetup2:{
+//============================================================================
+	level.snipers++
+	self thread sniperdies
+	
+	//	println "0000003"
+	//	thread sniperdeath 1200
+	
+	self accuracy 100
+	self type_attack "cover"
+
+	if (game.skill == "hard"){
+		self noticescale 0
+		local.healthnum = 80
+	}else{
+		self noticescale 50
+		local.healthnum = 40
+	}
+
+	self.fallheight = 18
+	self ammo_grenade 4
+	self maxdist 1548
+	self sight 1548
+	self hearing 1548
+	self mindist 128
+	self leash 384
+	self fov 360
+	self threatbias ignoreme
+	self.silent = 1
+	self.health = (100 + randomint(local.healthnum))
+	self.maxhealth = self.health
+
+
+	if (getcvar(fast) == "1"){
+		thread sniperdistance
+	}
+
+	self attackplayer
+
+	while (isalive self){
+		while ((isalive self) && (self.thinkstate != "attack")){
+			wait 1
+		}
+		wait 1.1
+
+		if (isalive self){
+			self threatbias 0
+		}
+
+		while ((isalive self) && (self.thinkstate != "idle")){
+			wait 1
+		}
+
+		if (isalive self){
+			self threatbias ignoreme
+		}
+	}
+
+}end
+
+//============================================================================
+medicstart:{
+//============================================================================
+	self.avoidplayer = 1
+	self.distance = 250
+	self.leash = 5000
+	
+	if(level.gametype == 0){ //chrissstrahl - sp
+		if (game.skill == "easy"){
+			self.health = level.easyhealth
+		}	
+	}else{//chrissstrahl - make sure medic does not die easy in coop
+		self.health = level.coopMedicHealth
+	}
+
+
+	self.friendtype = 5
+	self thread global/friendly.scr::friendlythink
+	self waittill death
+ 
+	//iprintlnbold "One of the tank crew members has been killed in action."
+}end
+
+//============================================================================
+leashrun local.dest:{
+//============================================================================
+	self tether $("destination" + local.dest)
+	//self lookat $player //Criminal.
+	exec coop_mod/replace.scr::lookat //Criminal- coop compabitility.
+	//self turnto $player //Criminal.
+	exec coop_mod/replace.scr::turnto // Criminal - coop compabitility.
+	self runto $("destination" + local.dest)
+	self waittill movedone
+	self.origin = $("destination" + local.dest).origin
+}end
+
+//============================================================================
+engstart:{
+//============================================================================
+	self.waittime = 1.5
+	self hearing 1024
+	self sight 1024
+	self maxdist 2048
+	self mindist 512
+
+	self.health = level.hardhealth
+
+	if (game.skill == "easy"){
+		self.health = level.easyhealth
+	}
+
+	level.engineers++
+	self waittill death
+	//iprintlnbold "One of the tank crew members has been killed in action."
+	level.engineers--
+
+	if (level.engineers < 2){
+		iprintlnbold "You lost too many of your tank crew."
+		level.flags[tankcrewdead] = 1
+		wait 4
+		//centerprint " :( "
+		//wait 1
+		if (getcvar(debug) != "1"){
+			missionfailed
+		}
+	}
+}end
+
+//============================================================================
+newobjective:{
+//============================================================================
+	if (level.flags[tankcrew] == 0){
+		waitthread global/objectives.scr::current_objectives 1
+	}else if (level.flags[tankdead] == 0){
+		waitthread global/objectives.scr::current_objectives 2
+	}else if (level.flags[cityhall] == 0){
+		waitthread global/objectives.scr::current_objectives 3
+	}else{
+		waitthread global/objectives.scr::current_objectives 4
+	}
+}end
+
+//============================================================================
+disc_tank:{
+//============================================================================
+	$dead_panzer disconnect_paths
+	while ($tank_block){
+		$tank_block[1] delete
+		waitframe
+	}
+
+	end
+
+	for (local.i=1;local.i<$tank_block.size+1;local.i++){
+		if ($dead_panzer istouching $tank_block[local.i]){
+			$tank_block[local.i] disconnect_paths
+			waitframe
+		}
+	}
+
+	while ($tank_block){
+		$tank_block[1] delete
+		waitframe
+	}
+}end
+
+//============================================================================
+tankdeath:{
+//============================================================================
+	self waittill death
+	//	self disconnect_paths
+
+	level.flags[tankdead] = 1
+	level.maxfriendlies = 2
+
+	local.ent = spawn script_model
+	local.ent.origin = self.origin
+	local.ent.angles = self.angles
+	//	local.ent model "vehicles/tigertank_d.tik"
+	local.ent model "vehicles/panzer_iv_eud.tik"
+
+	$dead_panzer.origin = local.ent.origin
+	$dead_panzer.angles = local.ent.angles
+	
+	thread disc_tank
+	local.ent notsolid
+
+	exec global/model.scr self.origin "models/fx/fx_tank_explosion"
+	waitthread global/objectives.scr::add_objectives 2 3 "Defeat the Panzer tank." $tank.origin
+	waitthread global/objectives.scr::current_objectives 3
+
+	level.completeobjs++
+	thread newobjective		
+	
+	//chrissstrahl - don't in mp
+	if(level.gametype != 0){
+		end
+	}
+	
+	wait 4
+
+	local.count = 1
+	local.health = $player.health / $player.maxhealth
+
+	if (local.health < 0.5){
+		local.count = -1
+	}
+
+	if (isalive level.friendly1){
+		local.health = level.friendly1.health / level.friendly1.maxhealth
+		if (local.health < 0.5){
+			local.count = -1
+		}
+	}
+
+	if (isalive level.friendly2){
+		local.health = level.friendly2.health / level.friendly2.maxhealth
+		if (local.health < 0.5){
+			local.count = -1
+		}
+	}
+
+	if (isalive level.friendly3){
+		local.health = level.friendly3.health / level.friendly3.maxhealth
+		if (local.health < 0.5){
+			local.count = -1
+		}
+	}
+	
+	if (level.flags[tankcrewdead] != 0){
+		local.count = -1
+	}
+
+	if ((local.count == 1) && (level.engineers > 1)){
+		exec global/autosave.scr 1
+	}
+}end
+
+//============================================================================
+happysad local.friend:{
+//============================================================================
+	if !(isalive local.friend)	{end}
+
+	//local.friend lookat $player //Criminal
+	local.friend exec coop_mod/replace.scr::lookat 	//Criminal - coop compabitility.
+	//local.friend turnto $player //Criminal
+	local.friend exec coop_mod/replace.scr::turnto 		//Criminal - coop compabitility.
+end
+
+	local.friend.emotion = emotion_happy
+	wait (randomint(7) + 2)
+
+	if !(isalive local.friend)	{end}
+
+	local.friend.emotion = emotion_none
+}end
+
+//============================================================================
+obj1:{
+//============================================================================
+	if (game.medic != NIL)	{end}
+
+	thread happysad level.friendly1
+	thread happysad level.friendly2
+	thread happysad level.friendly3
+
+	level.flags[tankstart] = 1
+	level.flags[tankcrew] = 1
+
+	waitthread global/objectives.scr::add_objectives 1 3 "Find the tank crew." level.friendly2.origin
+	level.completeobjs++
+	thread newobjective		
+}end
+
+//============================================================================
+obj2:{
+//============================================================================
+	if (game.medic != NIL)	{end}
+
+	if (level.flags[cityhall] == 0){
+		//$player stufftext "tmstart sound/music/mus_SniperTown_01e.mp3" //Criminal
+		exec coop_mod/replace.scr::tmstart "sound/music/mus_SniperTown_01e.mp3" //Criminal - coop comp.
+		level.flags[cityhall] = 1
+		level.completeobjs++
+		waitthread global/objectives.scr::add_objectives 3 3 "Keep the tank crew alive and infiltrate city hall." $obj2.origin
+		thread newobjective		
+	}
+}end
+
+//============================================================================
+obj3:{
+	//============================================================================
+	if (game.medic != NIL){
+		end
+	}
+
+	while (level.completeobjs < 3){
+		wait 1
+	}
+
+	local.dist = 750
+	local.break = 0
+	local.timer = level.time + 5
+
+	while (local.break == 0){
+		if (level.time > local.timer){
+			//if (vector_length ($player.origin - $obj3.origin) < 700){ //chrissstrahl
+			if (exec coop_mod/replace.scr::withinDistanceOf $obj3 700){ //chrissstrahl - coop compatible
+				iprintlnbold "You must gather the entire tank crew before you can leave"
+			}
+			local.timer = level.time + 10
+		}
+		local.break = 1
+
+		if (level.enemyarea[15] > 0){
+			local.break = 0
+			waitframe
+		//}else if (vector_length ($player.origin - $obj3.origin) > local.dist){ //chrissstrahl
+		}else if !(exec coop_mod/replace.scr::withinDistanceOf $obj3 local.dist){ //chrissstrahl - coop compatible
+			local.break = 0
+			wait 0.5
+		}else if ((isalive level.friendly1) && (vector_length (level.friendly1.origin - $obj3.origin) > local.dist)){
+			local.break = 0
+			wait 0.5
+		}else if ((isalive level.friendly2) && (vector_length (level.friendly2.origin - $obj3.origin) > local.dist)){
+			local.break = 0
+			wait 0.5
+		}else if ((isalive level.friendly3) && (vector_length (level.friendly3.origin - $obj3.origin) > local.dist)){
+			local.break = 0
+			wait 0.5
+		}
+	}
+
+	if (level.engineers > 1){
+		thread endfinalthing level.friendly1
+		thread endfinalthing level.friendly3
+		thread endfinalthing level.friendly2
+
+		if (isalive level.friendly3){
+			level.friendly3 say dfr_M5L1_502e_2
+			level.friendly3 waittill saydone
+		}else if (isalive level.friendly2){
+			level.friendly2 say dfr_M5L1_502e_2
+			level.friendly2 waittill saydone
+		}else if (isalive level.friendly1){
+			level.friendly1 say dfr_M5L1_502e_2
+			level.friendly1 waittill saydone
+		}
+
+		wait 2
+
+		if (level.engineers > 2){
+			setcvar g_medal1 "1"
+		}
+
+		if (level.engineers > 1){
+			waitthread global/objectives.scr::add_objectives 4 3 "Steal the King Tiger with the tank crew." $obj3.origin
+			wait 1
+			if ((level.medic_preppers > 0) && (game.skill == "hard")){
+				waitthread global/objectives.scr::add_objectives 5 3 "Bring reinforcements all the way through Sniper Town." $obj3.origin
+				wait 2
+				game.medic = 1
+				setcvar "medic_over" "0"
+				exec global/missioncomplete.scr void 1
+			}else{
+				exec global/missioncomplete.scr m5l2a
+			}
+		}
+	}	
+}end
+
+//============================================================================
+endfinalthing local.friend:{
+//============================================================================
+	if !(isalive local.friend) {end}
+
+	local.friend.friendtype = -1
+	wait (randomfloat (1))
+	local.friend.turndoneerror = 80 + randomint(40)
+	
+	if (randomint(100) > 50){
+		local.friend lookat $obj3
+		local.friend turnto $obj3
+	}else{
+		//local.friend lookat $player //Criminal
+		local.friend exec coop_mod/replace.scr::lookat //Criminal - coop compabitility.
+		//local.friend turnto $player //Criminal
+		local.friend exec coop_mod/replace.scr::turnto  //Criminal - coop compabitility.
+	}
+}end
+
+/*
+	local.bombertime[100] = level.time
+	thread global/bomber.scr::bomb 100
+	wait 5
+*/
+//============================================================================
+planesflyby:{
+//============================================================================
+	while (level.flags[tankdead] == 0)	{wait 1}
+
+	local.bombertime[101] = level.time
+	thread global/bomber.scr::bomb 101
+	wait 5
+	
+	local.bombertime[102] = level.time
+	thread global/bomber.scr::bomb 102
+	wait 5
+
+	//	local.bombertime[103] = level.time - 5000
+	local.bombertime[103] = level.time
+	thread global/bomber.scr::bomb 103
+	local.last = 103
+
+	end
+
+	local.planes = 12
+	while (local.planes > 0){
+		local.planes--
+		local.random = (randomint (4) + 100)
+		while ((local.random == local.last) || (local.bombertime[local.random] < level.time + 10)){
+			local.random = (randomint (4) + 100)
+			wait 0.25
+		}	
+		thread global/bomber.scr::bomb local.random
+		local.bombertime[local.random] = level.time
+		wait (1 + randomint(12))
+	}
+}end
+
+//============================================================================
+building_explode:{
+//============================================================================
+	thread global/ai.scr::spawn 200
+	level.flags[tankstart] = 1
+	thread global/bomber.scr::bomb 100
+}end
+
+
+//============================================================================
+tankdrive:{
+//============================================================================
+	self thread tankdeath
+	if (game.skill == "easy"){
+		self.health = 500
+	}else{
+		self.health = 625
+	}
+
+	self drive $tankpath 5 10 100 256 // ideal speed, accelleration/deceleration, close to nodes,  lookahead
+	self waitTill drive
+	if (isalive self){
+		self fullstop
+		local.gun = self QueryTurretSlotEntity 0
+		local.gun setAimTarget $tanktarget
+ 		local.gun waittill ontarget
+		wait 2
+		if (isalive self){
+			local.gun startfiring // anim "fire"
+			wait 0.25
+			thread global/exploder.scr::explode 3
+			level.friendly2 damage $world 5500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+			level.friendly1 damage $world 5500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+		}
+	}
+}end
+
+	/*
+	friendlythink:
+	self.health = 200
+	self.maxhealth = 200
+	self.friendtype = 0
+	self.mins = -30
+	self.maxs = 50
+	self.distance = 400
+	wait 2
+
+	if !(isalive self)
+	{
+		level.currentfriendlies--
+		end
+	}
+
+	if (isalive self)
+	{
+		self thread global/friendly.scr::friendlythink
+		self waittill death
+		level.currentfriendlies--
+		for (local.i=1;local.i<level.friendlys+1;local.i++)
+			if (level.friendly[local.i] == self)
+				level.friendly[local.i] = level.deadent
+	}
+	else
+		level.currentfriendlies--
+
+	end
+	*/
+
+//============================================================================
+continuegame:{
+//============================================================================
+	//	level.friendly1 remove
+	//	level.friendly3 remove
+
+	local.vec = (0 4352 0)
+	iprintlnbold_noloc("Dev: Figure out what is goin on, why we need player origin right now?") //chrissstrahl - temp fixme
+	$player.origin = game.playerorigin - local.vec
+	$player.viewangles = game.playerangles
+
+	level.windtime = game.windtime
+	level.shuttertime = game.shuttertime
+	level.raindensity = game.raindensity
+	level.rainvolume = game.rainvolume
+	level.thundertime =	game.thundertime
+	local.raindensity = (50 + ((level.raindensity - 5) * 8))
+	
+	setcvar "cg_rain_slant" (local.raindensity)
+	setcvar "cg_rain_density" (level.raindensity)
+
+	if (game.friendly1health != -1){
+		level.currentfriendlies++
+		level.friendlys++
+		local.ent = spawn game.friendly1model "targetname" "friendly"
+		
+		level.friendly[level.friendlys] = local.ent
+		local.ent.origin = game.friendly1origin - local.vec
+		local.ent.angles = game.friendly1angles
+		local.ent waitthread global/friendly.scr::friendlyinit
+		local.ent type_idle "idle"
+		local.ent type_attack "cover"
+		local.ent forceactivate
+		local.ent thread global/friendly.scr::friendlythink
+		local.ent.friendtype = 1
+		local.ent.health = 600
+		local.ent thread medic_prep
+
+		local.ent.headmodel = game.friendly1headmodel
+		local.ent.headskin = game.friendly1headskin
+	}
+
+	if (game.friendly2health != -1){
+		level.currentfriendlies++
+		level.friendlys++
+
+		local.ent = spawn game.friendly2model "targetname" "friendly"
+		level.friendly[level.friendlys] = local.ent
+
+		local.ent.origin = game.friendly2origin - local.vec
+		local.ent.angles = game.friendly2angles
+		local.ent waitthread global/friendly.scr::friendlyinit
+		local.ent type_idle "idle"
+		local.ent type_attack "cover"
+		local.ent forceactivate
+		local.ent thread global/friendly.scr::friendlythink
+		local.ent.friendtype = 1
+		local.ent.health = 600
+		local.ent thread medic_prep
+		local.ent.headmodel = game.friendly2headmodel
+		local.ent.headskin = game.friendly2headskin
+	}
+
+	if (game.friendly3health != -1){
+		level.currentfriendlies++
+		level.friendlys++
+
+		local.ent = spawn game.friendly3model "targetname" "friendly"
+		
+		level.friendly[level.friendlys] = local.ent
+		local.ent.origin = game.friendly3origin - local.vec
+		local.ent.angles = game.friendly3angles
+		local.ent waitthread global/friendly.scr::friendlyinit
+		local.ent type_idle "idle"
+		local.ent type_attack "cover"
+		local.ent forceactivate
+		local.ent thread global/friendly.scr::friendlythink
+		local.ent.friendtype = 1
+		local.ent.health = 600
+		local.ent thread medic_prep
+
+		local.ent.headmodel = game.friendly3headmodel
+		local.ent.headskin = game.friendly3headskin
+	}
+
+	if (game.friendly4health != -1){
+		level.currentfriendlies++
+		level.friendlys++
+
+		local.ent = spawn game.friendly4model "targetname" "friendly"
+		
+		level.friendly[level.friendlys] = local.ent
+		local.ent.origin = game.friendly4origin - local.vec
+		local.ent.angles = game.friendly4angles
+		local.ent waitthread global/friendly.scr::friendlyinit
+		local.ent type_idle "idle"
+		local.ent type_attack "cover"
+		local.ent forceactivate
+		local.ent thread global/friendly.scr::friendlythink
+		local.ent.friendtype = 1
+		local.ent.health = 600
+		local.ent thread medic_prep
+
+		local.ent.headmodel = game.friendly4headmodel
+		local.ent.headskin = game.friendly4headskin
+	}
+
+	if (game.friendly5health != -1){
+		level.currentfriendlies++
+		level.friendlys++
+
+		local.ent = spawn game.friendly5model "targetname" "friendly"
+		
+		level.friendly[level.friendlys] = local.ent
+		local.ent.origin = game.friendly5origin - local.vec
+		local.ent.angles = game.friendly5angles
+		local.ent waitthread global/friendly.scr::friendlyinit
+		local.ent type_idle "idle"
+		local.ent type_attack "cover"
+		local.ent forceactivate
+		local.ent thread global/friendly.scr::friendlythink
+		local.ent.friendtype = 1
+		local.ent.health = 600
+		local.ent thread medic_prep
+
+		local.ent.headmodel = game.friendly5headmodel
+		local.ent.headskin = game.friendly5headskin
+	}
+}end
+
+//============================================================================
+medic_prep:{
+//============================================================================
+	if (getcvar(alive) == "1"){
+		self nodamage
+	}
+
+	//self turnto $player  //Criminal
+	exec coop_mod/replace.scr::turnto //  Criminal - coop comp.
+	//self lookat $player  //Criminal
+	exec coop_mod/replace.scr::lookat // Criminal - coop comp.
+	level.medic_preppers++
+	self waittill death
+	level.medic_preppers--
+}end
+
+
+//============================================================================
+kaboom:{
+//============================================================================
+}end
+
+//============================================================================
+kaboom1:{
+//============================================================================
+	thread global/exploder.scr::explode 1
+}end
+
+//============================================================================
+kaboom2:{
+//============================================================================
+	thread global/exploder.scr::explode 2
+}end
+
+//============================================================================
+kaboom3:{
+//============================================================================
+//	$tank damage $world 25000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+//	thread global/exploder.scr::explode 3
+}end
+
+//============================================================================
+kaboom4:{
+//============================================================================
+//	$tank damage $world 25000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+	thread global/exploder.scr::explode 3
+}end
+
+//============================================================================
+kaboom5:{
+//============================================================================
+	thread global/exploder.scr::explode 5
+}end
+
+//============================================================================
+early_trigger:{
+//============================================================================
+	thread global/ai.scr::spawn 201
+	thread global/bomber.scr::bomb 100
+}end
+
+//============================================================================
+403_trigger:{
+//============================================================================
+	if (game.medic != NIL)	{end}
+
+	if (level.flags[403] == NIL){
+		if(level.gametype == 0){ //chrissstrahl - don't in mp - ain't no need autosave
+			local.count = 1
+
+			//chrissstrahl - handle sp
+			if(level.gametype == 0){
+				local.health = $player.health / $player.maxhealth
+				if (local.health < 0.5){
+					local.count = -1
+				}		
+			}
+			//chrissstrahl - handle mp/coop
+			else{
+				if ($player != NULL && $player.size < 2){
+					local.count = -1
+				}		
+			}
+
+			if (isalive level.friendly1){
+				local.health = level.friendly1.health / level.friendly1.maxhealth
+				if (local.health < 0.5){
+					local.count = -1
+				}
+			}
+			if (isalive level.friendly2){
+				local.health = level.friendly2.health / level.friendly2.maxhealth
+				if (local.health < 0.5){
+					local.count = -1
+				}
+			}
+			if (isalive level.friendly3){
+				local.health = level.friendly3.health / level.friendly3.maxhealth
+				if (local.health < 0.5){
+					local.count = -1
+				}
+			}
+			if (level.flags[tankcrewdead] != 0){
+				local.count = -1
+			}
+			if ((local.count == 1) && (level.engineers > 1)){
+				exec global/autosave.scr 2
+			}
+		}
+
+		exec global/ai.scr::spawn 403
+		level.flags[403] = 1
+		
+	//	if (isalive level.friendly1)
+	//		level.friendly1.distance = 650
+
+	//		thread setupendfriend level.friendly2
+	//		thread setupendfriend level.friendly3
+	}
+}end
+
+//============================================================================
+setupendfriend local.pal:{
+//============================================================================
+	if !(isalive local.pal){end}
+
+	local.pal.distance = 600
+	local.pal.friendtype = 1
+	local.pal maxdist 2000
+	local.pal mindist 1024
+	local.pal leash 256
+	//local.pal tether $player //chrissstrahl
+	local.pal exec coop_mod/main.scr::tether //chrissstrahl - coop mod compatibility
+}end
+
+//============================================================================
+lateleveltrigger:{
+//============================================================================
+	exec global/bomber.scr::bomb 105
+	exec global/ai.scr::spawn 404
+}end
+
+// nixfriendlies
+//============================================================================
+endsetup:{
+//============================================================================
+	if (game.medic != NIL){end}
+
+	//level.maxfriendlies = 0
+
+	local.count = 1
+
+	//chrissstrahl - don't in mp - ain't no need for autosave
+	if(level.gametype == 0){
+			local.health = $player.health / $player.maxhealth
+			if (local.health < 0.5){
+				local.count = -1
+			}
+
+		if (isalive level.friendly1){
+			local.health = level.friendly1.health / level.friendly1.maxhealth
+			if (local.health < 0.5){
+				local.count = -1
+			}
+		}
+
+		if (isalive level.friendly2){
+			local.health = level.friendly2.health / level.friendly2.maxhealth
+			if (local.health < 0.5){
+				local.count = -1
+			}
+		}
+
+		if (isalive level.friendly3){
+			local.health = level.friendly3.health / level.friendly3.maxhealth
+			if (local.health < 0.5){
+				local.count = -1
+			}
+		}
+
+		if (level.flags[tankcrewdead] != 0){
+			local.count = -1
+		}
+
+		if ((local.count == 1) && (level.engineers > 1)){
+			exec global/autosave.scr 4
+		}
+	}
+
+	thread global/ai.scr::spawn 208
+	thread global/ai.scr::spawn 205
+	
+	while (level.flags[tankcrew] == 0){
+		wait 1
+	}
+
+	wait 2
+
+	thread endfriendlythink level.friendly2
+	thread endfriendlythink level.friendly3
+
+	if (isalive level.friendly1){
+		level.friendly1.distance = 150
+	}
+}end
+
+//============================================================================
+endfriendlythink local.pal:{
+//============================================================================
+	if !(isalive local.pal){
+		end
+	}
+
+	local.pal.distance = 200
+	local.pal.friendtype = 1
+	local.pal maxdist 1000
+	local.pal mindist 128
+	local.pal leash 384
+	//local.pal tether $player //chrissstrahl
+	local.pal exec coop_mod/main.scr::tether //chrissstrahl - coop mod compatibility
+}end
+
+//chrissstrahl - spawn bazooka for players to kill tank
+//============================================================================
+coop_spawnBazooka:{
+//============================================================================
+	local.trigg1 = spawn trigger_multiple origin ( -782 -5153 110 ) setthread coop_bazookaSwitch wait 2
+	local.trigg2 = spawn trigger_multiple origin ( 0 -6227 110 ) setthread coop_bazookaSwitch wait 2
+	spawn script_model model "models/weapons/bazooka.tik" targetname "theOneAndOnlyTrueBazooka1" origin ( -782 -5153 110 ) notsolid 1
+	spawn script_model model "models/weapons/bazooka.tik" targetname "theOneAndOnlyTrueBazooka2" origin ( 0 -6227 110 ) notsolid 1
+	waitframe
+	local.trigg1 setsize ( -10 -10 0 ) ( 10 10 30 )
+	local.trigg2 setsize ( -10 -10 0 ) ( 10 10 30 )
+	$theOneAndOnlyTrueBazooka1 rotateY 100
+	$theOneAndOnlyTrueBazooka2 rotateY 100
+}end
+
+//chrissstrahl - allow players to switch their weapons
+//============================================================================
+coop_bazookaSwitch:{
+//============================================================================
+	//iprintlnbold_noloc("coop_bazookaSwitch")
+	if( parm.other.targetname == "player"){
+		local.player = parm.other
+		if( local.player.flags["coop_BaZookaSwitch"] == NIL ){	
+			local.isPrimary = 0
+			local.primary = waitexec coop_mod/main.scr::getActiveWeapon local.player
+			for(local.x=0;local.x<4;local.x++){
+				for(local.y=0;local.y<4;local.y++){
+					if(local.player == NULL || local.player.health < 1 || local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1){ end }
+					if		(local.y == 0){ local.type = "heavy" }
+					else if	(local.y == 1){ local.type = "smg" }
+					else if	(local.y == 2){ local.type = "rifle" }
+					else if	(local.y == 3){ local.type = "mg" }
+					local.player useweaponclass (local.type)
+					waitframe
+				}
+				local.primary = waitexec coop_mod/main.scr::getActiveWeapon local.player
+				local.isPrimary = waitexec coop_mod/main.scr::isPrimaryWeapon local.primary
+				if(local.isPrimary == 1){
+					local.player.flags["coop_BaZookaSwitch"] = local.primary
+					break					
+				}
+			}
+			//if no more player
+			if(local.player == NULL || local.player.health < 1 || local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1){ end }
+			
+			//if the player still does not have a primary weapon stop right here
+			if(	local.isPrimary == 0 ){
+				local.player iprint ("You need a Primary Weapon in order to Trade your Weapon!") 1
+				end
+			}
+			
+			exec coop_mod/main.scr::playerForcePrimary local.player "weapons/bazooka.tik"
+			local.player item heavy
+		}else{
+			exec coop_mod/main.scr::playerForcePrimary local.player local.player.flags["coop_BaZookaSwitch"]
+			local.player.flags["coop_BaZookaSwitch"] = NIL
+		}
+	}
+}end
+
+
+/*
+
+ enemyspawner enemyspawnerdestination, enemyspawnertrigger
+
+// 1	Houseboom
+// 2	smallerboom
+// 3	otherhouseboom
+// 5	rockwall
+// 150 tank escort
+// 100 plane1
+// 101 plane2
+// 102 plane3
+// 103 plane4
+// 105 plane5
+// 106 plane6
+
+// 200 Troopers
+// 201 Troopers
+// 205 Troopers
+// 206 Tower sniper
+// 207 respond spawner // ai_location
+// 208 ending guys
+// 300 respond
+
+// 350 intro panzer guys
+
+
+// 201 / 400 First building
+// 207 / 401 Second building
+// 402 Building on the left in cluster
+// 403 Building on the right in cluster, AND left
+// 404 Building in the middle in cluster
+// 405 Bridge building
+// 406 Post bridge
+// 407 City Hall
+
+
+	600 intro guys
+
+	panzer: bombs rockwall 5
+
+// types: sniper
+*/
+
+//chrissstrahl - update spawnlocations on player progress
+//make sure we don't go backwards
+//but allow to skip ahead
+//============================================================================
+coop_updatespawns:{
+//============================================================================
+	local.update = 0
+	while(1){
+		waitframe
+		if(local.update < 1){
+			if(exec coop_mod/replace.scr::withinDistance ( -1930 -1830 358 ) 1100){
+				exec coop_mod/spawnlocations.scr::m5l1b_update1
+				local.update = 1
+			}
+		}
+		if(local.update < 2){
+			if(exec coop_mod/replace.scr::withinDistance ( -103 683 430 ) 600){
+				exec coop_mod/spawnlocations.scr::m5l1b_update2
+				local.update = 2
+			}
+		}
+		if(local.update < 3){
+			if(exec coop_mod/replace.scr::withinDistance ( 3197 607 700 ) 1500){
+				exec coop_mod/spawnlocations.scr::m5l1b_update3
+				local.update = 3
+				end
+			}
+		}
+	}
+}end
+
+

@@ -1,0 +1,220 @@
+//this is intended as a guide how to modify a level
+//script to make it work in coop.
+//In any case you can ask chriss about stuff.
+
+
+### DESIGN OF THE HZM COOP MOD #########################
+########################################################
+The HaZardModding Coop Mod is designed in a fashion that
+it can be included and started from any level-script, it
+will act like a coop gametype inside the current gametype.
+
+The Idea is to design the scripts in a way that allowes
+the scripts to be re-used on other maps.
+This will not work for all scripts but for the most parts.
+
+
+### FILE STRUCTURE #####################################
+########################################################
+Some levels require a own script solution for coop, we
+like to keep coop and regular scripts seperated, especially
+when they get complex or large.
+
+Most of the times it is sufficent to put the coop code into
+a seperate function, check for level.gametype != 0 and call
+that function in coop. How ever, sometimes a seperate coop
+script-file is needed, you will have to decide for your own
+what suits the situation best.
+
+Please have a look at the existing filestructure to figure
+out where you would put the files.
+(please keep map related things in maps folder)
+
+
+### COMMENTS ###########################################
+########################################################
+You are expected to comment the things you changed.
+This is very important, so that we can compare the scripts
+in the future and to help with debugging.
+
+Your name should be at the very beginning of each comment:
+//Yourname - makes it work with multiple players
+
+Keep the original code, but deactive it with a note by
+turning it into a comment.
+
+If you copy code that is already commented by someone
+else, please add a note or replace their name with yours.
+
+
+### INCLUDING THE HZM COOP MOD #########################
+########################################################
+Include the Coop Mod files in the very beginning of the primary
+Levelscript its main function.
+
+The coop mod should be startet before any other scripts.
+How ever, if you need to fadeout the level/cam, do this before
+you start the coop mod, because the first few lines of code
+in the main function are send to the client as well.
+
+//CODE--- TO INCLUDE THE COOP MOD INTO A LEVELSCRIPT -----
+//--------------------------------------------------------
+	level.coopPrevMap = "e1l2"				//chrissstrahl - set previouse map (for mom voteing)
+	level.coopNextMap = "e1l4"				//chrissstrahl - set next map (for mom voteing)
+	level.coop_disableSpawnWarper = TRUE	//chrissstrahl - disable respawn warper (always re-spawns player at defined spawnlocation)
+	level.coop_aaMap = 0					//chrissstrahl - set if this is a Allied Assault map or not, not being BT
+	waitthread coop_mod/main.scr::main 		//chrissstrahl - start coop mod, wait for this to finish
+//--------------------------------------------------------
+//--------------------------------------------------------
+	
+### CLEAN CODE #########################################
+########################################################
+The original code of the level-scripts is a terrible mess!
+We expect every member of our team to do much better than that.
+
+For the (new) code we are adding, we do expect a few things:
+1. 	Brackets (curly brackets) are expected to be used for all
+	conditional	statments, that is specifically:
+	if/else/switch/while/for
+	
+	We would also like to have curly brackets added to the
+	functions you have edited, or added, so they can be
+	collapsed in the Script-Editor.
+
+2.	Flags are being used, if data is to be attached to
+	a entity, it should be done via using flags:
+	$world.flags["coop_missionStatus"] = 3
+	
+	This is how you should NOT do it:
+	$world.coop_missionStatus = 3
+	
+3.	Text indenting, we would like to have s nice indentation
+	of the code, so that it is easy to read. The brackets
+	and the indentation should make the code harmonic and
+	easy on the eyes.
+	How ever, you can have one-liners if that benefits the
+	structure of the code.
+	
+4.	Keep the code simple, if that does not work split it up
+	into functions, if that does not work eigther, put it
+	into a seperate script file.
+	
+5.	Try to use the already provided replacment functions.
+	If that does not work for some reason talk to Chriss.
+	If you are certain the code you need is uniqe to the
+	map, then create a new file for your code and put it
+	in the /maps/ sub-folder for this specific map.
+	
+	
+### LEVEL/GLOBAL VARS ##################################
+########################################################
+There are several new level variables being used in the
+HaZardModding Coop Mod scripts.
+
+Most of these variables are set in coop_mod/main.scr and
+are managed by the Coop Mod scripts.
+
+Here are a few of the new level variables that you might
+want to set/get in the level scripts:
+- level.coop_noWeapon = 1								//specifies if players should have no weapons
+- level.coop_forcePrimary = "xxx.tik"					//sets the primary weapon all players should spawn with
+- level.coop_forceSecondary = "xxx.tik"					//sets the secondary weapon all players should spawn with
+- level.coop_forceInventory = "models/items/papers.tik"	//used to force papers to inventory
+- level.coop_physicsOff = 1								//turn physics of the player off on spawn
+- level.coop_playerHide = 1								//hides player on spawn
+- level.coop_playerHasDisguise = 1						//sets .has_disguise on players on spawn
+- level.enemyhealthscalar 								//used in BT - used in global/spawner.scr
+- level.coopMedicHealth									//sets health for friendly AI medic
+- level.gametype										//this variable is set by the game, 0 is Singleplayer 1 or > is Multi
+- level.coop_disableSpawnWarper = TRUE					//this disables players respawning at where they died
+- level.coop_playerTank									//player currently driving the tank
+- level.coop_player										//player friendly AI is currently following
+- level.coop_threatbias									//how much the AI considers the players a threat, default: 10 / to ignore players use: ignoreme
+
+
+### CHECKING FLAGS ON A PLAYER #########################
+########################################################
+The HaZardModding Coop Mod is jkeeping track of player
+status by adding flags to each individual player entity.
+
+For example a player can be check by this code:
+//--------------------------------------------------------
+	local.player = $player[1]
+	if(local.player){
+		if(local.player.flags["coop_isActive"] == 1){
+			iprintlnbold_noloc("player is active in game, NOT dead/spec/joining")
+		}
+	}
+//--------------------------------------------------------
+
+There are some flags that are being used constantly by the Coop Mod.
+- local.player.flags["coop_isActive"] 				//if 1 player is active, in team, (with weapon), not dead, not a spectator
+- local.player.flags["coop_team"] 					//same as local.player.dmteam but updated by the coop mod to keep track
+- local.player.flags["coop_respawnOrigin"]			//used for respawing at where player died
+- local.player.flags["coop_respawnAngle"]			//used for respawing at where player died
+- local.player.flags["coop_respawning"]				//used for respawing at where player died
+- local.player.flags["coop_specialWeaponPrimary"]	//special primary weapon to set
+- local.player.flags["coop_specialWeaponSecondary"]	//special secondary weapon to set
+- local.player.flags["coop_specialInventory"] 		//special inventory item to set
+- local.player.flags["coop_playerTankExitAt"]		//hold level time + wait time when the player(driver) did exit the tank
+
+
+### REPLACING INCOMPATIBLE CODE ########################
+########################################################
+There are many replacment functions for Coop, most of the
+replacment functions are in coop_mod/replace.scr.
+
+Code that refers to $player is generally incompatible in
+Multiplayer. The reason is that the entity $player will
+turn into a ENTITY ARRAY once there is more than one
+player on the server.
+
+So every reference to the entity $player needs to be
+replaced with coop compatible code. And yes this is what
+takes the most time while coding. That and testing.
+
+Example of such code: 				$ai turnto $player
+The replacement code would be:		$ai exec coop_mod/replace.scr::turnto
+
+The function handling now turnto will select the closest
+player to the entity $ai in multiplayer/singleplayer.
+
+The replacment functions are mostly named the same way
+original functions/commands are named. Just search for
+the name of the command you whish to replace in the file:
+coop_mod/replace.scr
+
+
+### WAITFRAME - OVERFLOW - SYNCRONISATION ##############
+########################################################
+Because the scripts where designed to be executed during
+Singleplayer, there are several issues that are exclusively
+happening during Multiplayer.
+
+...use waitframe
+...overflow (events)
+...overflow entities in multi (CL_ParseGamestate)
+...overflow precache (configstrings - CL_ParseGamestate)
+...syncronisation (level waittill spawn/prespawn)
+...syncronisation (warmup-time)
+...syncronisation (player spawndelay)
+...syncronisation (coop ready delay)
+...syncronisation (triggers activated by spawning player before scripts are ready)
+...syncronisation (restarting rather than reloading maps script fuckup)
+...syncronisation (reloading map when files are already precached - messed up scripts)
+
+
+### EVENT BASED OPTIONAL CALLS #########################
+########################################################
+Some functions are called by the Mod when something specific
+happens, like a player spawning or dieing.
+
+These function need to be created in the primary level script
+and follow a specfic way of naming. If you don't need them,
+you do not need something to happen in such a event, you are
+not required to add or create them.
+
+If player 1 would be spawning that function would need to be
+named exactly: coop_playerJustSpawned1
+
+.....

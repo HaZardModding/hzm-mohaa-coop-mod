@@ -1,0 +1,149 @@
+//
+// FakeGunfire.scr
+//
+// by Chris Caron
+// 5.28.03
+//
+// You provide:
+//    statweapons/p_aagun_cannon.tik
+//    entity to the map (see RIO->ccaron->fake_gunfire.map)
+//    with $targetname fake_gunfire
+//
+// This entity will have a field $mytarget that points too a
+// script_origin as source for bursts.  It need to be
+// $mytarget and not target because target is a function
+// of ProjectileGenerator.
+//
+// The script origin will target multiple path nodes (all 
+// with the same $targetname) from which to pick from randomly.  
+//
+// The z-value of the script_origin will remain constant
+// (because path_nodes fall to the ground)
+// 
+// if the script_origin targets nothing then it's
+// position will be the souce of fake gunfire permanently.
+//
+// To delete a gun and the script_origin set
+// the field: #deleteme = 1 in the script_origin
+//
+//
+// usage: exec global/fake_gunfire.scr 
+//    (automatic when auto.scr is executed)
+// ------------------------------------------------------------
+
+main:
+end
+
+gunStart local.burstMinTime local.burstMaxTime local.pauseMinTime local.pauseMaxTime:
+	if (self.started == 1) {
+		// another thread is firing, stop it before starting this one
+		self thread gunStop
+		while (self.stopped == 0) {
+			// wait for other thread to finish
+			wait 0.5
+		}
+	}
+	
+	self.stopped = 0
+	self.started = 1
+
+	self turnoff
+	//self FakeBullets 1
+	self tracerspeed 1.0
+	self bulletspread 0 0 0 0
+	self bulletdamage 1
+	self Accuracy 25
+	self MaxDelay 0
+	self MinDelay 0
+	self MaxNumShots 50
+	self MinNumShots 50
+	self bulletlarge 1
+	self tracerspeed 1
+
+	local.so = $(self.mytarget)
+	local.z = local.so.origin[2]
+	local.targets = exec global/makearray.scr $(local.so.target)
+
+	while (self.started) 
+	{
+		local.i = (randomint local.targets.size) + 1
+		local.so.origin = (local.targets[local.i].origin[0] local.targets[local.i].origin[1] local.z)
+		waitframe
+		self target self.mytarget
+		waitframe
+		self turnon
+
+		local.burstTime = local.burstMinTime + (randomfloat (local.burstMaxTime - local.burstMinTime))
+		wait local.burstTime
+
+		self turnoff
+
+		local.pauseTime = local.pauseMinTime + (randomfloat (local.pauseMaxTime - local.pauseMinTime))
+		wait local.pauseTime
+	}
+	self.stopped = 1
+end
+
+//-----------------------------------------------------------------------------
+
+gunShootPlayer local.burstMinTime local.burstMaxTime local.pauseMinTime local.pauseMaxTime local.damage local.accuracy:
+	if (self.started == 1) {
+		// another thread is firing, stop it before starting this one
+		self thread gunStop
+		while (self.stopped == 0) {
+			// wait for other thread to finish
+			wait 0.5
+		}
+	}
+	
+	self.stopped = 0
+	self.started = 1
+
+	self turnoff
+	//self FakeBullets 1
+	self tracerspeed 1.0
+	self bulletspread 0 0 0 0
+	self bulletdamage local.damage
+	self Accuracy local.accuracy
+	self MaxDelay 0
+	self MinDelay 0
+	self MaxNumShots 50
+	self MinNumShots 50
+	self bulletlarge 1
+	self tracerspeed 1
+
+	while (self.started) 
+	{
+		//chrissstrahl - keep for sp
+		if(level.gametype == 0){
+			self target $player
+		}
+		//chrissstrahl - make coop compatible
+		else{
+			local.player = NULL
+			while(local.player == NULL){
+				waitframe
+				local.player = waitexec coop_mod/replace.scr::player_closestTo self
+			}
+			self target local.player
+		}
+		
+		waitframe
+		self turnon
+
+		local.burstTime = local.burstMinTime + (randomfloat (local.burstMaxTime - local.burstMinTime))
+		wait local.burstTime
+
+		self turnoff
+
+		local.pauseTime = local.pauseMinTime + (randomfloat (local.pauseMaxTime - local.pauseMinTime))
+		wait local.pauseTime
+	}
+	self.stopped = 1
+end
+
+//-----------------------------------------------------------------------------
+
+gunStop:
+	self.started = 0
+end

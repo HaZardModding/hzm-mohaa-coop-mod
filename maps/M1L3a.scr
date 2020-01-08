@@ -1,0 +1,566 @@
+// THE DESERT 
+// ARCHITECTURE: STEVE/TODD
+// SCRIPTING: Z
+
+/*
+$t50 = path for vehicle (jeep)
+$s1_jeep_path1 = jeep path
+
+//triggers need to be modified or respawned
+//to trigger when the jeep drivers enters them
+//or when the jeep is close
+
+2882 -5730 -68	$speedup
+2866 -5690 -68	thread friendly_message1
+-720 -5508 60	$slowdown
+-918 -5378 116	thread friendly_message2
+-1056 -5230 60	$speedup
+-134 -3534 60	thread over_the_wall
+-728 -3544 60	$slowdown
+-2378 -2792 60	$speedup
+-2542 -4104 60	thread scene2
+-2524 -4252 116	thread friendly_message3
+-2292 -4380 60	$slowdown
+110 -3076 60	$speedup
+1064 -3184 60	$slowdown
+1674 -3034 20	thread friendly_message4
+1764 -2722 4	$speedup
+1612 -1744 60	$slowdown
+1410 -1288 60	$speedup
+1390 -150 148	thread friendly_message5
+2344 -466 200	thread scene3
+6080 1088 60	$level_end
+*/
+
+//=========================================================================
+main:{
+//=========================================================================
+	level.coop_aaMap = 1				//chrissstrahl - let global scripts know this is a AA level
+	level.coopPrevMap = "m1l2b"			//chrissstrahl - set previouse map (for mom voteing)
+	level.coopNextMap = "m1l3b"			//chrissstrahl - set next map (for mom voteing)
+	level.coop_disableSpawnWarper	= TRUE		//chrissstrahl - disable respawn warper - we need all players to spawn at a specific place
+	thread coop_mod/main.scr::main 			//chrissstrahl - start coop mod extensions
+	
+	//chrissstrahl - setup stuff that is needed
+	if(level.gametype != 0){
+		thread coop_setup
+		thread coop_setupAttach		
+	}
+
+	level.script = "maps/m1l3a.scr"
+	thread global/exploder.scr::main
+	//thread global/exploder.scr::repeat
+	exec global/ai.scr
+	level.dontdropweapons = 1
+	exec global/loadout.scr maps/m1l3a.scr
+	exec global/spotlight.scr
+
+//////////////////////
+level waitTill prespawn
+//println "z:        prespawn marker" - //chrissstrahl - disabled
+//////////////////////
+
+	level.tempnum = 0
+	
+	level.slowspeed = 150 //was 150
+	level.fastspeed = 250 //was 300
+	level.lookahead = 256
+
+	level.grillo = $oss_man
+
+	level.totalbaddies = 0
+	
+	//chrissstrahl - wait until player is glued to jeep
+	if(level.gametype != 0){
+		while( level.coop_inJeep == NIL || level.coop_inJeep == 0 ){
+			waitframe
+		}
+	}
+	//chrissstrahl - give ammo to other players
+	thread coop_giveAmmo
+	//end chrissstrahl
+
+	level.playerjeep = $s1_jeep1
+	level.playerjeep thread global/vehicles_thinkers.scr::PLAYER_JEEP_CONTROLLER $s1_trigger1	
+	level.playerjeep thread PLAYER_JEEP_Drive
+
+
+	local.jeep = spawn script_origin
+	local.jeep.origin = level.playerjeep.origin
+	local.jeep glue level.playerjeep
+
+	$jeep_so0 bind local.jeep
+	$jeep_so1 bind local.jeep
+	$jeep_so2 bind local.jeep
+	$jeep_so3 bind local.jeep
+
+//	local.chair = spawn script_model model models/items/explosive.tik
+//	local.chair glue $jeep_so0
+
+
+//	$mg42_4 thread mg42_think
+
+	if ($flak_prop)
+	{
+		$flak_prop setaimtarget $flak_prop_target
+		$flak_prop.collisionent = $flak_prop.target
+		//$flak_prop.collisionent hide
+	}
+	
+	thread global/barrel.scr::explosive_barrel
+//	waitthread global/spotlight_old.scr::spotlight 1 1 4
+//	waitthread global/spotlight_old.scr::spotlight 2 1 4
+//	waitthread global/spotlight_old.scr::spotlight 3 5 8
+//	level.spottarget = level.playerjeep
+
+	$opel1 thread global/vehicles_thinkers.scr::enemy_truck_think 2000
+	$opel2 thread global/vehicles_thinkers.scr::enemy_truck_think 2000
+	if ($opel3)
+	{
+		$opel3.nolights = 1
+		$opel3 thread global/vehicles_thinkers.scr::enemy_truck_think 2000
+	}
+
+	exec global/ambient.scr m1l3a
+//	$alarm_sound exec global/loopsound.scr m1l3a_alarm
+
+	$guy3 remove
+	$guy2 remove
+
+//////////////////////
+level waitTill spawn
+println "z:        level waittill spawn marker"
+//////////////////////
+
+	//*** telling the AI to not drop health
+	level.nodrophealth = 1
+	
+	exec global/spotlight.scr::corona $opel1 "light left" // Turn on headlight coronas
+	exec global/spotlight.scr::corona $opel1 "light right"
+	
+	exec global/spotlight.scr::corona $opel2 "light left" // Turn on headlight coronas
+	exec global/spotlight.scr::corona $opel2 "light right"
+
+	exec coop_mod/replace.scr::tmstartloop "sound/music/mus_14a_action.mp3" //chrissstrahl - made compatible to coop
+
+	//*** TEMP reset the Objectives portion of the HUD
+//	waitthread global/objectives.scr::reset_objectives
+//	waitthread global/objectives.scr::blank_objectives
+	waitthread global/objectives.scr::add_objectives 1 2 "Reach the airfield." $level_end_so.origin
+	waitthread global/objectives.scr::current_objectives 1
+	thread objective1
+}end
+
+//------------------------------
+friendly_message1:
+	end
+	
+friendly_start:
+	// called by the drive logic
+	wait 2
+	level.grillo say dfr_m1l3_add01
+	// "Powell, get ready, we're coming up on the outskirts of the airfield now."
+	end
+	
+friendly_message2:
+	level.grillo say dfr_m1l3_add02
+	// "Hang on,  we're going to take a detour here!"
+	end
+
+friendly_message3:
+	if (level.barrier_attacked == 1)
+		end
+	level.grillo say dfr_m1l3_add03
+	// "Clear that barricade!"
+
+	wait 6
+	if (level.barrier_attacked == 1)
+		end
+	level.grillo say dfr_m1l3_add04
+	// "Clear a path!"
+
+	wait 6	
+	if (level.barrier_attacked == 1)
+		end
+	level.grillo say dfr_m1l3_add05
+	// "Powell, make a path for us!"
+	
+	wait 6
+	goto friendly_message3
+	end
+
+barrier_damage_trigger:
+	level.barrier_attacked = 1
+	end
+
+friendly_message4:
+	end
+	level.grillo say dfr_m1l3_add15
+	// "Machine gun nest!"
+	end
+
+friendly_message5:
+	level.grillo say dfr_m1l3_add07
+	// "That's the sign to the airfield."
+	end
+
+
+//-----------------------------
+alarm1000:
+	wait 1
+	$alarm1000_guy alarmnode $alarm2
+	$alarm1000_guy type_attack alarm
+	end
+
+scene2:
+	//spawn running men near the building
+	//println "z:         scene2 triggered"
+	// set 1 comes out the door
+	// set 5 comes from the left
+	// set 6 comes from the right behind the barrier
+	// set 7 comes from far back left
+	while (level.barrier_removed != 1)
+	{
+		if (level.totalbaddies <= 2)
+		{
+			//thread global/ai.scr::spawn 1
+			thread global/ai.scr::spawn 5
+		}
+		wait 1
+		
+		if ( (level.totalbaddies <= 2) && (level.barrier_removed != 1) )
+			thread global/ai.scr::spawn 6
+		wait 1
+		
+		if ( (level.totalbaddies <= 2) && (level.barrier_removed != 1) )
+			thread global/ai.scr::spawn 7
+		wait 1
+	}
+	
+	wait 4
+//	thread global/ai.scr::spawn 8
+	wait 4
+//	thread global/ai.scr::spawn 8
+	end
+
+radio_tower_barrel:
+	println "z:      tower falls"
+	$radio_tower playsound m1l3a_tower_falls
+	$radio_tower time 1
+	$radio_tower rotatez 100
+	$radio_tower waitmove
+	end
+
+over_the_wall:
+	if (level.wallscale == 1)
+		end
+	level.wallscale = 1
+	println "z:        starting over the wall"
+	local.spawn[0] = $wallscale1
+	local.spawn[1] = $wallscale2
+	local.spawn[2] = $wallscale3
+	local.spawn[3] = $wallscale4
+	
+	//insert roberts random sorter here
+	exec global/randomorder.scr local.spawn
+	
+
+	thread over_the_wall_spawn local.spawn[0]
+	wait (((randomint 5)*.2)+1)
+	thread over_the_wall_spawn local.spawn[1]
+end
+
+over_the_wall_spawn local.spawn_point:
+	println "z:       spawning guy to get out " local.spawn_point
+
+	local.guy = spawn human/german_afrika_private.tik
+	local.guy.origin = ((local.spawn_point.origin) + (0 0 -16))
+	local.guy.angles = ((local.spawn_point.angles) + (0 -90 0))
+		
+	local.guy noticescale 1
+	local.guy mindist 0
+	local.guy maxdist 1000
+	local.guy leash 10000
+		
+	local.guy exec global/disable_ai.scr
+	local.guy notsolid
+		
+	println "z:         starting anim: " local.spawn_point
+	local.guy anim_noclip wallscale
+//	local.guy anim_scripted wallscale
+	local.guy waittill animdone
+	println "z:         ending   anim: " local.spawn_point
+		
+	local.guy solid
+	local.guy exec global/enable_ai.scr
+	local.guy attackplayer
+end	
+
+scene3:
+	//spawn running men near the broken wall
+	//println "z:         scene3 triggered"
+	thread global/ai.scr::spawngroup 2 1
+	wait 2
+	thread global/ai.scr::spawngroup 2 2
+	wait 2
+	thread global/ai.scr::spawngroup 2 3
+	end
+
+objective1:
+	$level_end waittill trigger
+	waitthread global/objectives.scr::add_objectives 1 3
+	exec global/missioncomplete.scr m1l3b bsp2bsp //chrissstrahl - fixme
+	end
+	
+
+//--------------------------
+PLAYER_JEEP_Drive:
+	// drive Vector position, Float speed, Float acceleration, Float reach_distance, Float look_ahead, [ Vector alternate_position ] 
+	level waittill spawn
+	thread friendly_start
+	
+	self drive $s1_jeep_path1 level.slowspeed 40 200 level.lookahead
+	self waitTill drive
+	self stop
+
+	for (local.i = 1; local.i <= $crate_barrier.size; local.i++)
+	{
+		if (IsAlive $crate_barrier[local.i])
+			$crate_barrier[local.i] waittill death
+	}
+	level.barrier_removed = 1
+	
+	self drive $jeep_path2 level.fastspeed 50 200 level.lookahead
+	self waittill drive
+//	self stop
+end
+
+//-----------------------------------
+mg42_think:
+	self burstFireSettings 0 0 0 0
+	self tracerFrequency 1
+	self.gunner accuracy 100
+	
+level waittill spawn
+
+//	level.playerjeep thread jeep_trailing_target
+//	thread mg42_surpression
+		
+self.trigger_activate waittill trigger
+	
+
+	self startFiring
+	
+	waitthread mg42_randomtarget
+	
+//	local.target followpath self.path
+//	local.target waitmove
+	
+self.trigger_kill waittill trigger
+	self.kill_trigger = 1
+		
+//	self setAimTarget level.playerjeep.trailing_target
+	self setAimTarget $player //chrissstrahl - fixme
+	iprintlnbold_noloc("DEV: setAimTarget $player")//chrissstrahl - fixme
+	
+self.trigger_deactivate waittill trigger
+
+	self stopFiring
+end
+
+mg42_randomtarget:
+//	local.target = spawn script_origin
+	
+	while (self.kill_trigger != 1)
+	{
+		local.target = $("jeep_so" + (randomint 4) )
+		iprintlnbold_noloc("DEV: selected target of jeep: "+local.target)
+//		local.chair = spawn script_model model models/items/explosive.tik
+//		local.chair glue local.target
+
+		self setAimTarget local.target
+		
+		end
+		
+		wait 1
+	}
+end
+
+
+jeep_trailing_target:
+	local.offset = (0 0 96)
+	self.trailing_target = spawn script_origin
+	self.trailing_target.origin = (self.origin + local.offset)
+	local.index = 0
+	
+	while (1)
+	{
+		local.index = (local.index + 1) % 10  //1 trail
+		local.position = (local.node_history[local.index])
+		if (!local.position)
+			local.position = (self.origin + local.offset)
+		local.node_history[local.index] = (self.origin + local.offset)
+		self.trailing_target.origin = local.position
+		wait .1
+	}
+end
+
+mg42_surpression:
+	self.gunner.surpressed = 11
+	thread mg42_surpression_polling
+
+
+	while (IsAlive self.gunner)
+	{
+		self.trigger_surpression waittill trigger
+		println "z:   surpressing turret"
+		self.gunner.surpressed = 0
+	}
+end
+
+mg42_surpression_polling:
+while (IsAlive self.gunner)
+{
+	if (self.gunner.surpressed > 2)
+	{
+		println "z:   staying surpressed"
+		self.gunner exec global/stand.scr
+		self.gunner type_idle machinegunner
+		self.gunner exec global/enable_ai.scr	
+		wait .4
+		self startfiring
+	}
+	else
+	{	
+		println "z:   not surpressed"
+		self.gunner exec global/disable_ai.scr
+		self.gunner exec global/crouch.scr
+		self stopfiring
+	}
+	wait 1
+	self.gunner.surpressed ++
+	println "z:      local.gunner.surpressed: " local.gunner.surpressed 
+}
+end
+ 
+//=========================================================================
+coop_setup:{
+//=========================================================================
+	//chrissstrahl - change respond type, respond to ai and player, if player is dead triggers would not be activated
+	/* THIS SEAMS NOT TO WORK, needs more testing
+	for ( local.i = 1; local.i <= $slowdown.size; local.i++){
+		local.ent = $slowdown[local.i]
+		local.ent spawnflags 8
+	}
+	for ( local.i = 1; local.i <= $speedup.size; local.i++){
+		local.ent = $speedup[local.i]
+		local.ent spawnflags 8
+	}
+	*/
+	
+	//chrissstrahl - spawn trigger to run a thread each time a player spawns to manager player upon spawn
+	spawn trigger_multiple setthread "coop_playerSpawned" targetname "coop_playerSpawn" origin (3352 -6176 -88)
+	waitframe
+	$coop_playerSpawn setsize ( -500 -500 -1000) (500 500 1000)
+}end
+
+//=========================================================================
+coop_setupAttach:{
+//=========================================================================
+	//chrissstrahl - spawn entities which we'll attach to the model then glue the players to
+	local.distance = -100
+	for(local.i=2;local.i<=8;local.i++){
+		if(local.i==2){ local.offset = ( (local.distance) -10 -10) }
+		else if(local.i==3){ local.offset = ( (local.distance) 30 -10) }
+		else if(local.i==4){ local.offset = ( (local.distance) 70 -10) }
+		else if(local.i==5){ local.offset = ( (local.distance + -40) -10 -50) }
+		else if(local.i==6){ local.offset = ( (local.distance + -40) 30 -50) }
+		else if(local.i==7){ local.offset = ( (local.distance + -40) 70 -50) }
+		else{ local.offset = ( (distance + -80) 30 -50) }
+	
+		local.ent = spawn script_model "model" "models/fx/dummy.tik" targetname ("playerAttach"+local.i) notsolid 1
+		waitframe
+		local.ent attach $s1_jeep1 "passenger0" 0 ( local.offset )
+	}
+}end
+ 
+//chrissstrahl - this handles all players that touch the trigger, regardles of who triggred it
+//=========================================================================
+coop_playerSpawned:{
+//=========================================================================
+	$s1_jeep1 notsolid
+	$oss_man notsolid
+	//$t209 remove
+
+	for(local.i=1;local.i <= $player.size;local.i++){
+		local.player = $player[local.i]
+		if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 ){
+			if(local.player isTouching $coop_playerSpawn){
+				if(local.i == 1){
+					level.coop_inJeep = 1
+					if(local.player.flags["coop_inJeep"] == NIL){
+						local.player.flags["coop_inJeep"] = 1
+
+						local.player notsolid
+						
+						local.vturretent = $s1_jeep1 queryturretslotentity 0
+						local.vturretent unlock
+						$s1_jeep1 attachturretslot 0 local.player    // Attach the player to the jeep
+						local.player perferredweapon ".30cal Machine Gun"
+						local.vturretent lock
+						
+						local.player thread coop_monitorPlayer1
+					}
+				}
+				else{
+					//chrissstrahl - they don't need to be monitored, the coop mod does unglue on death
+					//local.player physics_off						//chrissstrahl - this will not work if player shall keep his weapon
+					local.player notsolid							//chrissstrahl - prevent players from stopping bullets of others
+					local.attach = $("playerAttach"+local.i)
+					
+					local.player origin local.attach.origin			//chrissstrahl - this might reduce the shaking
+					local.player velocity local.attach.velocity	//chrissstrahl - this might reduce the shaking
+					//local.player forcelegsstate CROUCH_IDLE //chrissstrahl - does not work anyway
+					local.player glue local.attach
+				}
+			}
+		}
+	}
+}end
+
+//chrissstrahl - this handles player 1 - deattach from turret on death
+//=========================================================================
+coop_monitorPlayer1:{
+//=========================================================================
+	while(self != NULL){
+		if(self.health <= 0 && self.flags["coop_inJeep"] != NIL){
+			self.flags["coop_inJeep"] = NIL
+			end
+		}
+		waitframe
+	}
+}end
+
+//chrissstrahl - gives ammo to the other players
+//=========================================================================
+coop_giveAmmo:{
+//=========================================================================
+	while(1){
+		for(local.i=1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+			if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 ){
+				//if(local.i == 1){
+					//continue
+				//}
+				local.player ammo rifle 100
+				local.player ammo mg 100
+				local.player ammo smg 100
+				local.player ammo pistol 100
+				local.player ammo heavy 100
+				local.player ammo grenade 5
+			}
+		}
+		wait 30
+	}
+}end
+

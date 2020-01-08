@@ -1,0 +1,85 @@
+//=========================================================================
+StartFollow local.dist local.medic:
+//=========================================================================
+{
+	if (local.medic == 1){
+		self.friendtype	=     5
+	}
+	else{
+		self.friendtype	=     1
+	}
+
+	self.destination	= $player
+	self.distance		= local.dist
+	self thread global/friendly.scr::friendlythink
+}end
+
+//=========================================================================
+StopFollow:
+//=========================================================================
+{
+	self thread global/friendly.scr::friendlystop
+	//	self.destination		= self
+}end
+
+//=========================================================================
+LeadPlayer local.startnode:
+//=========================================================================
+{
+	self exec global/enable_ai.scr
+	self.leading = 1
+
+	while (self && isalive self && self.leading == 1){
+		local.mynode 	 = self waitthread FindClosestNodeOnPath local.startnode
+		local.playernode = $player waitthread FindClosestNodeOnPath local.startnode
+
+		// If the player has a node in front of him, that is where we want to be
+		// Otherwise, we are done leading
+		if (local.playernode.target){
+			local.gotonode = local.playernode.target
+		}
+		else{
+			self.leading = 0
+			end
+		}
+
+		// If we have reached our target, or the player is moving backwards, stop
+		if (vector_length(local.gotonode.origin - self.origin) < 200 || local.gotonode.pathindex < local.mynode.pathindex){
+			self runto NULL
+			self turnto $player
+		}
+		else{
+			self runto local.gotonode
+		}
+		wait 0.5
+	}
+}end
+
+//=========================================================================
+FindClosestNodeOnPath local.startnode:
+//=========================================================================
+{
+	// Helpful optimization hint:
+	//		possibly try reworking this to use "vector_closer"
+	//
+	//		(vector_closer A B C) means "A is closer than B, to C"
+	//			vector_closer compares *squared* lengths, so avoids square-root
+
+	local.curnode 	   = local.startnode
+	local.closestnode  = local.startnode
+	local.closestdist  = 100000
+	local.curnodeindex = 0
+
+	while (local.curnode){
+		local.curnode.pathindex = local.curnodeindex
+		local.disttonode = vector_length(self.origin - local.curnode.origin)
+
+		if (local.disttonode < local.closestdist){
+			local.closestdist = local.disttonode
+			local.closestnode = local.curnode
+		}
+		local.curnode = local.curnode.target
+		local.curnodeindex++
+	}
+}end local.closestnode
+

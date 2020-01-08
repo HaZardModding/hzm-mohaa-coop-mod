@@ -1,0 +1,316 @@
+// E3L2 - Cannon Section 1
+
+// InitSection
+//=========================================================================
+InitSection: {
+//=========================================================================
+	waitthread global/ManSpawnNamed.scr::Init "openDoorGuy" 
+	waitthread global/ManSpawnNamed.scr::Init "TowerExploderGuy1"
+	waitthread global/ManSpawnNamed.scr::Init "TowerExploderGuy2"
+	waitthread global/ManSpawnNamed.scr::Init "Cannon1GuyA"
+	waitthread global/ManSpawnNamed.scr::Init "Cannon1GuyB"
+
+	$Cannon1 anim ready
+
+	if ($Cannon1_Shot_Region) {
+		$Cannon1_Shot_Region delete
+	}
+
+	// $Cannon1_Shot_Region nottriggerable
+
+	$tank2 thread initTank
+	$deadtruck thread InitTruck
+	$OpenDoorSection lock
+	thread CornerHouseCompassTargetingThread
+
+	local.tower1_exploder_trigger = NULL
+	local.tower2_exploder_trigger = NULL
+
+	for (local.i=1; local.i<=$explodertrigger.size; local.i++) {
+		if ($explodertrigger[local.i].set == 7) {
+			local.tower1_exploder_trigger = $explodertrigger[local.i]
+		}
+		else if ($explodertrigger[local.i].set == 9) {
+			local.tower2_exploder_trigger = $explodertrigger[local.i]
+		}
+	}
+
+	if (local.tower1_exploder_trigger) {
+		local.tower1_exploder_trigger thread ModelloExploderTriggerThread
+	}
+
+	if (local.tower2_exploder_trigger) {
+		local.tower2_exploder_trigger thread ModelloExploderTriggerThread
+	}
+
+	thread DoSection
+}end
+
+//=========================================================================
+ModelloExploderTriggerThread: {
+//=========================================================================
+	self nottriggerable
+	$BaddieSection5Trigger waittill trigger
+
+	while (self && !level.killedCannon1) {
+		while (self && !level.killedCannon1 && !$Cannon1.playerinturret) {
+			waitframe
+		}
+
+		if (!self || level.killedCannon1) {
+			break
+		}
+
+		self triggerable
+
+		while (self && $Cannon1.playerinturret) {
+			waitframe
+		}
+
+		if (!self || level.killedCannon1) {
+			break
+		}
+
+		self nottriggerable
+	}
+
+	if (self) {
+		self nottriggerable
+	}
+}end
+
+// DoSection
+//=========================================================================
+DoSection: {
+//=========================================================================
+	$BaddieSection5Trigger waittill trigger
+
+	waitthread global/ManSpawnNamed.scr::Spawn "openDoorGuy"
+	waitthread global/ManSpawnNamed.scr::Spawn "Cannon1GuyA"
+	waitthread global/ManSpawnNamed.scr::Spawn "Cannon1GuyB"
+	waitframe
+
+	$openDoorGuy thread MonitorCannon
+	$Cannon1GuyA exec global/disable_ai.scr
+	$Cannon1GuyB exec global/disable_ai.scr
+	$Cannon1GuyA exec global/crouch.scr
+	$Cannon1GuyA waittill animdone
+	$Cannon1GuyB exec global/crouch.scr
+	$Cannon1GuyB waittill animdone
+	$deadtruck thread TruckWaitToExplode
+
+	// fire cannon until player gets close enough
+	local.cannon_range = 1300
+	while (($Cannon1GuyA && (isalive $Cannon1GuyA) && ($Cannon1GuyA.health == $Cannon1GuyA.max_health)) ||
+			($Cannon1GuyB && (isalive $Cannon1GuyB) && ($Cannon1GuyB.health == $Cannon1GuyB.max_health))) {
+
+		$Cannon1 waitthread maps/e3l2/cannons.scr::CannonFire "Cannon1TargPoint" 1
+
+		if (vector_within $player.origin $Cannon1.origin local.cannon_range) {
+			break
+		}
+
+		wait (0.3 + (randomfloat 1))
+
+		if (vector_within $player.origin $Cannon1.origin local.cannon_range) {
+			break
+		}
+	}
+
+	// wake up guys
+	if ($Cannon1GuyA && (isalive $Cannon1GuyA)) {
+		$Cannon1GuyA exec global/stand.scr
+		$Cannon1GuyA waittill animdone
+		$Cannon1GuyA gun "mp40"
+		$Cannon1GuyA exec global/enable_ai.scr
+		$Cannon1GuyA.type_attack = "runandshoot"
+		$Cannon1GuyA runto $player
+	}
+
+	if ($Cannon1GuyB && (isalive $Cannon1GuyB)) {
+		$Cannon1GuyB exec global/stand.scr
+		$Cannon1GuyB waittill animdone
+		$Cannon1GuyB gun "mp40"
+		$Cannon1GuyB exec global/enable_ai.scr
+		$Cannon1GuyB.type_attack = "runandshoot"
+		$Cannon1GuyB runto $player
+	}
+
+	// cleanup
+	exec global/EntityRemoveOnTrigger.scr $tank5Trigger "openDoorGuy" "TowerExploderGuy1" "TowerExploderGuy2"
+	exec global/EntityRemoveOnTrigger.scr $tank5Trigger "Cannon1GuyA" "Cannon1GuyB" "buildingsniper1" "stepguy1"
+	exec global/EntityRemoveOnTrigger.scr $tank5Trigger "roompeople1" "lowdoorman" "windowman"
+}end
+
+// InitTruck
+//=========================================================================
+InitTruck: {
+//=========================================================================
+	self.health = 300
+	self.health_set = 1
+	self.nolights = 1
+}end
+
+// TruckWaitToExplode
+//=========================================================================
+TruckWaitToExplode: {
+//=========================================================================
+	thread global/vehicles_thinkers.scr::truck_INIT
+	self immune bullet
+	self waittill death
+	self.collisionent disconnect_paths
+	thread global/vehicles_thinkers.scr::truck_killed self.type
+	self thread maps/e3l3/scene1.scr::TruckSmoke 
+}end
+
+// MonitorCannon
+//=========================================================================
+MonitorCannon: {
+//=========================================================================
+	self exec global/disable_ai.scr
+	waitframe
+	self ai_off
+
+	while (!level.killedCannon1 || (level.MC_guys_rescued != 1)) {
+		wait 0.5
+	}
+
+	self ai_on
+	waitframe
+
+	//self waitthread maps/e3l2.scr::EnableGuy
+	$OpenDoorSection unlock
+	waitframe
+
+	$OpenDoorSection open self
+	self favoriteenemy $player
+	self runto $openDoorGuyDest
+	self waittill movedone
+	self exec global/enable_ai.scr
+}end
+
+// TowerExploderCheck1
+//=========================================================================
+TowerExploderCheck1 local.crosser: {
+//=========================================================================
+	$TowerExploderGuy1.deathanim = "death_backgrenade"
+	$TowerExploderGuy1 exec global/bullethit.scr (0 0 20) 5000 0 1
+}end
+
+// TowerExploderCheck2
+//=========================================================================
+TowerExploderCheck2 local.crosser: {
+//=========================================================================
+	$TowerExploderGuy2.deathanim = "death_backgrenade"
+	$TowerExploderGuy2 exec global/bullethit.scr (0 0 20) 5000 0 1
+}end
+
+// initTank
+//=========================================================================
+initTank: {
+//=========================================================================
+	spawn trigger_relay targetname "tank2FireTrigger"
+	self hide
+
+	local.gun = self QueryTurretSlotEntity 0
+	local.gun hide
+
+	self.gun = local.gun
+	self.tankFireTrigger = $tank2FireTrigger
+
+	self.health = 300
+	self.health_set = 1
+	self.tankType = panzer
+	self.tankSpeed = 3
+	self.tankAccel = 20
+	self.tankLookAhead = 200
+	self.tankPath = $tank2Path
+	self.tankPathLoop = 0
+	self.tankDriveDelay = 0
+	self.tankEngageDelay = 0
+	self.tankStunTime = 3
+	self.tankGuysJumpOut = 0
+	self.tankReloadTime = 4
+	level.tankDebugPrint = 0
+
+	$tank2Trigger waittill trigger
+	self show
+	local.gun show
+	self.gun maxYawOffset 85
+
+	thread tankAttack
+	//thread tankKillPlayer
+	thread waitTillDeath
+
+	self thread maps/e3l2/thinkTank.scr::tankGo 
+	self waittill drive
+}end
+
+// insures that the throbbing box on cannon1 remains hidden
+// until the tank is destroyed
+//=========================================================================
+waitTillDeath: {
+//=========================================================================
+	while (isAlive $tank2) {
+		waitframe 
+	}
+
+	radiusdamage $tank2.origin 500 500
+	$Cannon1_Throb show
+	$Cannon1.noexplode = 0
+	waitthread global/ObjMgr.scr::RevealObj "killModellos"
+	waitthread global/ObjMgr.scr::SetCurrObj "killModellos"
+}end
+
+// tankAttack
+//=========================================================================
+tankAttack: {
+//=========================================================================
+	$tank2Trigger2 waittill trigger
+	waitthread global/ManSpawnNamed.scr::Spawn "TowerExploderGuy1"
+	waitthread global/ManSpawnNamed.scr::Spawn "TowerExploderGuy2"
+	wait 2
+
+	self.tankTarget = player
+}end
+
+// tankKillPlayer
+//=========================================================================
+tankKillPlayer: {
+//=========================================================================
+	while (self != NULL && self != NIL && (isAlive self)) {
+		$tank2FireTrigger waittill trigger
+
+		if (level.cannonInUse != NULL) {
+			$player damage $world 50 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+		}
+	}
+}end
+
+//=========================================================================
+CornerHouseCompassTargetingThread: {
+//=========================================================================
+	if (!$CornerHouseCompFinalTrigger) {
+		end
+	}
+
+	thread CornerHouseCompassTrigger_Thread $CornerHouseCompTrigger0 $CornerHouseCompTarg0
+	thread CornerHouseCompassTrigger_Thread $CornerHouseCompTrigger1 $CornerHouseCompTarg1
+	thread CornerHouseCompassTrigger_Thread $CornerHouseCompTrigger2 $CornerHouseCompTarg2
+	thread CornerHouseCompassTrigger_Thread $CornerHouseCompTrigger3 $CornerHouseCompTarg3
+	thread CornerHouseCompassTrigger_Thread $CornerHouseCompTrigger4 $CornerHouseCompTarg4
+
+	while (1) {
+		$CornerHouseCompFinalTrigger waittill trigger
+		waitthread global/ObjMgr.scr::SetObjCompassTarg "findPOWs" $HomeStretchCompTarg0
+	}
+}end
+
+//=========================================================================
+CornerHouseCompassTrigger_Thread local.trig local.targ: {
+//=========================================================================
+	while (1) {
+		local.trig waittill trigger
+		waitthread global/ObjMgr.scr::SetObjCompassTarg "findPOWs" local.targ
+	}
+}end
