@@ -1,4 +1,4 @@
-//chrissstrahl - completed coopification on 2019.09.21
+//chrissstrahl - completed coopification on 2020.01.11
 //replaced:
 //	$player.on_roof			-> level.player_on_roof
 //	$player.entered_hotel		-> level.player_entered_hotel
@@ -227,8 +227,11 @@ DoWork:
 	if (isalive $ParadeChaser3)
 	{
 		wait (1 + (randomfloat 1))
-		$ParadeChaser3.type_attack = "runandshoot"
-		$ParadeChaser3 exec coop_mod/replace.scr::runto //chrissstrahl - coop
+		if($ParadeChaser3 != NULL && (isAlive $ParadeChaser3)){//[200] chrissstrahl - stop console spam
+			$ParadeChaser3.type_attack = "runandshoot"
+			$ParadeChaser3 exec coop_mod/replace.scr::runto //chrissstrahl - coop
+		}
+
 	}
 
 
@@ -307,16 +310,17 @@ Chaser1ThinkThread local.already_on_roof local.init_movedoneradius:
 
 		// going up to the roof section
 
-		while (level.player_on_roof <= 1)
-		{
-			self exec global/enable_ai.scr
-
+		while (level.player_on_roof <= 1){
 			//chrissstrahl - make sure we do proper null checks
 			if (self == NULL || !(isalive self) || $Claus == NULL || ($Claus.gave_up == 1))
 				end
+				
+			self exec global/enable_ai.scr //[200] chrissstrahl - moved here so proper checking is executed first
 
 			self exec coop_mod/replace.scr::turnto //chrissstrahl - coop
 			wait 0.5
+			
+			if (self == NULL || !(isalive self) ){ end } //[200] chrissstrahl - stop once the actor is gone
 			self turnto NULL
 
 			while (vector_within self.origin $player.origin self.movedoneradius){
@@ -327,14 +331,18 @@ Chaser1ThinkThread local.already_on_roof local.init_movedoneradius:
 					end
 			}
 
+			if (self == NULL || !(isalive self) ){ end } //[200] chrissstrahl - stop once the actor is gone
 			self exec global/disable_ai.scr
 			if (level.player_on_roof <= 0)
 				self exec coop_mod/replace.scr::runto //chrissstrahl - coop
 			else
 				self runto $RJClausWaypoint_Roof0
+				
+			if (self == NULL || !(isalive self) ){ end } //[200] chrissstrahl - stop once the actor is gone
 			self waittill movedone
 		}
 
+		if (self == NULL || !(isalive self) ){ end } //[200] chrissstrahl - stop once the actor is gone
 		self.movedoneradius = local.orig_movedoneradius
 	}
 
@@ -343,17 +351,21 @@ Chaser1ThinkThread local.already_on_roof local.init_movedoneradius:
 	// get to proper roof
 	self waitthread GuyGoToRoof (level.player_on_roof - 1)
 
-	while (self.on_roof != 3)
-	{
+
+	if (self == NULL || !(isalive self) ){ end } //[200] chrissstrahl - stop once the actor is gone
+	while (self.on_roof != 3){
 		wait 1
-		self exec global/enable_ai.scr
 
 		//chrissstrahl - make sure we do proper null checks
 		if (self == NULL || !(isalive self) || $Claus == NULL || ($Claus.gave_up == 1))
 			end
+			
+		self exec global/enable_ai.scr //[200] chrissstrahl - moved here so proper checking is executed first
 
 		self exec coop_mod/replace.scr::turnto //chrissstrahl - coop
 		wait 0.5
+		
+		if (self == NULL || !(isalive self) ){ end } //[200] chrissstrahl - stop once the actor is gone
 		self turnto NULL
 
 		// while on proper roof...
@@ -372,9 +384,12 @@ Chaser1ThinkThread local.already_on_roof local.init_movedoneradius:
 		self waitthread GuyGoToRoof (level.player_on_roof - 1)
 	}
 
+	if (self == NULL || !(isalive self) ){ end } //[200] chrissstrahl - stop once the actor is gone
 	self exec global/enable_ai.scr
 	self exec coop_mod/replace.scr::turnto //chrissstrahl - coop
 	wait 0.5
+	
+	if (self == NULL || !(isalive self) ){ end } //[200] chrissstrahl - stop once the actor is gone
 	self turnto NULL
 
 	if (level.rj_chaser_post_phase == 1)
@@ -398,8 +413,7 @@ Chaser2ThinkThread local.already_on_roof local.leader local.init_movedoneradius 
 		self.movedoneradius = local.init_movedoneradius
 
 		// going up to the roof section
-		while (local.leader.on_roof < 1 )
-		{
+		while (self != NULL && (isAlive self) && local.leader.on_roof < 1 ){ //[200] chrissstrahl - stop once the actor is gone
 			self exec global/enable_ai.scr
 
 			if (!self || !(isalive self) || ($Claus.gave_up == 1))
@@ -407,6 +421,8 @@ Chaser2ThinkThread local.already_on_roof local.leader local.init_movedoneradius 
 
 			self exec coop_mod/replace.scr::turnto //chrissstrahl - coop
 			wait 0.5
+			
+			if (self == NULL || !(isalive self) ){ end } //[200] chrissstrahl - stop once the actor is gone
 			self turnto NULL
 
 			while (vector_within self.origin local.leader.origin self.movedoneradius)
@@ -440,6 +456,7 @@ Chaser2ThinkThread local.already_on_roof local.leader local.init_movedoneradius 
 			self waittill movedone
 		}
 
+		if (self == NULL || !(isalive self) ){ end } //[200] chrissstrahl - stop once the actor is gone
 		self.movedoneradius = local.orig_movedoneradius
 	}
 
@@ -448,7 +465,7 @@ Chaser2ThinkThread local.already_on_roof local.leader local.init_movedoneradius 
 	// get to proper roof
 	self waitthread GuyGoToRoof local.leader.on_roof
 	
-	if(self == NULL){ end } //chrissstrahl - reduce console spam
+	if (self == NULL || !(isalive self) ){ end } //[200] chrissstrahl - stop once the actor is gone
 
 	while (self.on_roof != 3)
 	{
@@ -460,10 +477,12 @@ Chaser2ThinkThread local.already_on_roof local.leader local.init_movedoneradius 
 
 		self exec coop_mod/replace.scr::turnto //chrissstrahl - coop
 		wait 0.5
+		
+		if (self == NULL || !(isalive self) ){ end } //[200] chrissstrahl - stop once the actor is gone
 		self turnto NULL
 
 		// while on proper roof...
-		while (self.on_roof >= local.leader.on_roof)
+		while (self != NULL && (isalive self) && self.on_roof >= local.leader.on_roof)
 		{
 			wait 1
 			//chrissstrahl - check if Klaus even exists
@@ -492,6 +511,7 @@ Chaser2ThinkThread local.already_on_roof local.leader local.init_movedoneradius 
 		wait 1
 	}
 
+	if (self == NULL || !(isalive self) ){ end } //[200] chrissstrahl - stop once the actor is gone
 	self exec global/enable_ai.scr
 	self exec coop_mod/replace.scr::turnto //chrissstrahl - coop
 	wait 0.5
@@ -1652,7 +1672,9 @@ DoLockPickParade:
 	level.rj_num_parade_chasers_alive = 0
 	if (local.num_chaser_guys_left <= 1)
 	{
+//iprintlnbold ("DEV: SpawnChaseParadeGuys 1") //chrissstrahl - fixme debugme
 		waitthread SpawnChaseParadeGuys (2 - local.num_chaser_guys_left) local.all_parade_chasers_dead_trigger
+//iprintlnbold ("DEV: SpawnChaseParadeGuys 2 end") //chrissstrahl - fixme debugme
 	}
 
 
@@ -1661,12 +1683,10 @@ DoLockPickParade:
 		$RJ_AllChasersDead_Trigger waittill trigger
 
 	//iprintlnbold ("***** LOCKPICKING START")
-iprintlnbold ("DEV: all cheasers are fucking dead") //chrissstrahl - fixme debugme
-
 
 	for (local.i=1; local.i<=level.num_lockpick_waves; local.i++)
 	{
-iprintlnbold ("DEV: ***** LOCKPICKING 1  " + local.i) //chrissstrahl - fixme debugme
+//iprintlnbold ("DEV: ***** LOCKPICKING 1  " + local.i) //chrissstrahl - fixme debugme
 		//iprintlnbold ("***** LOCKPICKING 1  " + local.i)
 
 		if ((local.i == level.num_lockpick_waves) && $Claus && (isalive $Claus))
@@ -1681,8 +1701,9 @@ iprintlnbold ("DEV: ***** LOCKPICKING 1  " + local.i) //chrissstrahl - fixme deb
 		//iprintlnbold ("***** LOCKPICKING 1a  " + local.i + "    nrpga = " + level.rj_num_roof_parade_guys_alive)
 
 		if (level.rj_num_roof_parade_guys_alive > 0){
-iprintlnbold ("DEV: rj_num_roof_parade_guys_alive > 0") //chrissstrahl - fixme debugme
+//iprintlnbold ("DEV: waittill trigger") //chrissstrahl - fixme debugme
 			local.roof_guys_dead_trigger waittill trigger
+//iprintlnbold ("DEV: waittill trigger done") //chrissstrahl - fixme debugme
 		}
 
 		//iprintlnbold ("***** LOCKPICKING 2  " + local.i)
@@ -1698,25 +1719,25 @@ iprintlnbold ("DEV: rj_num_roof_parade_guys_alive > 0") //chrissstrahl - fixme d
 
 		// now spawn some roof parade guys
 		
-iprintlnbold ("DEV: spawn 1 roof parade1 morons") //chrissstrahl - fixme debugme
+//iprintlnbold ("DEV: spawn 1 roof parade1 morons") //chrissstrahl - fixme debugme
 
 		local.num_new_guys = waitthread RandomIntMinMax level.lockpick_wave_num_guys_min[local.i] level.lockpick_wave_num_guys_max[local.i]
 		waitthread SpawnRoofParadeGuys local.num_new_guys local.roof_guys_dead_trigger
 
-iprintlnbold ("DEV: spawn 2 roof parade1 morons complete") //chrissstrahl - fixme debugme
+//iprintlnbold ("DEV: spawn 2 roof parade1 morons complete") //chrissstrahl - fixme debugme
 
 		//iprintlnbold ("***** LOCKPICKING 3  " + local.i)
 
 
 		// make sure all previous chaser guys are dead
 		if (level.rj_num_parade_chasers_alive > 0){
-iprintlnbold ("DEV: wait for parade chasers to be dead") //chrissstrahl - fixme debugme
+//iprintlnbold ("DEV: wait for parade chasers to be dead") //chrissstrahl - fixme debugme
 			local.all_parade_chasers_dead_trigger waittill trigger
 		}
 
 		// wait until roof parade guys are dead or time-to-overlap elapses
 		local.start_time = level.time
-iprintlnbold ("DEV: spawn 3 wait for parade2 moroans") //chrissstrahl - fixme debugme
+//iprintlnbold ("DEV: spawn 3 wait for parade2 moroans") //chrissstrahl - fixme debugme
 		
 		while (((level.time - local.start_time) < level.lockpick_wave_overlap_time_delay) &&
 				(level.rj_num_roof_parade_guys_alive > 0))
@@ -1729,7 +1750,7 @@ iprintlnbold ("DEV: spawn 3 wait for parade2 moroans") //chrissstrahl - fixme de
 
 		// unleash a pair of Chaser guys
 		
-iprintlnbold ("DEV: spawn 4 new bastards") //chrissstrahl - fixme debugme
+//iprintlnbold ("DEV: spawn 4 new bastards") //chrissstrahl - fixme debugme
 
 		local.num_new_guys = waitthread RandomIntMinMax level.lockpick_wave_num_guys_min[local.i] level.lockpick_wave_num_guys_max[local.i]
 		//iprintlnbold ("***** BACON  " + local.num_new_guys)
@@ -1758,7 +1779,7 @@ end local.rv
 SpawnRoofParadeGuys local.num_guys local.death_trigger local.uber_guys:
 
 	level.rj_num_roof_parade_guys_alive = local.num_guys
-	//iprintlnbold ("***** NUM ROOFPARADEGUYS " + local.num_guys)
+//iprintlnbold ("***** NUM ROOFPARADEGUYS " + local.num_guys)
 
 	for (local.i=1; local.i<=local.num_guys; local.i++)
 	{
@@ -1769,6 +1790,8 @@ SpawnRoofParadeGuys local.num_guys local.death_trigger local.uber_guys:
 		waitframe
 
 		local.guy thread RoofParadeGuyThink local.death_trigger local.uber_guys
+		
+//iprintlnbold ("***** NUM ROOFPARADEGUYS SPAWNED:" + local.i)
 
 		wait (1 + (randomfloat 0.8))
 	}
@@ -1800,35 +1823,31 @@ RoofParadeGuyThink local.death_trigger local.uber_guy:
 	wait 0.5
 	self turnto NULL
 
-	if (local.uber_guy == 1)
-	{
-		self favoriteenemy $Claus
-		self health 10000
-		self accuracy 100
+	//[200] chrissstrahl - we don't do this fuck in coop
+	if(level.gametype == 0){ //chrissstrahl - maybe this makes sence in singleplayer some how, so we keep it
+		if (local.uber_guy == 1){
+			self favoriteenemy $Claus
+			self health 10000
+			self accuracy 100
+		}
 	}
-
 end
 
 
 
 PlayerBoundsCheckUntilLockPickDone_Thread:
-
-	while (level.lock_pick_gag_going == 1)
-	{
-		if (level.player_on_roof != 4)
-		{
-//			if ((!$RoofParadeGuy1 || !(isalive $RoofParadeGuy1)) &&
-//					(!$RoofParadeGuy2 || !(isalive $RoofParadeGuy2)))
-//			{
-				waitthread SpawnRoofParadeGuys 5 NIL 1			// uber-killers
-//			}
-
-			end
-		}
-
-		waitframe
+	//[200] chrissstrahl - we don't do this shitt in coop, because players are all over the place
+	if(level.gametype != 0){
+		end
 	}
 
+	while (level.lock_pick_gag_going == 1){
+		if (level.player_on_roof != 4){
+			waitthread SpawnRoofParadeGuys 5 NIL 1			// uber-killers
+			end
+		}
+		waitframe
+	}
 end
 
 
@@ -1889,25 +1908,7 @@ SpawnChaseParadeGuys local.num_guys local.all_dead_trig:
 
 end
 
-//[200] chrissstrahl - debugme fixme - find out if they are the right ones
-coop_debugTheFuckerByBlinking:{
-	while(self != NULL&& isalive(self)){
-		self hide
-		wait 0.2
-		if(self == NULL){ end }
-		self show
-	}
-}
- 
-
-
-
-
 ChaseParadeGuyThink local.picked_point_array local.counter:
-
-	self thread coop_debugTheFuckerByBlinking //[200] chrissstrahl - debugme fixme - find out if they are the right ones
-	
-	
 //	self exec global/disable_ai.scr
 	self sight 1548
 	self hearing 1548
@@ -1953,32 +1954,33 @@ ChaseParadeGuyThink local.picked_point_array local.counter:
 		local.counter.num_points_avail--
 
 		//self.type_attack = "runandshoot"
-
-		if (local.pick <= local.num_roof_2)
-		{
-			self.type_attack = "runandshoot"
-			self runto $ChaserParadeRallyPoint_Roof2[local.pick]
+	
+		
+		if(self != NULL && (isAlive self)){//[200] chrissstrahl - stop console spam
+			if (local.pick <= local.num_roof_2){
+				self.type_attack = "runandshoot"
+				self runto $ChaserParadeRallyPoint_Roof2[local.pick]
+			}
+			else{
+				self.type_attack = "runandshoot"
+				self waitthread GuyGoToRoof3
+				if(self != NULL && (isAlive self)){//[200] chrissstrahl - stop console spam
+					self.type_attack = "runandshoot"
+					self runto $ChaserParadeRallyPoint_Roof3[local.pick - local.num_roof_2]
+				}
+			}
 		}
-		else
-		{
-			self.type_attack = "runandshoot"
-			self waitthread GuyGoToRoof3
-			self.type_attack = "runandshoot"
-			self runto $ChaserParadeRallyPoint_Roof3[local.pick - local.num_roof_2]
+		if(self != NULL && (isAlive self)){//[200] chrissstrahl - stop console spam
+			self waittill movedone
 		}
-
-		self waittill movedone
 	}
-
-//	local.guy exec global/enable_ai.scr
-	local.guy exec coop_mod/replace.scr::turnto //chrissstrahl - coop
-//	wait 0.5
-//	local.guy turnto NULL
-
+	if(self != NULL && (isAlive self)){//[200] chrissstrahl - stop console spam
+		self exec coop_mod/replace.scr::turnto //[200] chrissstrahl - coop
+	}
+	
 	wait 10			// after this, rush the player, that bastard
 
-	while (self && (isalive self))
-	{
+	while (self && (isalive self)){
 		self.type_attack = "runandshoot"
 		self exec coop_mod/replace.scr::runto //chrissstrahl - coop
 		wait 1
@@ -1995,8 +1997,7 @@ ParadeChaserDeathTracker_Thread local.trig:
 	level.rj_num_parade_chasers_alive--
 	//iprintlnbold ("***** NUM ALIVE NOW " + level.rj_num_parade_chasers_alive)
 
-	if (level.rj_num_parade_chasers_alive <= 0)
-	{
+	if (level.rj_num_parade_chasers_alive <= 0){
 		trigger local.trig
 	}
 
@@ -2121,7 +2122,8 @@ coop_PlayerOnRoofChecker_Thread local.init_delay:{
 		
 		if(waitthread coop_mod/replace.scr::istouching $OnRoof4Trigger){
 			level.player_on_roof = 4
-			level.player_not_on_roof_value = -1			
+			level.player_not_on_roof_value = -1
+		
 		}else if(waitthread coop_mod/replace.scr::istouching $OnRoof3Trigger){
 			level.player_on_roof = 3
 			level.player_not_on_roof_value = -1
@@ -2139,7 +2141,7 @@ coop_PlayerOnRoofChecker_Thread local.init_delay:{
 			level.player_on_roof = level.player_not_on_roof_value
 		}
 
-//if (self.on_roof != local.prev_on_roof)
+//chrissstrahl - debugggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg ggggrrrrrrrrrrrrrrrrrrrrrr
 //iprintlnbold ("***** player from roof " + local.prev_on_roof + " to roof " + level.player_on_roof)
 
 		wait 0.5
