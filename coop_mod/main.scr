@@ -49,6 +49,9 @@
 // setsize "-16 -16 0" "16 16 92"
 //KILLED
 // local.player killed local.player (local.player.health + 1) local.player (0 0 -1) (local.player.origin) (0 0 0) (100) (0) (1) (-1)
+//notready - makes this player not ready for the round to start
+//ready - makes this player ready for the round to start
+//ready - returns 1 if this player is ready, 0 otherwise
 	
 
 //chrissstrahl - texture problems (maybe this is caused by updated shaders, renaming the textures in the bsp would do the trick)
@@ -77,9 +80,10 @@ level.dontdropweapons = 1
 //=========================================================================
 main:{
 //=========================================================================
-	level.gametype						= int(getCvar("g_gametype")) //[200] chrissstrahl - this seams not to work sometimes, this is why we have the coop mod set it, just in case
+	level.gametype						= int(getCvar("g_gametype"))		//[200] chrissstrahl - this seams not to work sometimes, this is why we have the coop mod set it, just in case
+	level.coop_dedicated				= int(getcvar("dedicated"))		//[200] chrissstrahl - have this in a var, as we will need this more often in the future
+	level.coop_svmaxclients				= int(getcvar("sv_maxclients"))	
 	level.coop_debugSpawn				= 0 //show (1) spawnlocations or not (0)
-	level.coop_svmaxclients				= int(getcvar("sv_maxclients"))
 	level.coop_playerReady				= 0	//player(s) are not ready/not joined
 	
 	level.coop_musicCommandVol			= NIL
@@ -152,18 +156,56 @@ main:{
 //=========================================================================
 coop_checkMaps:{
 //=========================================================================
-	if(int(getcvar("coop_dev")) == 1 && int(getcvar("coop_check")) == 1){
-		if( level.coopNextMap == "briefing/briefing1" || level.coopNextMap == "e1l1" ){
+	if((int(getcvar("coop_dev")) == 1) && (int(getcvar("coop_check")) == 1)){
+		//[200] chrissstrahl - make sure we have at least two clients so it does not wait for player ready in loadingscreen
+		if(int(getcvar("sv_maxclients")) < 2){
+			setcvar "sv_maxclients" 2
+		}
+	
+		//[200] chrissstrahl - if we come full circle we can stop
+		if( level.coopNextMap == "briefing/briefing1" ){
 			setcvar "coop_check" "0"
 			end
 		}
-		local.waittime = 10
+		local.waittime = 5 //[200] chrissstrahl - reduced the time from 10 to 5
 		for(local.i=local.waittime;local.i > 0;local.i--){
 			iprintlnbold_noloc("Coop Map Ceck is active, loading next map in: "+local.i)
 			wait 1
+			
+			//[200] chrissstrahl - make player autospawn
+			if(local.waittime == local.i){
+				thread autoSpawnHost
+			}
 		}
 		exec global/missioncomplete.scr level.coopNextMap
 	}
+}end
+
+//[200] chrissstrahl - this outospawns the hosting player
+//this is meant to be used for debugging/testing all maps
+//=========================================================================
+autoSpawnHost:{
+//=========================================================================
+	if(level.coop_dedicated != 0){ end }
+	
+	local.player = getentbyentnum( 0 )
+	while( local.player == NULL ){
+		waitframe
+	}
+	
+	local.player iprint "You are being auto spawned for testing!!!" 1
+	local.player stufftext ( "primarydmweapon rifle" )
+
+	wait 0.1
+	if( local.player == NULL ){ end }
+	
+	local.player stufftext ( "popmenu 0" )
+	local.player stufftext ( "+attackprimary" )
+	waitframe
+	
+	if(local.player == NULL){ end }
+	
+	local.player stufftext ( "-attackprimary" )
 }end
 
 //this makes sure we have all the settings set we need to operate correctly
@@ -230,7 +272,6 @@ fixServer:{
 		wait 1
 	}
 	
-	//if this does not work fall back to stufftext
 	setcvar "ui_team_spawn_interval" 0 //local server
 	setcvar "sv_team_spawn_interval" 0
 	
@@ -246,14 +287,14 @@ fixServer:{
 	//force all players into spec to prevent players being in a team when the map is reloaded
 	for (local.i = 1;local.i <= $player.size;local.i++){
 		local.player = $player[local.i]
-		if( local.player != NULL && local.player.dmteam != "spectator" ){
+		if( local.player != NULL /*&& local.player.dmteam != "spectator" */ ) { //[200] chrissstrahl - move into spec, just to be sure it registers right
 			local.player join_team ( "spectator" )
 		}	
 	}
 	waitframe
 
 	//this is a ugly way to do this, but the best result so far 
-	setcvar "nextmap" (getcvar("mapname"))
+	setcvar "nextmap" (level.coop_mapname) //[200] chrissstrahl - fixed useing unfiltred mapname
 	setcvar "g_gametype" 0
 	bsptransition nextmap
 	setcvar "g_gametype" 2
@@ -401,7 +442,7 @@ managePlayers:{
 				if(	local.player.flags["coop_isActive"] == NIL){
 				
 					//[200] chrissstrahl - detect host
-					if(int(getcvar("dedicated")) == 0){
+					if(level.coop_dedicated == 0){
 						local.entTemp = getentbyentnum( 0 )
 						if(local.entTemp != NULL && local.entTemp == local.player){
 							local.player.flags["coop_isHost"] = 1
