@@ -9,6 +9,11 @@ InitArtillery:
 	$artillery2 thread InitGun $artillery2_turret0 $artillery2charge 90
 	$artillery3 thread InitGun $artillery3_turret0 $artillery3charge 40
 	waitframe
+	
+//[200] chrissstrahl - used to debug
+//	$artillery1 thread varcheck
+//	$artillery2 thread varcheck
+//	$artillery3 thread varcheck
 
 	$artillery1 thread GunOrExplosive $artillery1charge
 	$artillery2 thread GunOrExplosive $artillery2charge
@@ -277,7 +282,7 @@ minefieldautosave:
 SniperRifle:
 //=========================================================================
 {
-iprintlnbold_noloc("DEV: Sniper")
+//iprintlnbold_noloc("DEV: Sniper")
 	//chrissstrahl - coop compatible
 	local.model = self.model
 	if(level.gametype == 0){
@@ -289,12 +294,13 @@ iprintlnbold_noloc("DEV: Sniper")
 			local.player =  $player[local.i]
 			if(local.player != NULL && local.player.health > 0 ){
 				if( level.gametype == 0 || local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+					//[200] chrissstrahl - print message to each player privatly
 					exec coop_mod/main.scr::playerForcePrimary local.player local.model
+					local.player iprint "You have acquired KAR98 Sniper Rifle" 1
 //					local.player weapon local.model
 				}
 			}
 		}
-		iprintlnbold_noloc("You have acquired KAR98 Sniper Rifle")
 	}
 	self remove
 	waitframe //chrissstrahl - we need to wait a moment in mp for the weapon to be accsessible
@@ -411,17 +417,22 @@ coop_trackUser local.player local.entturret local.entturret2:{
 GunOrExplosive local.charge:
 //=========================================================================
 {
-	//chrissstrahl - handle seperate for coop
-	if(level.gametype != 0){
-		self thread coop_handleArtillery
-		end
-	}
-
+	//[200] chrissstrahl - debugme fixme
+	iprintlnbold_noloc("GunOrExplosive: "+local.charge)
+	
+	
+	//[200] chrissstrahl - moved up here, before coop func is started
 	self.helpactiveturret = 0
 	self.helpactiveexplosive = 0
 	self.playerinturret = 0
 //	local.charge setusable 0
 	self.explosiveset = 0
+	
+	//chrissstrahl - handle seperate for coop
+	if(level.gametype != 0){
+		self thread coop_handleArtillery
+		end
+	}
 
 	// center our turret by default...
 	self.turret thread CenterTurret
@@ -430,7 +441,7 @@ GunOrExplosive local.charge:
 	while (self)
 	{
 		local.canuse = self canuse $player
-		if (vector_length($player.origin-self.origin) < 200 && self.explosivesetself.explosiveset == 0)
+		if (vector_length($player.origin-self.origin) < 200 && self.explosiveset == 0)
 		{
 
 			if (self.playerinturret == 0)
@@ -563,81 +574,74 @@ coop_handleArtillery:{
 // center our turret by default...
 	self.turret thread CenterTurret
 	
-//set state vars
-	self.explosiveset = 0
-	
-//loop while artillery exists
-	while(self != NULL){
+//[200] chrissstrahl - hillary is a bitch and needs extra attetntion
+	local.player = NULL
+	local.playerPressedUse = 0
+	while(self != NULL && int(self.explosiveset) == 0){
 	//check each player if they validate
 		for (local.i = 1;local.i <= $player.size;local.i++){
 			local.player =  $player[local.i]
-			if(	local.player == NULL ||
-				local.player.health <= 0 ||
-				local.player.dmteam == "spectator" ||
-				local.player.flags["coop_isActive"] != 1 ||
-				vector_length (local.player.origin - self.origin) > 200){
+			if(	local.player == NULL || local.player.health <= 0 ||	local.player.dmteam == "spectator" ||
+				local.player.flags["coop_isActive"] != 1 ||	vector_length (local.player.origin - self.origin) > 200)
+			{
 				continue
 			}
-		//valid player pressing use
 			if(local.player.useheld){
-				iprintlnbold_noloc("DEV: valid player pressing use key")
-		//valid player check if player is within range of explosive
-				if (vector_length(local.player.origin-self.charge.origin) < 100){
-		//valid player setting explosive
-					//self.charge doUse //chrissstrahl - presumably uses any close entity
-					self.charge doUse local.player //chrissstrahl
-					self.explosiveset = 1
-					iprintlnbold_noloc("DEV: setting charge")
-					end
-				}
-		//valid player in range of turret
-				else{
-		//valid player using, wait until player (gets) interrupt(ed)
-					iprintlnbold_noloc("DEV: useing turret")
-					self waitthread coop_handleArtillery_player local.player				
-				}
+				local.playerPressedUse = 1
+				break
 			}
-		//valid player in range not pressing use
 			else{
 				if (vector_length(local.player.origin-self.charge.origin) < 100){
 					exec coop_mod/main.scr::printInfo local.player "Press use to set the explosive." 1 NIL
 				}
 				else if(self canuse local.player){
-					exec coop_mod/main.scr::printInfo local.player "Press use to to use the cannon." 1 NIL
+					exec coop_mod/main.scr::printInfo local.player "Press use to use the cannon." 1 NIL
 				}
 			}
 		}
+	//check if action is to be taken
+		if(local.playerPressedUse == 1 && int(self.explosiveset) == 0){
+		//plant explosive
+			local.originPlayer = local.player.origin
+			local.originPlayer[2] = self.charge.origin[2]
+			
+			if (vector_length(local.originPlayer - self.charge.origin) < 60){
+				self.explosiveset = 1
+				self.charge doUse local.player
+				iprintlnbold_noloc("Charge set!")
+				self waitthread coop_handleArtillery_playerExit local.player
+				end
+			}
+		//use turret
+			else{
+				iprintlnbold_noloc("Using hillary set!")
+				self unlock
+				self.turret unlock
+				self doUse local.player
+				local.player.flags["coop_usingTurret"] = 1
+				self lock
+				self.turret lock
+				//have some delay here so player does not exit right away when still pressing button
+				wait 0.25
+				while(	local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" &&
+						local.player.flags["coop_isActive"] == 1 && vector_length (local.player.origin - self.origin) < 200)
+				{
+					if(local.player.useheld){
+						iprintlnbold_noloc("use held! break")
+						break
+					}
+					waitframe
+				}
+				//exit player
+				iprintlnbold_noloc("exiting")
+				self waitthread coop_handleArtillery_playerExit local.player
+			}
+		}
+		local.playerPressedUse = 0
 		waitframe
 	}
 }end
 
-//chrissstrahl - this manages the player inside Hillery for coop
-//=========================================================================
-coop_handleArtillery_player local.player:{
-//=========================================================================
-	iprintlnbold_noloc("DEV: useing turret thread")
-	self unlock
-	self.turret unlock
-	self doUse local.player
-	self lock
-	self.turret lock
-	wait 1		
-	while(1){//run forest run!
-//player left server - player dead - player changed team
-		if( local.player == NULL || local.player.health <= 0 || local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1){
-			iprintlnbold_noloc("DEV: left, team or dead")
-			self waitthread coop_handleArtillery_playerExit NULL
-			break
-		}
-//player out of reach(for what ever reason) - player pressing use (wants to exit)
-		else if(vector_length (local.player.origin - self.origin) > 200 || local.player.useheld || self.explosiveset == 1){
-			iprintlnbold_noloc("DEV: out of range, explosive set or pressed use")
-			self waitthread coop_handleArtillery_playerExit local.player local.playerAngles
-			break
-		}
-		waitframe
-	}
-}end
 
 //chrissstrahl - this manages the player leaving Hillery
 //=========================================================================
@@ -647,14 +651,30 @@ coop_handleArtillery_playerExit local.player:{
 	self unlock
 	self.turret unlock
 	//unlock player from turret only if we really need to, or we can get a player stuck in a loop untill they kill them self
-	if(local.player != NIL && local.player != NULL){
+	if(local.player != NIL && local.player != NULL && local.player.flags["coop_usingTurret"] != NIL && local.player.flags["coop_usingTurret"] == 1){
+		iprintlnbold_noloc("exiting auto-use")
 		self doUse local.player
+		local.player.flags["coop_usingTurret"] = 0
 		waitframe
 	}
 	self lock
 	self.turret lock
-	wait 1
+	wait 0.25
 }end
 
-
+//[200] chrissstrahl - used to check if certain vars change
+//=========================================================================
+varcheck:{
+//=========================================================================
+	local.laststate = self.explosiveset
+	println ("self.explosiveset: "+self.explosiveset)
+	while(self != NULL){
+		if(self.explosiveset != local.laststate){
+			local.laststate = self.explosiveset
+			println("changed self.explosiveset: "+self.explosiveset)
+			iprintlnbold_noloc("changed self.explosiveset: "+self.explosiveset)
+		}
+		waitframe
+	}
+}end
 
