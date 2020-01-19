@@ -1,0 +1,172 @@
+//chrissstrahl - modified for coop on 2020.01.13
+
+// Safe Move-To routines
+
+
+SafeRunTo local.dest local.trigger_when_done local.movedonerad local.retry_delay local.crouch_at_dest:
+
+	if (local.trigger_when_done == NIL)
+		local.trigger_when_done = NULL
+	if (local.movedonerad == NIL)
+		local.movedonerad = 100.0
+	if (local.retry_delay == NIL)
+		local.retry_delay = 1.0
+	if (local.crouch_at_dest == NIL)
+		local.crouch_at_dest = 0
+	if (self.safemoveto_in_progress == NIL)
+		self.safemoveto_in_progress = 0
+
+	if (self.safemoveto_in_progress == 1)
+	{
+		// one already in progress, so let it finish up
+
+		self.safemoveto_done = 1
+		//[200] chrissstrahl - fixed null entity issue
+		while (self != NULL && self.safemoveto_in_progress == 1)
+			waitframe
+	}
+
+	//[200] chrissstrahl - fixed null entity issue
+	if(self == NULL){ end }
+	
+	self.safemoveto_in_progress = 1
+	self.safemoveto_done = 0
+
+	self.destination = local.dest
+	self.movedoneradius_backup = self.movedoneradius
+	self.movedoneradius = local.movedonerad
+	self.safemoveto_trigger = local.trigger_when_done
+
+	self.safemoveto_gotmovedoneevent = 0
+	self thread SafeRunTo_WaitMoveThread
+
+	self runto self.destination
+	self thread SafeRunTo_MaintenanceThread local.crouch_at_dest local.retry_delay
+
+end
+
+SafeRunTo_MaintenanceThread local.crouch_at_dest local.retry_delay:
+	while (self && isalive self){
+		//[200] chrissstrahl - moved null and alive check at the start where they should have been in the first place
+		while ((self && isalive self) && (self.safemoveto_gotmovedoneevent == 0) && (self.safemoveto_done == 0) )
+			waitframe
+
+		//[200] chrissstrahl - I belive this was wrong - so I fixed it
+		//chrissstrahl //if ((self && isalive self) || (self.safemoveto_done == 1) || (vector_within self.origin self.destination.origin self.movedoneradius))
+		if(self == NULL || !(isalive self)){ end }
+		
+		if((self.safemoveto_done == 1) || (vector_within self.origin self.destination.origin self.movedoneradius))
+			break
+
+		wait local.retry_delay
+		
+		//[200] chrissstrahl - fix null entity issue
+		if(self == NULL || !(isalive self)){ end }
+		self.safemoveto_gotmovedoneevent = 0
+		self runto self.destination
+	}
+	
+	//[200] chrissstrahl - fix null entity issue
+	if (self != NULL && isalive self) {
+		if (self.safemoveto_done == 0){
+			if (local.crouch_at_dest == 1){
+				self exec global/crouch.scr
+				self waittill animdone
+			}
+
+			self.safemoveto_done = 1
+			if (self.safemoveto_trigger != NULL){
+				trigger self.safemoveto_trigger
+			}
+		}
+
+		self.safemoveto_trigger = NULL
+		self.movedoneradius = self.movedoneradius_backup
+		self.safemoveto_in_progress = 0
+	}
+end
+
+SafeRunTo_WaitMoveThread:
+	//[200] chrissstrahl - fixed null entity issue
+	while (self != NULL && self.safemoveto_in_progress == 1){
+		self waittill movedone
+		if(self == NULL){ end }
+		self.safemoveto_gotmovedoneevent = 1
+	}
+end
+
+
+SafeRunTo_Wait local.dest local.movedonerad local.retry_delay local.crouch_at_dest:
+	local.trigger = spawn trigger_relay
+	waitthread SafeRunTo local.dest local.trigger local.movedonerad local.retry_delay local.crouch_at_dest
+	local.trigger waittill trigger
+	local.trigger delete
+end
+
+
+// put walkto, crouchto, crawlto variations here if desired
+
+
+
+WaitMoveDone:
+
+	//[200] chrissstrahl - fixed null entity issue
+	while (self != NULL && self.safemoveto_done == 0)
+		waitframe
+
+/*		--- this seems unreliable
+	if (self.safemoveto_done == 0)
+	{
+		if (self.safemoveto_trigger == NULL)
+		{
+			local.trigger = spawn trigger_relay
+			self.safemoveto_trigger = local.trigger
+		}
+		else
+		{
+			local.trigger = NULL
+		}
+
+		if (self.safemoveto_done == 0)
+			self.safemoveto_trigger waittill trigger
+
+		if (local.trigger != NULL)
+			local.trigger delete
+	}
+*/
+
+end
+
+//-----------------------------------------------------------
+reach local.point:
+//-----------------------------------------------------------
+
+	if (self.reach_thread)
+		self.reach_thread delete
+
+	self.reach_thread = local
+
+reach_loop:
+	//[200] chrissstrahl - fixed null entity issue
+	if(self == NULL){ end }
+	
+	self runto local.point
+	self waittill movedone
+
+	if (parm.movedone==1)
+		end
+
+	wait 0.1
+	goto reach_loop
+
+end
+
+//-----------------------------------------------------------
+reach_cancel:
+//-----------------------------------------------------------
+	if (self.reach_thread)
+	{
+		self.reach_thread delete
+		self.reach_thread = NULL
+	}
+end
