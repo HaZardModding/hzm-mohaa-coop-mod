@@ -8,7 +8,6 @@
 //WARNING these files contain Adult commentary
 //WARNING these files contain Adult commentary
 
-//
 //////////////////////////////////////////////
 //NEW CVARS
 // coop_health - sets health players have
@@ -16,42 +15,24 @@
 // coop_lifes - sets respawns players have, default 0 = infinity
 // coop_obj - responsible for toggeling menu
 //
-//NOTES
-//global/friendly.scr
-// $player.entref = -1 //chrissstrahl - dono what this is used for yet
-// $player.maxhealth = $player.health //chrissstrahl - not sure this is even used anywhere
-// friendlyinit: - self.destination = $player
-// (exec coop_mod/main.scr::friendlyPlayerOrigin)) //chrissstrahl - made coop mod compatible
-// (exec coop_mod/main.scr::friendlyDestination)) //chrissstrahl - made coop mod compatible
-// self.destination = $player
-// local.player.flags["coop_isActive"] == 1 //if a player has selected a team but is not active yet the "spectator" check will not work anymore, this is only set to 1 if a player is truly active in game
 //MISC
-// threatbias ignoreme
 // game.skill
 // self.enemy
 // level.pilot type_attack weaponless
 // anim/gog_killed.scr
-// level.time
 // self removeondeath 0 						//prevent it from vanishing when destroyed
-// waitexec
-// exec
-// thread
-// waitthread
-// level.gametype
 // safesolid <- can this actually replace coop check routines ? Need to test
-// //for class
 //team - returns 'german' or 'american'
 //"local.player.dmteam", can be 'spectator', 'freeforall', 'allies' or 'axis'
-//level.nodrophealth = 1	// telling the AI to not drop health
 //self.nosurprise = 1 //telling ai not to be surprised when encountering player
-// if (((self.current_target.origin - self.origin) * self.leftvector) >= 0){
-//PLAYER SIZE
-// setsize "-16 -16 0" "16 16 92"
-//KILLED
-// local.player killed local.player (local.player.health + 1) local.player (0 0 -1) (local.player.origin) (0 0 0) (100) (0) (1) (-1)
+// if (((self.current_target.origin - self.origin) * self.leftvector) >= 0){ //enemy to the left ?
+//PLAYER SIZE setsize "-16 -16 0" "16 16 92"
+//KILLED local.player killed local.player (local.player.health + 1) local.player (0 0 -1) (local.player.origin) (0 0 0) (100) (0) (1) (-1)
 //notready - makes this player not ready for the round to start
 //ready - makes this player ready for the round to start
 //ready - returns 1 if this player is ready, 0 otherwise
+//local.master = spawn ScriptMaster
+//local.master aliascache racmsg11 sounds/menu/typewriter.wav soundparms 4 0.1 0.9 0.2 320 4000 auto loaded maps "m dm obj"
 	
 
 //chrissstrahl - texture problems (maybe this is caused by updated shaders, renaming the textures in the bsp would do the trick)
@@ -64,17 +45,11 @@
 //general_industrial/strangebrace1straight
 //general_industrial/jh_holeflr1
 
-//NEEDS FIXING
-// squad.scr - fix player reference, need to figure out where and how it is used
-// Entity::Sound: snd_pickup needs an alias in ubersound.scr or uberdialog.scr - Please fix.
-//DEAD STAY
-//self removeondeath 0
-//m3l1a - setup_mg42, whats going on there unfinished ?
 /*
 level.aipronechance = 0
 level.aicrouchchance = 0
 level.dontdropweapons = 1
-//level.debug_mode = 1
+level.debug_mode = 1
 */
 
 //=========================================================================
@@ -126,8 +101,7 @@ main:{
 	
 	//SINGLEPLAYER//////////////////////////	
 	if( level.gametype == 0 ){	
-		level waittill spawn
-		level.coop_playerReady = 1
+		thread spWaitForPlayer
 		end
 	}
 	//MULTIPLAYER//////////////////////////
@@ -147,6 +121,14 @@ main:{
 		//iprintlnbold_noloc("gametype:"+level.gametype)
 		//waitframe
 	//}
+}end
+
+
+//=========================================================================
+spWaitForPlayer:{
+//=========================================================================
+	level waittill spawn
+	level.coop_playerReady = 1	
 }end
 
 //loads next map until check is over or starting maps are reached
@@ -408,8 +390,13 @@ managePlayers:{
 	//this needs to be figured out as we go along
 	////Going into spectator and then joing back in will spawn players at the default spawn
 	//2. sets player max health, based on dificulty settings
+	
+	//[200] chrissstrahl - wait for a player to join the game
+	//might need to experiment further with level waittill playerspawn once we are on dedicated servers
+	level waittill spawn
+	
 	while(1){
-		//if no player on server
+		//if no player on server - also needed for dedicated servers
 		if( $player == NULL || $player.size == 0 ){
 			level.coop_playerReady = 0
 			waitframe
@@ -1663,4 +1650,13 @@ isFloat local.var:{
 	
 	if(local.afterDot == 3){ end 1 }
 }end 0
+
+
+//[200] chrissstrahl - text to print if developer needs to be activated
+//=========================================================================
+checkCoopDeveloper local.text:{
+//=========================================================================
+	if(int(getcvar("coop_dev") == 1)){ end 0 }
+	self iprint (local.text+" is not allowed, cvar coop_dev needs to be 1") 1
+}end 1
 
