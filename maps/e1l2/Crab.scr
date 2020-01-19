@@ -83,11 +83,9 @@ ReturnToCrab:
 	}
 
 	// Wait till the player gets near the commander in the jeep (after the jeep has stopped)
-	local.player = waitexec coop_mod/replace.scr::player_closestTo $commander NIL
-	
-	//chrissstrahl - wait for player in coop
 	while (local.player == NULL || $jeep.stopped == 0 || vector_length($commander.origin-local.player.origin) > 650){
 		waitframe
+		local.player = waitexec coop_mod/replace.scr::player_closestTo $commander NIL //[200] chrissstrahl - now the script should no longer get stuck
 	}
 
 	$commander exec coop_mod/replace.scr::lookat //chrissstrahl
@@ -97,8 +95,10 @@ ReturnToCrab:
 	wait 4
 
 	$commander lookat NULL
-	exec global/autosave.scr level.autosave // "Escort the tanks"
-	level.autosave++
+	if(level.gametype == 0){
+		exec global/autosave.scr level.autosave // "Escort the tanks"
+		level.autosave++
+	}
 }end
 
 //=========================================================================
@@ -558,7 +558,10 @@ minesweeperDamagePlayer local.damageModel:
 	$minesweeperdamage notsolid
 	//iprintln ("DEBUG: location is " + $minesweeperdamage.origin)
 	
-	while (1){
+	//[200] chrissstrahl - fixing a reported infinite loop error, by checking for NULL
+	//not sure why this error happens for others, this needs further investigation
+	//Thanks to Jerry The Zoroark for reporting this issue
+	while (self != NULL ){
 		while (self.minesweeperOn == 1){
 			//dprintln ("DEBUG: location is " + $minesweeperdamage.origin)
 			
@@ -587,6 +590,7 @@ minesweeperDamagePlayer local.damageModel:
 			waitframe
 		}
 		
+		//[200] chrissstrahl - fixing a reported infinite loop error, by checking for NULL
 		while (self != NULL && self.minesweeperOn != 1){
 			waitframe
 		}
