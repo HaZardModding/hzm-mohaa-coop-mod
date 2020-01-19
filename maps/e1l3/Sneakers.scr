@@ -32,7 +32,7 @@ init:
 	spawn trigger_relay targetname clausCrossingStreet_2
 
 	//level.streetCrossTime = 7 // how many seconds the player gets to cross the street
-//chrissstrahl - 7 secs is to low, we need more time in coop
+//chrissstrahl - 7 secs is to less, we need more time in coop
 level.streetCrossTime = 20 // how many seconds the player gets to cross the street
 
 	level.street1Open = 0
@@ -243,6 +243,12 @@ doClaus:
 
 	//---------------------------------------------
 
+	//chrissstrahl - klaus is ready, allow triggering now
+	//[200] chrissstrahl - allow the triger to be activated earlier
+	if(level.gametype != 0){
+		$RoofJauntStartTrigger triggerable
+	}
+
 	// run claus to the courtyard
 	self waitthread clausRun $clausPath_5
 
@@ -250,30 +256,36 @@ doClaus:
 	self lookat $getawayTruck
 	self thread global/loopanim.scr::LoopAnim unarmed_crouch_alert
 
+	//[200] chrissstrahl - we need to start this speratley
+	thread clausGetIntoPosition
+
+	//chrissstrahl - this waits for a player getting next to klaus
+	//[200] chrissstrahl - make sure the trigger exists
+	if ($RoofJauntStartTrigger != NULL && level.roof_jaunt_section_triggered == 0)
+		$RoofJauntStartTrigger waittill trigger
+		
+	//[200] chrissstrahl - wait until claus is ready
+	while(level.clausDoneSneaking != 1){
+		waitframe
+	}
+
+	self lookat NULL
+	self thread global/loopanim.scr::LoopAnimStop
+
+	// roof jaunt code takes over control of Claus here
+	trigger $sneakersGagDone
+end
+
+
+//[200] chrissstrahl - we neeed this to be seperate, because players might touch trigger before ai is ready
+clausGetIntoPosition:{
 	wait 2
 	self.flyModel remove
 	self physics_on
 	self solid
 	self takedamage
-
 	level.clausDoneSneaking = 1
-	
-	//chrissstrahl - klaus is ready, allow triggering now
-	if(level.gametype != 0){
-		$RoofJauntStartTrigger triggerable
-	}
-
-	//chrissstrahl - this waits for a player getting next to klaus
-	if (level.roof_jaunt_section_triggered == 0)
-		$RoofJauntStartTrigger waittill trigger
-
-	self lookat NULL
-	self thread global/loopanim.scr::LoopAnimStop
-
-
-	// roof jaunt code takes over control of Claus here
-	trigger $sneakersGagDone
-end
+}end
 
 
 ShadowThread:
