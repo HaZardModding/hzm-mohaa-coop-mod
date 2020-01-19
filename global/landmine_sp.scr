@@ -1,0 +1,258 @@
+//chrisstrahl modified for coop on 2020.01.13s
+
+/*
+single player landmine script
+
+Most of this stuff is just adaptations of JA's multiplayer landmine stuff, with a few extra little bells and 
+whistles.  Basically this script lets you run landmines that are already existing in the map.  When creating
+a landmine in the map, the following values need to be set.
+
+classname:	trigger_landmine
+targetname: 	landmine
+
+The next few values are optional:
+
+setthread:  	global/landmine_sp.scr::steppedOn
+		
+		This will make the mine explode if someone steps on it.  If you would prefer not to have your 
+		mines explode, simply don't assign the setthread.  If you want it to behave differently just 
+		write a new function for the setthread
+
+$defuseThread:	global/landmine_sp.scr::defuse
+
+		Again, if you want the player to be able to defuse the landmine with the mine detector, then 
+		assign this value in the map...if you want something different to happen on a defuse, just 
+		write a new thread, but make sure it has a key of $defuseThread
+		
+damageable:	0/1
+health:
+
+		If you want the player to be able to damage the landmines (blow them up with grenades, etc)
+		then set damageable to 1, and give each landmine some health (20 works fine).  If you don't
+		want the player to be able to damage the mines just set damageable to 0
+		
+$setName:
+		if you want the landmines to be in groups give all mines in the group the same $setName.  (This
+		saves, at least temporarily, running 2 threads per mine).  In this case the mines can be 
+		"turned on" in groups when the player crosses a trigger.  The trigger will  need the 
+		following values:
+		
+		setthread:	global/landmine_sp.scr::prepForDetonation
+		$setName:	must be the same as the $setName for the mines the trigger activates
+		
+		Note that the mines will still explode on contact and will still be defusable before the trigger
+		is hit, but that the player will not be able to destroy them with grenades, and they will not 
+		explode when close to the level's detonatingEntity.  The detonatingEntity will have to pass
+		through the trigger to kick off the mines' threads.
+		
+To set up the script, after putting the proper values into the map just call initLandMines with the following
+values:
+
+local.detonatingEntity:  	if the mines should detonate when near a specific entity (such as a minesweeper tank)
+				you can assign it here.  Once the detonatingEntity has passed through the proper 
+				trigger the mines will listen for proxinmity, and will detonate themselves when 
+				at or below the level.detonationDistance
+				
+local.detonationDistance:	the distance between the origin of a mine and the origin of the detonatingEntity 
+				at which the mine will detonate
+				
+local.activateAll:		when set to 1 it kicks off the thinker threads for all mines in the level at once.
+				when set to 0 the thinkers will not kick off until their set's trigger has been
+				run through
+
+*/
+
+
+//----------------------------------
+initLandMines local.detonatingEntity local.detonationDistance local.activateAll:
+//----------------------------------
+	level.detonator = local.detonatingEntity.targetname
+	level.activateAll = local.activateAll
+	
+	level.detonationDistance = local.detonationDistance
+	
+	for (local.i = 1; local.i <= $landmine.size; local.i++)
+	{
+		
+		local.mine = $landmine[local.i] 
+	
+		local.mine nodamage
+			
+		if (level.activateAll == 1)
+		{
+			local.mine thread landmineThinker
+		}
+	}
+end
+
+//----------------------------------
+prepForDetonation local.triggerer: 
+//----------------------------------
+	dprintln "DEBUG: turning on mines"
+
+	if (local.triggerer.targetname == level.detonator)
+	{
+		local.setName = self.setName
+		self remove
+
+		for (local.i = 1; local.i <= $landmine.size; local.i++)
+		{
+			if($landmine[local.i].setName == local.setName)
+			{
+				$landmine[local.i] thread mineListeningForDetonator
+				
+				if (level.activateAll != 1)
+				{
+					$landmine[local.i] thread landmineThinker
+				}
+			}
+		}
+	}
+end
+
+//----------------------------------
+mineListeningForDetonator:
+//----------------------------------
+	while (vector_length (self.origin - level.detonator.origin) > level.detonationDistance){
+		waitframe
+		//[200] chrisstrahl - NULL entity fix - intentional this way to print once the error to console
+		if(self == NULL){ end }
+	}
+	
+	//[200] chrisstrahl - NULL entity fix
+	if(self == NULL){ end }
+
+	self playsound landmine_explode
+	thread BlowUpMine self.origin
+	//[200] chrisstrahl - using remove instead to remove mine in the next frame, to avoid issues in multiplayer
+	self remove 
+end
+
+//----------------------------------
+BlowUpMine local.origin:
+//----------------------------------
+	local.temp = spawn script_model model emitters/explosion_mine.tik
+	local.temp notsolid
+	local.temp.origin = local.origin
+	local.temp anim start
+	local.temp notsolid
+	wait 5
+	local.temp remove
+
+End
+		
+//--------------------------------------------------------------------
+// Called when a minelayer tries to defuse a landmine
+//--------------------------------------------------------------------
+defuse local.defuser:
+	self delete
+//	iprintln "landmine defused!"
+end
+
+//--------------------------------------------------------------------
+// Called when someone has stepped on a "live" landmine (called
+// by steppedOn). If they hold still for 15 seconds, they get to live
+// (because they defused it themselves), otherwise they die.
+//--------------------------------------------------------------------
+triggerMine local.stepper:
+	self playsound landmine_trigger
+	self show
+
+	local.noboom = true
+	local.defuseTime = level.time + 15
+
+	local.stepper iprint( "You've stepped on a landmine!" )
+
+	while (local.noboom == true) {
+		if (self == NIL || self == NULL) {
+			if (local.stepper != NIL && local.stepper != NULL)
+				local.stepper iprint( "landmine vanished!" )
+			end			
+		} else if (local.stepper == NIL || local.stepper == NULL) {
+			local.noboom = false
+		} else if (vector_length(self.origin - local.stepper.origin) > 40) {
+			local.noboom = false
+		} else if (level.time > local.defuseTime) {
+			if (local.stepper != NIL && local.stepper != NULL)
+				local.stepper iprint( "landmine defused!" )
+			self playsound landmine_defuse
+			self delete
+		}
+		wait 0.1
+	}
+
+	self playsound landmine_explode
+	thread BlowUpMine self.origin
+	landminedamage self 500 150	
+end
+
+//--------------------------------------------------------------------
+// Landmine thinking code - gets rid of the mine if it becomes damaged
+//--------------------------------------------------------------------
+landmineThinker:
+
+	if (self.damageable != 1)
+		end
+		
+	self takedamage
+	
+//	iprintln "thinking"
+//	if (self.health < 20)
+//	{
+//		iprintln "low health"
+//		self health 20
+//		wait .5
+//	}
+	
+//	else
+//		iprintln "not low health"
+		
+	local.health = self.health
+	while (self != NULL) {
+		if (self.health < local.health)
+		{
+			self playsound landmine_explode
+			thread BlowUpMine self.origin
+			landminedamage self 100 150
+			self delete
+		}
+		wait .5
+	}
+end
+
+//--------------------------------------------------------------------
+// This code is called when the landmine is initially stepped on.
+//--------------------------------------------------------------------
+steppedOn local.stepper:
+
+	// Believe it or not, you can be stepped on by a NULL object
+	if (local.stepper == NULL)
+		end
+
+	//the player's grenades set off mines even when they shouldn't, so
+	//this insures that the stepper is actually close enough to set off
+	//the mine
+	if (vector_length (local.stepper.origin - self.origin) > 50)
+		end
+		
+	self nottriggerable
+	if (self.lock != NIL && self.lock == level.time) {
+		end
+	}
+	self.lock = level.time
+
+	if ( self isimmune local.stepper) { 
+		// do nothing
+	} 	
+	else
+	{
+		self waitthread triggerMine local.stepper
+		if (self != NIL && self != NULL)
+			self delete
+	}
+
+	wait .1
+	if (self != NIL && self != NULL) {
+		self triggerable
+ 	} 
+end
