@@ -18,8 +18,28 @@ spawner_create local.dude:{
 	local.spawner = spawn info_waypoint		// jsl-->changed to info_waypoint so we don't use up an entity count.......
 
 	//*** grab all of the AI's properties
+	
+	//[200] chrissstrahl - BT only properties
+	if(level.coop_aaMap == NIL || level.coop_aaMap != 1){
+println("dev: spawner.scr spawner_create BT MAP")
+		local.spawner.gun								= local.dude.gun
+		local.spawner.pause								= local.dude.pause
+		local.spawner.dontdropweapons					= local.dude.dontdropweapons
+		local.spawner.drophealth                        = local.dude.drophealth
+		local.spawner.dropgun                           = local.dude.dropgun
+		local.spawner.forcedropweapon					= local.dude.forcedropweapon
+		local.spawner.forcedrophealth					= local.dude.forcedrophealth
+	}
+	else{
+println("dev: spawner.scr spawner_create AA MAP")
+		if(level.dontdropweapons == NIL || level.dontdropweapons != 1){
+			local.spawner.dropgun = 1
+			local.spawner.dontdropweapons = 0
+		}
+	}
+	
+	//[200] chrissstrahl - general properties
 	local.spawner.origin							= local.dude.origin
-	local.spawner.gun								= local.dude.gun
 	local.spawner.type_idle							= local.dude.type_idle
 	local.spawner.type_attack						= local.dude.type_attack
 	local.spawner.type_disguise						= local.dude.type_disguise
@@ -34,6 +54,7 @@ spawner_create local.dude:{
 	local.spawner.sound_awareness					= local.dude.sound_awareness
 	local.spawner.noticescale						= local.dude.noticescale
 	local.spawner.fixedleash						= local.dude.fixedleash
+	
 	local.spawner.enemysharerange					= local.dude.enemysharerange
 	local.spawner.voicetype							= local.dude.voicetype
 	local.spawner.accuracy							= local.dude.accuracy
@@ -46,6 +67,7 @@ spawner_create local.dude:{
 	local.spawner.disguise_level					= local.dude.disguise_level
 	local.spawner.patrolpath						= local.dude.patrolpath
 	local.spawner.waittrigger						= local.dude.waittrigger
+	
 	local.spawner.turret							= local.dude.turret
 	local.spawner.alarmnode							= local.dude.alarmnode
 	local.spawner.alarmthread						= local.dude.alarmthread
@@ -57,23 +79,16 @@ spawner_create local.dude:{
 	local.spawner.healthchance						= local.dude.healthchance
 	local.spawner.area								= local.dude.area
 	local.spawner.enemyname							= local.dude.enemyname
+	
 	local.spawner.playerseek						= local.dude.playerseek
 	local.spawner.fnum								= local.dude.fnum
 	local.spawner.turndoneerror						= local.dude.turndoneerror
 	local.spawner.threatbias						= local.dude.threatbias
 	local.spawner.radnum							= local.dude.radnum
 	local.spawner.balconyheight						= local.dude.balconyheight
-	local.spawner.pause								= local.dude.pause
-	local.spawner.dontdropweapons					= local.dude.dontdropweapons
-
+	
 	local.spawner.spawn_model						= local.dude.model
 	local.spawner.spawn_targetname					= local.dude.targetname
-
-	local.spawner.drophealth                        = local.dude.drophealth
-	local.spawner.dropgun                           = local.dude.dropgun
-
-	local.spawner.forcedropweapon					= local.dude.forcedropweapon
-	local.spawner.forcedrophealth					= local.dude.forcedrophealth
 
 
 	//*** remove the AI
@@ -119,9 +134,6 @@ spawner_activate local.spawner:{
 		local.dude.type_grenade = local.spawner.type_grenade
 	}
 
-	if ( local.spawner.gun && local.spawner.gun!="" ){
-		local.dude.gun = local.spawner.gun
-	}
 
 	local.dude.hearing = local.spawner.hearing
 	local.dude.sight = local.spawner.sight
@@ -149,8 +161,22 @@ spawner_activate local.spawner:{
 	local.dude.disguise_accept_thread = local.spawner.disguise_accept_thread
 	local.dude.disguise_level = local.spawner.disguise_level
 
-	if (local.spawner.dontdropweapons){
-		local.dude dontdropweapons
+	//[200] chrissstrahl - just make sure this works right
+	if(level.coop_aaMap == NIL || level.coop_aaMap != 1){
+		if ( local.spawner.gun && local.spawner.gun!="" ){
+			local.dude.gun = local.spawner.gun
+		}
+		if (local.spawner.dontdropweapons != NIL && local.spawner.dontdropweapons == 1){
+			local.dude dontdropweapons
+		}
+		if ( local.spawner.drophealth != NIL && local.spawner.drophealth != 0 ){
+			local.dude.forcedrophealth = 1
+		}
+
+		if ( local.spawner.dropgun != NIL && local.spawner.dropgun != 0){
+			local.dude.forcedropweapon = 1
+		}
+		local.dude.pause = local.spawner.pause
 	}
 
 	if ( local.spawner.patrolpath!="" ){
@@ -199,24 +225,6 @@ spawner_activate local.spawner:{
 	if ( local.spawner.balconyheight!=NIL ){
 		local.dude.balconyheight = local.spawner.balconyheight
 	}
-
-	if ( local.spawner.drophealth != NIL ){
-		if ( local.spawner.drophealth != 0 ){
-//			local.dude thread global/weapondrop.scr::ForceDropHealth
-			// jsl-->Let the engine code do this now...
-			local.dude.forcedrophealth = 1
-		}
-	}
-
-	if ( local.spawner.dropgun != NIL ){
-		if ( local.spawner.dropgun != 0 ){
-//			local.dude thread global/weapondrop.scr::ForceDropGun
-			// jsl-->Let the engine code do this now...
-			local.dude.forcedropweapon = 1
-		}
-	}
-
-	local.dude.pause = local.spawner.pause
 }end local.dude
 
 //**********************************************************************************
