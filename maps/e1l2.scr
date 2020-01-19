@@ -20,11 +20,6 @@ main:{
 //============================================================
 	fadeout 0.1 0 0 0 1	 //chrissstrahl - fade it out first
 	
-	//chrissstrahl - debug test
-	thread juck	
-	if( level.coop_debugLevel != NIL ){
-		thread juck	
-	}
 	level.music  = "e1l2"
 	level.coopPrevMap = "e1l1"				//chrissstrahl - set previouse map (for mom voteing)
 	level.coopNextMap = "e1l3"				//chrissstrahl - set next map (for mom voteing)
@@ -65,9 +60,6 @@ main:{
 		waitframe
 		local.spawnEnt attach $tank2 origin 1 ( 0 -150 180 )
 		local.spawnEnt hide
-	}else{
-		//chrissstrahl - overwrite mission progress - deletes e1l3 save
-		setcvar "coop_save" ""
 	}
 
 	fadein 5.0 0 0 0 1
@@ -104,49 +96,12 @@ main:{
 	exec global/missioncomplete.scr e1l3 1
 }end
 
-juck:{
-	//chrissstrahl - developer test - force spawn to area where we do script debugging
-	//chrissstrahl - developer test - force spawn to area where we do script debugging
-	//chrissstrahl - developer test - force spawn to area where we do script debugging
-	//chrissstrahl - developer test - force spawn to area where we do script debugging
-	//chrissstrahl - developer test - force spawn to area where we do script debugging
-	//chrissstrahl - developer test - force spawn to area where we do script debugging
-	//chrissstrahl - developer test - force spawn to area where we do script debugging
-	//chrissstrahl - developer test - force spawn to area where we do script debugging
-	//chrissstrahl - developer test - force spawn to area where we do script debugging
-	//chrissstrahl - developer test - force spawn to area where we do script debugging
-	//chrissstrahl - developer test - force spawn to area where we do script debugging
-	//chrissstrahl - developer test - force spawn to area where we do script debugging
-	
-	//spawn first at bohler trigger
-	/*
-	local.xxx = 260
-	while(local.xxx > 0){
-		local.xxx--
-		//level.flags["coop_spawn1origin"] = ( 2520 -4480 600 )
-		level.flags["coop_spawn1origin"] = ( 1112 -4360 600 )
-		waitframe
-	}
-	//spawn then at bohler
-	while(1){
-		waitframe
-		//level.flags["coop_spawn1origin"] = ( 2950 -807 482 ) //bohler1
-		level.flags["coop_spawn1origin"] = ( 2950 -807 482 ) //bohler2
-	}	
-	//spawn at artillery
-	while(1){
-		waitframe
-		level.flags["coop_spawn1origin"] = ( -4398 -5601 1169 ) //artillery
-	}
-	*/
-}end
-
 //============================================================
 startMusic_e1l2_main:{
 //============================================================
 	//chrissstrahl - make coop compatible
 	//$player stufftext "tmstop; tmstartloop sound/music/Radar_Train.mp3; tmvolume 1.6"
-	exec coop_mod/replace.scr::tmstop	
+	//[200] chrissstrahl - tmstartloop stops old song automatically //exec coop_mod/replace.scr::tmstop	
 	exec coop_mod/replace.scr::tmstartloop 	"sound/music/Radar_Train.mp3"
 	exec coop_mod/replace.scr::tmvolume 1.6
 }end
@@ -244,7 +199,7 @@ coop_updateSpawn2:{
 		wait 0.5
 		local.player = waitexec coop_mod/replace.scr::player_closestTo NIL local.origin
 	}
-	iprintlnbold_noloc("DEV: coop_updateSpawn2")
+//iprintlnbold_noloc("DEV: coop_updateSpawn2")
 	thread coop_mod/spawnlocations.scr::e1l2_update2
 	
 	thread coop_handleMineDetectorForPlayers
@@ -260,7 +215,7 @@ coop_updateSpawn3:{
 		wait 0.5
 		local.player = waitexec coop_mod/replace.scr::player_closestTo NIL local.origin
 	}
-	iprintlnbold_noloc("DEV: coop_updateSpawn3")
+//iprintlnbold_noloc("DEV: coop_updateSpawn3")
 	thread coop_mod/spawnlocations.scr::e1l2_update3
 }end
 
@@ -274,22 +229,24 @@ coop_updateSpawn4:{
 		wait 0.5
 		local.player = waitexec coop_mod/replace.scr::player_closestTo NIL local.origin
 	}
-	iprintlnbold_noloc("DEV: coop_updateSpawn4")
-	
+//iprintlnbold_noloc("DEV: coop_updateSpawn4")
 	//chrissstrahl - set sniper as primary weapon for respawn (this is failsafe if no player picked up the sniper)
-	local.model = "models/weapons/KAR98sniper.tik"
-	level.coop_forcePrimary = local.model
-	for (local.i = 1;local.i <= $player.size;local.i++){
-		local.player =  $player[local.i]
-		if(local.player != NULL && local.player.health > 0 ){
-			if( level.gametype == 0 || local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
-				exec coop_mod/main.scr::playerForcePrimary local.player local.model
-//					local.player weapon local.model
-				iprintlnbold_noloc("You have acquired KAR98 Sniper Rifle")
-			}
-		}
-	}
+	if(level.coop_forcePrimary != "weapons/KAR98sniper.tik"){ //[200] chrissstrahl - no one picked the sniper up in the tent
+		//[200] chrissstrahl - remove sniper from tent now
+		if($sniperrifle != NULL){ $sniperrifle delete }
 	
+		local.model = "models/weapons/KAR98sniper.tik"
+		level.coop_forcePrimary = local.model
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player =  $player[local.i]
+			if(local.player != NULL && local.player.health > 0 ){
+				if( level.gametype == 0 || local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+					exec coop_mod/main.scr::playerForcePrimary local.player local.model
+					iprintlnbold_noloc("You have acquired KAR98 Sniper Rifle")
+				}
+			}
+		}	
+	}
 	waitthread coop_mod/spawnlocations.scr::e1l2_update4
 	wait 15 //wait some time here, then start spawning near convoy leading tank
 	thread coop_updateSpawn5
@@ -299,7 +256,7 @@ coop_updateSpawn4:{
 //============================================================
 coop_updateSpawn5:{
 //============================================================
-	iprintlnbold_noloc("DEV: coop_updateSpawn5")
+//iprintlnbold_noloc("DEV: coop_updateSpawn5")
 	waitthread coop_mod/spawnlocations.scr::e1l2_update5
 	//632 -4412 352 barricade1 after artillery
 	//2128 -4720 544 barricade2 after artillery
@@ -311,7 +268,7 @@ coop_updateSpawn5:{
 //============================================================
 coop_updateSpawn6:{
 //============================================================
-	iprintlnbold_noloc("DEV: coop_updateSpawn6")
+//iprintlnbold_noloc("DEV: coop_updateSpawn6")
 	waitthread coop_mod/spawnlocations.scr::e1l2_update6
 }end
 
