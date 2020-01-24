@@ -123,12 +123,14 @@ main:{
 	//}
 }end
 
-
+//[200] chrissstrahl - have a seperate handle for singleplayer
 //=========================================================================
 spWaitForPlayer:{
 //=========================================================================
 	level waittill spawn
 	level.coop_playerReady = 1	
+	//[200] chrissstrahl - set variables
+	$player.flags["coop_isHost"] = 1
 }end
 
 //loads next map until check is over or starting maps are reached
@@ -286,6 +288,7 @@ fixServer:{
 	//local.trigger doActivate $world
 }end
 
+//forces player into allies team
 //=========================================================================
 forceTeam local.player:{
 //=========================================================================
@@ -305,6 +308,7 @@ forceTeam local.player:{
 	local.player join_team ( "allies" )
 }end
 
+//makes player respawn at predefined spawn location, rather than the last pos player was alive
 //=========================================================================
 resetSpawn local.player:{
 //=========================================================================
@@ -520,7 +524,15 @@ managePlayers:{
 							if( local.player.flags["coop_justSpawnedDone"] == NIL ){
 								local.player.flags["coop_justSpawnedDone"] = TRUE
 								//[200] chrissstrahl - added trigger activator (this player)
-								thread startThread ( "maps/"+getcvar("mapname")+".scr::coop_playerJustSpawned"+local.i ) (local.player)
+								//[200] chrissstrahl - now using filtred level var instead of cvar
+								//[200] chrissstrahl - no longer using player id in func name (use parm.other to get player)
+								//thread startThread ( "maps/"+level.coop_mapname+".scr::coop_playerJustSpawned"+local.i ) (local.player)
+								//
+								//There are these optional functions calls:
+								//- FIRST SPAWN:	coop_playerJustSpawned
+								//- EACH RESPAWN:	coop_playerJustRespawned
+								//- EACH DEATH:		coop_playerJustDied
+								thread startThread ( "maps/"+level.coop_mapname+".scr::coop_playerJustSpawned" ) (local.player)
 							}
 							local.player max_health local.health
 							local.player healthonly local.health
@@ -590,7 +602,7 @@ managePlayers:{
 								}
 							}
 						}
-						// RESPAWNING & RESTORE /////////////////////////////////////////
+// RESPAWNING & RESTORE /////////////////////////////////////////
 						if(local.player.flags["coop_respawning"] == TRUE){
 							if( level.coop_disableSpawnWarper != TRUE && vector_length( local.player.flags["coop_respawnOrigin"] ) > 10){
 								thread playerMakeSolidAsap local.i
@@ -599,13 +611,20 @@ managePlayers:{
 								if(local.player.flags["coop_respawnAngle"] != 0){
 									//need to call this delayed or it will not work most of the time in mp
 									local.player thread playerFace ( 0 local.player.flags["coop_respawnAngle"] 0 )
-								}
-								local.player.flags["coop_respawning"] = FALSE								
+								}					
 							}
 							else{
 								thread playerPlaceAtSpawn local.i
-								local.player.flags["coop_respawning"] = FALSE	
 							}
+							//[200] chrissstrahl - moved here
+							local.player.flags["coop_respawning"] = FALSE	
+							//[200] chrissstrahl - added special handling for players that just respawned
+							//
+							//There are these optional functions calls:
+							//- FIRST SPAWN:	coop_playerJustSpawned
+							//- EACH RESPAWN:	coop_playerJustRespawned
+							//- EACH DEATH:		coop_playerJustDied
+							thread startThread ( "maps/"+level.coop_mapname+".scr::coop_playerJustRespawned" ) (local.player)
 						}
 						else if( level.coop_disableSpawnWarper != TRUE ){
 							if(	local.player.flags["coop_respawnTime"] == NIL ||
@@ -633,9 +652,19 @@ managePlayers:{
 					else{
 						local.player.flags["coop_iAmTruelyActive"] = 0
 						if(	local.player.flags["coop_isActive"] != -2 ){
-							local.player.flags["coop_justSpawnedDone"] = NIL
 							local.player.flags["coop_isActive"] = -2
+							local.player.flags["coop_justSpawnedDone"] = NIL
 							local.player.flags["coop_respawning"] = TRUE
+							
+							//[200] chrissstrahl - start thread in main level-script
+							//used to handle stuff when player dies
+							//used to make sure player is not respawning in a vehicle or something
+							//
+							//There are these optional functions calls:
+							//- FIRST SPAWN:	coop_playerJustSpawned
+							//- EACH RESPAWN:	coop_playerJustRespawned
+							//- EACH DEATH:		coop_playerJustDied
+							thread startThread ( "maps/"+level.coop_mapname+".scr::coop_playerJustDied" ) (local.player)
 							
 							//local.player notarget 1
 							local.player unglue
@@ -821,7 +850,25 @@ playersWarpto local.origin local.angle local.setSpawn:{
 //=========================================================================
 playerPlaceAtSpawn local.i:{
 //=========================================================================
-	local.player = $player[local.i]
+	//[200] chrissstrahl - if we are given a entity instead of a number, deal with it
+	//detecting a single player entity as 0
+	//detecting a interger as 1 or
+	if(local.i == NIL){ end }
+	local.varType = waitthread returnVarType local.i
+	//entity - fine grab directly
+	if(local.varType == 2){
+		local.player = local.i
+	}
+	//int - grab by player number
+	else if(local.varType == 4){
+		local.player = $player[int(string(local.i))] //just to be sure convert to string then int, a player in a var can also be returned as a number, this is why we make sure to convert it over
+	}
+	//error out, it is better than never finding out whats wrong
+	else{
+		local.typename = waitthread returnVarTypename(local.varType)
+		error ( "coop_mod/main.scr::playerPlaceAtSpawn - does not support var type: "+local.typename ) 1000
+	}
+
 	if( local.player == NULL){ end }
 	
 	if( local.player.flags["coop_playerTankExit"] != NIL && $coop_tankExit != NULL){
@@ -894,63 +941,79 @@ playerMakeSolidAsap local.i:{
 				//println("playerMakeSolidAsap 3")
 				end
 			}
-		}		
+		}
+		
+		//[200] chrissstrahl - moved here because it was in the player for loop, which is not nessary
+		//check other special entites, like tanks
+		if( $playertank_trigger != NULL && local.player isTouching $playertank_trigger){ //king tiger tank m5l2a,m5l2a
+			local.touch = 1
+			//iprintlnbold_noloc("DEV: TOUCHING $playertank_trigger")
+		}
+		if( $panzer_mask != NULL && local.player isTouching $panzer_mask){ //german panzer m5l2a
+			local.touch = 1
+			//iprintlnbold_noloc("DEV: TOUCHING $panzer_mask")
+		}
+		if( $tank_mask != NULL && local.player isTouching $tank_mask){ //german panzer m5l1b,m5l2a
+			local.touch = 1
+			//iprintlnbold_noloc("DEV: TOUCHING $tank_mask")
+		}
+		if( $t214 != NULL && level.coop_mapname == "m5l2a" && local.player isTouching $t214){ //german strange vehicle m5l2a
+			local.touch = 1
+			//iprintlnbold_noloc("DEV: TOUCHING $t214")
+		}
+		if( $kingtigercollision != NULL && local.player isTouching $kingtigercollision ){ //king tiger m5l3
+			local.touch = 1
+			//iprintlnbold_noloc("DEV: TOUCHING $kingtigercollision")
+		}	
+		
+//[200] chrissstrahl - added additional checks
+		if(local.touch){ goto playerMakeSolidAsapSet }//[200] chrissstrahl - make sure we skip unnessary checks
+		if( level.coop_mapname = "m5l2a" ){
+			if( $s5_tank && local.player isTouching $s5_tank)
+				local.touch = 1
+			}
+			if( $s10_tank1 && local.player isTouching $s10_tank1)
+				local.touch = 1
+			}
+			if( $s10_tank2 && local.player isTouching $s10_tank2)
+				local.touch = 1
+			}
+			if( $s3_halftrak && local.player isTouching $s3_halftrak)
+				local.touch = 1
+			}
+		}
+		if($playertank && local.player istouching $playertank){
+			local.touch = 1
+		}	
+//friendlies
+		if(local.touch){ goto playerMakeSolidAsapSet }//[200] chrissstrahl - make sure we skip unnessary checks
+		if(isalive level.friendly1 && local.player isTouching level.friendly1){
+			local.touch = 1
+		}
+		if(isalive level.friendly2 && local.player isTouching level.friendly2){
+			local.touch = 1
+		}
+		if(isalive level.friendly3 && local.player isTouching level.friendly3){
+			local.touch = 1
+		}
+		if(isalive level.friendly4 && local.player isTouching level.friendly4){
+			local.touch = 1
+		}
+		if(isalive level.friendly5 && local.player isTouching level.friendly5){
+			local.touch = 1
+		}
+		if(isalive level.friendly6 && local.player isTouching level.friendly6){
+			local.touch = 1
+		}
+
+		//[200] chrissstrahl - apperently a goto is the best way to do this, this so ironic
+		//we have to check player vs player, otherwise the other player might still get stuck
+		playerMakeSolidAsapSet:
+		
 		//check if this player is inside another
 		local.touch = 0
 		for (local.iOther = 1;local.iOther <= $player.size;local.iOther++){
 			local.otherPlayer =  $player[local.iOther]
-			
-			//check other special entites, like tanks
-			if( $playertank_trigger != NULL && local.player isTouching $playertank_trigger){ //king tiger tank m5l2a,m5l2a
-				local.player notsolid
-				local.touch = 1
-				//iprintlnbold_noloc("DEV: TOUCHING $playertank_trigger")
-			}
-			if( $panzer_mask != NULL && local.player isTouching $panzer_mask){ //german panzer m5l2a
-				local.player notsolid
-				local.touch = 1
-				//iprintlnbold_noloc("DEV: TOUCHING $panzer_mask")
-			}
-			if( $tank_mask != NULL && local.player isTouching $tank_mask){ //german panzer m5l1b,m5l2a
-				local.player notsolid
-				local.touch = 1
-				//iprintlnbold_noloc("DEV: TOUCHING $tank_mask")
-			}
-			if( $t214 != NULL && level.coop_mapname == "m5l2a" && local.player isTouching $t214){ //german strange vehicle m5l2a
-				local.player notsolid
-				local.touch = 1
-				//iprintlnbold_noloc("DEV: TOUCHING $t214")
-			}
-			if( $kingtigercollision != NULL && local.player isTouching $kingtigercollision ){ //king tiger m5l3
-				local.player notsolid
-				local.touch = 1
-				//iprintlnbold_noloc("DEV: TOUCHING $kingtigercollision")
-			}
-//friendlies
-			if(isalive level.friendly1 && local.player isTouching level.friendly1){
-				local.player notsolid
-				local.touch = 1
-			}
-			if(isalive level.friendly2 && local.player isTouching level.friendly2){
-				local.player notsolid
-				local.touch = 1
-			}
-			if(isalive level.friendly3 && local.player isTouching level.friendly3){
-				local.player notsolid
-				local.touch = 1
-			}
-			if(isalive level.friendly4 && local.player isTouching level.friendly4){
-				local.player notsolid
-				local.touch = 1
-			}
-			if(isalive level.friendly5 && local.player isTouching level.friendly5){
-				local.player notsolid
-				local.touch = 1
-			}
-			if(isalive level.friendly6 && local.player isTouching level.friendly6){
-				local.player notsolid
-				local.touch = 1
-			}
 //check player to player - don't check the player against him self
 			if(local.player == local.otherPlayer){
 				continue			
@@ -968,16 +1031,20 @@ playerMakeSolidAsap local.i:{
 					//iprintlnbold_noloc ( "OMG, YOU DID TOUCH EACH OTHER" )
 					local.otherPlayer notsolid
 					thread playerMakeSolidAsap local.iOther
-					local.player notsolid
 					local.touch = 1
 				}
 			}
 		}
+		
 		if(local.touch == 0){
 			//println("playerMakeSolidAsap NOW SOLID...")
 			local.player.flags["coop_makesolid"] = NIL
 			local.player solid
 			end			
+		}
+		//[200] chrissstrahl - moved notsolid here, was in each if statment seperatly before
+		else{
+			local.player notsolid
 		}
 		//println("playerMakeSolidAsap loop")
 		waitframe
@@ -1066,11 +1133,16 @@ managePlayerToFollow:{
 		
 		//if everything is ok, wait a moment then try again
 		if(level.coop_player != NULL && local.grabNewPlayer != 1){
-			if(	level.coop_player.dmteam == "spectator" ||
-				level.coop_player.health <= 0 ||
-				level.coop_player.flags["coop_isActive"] != 1)
-			{
-				local.tries++
+			//[200] chrissstrahl - added handle for singleplayer
+			if(level.gametype != 0){
+				if(	level.coop_player.dmteam == "spectator" ||
+					level.coop_player.health <= 0 ||
+					level.coop_player.flags["coop_isActive"] != 1)
+				{
+					local.tries++
+				}
+			}else if(level.coop_player.health <= 0){
+				end
 			}
 			
 			//if max tries exceeded, find new player
@@ -1082,9 +1154,13 @@ managePlayerToFollow:{
 			continue
 		}
 		
+		//[200] chrissstrahl - note we can only test this once we have dedicated servers
+		//level waittill playerspawn
+		//
+		//use the looping code below instad until we have a dedicated test server
+		
 		//pause if there is no player
 		while( $player == NULL ){
-			iprintlnbold_noloc("DEV: no $player, doing pause")
 			local.grabNewPlayer = 1
 			wait 2
 		}
@@ -1125,70 +1201,17 @@ fiendlyFollow local.setPlayerDest:{
 //early stage might needs more thougth with thether combined
 //FOLLOW .fnum = -1
 //not FOLLOW .fnum = NIL?
-	if( level.gametype == 0 ){
-		if(local.setPlayerDest == NIL || local.setPlayerDest == 1 || local.setPlayerDest == true ){
-			self.destination = $player
-		}
-		self tether $player
-		end
-	}
-	println ( self.targetname + " : fiendlyFollow" )
-	
-	if( self.flags["coop_followingPlayer"] == 1){
-		end
-	}
-	
-	//flag this actor to be following
-	self.flags["coop_followingPlayer"] = 1
-	local.tries = 0
-	local.triesMax = 10
-	
-	while( self != NULL && isAlive self ){
-		//terminate if no more following player
-		if( self.flags["coop_followingPlayer"] != 1 ){
-			iprintlnbold_noloc ( self.targetname + " : FOLLOW STOPING" )
-			println ( self.targetname + " : FOLLOW STOPING" )
-			break
-		}
-		//get new player if current player is missing
-		if( level.coop_player == NULL ){
-			iprintlnbold_noloc ( self.targetname + " : NULL "  )
-			println ( self.targetname + " : NULL "  )
-			local.tries = local.triesMax
-		}
-		//keep track of failed atempts
-		else if( level.coop_player.dmteam == "spectator" ||
-			level.coop_player.health <= 0 ||
-			level.coop_player.flags["coop_isActive"] != 1 )
-		{
-			local.tries++
-			iprintlnbold_noloc ( self.targetname + " : TRYING " + local.tries  )
-			println ( self.targetname + " : TRYING " + local.tries  )
-		}
-		//get new player and reset
-		if( local.tries >= local.triesMax ){
-			while(level.coop_player == NULL){
-				wait 5
-				if(self == NULL){
-					end
-				}
-				waitthread fiendlyFindPlayer
-				iprintlnbold_noloc ( self.targetname + " : FINDING"  )
-				println ( self.targetname + " : FINDING"  )
-			}
-			iprintlnbold_noloc ( self.targetname + " : FOUND and SET"  )
-			println ( self.targetname + " : FOUND and SET"  )
-			self.destination = level.coop_player
-			self tether level.coop_player
-			local.tries = 0
-		}
-		wait 1
-	}
 }end
 
 //=========================================================================
 fiendlyFindPlayer:{
 //=========================================================================
+	//[200] chrissstrahl - make sure this works in sp as well
+	//thanks to DoubleKill for reporting this issue
+	if(level.gametype == 0){
+		level.coop_player = $player
+		end
+	}
 //find a valid player to follow, this is used to direct the ai to a player to follow
 	for (local.i = 1;local.i <= $player.size;local.i++){
 		local.player =  $player[local.i]
@@ -1209,6 +1232,8 @@ isPlayerActive local.player:{
 		if($player != NULL && $player.health > 0){
 			end 1
 		}
+		//[200] chrissstrahl - fix missing end 0 if player is dead
+		end 0
 	}
 	if( local.player == NIL ){
 		error ( "coop_mod/main.scr::isPlayerActive - parameter 1 was NIL, needs to be player" ) 1000
@@ -1227,23 +1252,6 @@ playerActives:{
 //=========================================================================
 	error ( "coop_mod/main.scr::playerActives - used, use player_numActive in replace.scr instead" ) 1000
 	end
-//returns how many active players there are
-	if(level.gametype == 0){
-		if(isAlive $player){
-			end 1
-		}
-	}
-	
-	local.actives = 0
-	for (local.i = 1;local.i <= $player.size;local.i++){
-		local.player =  $player[local.i]
-		if( local.player != NULL ){
-			if( local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
-				local.actives++
-			}
-		}
-	}
-//	level.coop_player = NULL //wtf
 }end local.actives
 
 //PLEASE NOTE! THIS FUNCTION HAS A INTENTIONAL 1 FRAME DELAY!
@@ -1283,23 +1291,26 @@ getPlayerId local.player:{
 //=========================================================================
 getActiveWeapon local.player:{
 //=========================================================================
-	if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator"){
-		local.playerOrigin1 = local.player gettagposition "tag_weapon_right"
-		local.playerOrigin2 = local.player gettagposition "tag_weapon_left"
-		local.maxentities = int(getcvar("maxentities"))
-		
-		for (local.i = 0; local.i < local.maxentities; local.i++) {
-			local.ent = getentbyentnum local.i
-			if ( local.ent != NULL && local.ent.model != NIL){	
-				local.entOrigin = local.ent.origin
-				if( vector_length(local.entOrigin - local.playerOrigin1) < 2 || vector_length(local.entOrigin - local.playerOrigin2) < 2 ){
-					if( waitthread isWeaponModel local.ent.model ){
-						//println ("returning: " + local.ent.model)
-						end local.ent.model
+	if(local.player != NULL && local.player.health > 0 ){
+		//[200] chrissstrahl - made singleplayer compatible
+		if(level.gametype == 0 || local.player.dmteam != "spectator"){
+			local.playerOrigin1 = local.player gettagposition "tag_weapon_right"
+			local.playerOrigin2 = local.player gettagposition "tag_weapon_left"
+			local.maxentities = int(getcvar("maxentities"))
+			
+			for (local.i = 0; local.i < local.maxentities; local.i++) {
+				local.ent = getentbyentnum local.i
+				if ( local.ent != NULL && local.ent.model != NIL){	
+					local.entOrigin = local.ent.origin
+					if( vector_length(local.entOrigin - local.playerOrigin1) < 2 || vector_length(local.entOrigin - local.playerOrigin2) < 2 ){
+						if( waitthread isWeaponModel local.ent.model ){
+							//println ("returning: " + local.ent.model)
+							end local.ent.model
+						}
 					}
 				}
 			}
-		}	
+		}
 	}
 }end "weaponless"
 
@@ -1454,12 +1465,17 @@ playerPrimarySwapCancel local.player:{
 		end 1
 	}
 	
-	if( local.player.health < 1 ||
-		local.player.dmteam == "spectator" ||
-		local.player.flags["coop_isActive"] != 1)
-	{
-		local.player.flags["coop_swapedWeaponPrimary"] = NIL
+	//[200] chrissstrahl - made singleplayer compatible
+	if( local.player.health <= 0 ){
 		end 1
+	}
+	
+	//[200] chrissstrahl - made singleplayer compatible
+	if(level.gametype != 0){
+		if(local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1){
+			local.player.flags["coop_swapedWeaponPrimary"] = NIL
+			end 1
+		}
 	}	
 }end 0
 
