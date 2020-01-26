@@ -27,7 +27,11 @@ SafeRunTo local.dest local.trigger_when_done local.movedonerad local.retry_delay
 	}
 
 	//[200] chrissstrahl - fixed null entity issue
-	if(self == NULL){ end }
+	if(self == NULL){ 
+		//[200] chrissstrahl - make sure we know whats going on
+		println("safeMoveTo.scr::SafeRunTo self was NULL - ended")
+		end
+	}
 	
 	self.safemoveto_in_progress = 1
 	self.safemoveto_done = 0
@@ -42,45 +46,23 @@ SafeRunTo local.dest local.trigger_when_done local.movedonerad local.retry_delay
 
 	self runto self.destination
 	self thread SafeRunTo_MaintenanceThread local.crouch_at_dest local.retry_delay
-
 end
 
 SafeRunTo_MaintenanceThread local.crouch_at_dest local.retry_delay:
-	//[200] chrissstrahl - make sure we have data to do debugging
-	local.self_targetname = self.targetname
-	local.self_destination = self.destination.targetname
-		
-	while (self && isalive self){
-		//[200] chrissstrahl - moved null and alive check at the start where they should have been in the first place
-		while ((self && isalive self) && (self.safemoveto_gotmovedoneevent == 0) && (self.safemoveto_done == 0) ){
-			waitframe
-		}
 
-		//[200] chrissstrahl - I belive this was wrong - so I fixed it
-		//chrissstrahl //if ((self && isalive self) || (self.safemoveto_done == 1) || (vector_within self.origin self.destination.origin self.movedoneradius))
-		if(self == NULL || !(isalive self)){ 
-			println("safeMoveTo.scr::SafeRunTo_MaintenanceThread - self("+local.self_targetname+") is dead or NULL")
-			end
-		}
-		
-		if(self.destination == NULL){ 
-			println("safeMoveTo.scr::SafeRunTo_MaintenanceThread - self("+local.self_targetname+") can't reach NULL("+local.self_destination+")")
-			end
-		}
-		
-		if((self.safemoveto_done == 1) || (vector_within self.origin self.destination.origin self.movedoneradius))
+	while (self && isalive self){
+		while ((self.safemoveto_gotmovedoneevent == 0) && (self.safemoveto_done == 0) && (self && isalive self))
+			waitframe
+
+		if ((self && isalive self) || (self.safemoveto_done == 1) || (vector_within self.origin self.destination.origin self.movedoneradius))
 			break
 
 		wait local.retry_delay
-		
-		//[200] chrissstrahl - fix null entity issue
-		if(self == NULL || !(isalive self)){ end }
 		self.safemoveto_gotmovedoneevent = 0
 		self runto self.destination
 	}
-	
-	//[200] chrissstrahl - fix null entity issue
-	if (self != NULL && isalive self) {
+
+	if (isalive self){
 		if (self.safemoveto_done == 0){
 			if (local.crouch_at_dest == 1){
 				self exec global/crouch.scr
@@ -88,22 +70,27 @@ SafeRunTo_MaintenanceThread local.crouch_at_dest local.retry_delay:
 			}
 
 			self.safemoveto_done = 1
-			if (self.safemoveto_trigger != NULL){
+			if (self.safemoveto_trigger != NULL)
 				trigger self.safemoveto_trigger
-			}
 		}
 
 		self.safemoveto_trigger = NULL
 		self.movedoneradius = self.movedoneradius_backup
 		self.safemoveto_in_progress = 0
 	}
+
 end
 
 SafeRunTo_WaitMoveThread:
 	//[200] chrissstrahl - fixed null entity issue
-	while (self != NULL && self.safemoveto_in_progress == 1){
+	while (self.safemoveto_in_progress == 1){
 		self waittill movedone
-		if(self == NULL){ end }
+
+		//[200] chrissstrahl - make sure we know whats going on
+		if(self == NULL){
+			println("safeMoveTo.scr::SafeRunTo_WaitMoveThread self was NULL - ended")
+			end
+		}
 		self.safemoveto_gotmovedoneevent = 1
 	}
 end
@@ -122,32 +109,15 @@ end
 
 
 WaitMoveDone:
-
 	//[200] chrissstrahl - fixed null entity issue
-	while (self != NULL && self.safemoveto_done == 0)
+	while (self != NULL && self.safemoveto_done == 0){
 		waitframe
-
-/*		--- this seems unreliable
-	if (self.safemoveto_done == 0)
-	{
-		if (self.safemoveto_trigger == NULL)
-		{
-			local.trigger = spawn trigger_relay
-			self.safemoveto_trigger = local.trigger
-		}
-		else
-		{
-			local.trigger = NULL
-		}
-
-		if (self.safemoveto_done == 0)
-			self.safemoveto_trigger waittill trigger
-
-		if (local.trigger != NULL)
-			local.trigger delete
 	}
-*/
-
+	//[200] chrissstrahl - make sure we know whats going on
+	if(self == NULL){
+		println("safeMoveTo.scr::WaitMoveDone self was NULL - ended")
+		end
+	}
 end
 
 //-----------------------------------------------------------
@@ -161,7 +131,11 @@ reach local.point:
 
 reach_loop:
 	//[200] chrissstrahl - fixed null entity issue
-	if(self == NULL){ end }
+	if(self == NULL){
+		//[200] chrissstrahl - make sure we know whats going on
+		println("safeMoveTo.scr::reach_loop self was NULL - ended")
+		end
+	}
 	
 	self runto local.point
 	self waittill movedone
