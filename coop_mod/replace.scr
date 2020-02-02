@@ -1653,27 +1653,50 @@ originOffset local.offset:{
 //SOLID
 //makes a entity solid and moves all players away, which would get stuck
 //if no away or landing position is set, players will be moved back to spawn position
+//[200] chrissstrahl - allow parmeter1 to be of type vector or entity
 //=========================================================================
 solid local.awaypos:{
 //=========================================================================
 	if(self == NULL){ end }
 	self solid
 	
-// safesolid <- can this actually replace coop check routines ? Need to test
-// safesolid <- can this actually replace coop check routines ? Need to test
-// safesolid <- can this actually replace coop check routines ? Need to test
+	local.vartype = waitthread coop_mod/main.scr::returnVarType local.awaypos
+	
+	//[200] chrissstrahl - make sure the right var type is used
+	if(local.vartype != 2 && local.vartype != 3){
+		error ( "coop_mod/replace.scr::solid - parameter1 was of type "+(waitthread coop_mod/main.scr::returnVarTypename local.vartype)+", but needs to be: Enity or Vector" ) 1000
+		end
+	}
+	
+	//[200] chrissstrahl - get pos
+	local.location = NIL
+	if(local.vartype == 2 ){ //entity
+		if( local.awaypos != NULL ){
+			local.location = local.awaypos.origin
+		}
+	}else{ //vector
+		local.location = local.awaypos
+	}
+	
+	//[200] chrissstrahl - make sp compatible
+	if(level.gametype == 0){
+		if(local.location != NIL){
+			$player origin local.location
+		}
+		thread coop_mod/main.scr::playerMakeSolidAsap local.i
+		end
+	}
 	
 	for (local.i = 1;local.i <= $player.size;local.i++){
 		local.player =  $player[local.i]
 		if( local.player != NULL && local.player isTouching self){
 			if( local.player.dmteam != "spectator" && local.player.health > 0 ){
-				if(local.awaypos != NIL){
-					local.player origin local.awaypos
-					thread coop_mod/main.scr::playerMakeSolidAsap local.i
+				if(local.location != NIL){
+					local.player origin local.location
+				}else{
+					thread coop_mod/main.scr::playerPlaceAtSpawn local.player
 				}
-				else{
-					thread coop_mod/main.scr::playerPlaceAtSpawn local.i
-				}
+//iprintlnbold_noloc("DEV: coop_mod/replace.scr::solid moved player to ("+local.location+")")
 			}
 		}
 	}
@@ -1746,46 +1769,73 @@ skip local.useOnly:{
 	}
 }end
 
+//STOPONTOUCH
+//[200] chrissstrahl - stops coop related on touch events
+//=========================================================================
+stopOnTouch:{
+//=========================================================================
+	if( self == NIL || self == NULL ){
+		error ( "coop_mod/replace.scr::stopOnTouch - needs to be executed by a entity" ) 1000
+		end
+	}
+	self.flags["coop_onTouchActivate"] = NIL
+}end
 
 //TELEPORTTOONTOUCH
 //teleports a player that is touching a specific origin
+//[200] chrissstrahl - parameter1(ent) can now be vector or entity (see m1l3c.scr elevator)
 //=========================================================================
-teleportToOnTouch local.ent local.vec local.offset:{
+teleportToOnTouch local.ent:{
 //=========================================================================
 	if( self == NIL || self == NULL ){
 		error ( "coop_mod/replace.scr::teleportToOnTouch - needs to be executed by a entity" ) 1000
 		end
 	}
 	
-	if(self.flags["coop_teleportToOnTouch"] != NIL){
+	if(self.flags["coop_onTouchActivate"] != NIL){
 		end
 	}
-	self.flags["coop_teleportToOnTouch"] = 1
+	self.flags["coop_onTouchActivate"] = 1
 	
-	if( local.ent == NULL || local.ent == NIL && local.vec == NIL){
-		error ( "coop_mod/replace.scr::teleportToOnTouch - parameter 1 and 2 where empty, you need to set at lest one NOT to NIL" ) 1000
+	//[200] chrissstrahl - removed check for other parameter
+	if( local.ent == NULL || local.ent == NIL ){
+		error ( "coop_mod/replace.scr::teleportToOnTouch - parameter 1 is NULL or NIL, needs to be vector or entity" ) 1000
 		end
 	}
 	
-	while(self != NULL){
+	//[200] chrissstrahl - allow detection of var type of parameter1
+	local.vartype =	waitthread coop_mod/main.scr::returnVarType local.ent
+	
+	//[200] chrissstrahl - make sure the right var type is used
+	if(local.vartype != 2 && local.vartype != 3){
+		error ( "coop_mod/replace.scr::teleportToOnTouch - parameter1 was of type "+(waitthread coop_mod/main.scr::returnVarTypename local.vartype)+", but needs to be: Enity or Vector" ) 1000
+		end
+	}
+	
+	//[200] chrissstrahl - make sure we have the data for the error message once the entity NULLs
+	local.targetnameParm1 = local.ent.targetname
+	
+	//[200] chrissstrahl - added check if ontouch should still be active
+	while(self != NULL && self.flags["coop_onTouchActivate"] == 1){
 		for (local.i = 1;local.i <= $player.size;local.i++){
 			local.player = $player[local.i]
 			if( local.player != NULL && local.player isTouching self ){
 				if(	local.player.dmteam != "spectator" && local.player.health > 0 &&local.player.flags["coop_isActive"] == 1){
 					local.pos = NIL
-					if(local.vec != NIL){
-						local.pos = local.vec
-					}
-					else if( local.ent != NULL && local.ent != NIL){
+					
+					//[200] chrissstrahl - get origin of entity to warp to
+					if(local.vartype == 2){
+						if(local.ent == NULL){
+							iprintlnbold_noloc("Coop Error: teleportToOnTouch parm2 entity("+local.targetnameParm1+") missing")
+							end
+						}
 						local.pos = local.ent.origin
 					}
+					//[200] chrissstrahl - set vector directly
 					else{
-						end
+						local.pos = local.ent
 					}
-					
-					if( local.offset != NIL ){
-						local.pos += local.offset
-					}
+					local.player notsolid //[200] chrissstrahl - just make sure not solid is really applied
 					local.player origin local.pos
 					thread coop_mod/main.scr::playerMakeSolidAsap local.i
 				}
