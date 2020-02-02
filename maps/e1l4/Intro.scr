@@ -1,37 +1,41 @@
-//
-// intro.scr
-//
-
-InitIntro:
+//=========================================================================
+InitIntro: {
+//=========================================================================
 	$spy exec global/disable_ai.scr
 	$spy german
 	$spy gun "none"
 	$spy rendereffects "-shadow"
-//	$spy anim jeep_idle_drive
-
-	$player.has_disguise = 1 	
+	//$spy anim jeep_idle_drive
+	
+	//Crimewavez
+	if (level.gametype == 0) {
+		$player.has_disguise = 1 	
+	}
+	
 	waitthread AIdisable
-
 	level.RideOver = 0
+}end
 
-end
-
-//-----------------------------------------------------------------------------
-
-AIdisable:
+//=========================================================================
+AIdisable: {
+//=========================================================================
 	$clerk ai_off
 	$clerkbuddy ai_off
 	$boatguard  ai_off
 	
-	for(local.j = 1; local.j < $deleteguy2.size; local.j++)
+	for(local.j = 1; local.j < $deleteguy2.size; local.j++) {
 		$deleteguy2[local.j] ai_off
-	for(local.i = 1; local.i < $ai_alarm.size; local.i++)
-		$ai_alarm[local.i] ai_off
-End
+	}
 
-DoIntro:
-	if (level.skipintro == 1)
-	{
+	for(local.i = 1; local.i < $ai_alarm.size; local.i++) {
+		$ai_alarm[local.i] ai_off
+	}
+}End
+
+//=========================================================================
+DoIntro: {
+//=========================================================================
+	if (level.skipintro == 1) {
 		println "DEBUG:  skipping intro"
 		thread giveDisguise
 		$player.origin = "-4360 4696 96"
@@ -41,19 +45,16 @@ DoIntro:
 	}
 
 	drawhud 0
-	
 	thread handleDriver
 	thread handlePlayer
-
 	thread startTruckLightsCheck
-	$starttruck thread startTruckOptions
 
+	$starttruck thread startTruckOptions
 	$starttruck rendereffects "+growradius"
 	$starttruck drive $starttruckpath 300 200 200 128		//256
 
 	//call to briefing dialogue
 	thread doBriefing
-	
 	thread global/MaintainCamera.scr::StartMaintainCamera $starttruck
 	thread handleTruckGag
 		
@@ -62,7 +63,6 @@ DoIntro:
 	$starttruck waittill drive
 
 	waitthread GateGuardDialogue
-	
 	$gate1 open $player
 
 	wait 2.0
@@ -75,7 +75,6 @@ DoIntro:
 	$starttruck waittill drive
 	waitthread doBriefing2
 	level.Introdrivedone = 1	
-
 	thread DontBeCaught
 	
 	// Hand the player the gun
@@ -84,83 +83,105 @@ DoIntro:
 	
 	$starttruck setcollisionentity $truckcollide
 	thread maps/e1l4/PreShip.scr::DontMoveUnlessIAmNear
-end
+}end
 
-doBriefing:
+//=========================================================================
+doBriefing: {
+//=========================================================================
 	$spy say A_14_ClausTalk01   //we are going to the...
 	$spy waittill saydone
 	$spy say A_14_ClausTalk02  //we must have those plans...
 	$spy waittill saydone
 	$spy say A_14_ClausTalk03  //sink da boat...
 	$spy waittill saydone
-end
+}end
 
-doBriefing2:
+//=========================================================================
+doBriefing2: {
+//=========================================================================
 	$spy say A_14_ClausTalk04  //these papers will...
 	$spy waittill saydone
 	$spy say A_14_Klaus_1A  // after you sabotage...
 	$spy waittill saydone
-end
+}end
 	
-
-DontBeCaught:
-	for(local.i = 1; local.i <= $deleteguy2.size; local.i++)
+//=========================================================================
+DontBeCaught: {
+//=========================================================================
+	for(local.i = 1; local.i <= $deleteguy2.size; local.i++) {
 		$deleteguy2[local.i] dontdropweapons
-End
-
-IfPullGunFail:
-	self dontdropweapons
-	while(self && (self.thinkstate != "attack" ||  self.thinkstate != attack))
-	{
-		wait 1.0
-		if(level.failongun == 0)
-			End
 	}
-	if(self != NIL && self != NULL)
-		thread FAILEDMISSION
-End
+}End
 
-FAILEDMISSION:
-	if(level.FAILEDMISSION == 1)
+//=========================================================================
+IfPullGunFail: {
+//=========================================================================
+	self dontdropweapons
+
+	while(self && (self.thinkstate != "attack" ||  self.thinkstate != attack)) {
+		wait 1.0	
+		if(level.failongun == 0) { End }
+	}
+
+	if(self != NIL && self != NULL) {
+		thread FAILEDMISSION
+	}
+}End
+
+//=========================================================================
+FAILEDMISSION: {
+//=========================================================================
+	if(level.FAILEDMISSION == 1) {
 		End
+	}
+
 	level.FAILEDMISSION = 1
 	level.sirenson = 1
 	wait 2
+
 	iprintln "You've blown your cover without getting on the ship!"
 	wait 3
+
 	iprintln "MISSION FAIL"
 	missionfailed
-End
+}End
 
-
-DeleteGuy1:
+//=========================================================================
+DeleteGuy1: {
+//=========================================================================
 	thread global/EntityCleanup.scr::EntityCleanup "pathintalkers0" 1
 	thread global/EntityCleanup.scr::EntityCleanup "t375" 1
 	thread global/EntityCleanup.scr::EntityCleanup "t375_passenger" 1
 	thread global/EntityCleanup.scr::EntityCleanup "deleteguy1" 1
 	thread global/EntityCleanup.scr::EntityCleanup "1stgateguard" 1
-End
+}End
 
-GateGuardDialogue:
-	
-	// "press 7 to show your papers" throbbing text...	
-	local.key = getboundkey1 "toggleitem"
-	local.string = (loc_convert_string ("Press " + local.key + " to show your papers."))
-	thread global/throbtext.scr::throbtext local.string 9999
+//=========================================================================
+GateGuardDialogue: {
+//=========================================================================
+	// Crimewavez
+	// "press 7 to show your papers" throbbing text...
+	if(level.gametype == 0) {
+		local.key = getboundkey1 "toggleitem"
+		local.string = (loc_convert_string ("Press " + local.key + " to show your papers."))
+		thread global/throbtext.scr::throbtext local.string 9999
+	}
 
 	$starttruck setcollisionentity $truckcollide2
 
 	local.placetospawn = $player.origin + (0 -1000 0)
-	
 	local.person = spawn models/human/german_wehrmact_soldier.tik origin local.placetospawn "targetname" "mrinvisible2"
 	local.person hide
+
 	$mrinvisible2.shuddup = 1
 	$mrinvisible2 exec global/enable_ai.scr
 	$mrinvisible2 notsolid
-	$mrinvisible2 turnto $player
+	
+	//Crimewavez.
+	//$mrinvisible2 turnto $player
+	$mrinvisible2 exec coop_mod/replace.scr::turnto
 	$mrinvisible2.origin = $spy.origin + (0 0 -50)
 	$mrinvisible2 waitthread askForPapers
-
 	thread KillPlayerIfFailPapers
 
 	//$1stgateguard playsound DFRGM_E1L4_CK3408 //use your uniform...
@@ -172,63 +193,67 @@ GateGuardDialogue:
 	$spy anim A_14_Claus_show_papers
 	$spy waittill animdone
 	$spy anim A_14_Claus_Opel_idle
-	if(level.GatePapersAccepted != 1)
-	{
+
+	if(level.GatePapersAccepted != 1) {
 		$1stgateguard say A_14_GermATalk2    //and you sir?
 		$1stgateguard waittill say
 	}
 
 	//$1stgateguard waitthread askForPapers
 	//thread keepAskingtillSeePapers
-	while(level.GatePapersAccepted != 1)
-		wait 0.3
+	while(level.GatePapersAccepted != 1) { wait 0.3 }
+	
 	$1stgateguard anim A_14_GermATalk4    //if you want to board the boat you will have to see the HM
 	$1stgateguard waittill animdone
+	
 	$spy lookat NULL
 	//$spy waitthread global/LoopAnim.scr::LoopAnimStop
     //$spy anim jeep_idle_drive //00A004_driversitstill
+	
 	$mrinvisible2 remove
-End
+}End
 
-KillPlayerIfFailPapers:
+//=========================================================================
+KillPlayerIfFailPapers: {
+//=========================================================================
+	while ($1stgateguard && (isalive $1stgateguard) &&
+		($1stgateguard.thinkstate != "attack")) { wait 1 }
 
-	while ($1stgateguard && (isalive $1stgateguard) && ($1stgateguard.thinkstate != "attack"))
-	{
-		wait 1
-	}
-	if (!$1stgateguard || !(isalive $1stgateguard))
-		end
+	if (!$1stgateguard || !(isalive $1stgateguard)) { end }
 	wait 1
 
-	if (level.GatePapersAccepted != 1)
-	{
+	if (level.GatePapersAccepted != 1){
 		waitthread global/throbtext.scr::throbtext_off
 		waitframe
 
 		$player takedamage
 		$player damage $world 99999 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
 	}
+}end
 
-end
-
-keepAskingtillSeePapers:
+//=========================================================================
+keepAskingtillSeePapers: {
+//=========================================================================
 	//	thread HACK
-	while(level.GatePapersAccepted != 1)
-	{
-		
+	while(level.GatePapersAccepted != 1) {
 		$1stgateguard anim A_14_GermATalk3
 		$1stgateguard waittill animdone
 		wait 10
 	}
-End
+}End
 
-HACK:
+//=========================================================================
+HACK: {
+//=========================================================================
 	wait 6
-	if(level.GatePapersAccepted != 1)
+	if(level.GatePapersAccepted != 1) {
 		level.GatePapersAccepted = 1
-End
+	}
+}End
 
-askForPapers:
+//=========================================================================
+askForPapers: {
+//=========================================================================
 	self disguise_level 1
 	self disguise_period 60
 	self disguise_range 3000
@@ -238,134 +263,167 @@ askForPapers:
 	
 	//wait 2
 	self exec global/enable_ai.scr
-end
+}end
 
-papersAccepted:
+//=========================================================================
+papersAccepted: {
+//=========================================================================
 	thread global/throbtext.scr::throbtext_off
 	level.GatePapersAccepted = 1
 	waitthread AIenable
-end
+}end
 
-AIenable:
+//=========================================================================
+AIenable: {
+//=========================================================================
 	$clerk ai_on
 	$clerkbuddy ai_on
 	$boatguard  ai_on
 	
-	for(local.j = 1; local.j < $deleteguy2.size; local.j++)
+	for(local.j = 1; local.j < $deleteguy2.size; local.j++) {
 		$deleteguy2[local.j] ai_on
-	for(local.i = 1; local.i < $ai_alarm.size; local.i++)
+	}
+
+	for(local.i = 1; local.i < $ai_alarm.size; local.i++) {
 		$ai_alarm[local.i] ai_on
-End
+	}
+}End
 
+//=========================================================================
+giveDisguise: {
+//=========================================================================
+	//Crimewavez
+	if(level.gametype == 0) {
+		$player playsound pickup_papers
+		$player playsound pickup_uniform
+		waitthread global/items.scr::add_item "papers_level1" noMessage
+		$player.has_disguise = 1
+		setcvar g_playermodel "Sc_AX_Ital_Inf" 
+	}
+	else {
+		exec coop_mod/replace.scr::playsound "pickup_papers"
+		exec coop_mod/replace.scr::playsound "pickup_uniform"
+		waitthread global/items.scr::add_item "papers_level1" noMessage
+	} 
+}end
 
-giveDisguise:
-	$player playsound pickup_papers
-	$player playsound pickup_uniform
-	waitthread global/items.scr::add_item "papers_level1" noMessage
-	$player.has_disguise = 1
-	setcvar g_playermodel "Sc_AX_Ital_Inf" 
-end
-
-handleDriver:
+//=========================================================================
+handleDriver: {
+//=========================================================================
 	$spy physics_off
 	$spy notsolid
 	$spy nodamage
 	$spy angles (0 0 0)
 	$spy attach $starttruck driver 1 
-//	$spy anim jeep_idle_drive //00A004_driversitstill
+	//	$spy anim jeep_idle_drive //00A004_driversitstill
 	$spy gun "none"	
 	$spy thread driverDriveStraight
-end
+}end
 
-//----------------------------------------------------------------------
 //animations for Claus as he drives ye olde truck 
-//----------------------------------------------------------------------
-
-driverTurnLeft local.degrees:
-	if (level.inLeftTrun == 1)
-		end
+//=========================================================================
+driverTurnLeft local.degrees: {
+//=========================================================================
+	if (level.inLeftTrun == 1) { end }
 	level.inLeftTurn = 1
 	$spy anim A_13_driver_turnleft
 	$spy waittill animdone
 	level.inLeftTurn = 0
-end
+}end
 
-driverTurnRight local.degrees:
-	if (level.inRightTurn == 1)
-		end
+//=========================================================================
+driverTurnRight local.degrees: {
+//=========================================================================
+	if (level.inRightTurn == 1) { end }
 	level.inRightTurn = 1
 	$spy anim A_13_driver_turnright
 	$spy waittill animdone
 	level.inRightTurn = 0 
-end
+}end
 
-driverDriveStraight:
-	if (level.driverDrivingStraight == 1)
-		end
+//=========================================================================
+driverDriveStraight: {
+//=========================================================================
+	if (level.driverDrivingStraight == 1) { end }
+
 	level.driverDrivingStraight = 1
 	$spy thread global/loopanim.scr::LoopAnim A_13_driver_drive
-end
+}end
 
-driverStopDriving:
+//=========================================================================
+driverStopDriving: {
+//=========================================================================
 	$spy thread global.loopanim.scr::LoopAnimStop
 	level.driverDrivingStraight = 0
-end
+}end
 
-//----------------------------------------------------------------------
-
-
-handlePlayer:
+//=========================================================================
+handlePlayer: {
+//=========================================================================
 	thread giveDisguise
 	level.opelpassengerseat = spawn script_origin
+
 	local.seatpos = $starttruck gettagposition "passenger"
 	local.seatpos[2] -= 45
+
 	level.opelpassengerseat.origin = local.seatpos
-
 	level.opelpassengerseat bind $starttruck
-	$player nodamage
-	$player notsolid
-//	$player physics_off
-	$player glue level.opelpassengerseat
 
-	$player.viewangles = (0 180 0)
-end
+	//Crimewavez
+	if(level.gametype == 0) {
+		$player nodamage
+		$player notsolid
+		//$player physics_off
+		$player glue level.opelpassengerseat
+		$player.viewangles = (0 180 0)
+	}
+	else {
+		for (local.i = 1; local.i <= $player.size; local.i++) {
+			if(local.player.dmteam != spectator && local.player.health > 0) {
+				local.player = $player[local.i]
+				local.player nodamage
+				local.player notsolid
+			}
+		}
+		exec coop_mod/replace.scr::glue level.opelpassengerseat
+		exec coop_mod/replace.scr::viewangles (0 180 0)
+	}
+}end
 
-startTruckLightsCheck:	
-	if (level.startTruckLights == 1 && level.RideOver == 0)
-	{
+//=========================================================================
+startTruckLightsCheck: {
+//=========================================================================
+	if (level.startTruckLights == 1 && level.RideOver == 0) {
 		$starttruck vehicleanim idlelights
 	}
-	else
-	{
+	else {
 		$starttruck vehicleanim idlenolights 
 	}
-end
+}end
 
-handleTruckGag:	
+//=========================================================================
+handleTruckGag:	{
+//=========================================================================
     thread intro_truck_jitter
 
-	while(level.Introdrivedone != 1)
-		wait 0.2
+	while(level.Introdrivedone != 1) { wait 0.2 }
+
 	$starttruck.corona = 0  //turn off coronas
 	waitframe
+	
 	$starttruck moveanim passengerdooropen
 	$player playsound opeltruck_snd_dooropen //sound when player opens door
 	wait 0.5
+	
 	$player playsound opeltruck_snd_doorclose  //sound when player closes door
-
 	waitthread DeleteGuy1
-
 	thread PlayerExitVehicle
-
 	level.RideOver = 1
 
 	thread startTruckLightsCheck
 
-
 	// take care of Klaus driving out
-
-	if ($starttruckleavepathA && $starttruckbackuppath && $starttruckleavepathB)
-	{
+	if ($starttruckleavepathA && $starttruckbackuppath && $starttruckleavepathB) {
 		wait 3
 
 		local.speed = 400
@@ -376,36 +434,36 @@ handleTruckGag:
 
 		$starttruck drive $starttruckbackuppath local.reverse_speed local.accel local.reached_dest local.look_ahead
 		$starttruck waittill drive
-
 		wait 0.5
 
 		$starttruck drive $starttruckleavepathA local.speed local.accel local.reached_dest local.look_ahead
 		wait 0.5
+
 		$gate1 open $player
 		$starttruck waittill drive
-
 		$starttruck drive $starttruckleavepathB local.speed local.accel local.reached_dest local.look_ahead
-
 		wait 1
+
 		$gate1 close
-
-//		$starttruck waittill drive
+		//$starttruck waittill drive
 	}
+}end
 
-end
-
-
-startTruckOptions:	//self refers to $starttruck
+//self refers to $starttruck
+//=========================================================================
+startTruckOptions: {
+//=========================================================================
 	$starttruck nodamage
-	if (level.startTruckLights == 1)
-	{
-		exec global/spotlight.scr::corona $starttruck "light left" // Turn on headlight coronas
-		exec global/spotlight.scr::corona $starttruck "light right"
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	if (level.startTruckLights == 1) {
+		//exec global/spotlight.scr::corona $starttruck "light left" // Turn on headlight coronas
+		//exec global/spotlight.scr::corona $starttruck "light right"
 	}
-end
+}end
 
-
-PlayerExitVehicle:
+//=========================================================================
+PlayerExitVehicle: {
+//=========================================================================
 	local.startpos = $player.origin
 	local.exitpos = $starttruck gettagposition "passenger_enter"
 	local.exitpos[2] = local.startpos[2]
@@ -418,12 +476,10 @@ PlayerExitVehicle:
 	$player.origin = local.exitpos
 
 	$starttruck notsolid
-
 	local.playerspot = spawn script_origin origin local.startpos
 	$player glue local.playerspot 0
 
 	local.disembark_time = 0.8
-
 	local.playerspot time local.disembark_time
 	local.playerspot moveto local.exitpos
 	local.playerspot move
@@ -431,60 +487,52 @@ PlayerExitVehicle:
 	wait local.disembark_time
 	$player unglue
 	drawhud 1
+}end
 
-end
-
-OpenGate1 local.vehicle:
+//=========================================================================
+OpenGate1 local.vehicle: {
+//=========================================================================
 	//iprintln "OpenGate1 Trigger lives!!!"
-	
 	//$starttruck fullstop
 	end
 	
-	if (local.vehicle == $starttruck)
-	{
+	if (local.vehicle == $starttruck) {
 		self remove
 
 		$starttruck modifydrive 0 500 156
 		$gate1 open $player
-
 		wait 2.5
 
 		$starttruck modifydrive 500 200 156
 	}
+}end
 
-end
-
-intro_truck_jitter:
-while (level.RideOver != 1)
-{
-	if (level.RideOver == 0)
-	{
-		waitexec global/earthquake.scr .3 .1 0 0
-    }
+//=========================================================================
+intro_truck_jitter: {
+//=========================================================================
+	while (level.RideOver != 1) {
+		if (level.RideOver == 0) {
+			waitexec global/earthquake.scr .3 .1 0 0
+    	}
 	
-    if (level.RideOver == 0)
-    {
-		waitexec global/earthquake.scr 3 .05 0 0
-    }
+    	if (level.RideOver == 0) {
+			waitexec global/earthquake.scr 3 .05 0 0
+    	}
 
-    if (level.RideOver == 0)
-    {
-		waitexec global/earthquake.scr .5 .15 0 0
-    }
+    	if (level.RideOver == 0) {
+			waitexec global/earthquake.scr .5 .15 0 0
+    	}
 
-    if (level.RideOver == 0)
-    {
-		waitexec global/earthquake.scr 1.5 .05 0 0
-    }
+    	if (level.RideOver == 0) {
+			waitexec global/earthquake.scr 1.5 .05 0 0
+    	}
 
-    if (level.RideOver == 0)
-    {
-		waitexec global/earthquake.scr .2 .2 0 0
-    }
+    	if (level.RideOver == 0) {
+			waitexec global/earthquake.scr .2 .2 0 0
+    	}
 
-    if (level.RideOver == 0)
-    {
-		waitexec global/earthquake.scr 3 .05 0 0
-    }
-}
-end
+    	if (level.RideOver == 0) {
+			waitexec global/earthquake.scr 3 .05 0 0
+    	}
+	}
+}end
