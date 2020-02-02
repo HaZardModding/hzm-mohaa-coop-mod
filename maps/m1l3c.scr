@@ -12,6 +12,7 @@ main:{
 	level.coopPrevMap = "m1l3b"					//chrissstrahl - set previouse map (for mom voteing)
 	level.coopNextMap = "briefing/briefing2"	//chrissstrahl - set next map (for mom voteing)
 	level.coop_equipmentDestroyed = 0			//chrissstrahl - specific var for this level elevator thread
+	level.coop_liftUsedByAPlayer = 0			//[200] chrissstrahl - used to handle spawnlocation update
 	waitthread coop_mod/main.scr::main 		//chrissstrahl - start coop mod extensions
 	
 	//chrissstrahl - setup stuff that is needed
@@ -25,6 +26,10 @@ main:{
 		
 		//chrissstrahl - place trigger in the elevator pit so that players jumping down can be teleported and do not get stuck
 		spawn trigger_multiple targetname coop_liftPit origin ( -5952 -5488 -50) setthread coop_liftPit
+		
+		//[200] chrissstrahl - we need a tiki origin to grab precise location, bsp bbox will prevent accurate return result
+		//spawn script_model model "models/items/Af_P_Lantern.tik" targetname coop_liftOrigin origin ( -5952 -5488 740) notsolid 1
+		spawn script_model model "models/fx/dummy.tik" targetname coop_liftOrigin origin ( -5952 -5488 740) notsolid 1
 	}
 	
 	
@@ -65,13 +70,6 @@ main:{
 	level.radiosound = spawn script_model model "fx/dummy.tik"
 	level.radiosound.origin = $radio3.origin
 	level.radiosound loopsound m1l2b_radio1 // I put this here, loopsounds to be played after level spawns- nate
-	
-	//chrissstrahl - setup the extra coop triggers
-	if(level.gametype != 0){
-		$coop_liftTop bind $elevator_origin
-		$coop_liftTop setsize ( -60 -60 0)  (60 60 4)
-		$coop_liftPit setsize ( -60 -60 -100)  (60 60 1)
-	}
 }end
 
 
@@ -303,7 +301,6 @@ radio_objective:{
 		
 		//chrissstrahl - ai gets stuck in elevator and breaks the script....
 		level.coop_equipmentDestroyed = 1					//chrissstrahl - allow lift to move now
-		thread coop_mod/spawnlocations.scr::m1l3c_update1	//chrissstrahl - update spawnpoints for coop
 	}
 }end
 
@@ -468,6 +465,15 @@ end
 
 //*** Elevator Setup
 elevatorprep:
+	//chrissstrahl - setup the extra coop triggers
+	//[200] chrissstrahl - fixed attaching to wrong entity
+	if(level.gametype != 0){
+		$coop_liftTop bind $elevator_cab
+		$coop_liftTop setsize ( -60 -60 0)  (60 60 4)
+		$coop_liftPit setsize ( -60 -60 -100)  (60 60 1)
+		$coop_liftOrigin bind $elevator_cab
+	}
+
 	//*** Switch Position
 	$elevator_switch_pulse bind $elevator_cab
 	$elevator_switch bind $elevator_cab
@@ -500,144 +506,190 @@ goto elevator_loop
 end
 
 elevator_loop:
-	local.clip1 = ( -5760 -5528 752)
-	local.clip2 = ( -5808 -5480 258)
-	local.clip3 = ( -5804 -5484 -20)
+	//[200] chrissstrahl - no longer needed
+	//local.clip1 = ( -5760 -5528 752)
+	//local.clip2 = ( -5808 -5480 258)
+	//local.clip3 = ( -5804 -5484 -20)
 
-	$elevator_switch anim off
-	//$elevator_reset1 waittill trigger
-	$clip2 notsolid
+//TOP///////////////////////////////////////////MOVING DOWN	
+	{ //[200] chrissstrahl - used for grouping
+		$elevator_switch anim off
+		$elevator_top waittill trigger
+		
+		//iprintlnbold_noloc("DEV: top going down")
 
-	$elevator_top waittill trigger
+		//[200] chrissstrahl - update spawnloacations once
+		if(level.coop_liftUsedByAPlayer == 0){
+			level.coop_liftUsedByAPlayer = 1
+			$elevator_switch_pulse hide
+			$elevator_switch show
+			if( level.gametype != 0){
+				thread coop_mod/spawnlocations.scr::m1l3c_update1	//chrissstrahl - update spawnpoints for coop
+			}
+		}
+		
+		//[200] chrissstrahl - move player inside lift
+		//[200] chrissstrahl - updated teleportToOnTouch and adjusted parameters $coop_liftOrigin
+		$clip1 exec coop_mod/replace.scr::solid $coop_liftOrigin
+		$clip1 exec coop_mod/replace.scr::teleportToOnTouch $coop_liftOrigin
+		
+		$elevator_switch anim turn
+		$elevator_switch anim waittill animdone
+		$elevator_switch anim on
 
-//moving down//////////////////////////////chrissstrahl
+		$elevator_gate_1 playsound elevator_gate
+		$elevator_gate_1 moveup 70
+		$elevator_gate_1 waitmove
 
-	$elevator_switch show
-	$elevator_switch_pulse hide
+		wait 1
+
+		$elevator_cab playsound elevator_start wait
+
+		wait .5
+
+		$elevator_cab playsound elevator_run
+		$elevator_cab moveto $elevator_way2
+		$elevator_cab waitmove
+		
+		//[200] chrissstrahl - allow entering lift now
+		$clip2 notsolid
+		$clip2 exec coop_mod/replace.scr::stopOnTouch
+
+		wait 1
+
+		$elevator_gate_2 playsound elevator_gate
+		$elevator_gate_2 movedown 70
+		$elevator_gate_2 waitmove
+
+		$elevator_switch anim off
+	}
+
+//MIDDLE///////////////////////////////////////////MOVING DOWN
+	{ //[200] chrissstrahl - used for grouping
+		$elevator_switch anim off
+		$elevator_middle waittill trigger
+		
+		//iprintlnbold_noloc("DEV: middle going down")
+		
+		//[200] chrissstrahl - move player inside lift
+		//[200] chrissstrahl - updated teleportToOnTouch and adjusted parameters $coop_liftOrigin
+		$clip2 exec coop_mod/replace.scr::solid $coop_liftOrigin
+		$clip2 exec coop_mod/replace.scr::teleportToOnTouch $coop_liftOrigin
+		
+		$elevator_switch anim turn
+		$elevator_switch anim waittill animdone
+		$elevator_switch anim on
+
+		$elevator_gate_2 playsound elevator_gate
+		$elevator_gate_2 moveup 70
+		$elevator_gate_2 waitmove
+
+		wait 1
+
+		$elevator_cab playsound elevator_start wait
+
+		wait .5
+
+		$elevator_cab playsound elevator_run
+		$elevator_cab moveto $elevator_way3
+		$elevator_cab waitmove
+		
+		//[200] chrissstrahl - allow entering lift now
+		$clip3 notsolid
+		$clip3 exec coop_mod/replace.scr::stopOnTouch	
+
+		wait 1
+
+		$elevator_gate_3 playsound elevator_gate
+		$elevator_gate_3 movedown 70
+		$elevator_gate_3 waitmove
+	}
 	
-	$clip1 exec coop_mod/replace.scr::solid local.clip1 //chrissstrahl - coop replacement
-	$clip1 exec coop_mod/replace.scr::teleportToOnTouch $elevator_cab NIL (0 0 -70) //chrissstrahl - coop teleport player touching clip into lift
-	$elevator_switch anim turn
-	$elevator_switch anim waittill animdone
-	$elevator_switch anim on
+//BOTTOM///////////////////////////////////////////MOVING UP
+	{ //[200] chrissstrahl - used for grouping
+		$elevator_switch anim off
+		$elevator_bottom waittill trigger
+		
+		//iprintlnbold_noloc("DEV: bottom going up")
+		
+		//[200] chrissstrahl - move player inside lift
+		//[200] chrissstrahl - updated teleportToOnTouch and adjusted parameters $coop_liftOrigin
+		$clip3 exec coop_mod/replace.scr::solid $coop_liftOrigin
+		$clip3 exec coop_mod/replace.scr::teleportToOnTouch $coop_liftOrigin
+		
+		$elevator_switch anim turn
+		$elevator_switch anim waittill animdone
+		$elevator_switch anim on
 
-	$elevator_gate_1 playsound elevator_gate
-	$elevator_gate_1 moveup 70
-	$elevator_gate_1 waitmove
+		$elevator_gate_3 playsound elevator_gate
+		$elevator_gate_3 moveup 70
+		$elevator_gate_3 waitmove
+		
+		wait 1
+		
+		$elevator_cab playsound elevator_start wait
+		
+		wait .5
+		
+		$elevator_cab playsound elevator_run
+		$elevator_cab moveto $elevator_way2
+		$elevator_cab waitmove
+		
+		//[200] chrissstrahl - allow entering lift now
+		$clip2 notsolid
+		$clip2 exec coop_mod/replace.scr::stopOnTouch	
 
-	wait 1
-
-	$elevator_cab playsound elevator_start wait
-
-	wait .5
-
-	$elevator_cab playsound elevator_run
-	$elevator_cab moveto $elevator_way2
-	$elevator_cab waitmove
-
-	wait 1
-
-	$elevator_gate_2 playsound elevator_gate
-	$elevator_gate_2 movedown 70
-	$elevator_gate_2 waitmove
-
-	$elevator_switch anim off
-	//$elevator_reset2 waittill trigger
-	$clip1 notsolid
-
-	$elevator_middle waittill trigger
-	$clip2 exec coop_mod/replace.scr::solid local.clip2
-	$clip2 exec coop_mod/replace.scr::teleportToOnTouch $elevator_cab NIL (0 0 -70) //chrissstrahl - coop teleport player touching clip into lift
+		wait 1
+		
+		$elevator_gate_2 playsound elevator_gate
+		$elevator_gate_2 movedown 70
+		$elevator_gate_2 waitmove
+	}
+//MIDDLE///////////////////////////////////////////MOVING UP
+	{ //[200] chrissstrahl - used for grouping
+		$elevator_switch anim off
+		$elevator_middle waittill trigger
+		
+		//iprintlnbold_noloc("DEV: middle going up")
 	
-	$elevator_switch anim turn
-	$elevator_switch anim waittill animdone
-	$elevator_switch anim on
+		//[200] chrissstrahl - move player inside lift
+		//[200] chrissstrahl - updated teleportToOnTouch and adjusted parameters $coop_liftOrigin
+		$clip2 exec coop_mod/replace.scr::solid $coop_liftOrigin
+		$clip2 exec coop_mod/replace.scr::teleportToOnTouch $coop_liftOrigin
+	
+		$elevator_switch anim turn
+		$elevator_switch anim waittill animdone
+		$elevator_switch anim on
+		
+		$elevator_gate_2 playsound elevator_gate
+		$elevator_gate_2 moveup 70
+		$elevator_gate_2 waitmove
+		
+		$elevator_cab playsound elevator_start wait
+		
+		wait .5
+		
+		$elevator_cab playsound elevator_run
+		$elevator_cab moveto $elevator_way1
+		$elevator_cab waitmove
+		$elevator_cab playsound elevator_stop
+		
+		//[200] chrissstrahl - allow entering lift now
+		$clip1 notsolid
+		$clip1 exec coop_mod/replace.scr::stopOnTouch
 
-	$elevator_gate_2 playsound elevator_gate
-	$elevator_gate_2 moveup 70
-	$elevator_gate_2 waitmove
-
-	wait 1
-
-	$elevator_cab playsound elevator_start wait
-
-	wait .5
-
-	$elevator_cab playsound elevator_run
-	$elevator_cab moveto $elevator_way3
-	$elevator_cab waitmove
-
-	wait 1
-
-	$elevator_gate_3 playsound elevator_gate
-	$elevator_gate_3 movedown 70
-	$elevator_gate_3 waitmove
-
-	//$elevator_reset3 waittill trigger
-	$clip2 notsolid
-	
-	$elevator_bottom waittill trigger
-	$clip3 exec coop_mod/replace.scr::solid local.clip3
-	$clip3 exec coop_mod/replace.scr::teleportToOnTouch $elevator_cab NIL (0 0 -70) //chrissstrahl - coop teleport player touching clip into lift
-	$elevator_switch anim turn
-	$elevator_switch anim waittill animdone
-	$elevator_switch anim on
-	
-	$elevator_gate_3 playsound elevator_gate
-	$elevator_gate_3 moveup 70
-	$elevator_gate_3 waitmove
-
-	wait 1	
-	
-	$elevator_cab playsound elevator_start wait
-	
-	wait .5
-	
-	$elevator_cab playsound elevator_run
-	$elevator_cab moveto $elevator_way2
-	$elevator_cab waitmove
-
-	wait 1
-	
-	$elevator_gate_2 playsound elevator_gate
-	$elevator_gate_2 movedown 70
-	$elevator_gate_2 waitmove
-
-	//$elevator_reset2 waittill trigger
-	$clip3 notsolid
-	
-	$elevator_middle waittill trigger
-	$clip2 exec coop_mod/replace.scr::solid local.clip2
-	$clip2 exec coop_mod/replace.scr::teleportToOnTouch $elevator_cab NIL (0 0 -70) //chrissstrahl - coop teleport player touching clip into lift
-	$elevator_switch anim turn
-	$elevator_switch anim waittill animdone
-	$elevator_switch anim on
-	
-	$elevator_gate_2 playsound elevator_gate
-	$elevator_gate_2 moveup 70
-	$elevator_gate_2 waitmove
-	
-	$elevator_cab playsound elevator_start wait
-	
-	wait .5
-	
-	$elevator_cab playsound elevator_run
-	$elevator_cab moveto $elevator_way1
-	$elevator_cab waitmove
-	$elevator_cab playsound elevator_stop
-
-	wait 1
-	
-	$elevator_gate_1 playsound elevator_gate
-	$elevator_gate_1 movedown 70
-	$elevator_gate_1 waitmove
-	
+		wait 1
+		
+		$elevator_gate_1 playsound elevator_gate
+		$elevator_gate_1 movedown 70
+		$elevator_gate_1 waitmove
+	}
 goto elevator_loop
 
 //=========================================================================
 elevator_failsafe:{
 //=========================================================================
-	if(level.gametype != 0){ end } //chrissstrahl - don't do this in coop - we are looping the lift up and down all the time
+	if(level.gametype != 0){ end } //chrissstrahl - don't do this in coop - we have a warper in place moving player inside lift if they want to
 
 	$elevator_switch anim turn
 	$elevator_switch anim waittill animdone
@@ -951,40 +1003,35 @@ coop_setup:{
 	$ossmobiletrig setsize ( -312 -312 -20) (312 312 20)
 }
 
+//[200] chrissstrahl - rewrote this func entierly
 //=========================================================================
 coop_liftTop:{
 //=========================================================================
-	if( parm.other != NULL ){
-		local.awaypos = $elevator_origin.origin
-		local.awaypos[2] += -70
-		parm.other origin local.awaypos
-iprintlnbold("DEV: coop_liftTop triggered")
-		
-		for (local.iOther = 1;local.iOther <= $player.size;local.iOther++){
-			local.otherPlayer =  $player[local.iOther]
-			if( local.otherPlayer != NULL && local.player == parm.other ){
-				exec coop_mod/main.scr::playerMakeSolidAsap local.i
-				end
-			}
+	local.activator = parm.other
+
+	if( local.activator != NIL && local.activator != NULL ){
+		local.awaypos = $coop_liftOrigin.origin
+		if(local.awaypos != NIL){
+			local.activator origin local.awaypos
 		}
+		exec coop_mod/main.scr::playerMakeSolidAsap local.activator
+		//iprintlnbold_noloc("DEV: coop_liftTop triggered ("+local.awaypos+")")
 	}
 }
 
+//[200] chrissstrahl - rewrote this func entierly
 //=========================================================================
 coop_liftPit:{
 //=========================================================================
-	if( parm.other != NULL ){
-iprintlnbold("DEV: coop_liftPit triggered")
-		local.awaypos = ( -5804 -5484 -20)
-		parm.other origin local.awaypos
-		
-		for (local.iOther = 1;local.iOther <= $player.size;local.iOther++){
-			local.otherPlayer =  $player[local.iOther]
-			if( local.otherPlayer != NULL && local.player == parm.other ){
-				exec coop_mod/main.scr::playerMakeSolidAsap local.i
-				end
-			}
+	local.activator = parm.other
+
+	if( local.activator != NIL && local.activator != NULL ){
+		local.awaypos = $coop_liftOrigin.origin
+		if(local.awaypos != NIL){
+			local.activator origin local.awaypos
 		}
+		exec coop_mod/main.scr::playerMakeSolidAsap local.activator
+		//iprintlnbold_noloc("DEV: coop_liftPit triggered ("+local.awaypos+")")
 	}
 }
 
