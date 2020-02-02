@@ -1,17 +1,17 @@
-//chrissstrahl - 30.12.2019 started modifying for coop
-InitMaproom:
-	
+//============================================================
+InitMaproom: {
+//============================================================	
 	spawn trigger_relay targetname "retaliateTrigger"
 	
 	level.mapRoomEntered = 0
 	println ("DEBUG:  mapRoomEntered = " + mapRoomEntered )
+	
 	level.thrownsmokebomb = 0
 	level.openeddooronce = 0
 	level.maproomdooractive = 1
 
 	//$maproomdoorguy gun "MP40"
 	//$maproomguy1 gun "walter p38"
-	
 	$maproomguy1 dontdropweapons
 	
 	//$maproomguy2 gun "MP40"
@@ -42,52 +42,51 @@ InitMaproom:
 
 	thread alarmAware
 	$maproomdoor lock
+}end
 
-end
-
-//-----------------------------------------------------
-alarmAware:
-	while (level.sirenson != 1 && $maproomdoorguy && isAlive $maproomdoorguy)
-		wait 1
+//============================================================
+alarmAware: {
+//============================================================
+	while (level.sirenson != 1 && $maproomdoorguy &&
+		isAlive $maproomdoorguy) { wait 1 }
+		
 	level.openeddooronce = 20
-end
+}end
 
-//----------------------------------------------------------------------
-invisibleMan:
+//============================================================
+invisibleMan: {
+//============================================================
 	//local.placetospawn = $player.origin + (0 -1000 0) //chrissstrahl
-	local.placetospawn = (-4592 72 64) //chrissstrahl - based on info_player_start origin - because we might not have a player spawned yet (if dedicated server)
+	local.placetospawn = ( -4592 72 64 ) //chrissstrahl - based on info_player_start origin - because we might not have a player spawned yet (if dedicated server)
 	local.person = spawn models/human/german_wehrmact_soldier.tik origin local.placetospawn "targetname" "mrinvisible"
 	local.person hide
+
 	//iprintln $mrinvisible
 	$mrinvisible physics_off
 	$mrinvisible holster
 	$mrinvisible notsolid
 	$mrinvisible.origin = "-3312 5080 96"
-	
 	//$mrinvisible turnto $player //chrissstrahl
 	//$mrinvisible lookat $player //chrissstrahl
-	$mrinvisible thread coop_mod/replace.scr:: //chrissstrahl
+	$mrinvisible thread coop_mod/replace.scr::turnto //chrissstrahl
 	$mrinvisible thread coop_mod/replace.scr::lookat //chrissstrahl
-	
 	$mrinvisible disguise_level 1
 	$mrinvisible disguise_period 15
 	$mrinvisible disguise_range 1000
 	$mrinvisible type_attack alarm
 	$mrinvisible type_disguise none
-	
 	$mrinvisible thread invisibleAdvice
-end
+}end
 
-//----------------------------------------------------------------------
-invisibleAdvice:
-	while(self && (self.thinkstate != "attack" ||  self.thinkstate != attack))
-		wait 1
+//============================================================
+invisibleAdvice: {
+//============================================================
+	while(self && (self.thinkstate != "attack" ||
+	  self.thinkstate != attack)) { wait 1 }
 
-
-	if !(self && isAlive self)
-		end
-	
+	if !(self && isAlive self) { end }	
 	wait .5	
+
 	$maproomdoorguy exec global/enable_ai.scr
 	$maproomguy1 exec global/enable_ai.scr
 	$maproomguy2 exec global/enable_ai.scr
@@ -97,32 +96,28 @@ invisibleAdvice:
 
 	// Just make sure if we open the door again from in here, we don't start our animations again
 	level.openeddooronce = 20
-	
 	self remove
+}end
 
-end
-
-//------------------------------------------------------
-OpenMapRoomDoor:
+//============================================================
+OpenMapRoomDoor: {
+//============================================================
 	$maproomguy1 	ai_on
 	$maproomguy2 	ai_on
 	$maproomdoorguy	ai_on
 	$maproomguy1 	show
 	$maproomguy2 	show
 	$maproomdoorguy	show
-
-
+	
 	thread invisibleMan
 
-	if (level.abortMapRoomGag == 1)
+	if (level.abortMapRoomGag == 1) {
 		level.openeddooronce = 9999
+	}
 	
-	if(level.maproomdontopenflag == 1)
-		End
+	if(level.maproomdontopenflag == 1) { End }
 
-	if (level.maproomdooractive == 1)
-	{
-
+	if (level.maproomdooractive == 1) {
 		level.maproomdooractive = 0
 		$maproomdoor unlock
 		
@@ -130,23 +125,20 @@ OpenMapRoomDoor:
 		//$maproomdoor open $player //chrissstrahl
 		$maproomdoor open local.player //chrissstrahl
 
-
-		if (level.openeddooronce < 2)
-		{
+		if (level.openeddooronce < 2) {
 			// iprintln level.openeddooronce
-			if (isalive $maproomdoorguy)
-			{
+			
+			if (isalive $maproomdoorguy) {
 				$maproomdoorguy anim A_14_GermTalk
 				wait 0.1
+
 				$maproomdoorguy say A_14_Germ_mapTalk
 				//$maproomdoorguy playsound DENGM_E1L4_GO8306
-
 				//$maproom playsound DENGM_E1L4_GO5406  // "What is it?  You are not allowed in here.  Go away!"
 				// FIXME: does not play sound but does do DFRGM_E1L4_CK3404 
 			}
 		}
-		else
-		{
+		else {
 			trigger $musicTransitionCoverBlown
 			$maproomdoorguy exec global/enable_ai.scr
 			$maproomguy1 exec global/enable_ai.scr
@@ -165,39 +157,34 @@ OpenMapRoomDoor:
 		}
 	}
 
-
 	wait 4
-	level.maproomdooractive = 1
-	
+	level.maproomdooractive = 1	
 	iprintlnbold_noloc("DEV: $maproomdoor locked")
-	
+
 	$maproomdoor lock
 	$maproomdoor close
-	if(level.openeddooronce == 0)
-	{
+
+	if(level.openeddooronce == 0) {
 		//$maproomguy2.origin exec global/walkto.scr $maproom.origin
 		//$maproomguy2 waittill movedone
 		// HACK FIX FOR GETTING HIM OFF TABLE
 		level.maproomdontopenflag = 1
 		wait 0.7
+
 		$maproomguy2.origin =  $maproomguy2.startorigin
 		level.maproomdontopenflag = 0
 	}
+
 	$maproomdoor unlock
-	
-	iprintlnbold_noloc("DEV: $maproomdoor unlocked")
-	
+	iprintlnbold_noloc("DEV: $maproomdoor unlocked")	
 	level.openeddooronce++
+}end
 
-
-end
-
-//------------------------------------------------------------------------------------
-GuysDead:
-	while(1)
-	{
-		if(!isalive $maproomdoorguy && !isalive $maproomguy1 && !isalive $maproomguy2)
-		{
+//============================================================
+GuysDead: {
+//============================================================
+	while(1) {
+		if(!isalive $maproomdoorguy && !isalive $maproomguy1 && !isalive $maproomguy2) {
 			println "Map Guys Dead"
 			//$player.has_disguise = 1 //chrissstrahl
 			thread coop_mod/replace.scr::has_disguise 1 //chrissstrahl
@@ -207,10 +194,11 @@ GuysDead:
 		}
 		waitframe
 	}
-End
+}End
 
-//------------------------------------------------------------------------------------
-EnterMapRoom:
+//============================================================
+EnterMapRoom: {
+//============================================================
 	level.mapRoomEntered = 1
 	$maproomdoorguy exec global/enable_ai.scr
 	$maproomguy1 exec global/enable_ai.scr
@@ -218,24 +206,19 @@ EnterMapRoom:
 
 	// Just make sure if we open the door again from in here, we don't start our animations again
 	level.openeddooronce = 20
-
-
 	$maproomdoorguy attackplayer
 	$maproomguy1 attackplayer
 	$maproomguy2 attackplayer
 
 	self remove
+}end
 
-end
-
-//-------------------------------------------------------------------------
-ObjectiveStealDocuments:
-
-	if (level.skipobjmaproom == 1)
-	{
+//============================================================
+ObjectiveStealDocuments: {
+//============================================================
+	if (level.skipobjmaproom == 1) {
 		$player.origin = "-3320 4102.66 -95.88"
 		$player.has_disguise = 0
-
 		end
 	}
 
@@ -244,19 +227,20 @@ ObjectiveStealDocuments:
 	$documents delete
 	thread alarmGuy
 	thread CleanUpDeleteguy2
-End
+}End
 
-CleanUpDeleteguy2:
+//============================================================
+CleanUpDeleteguy2: {
+//============================================================
 	thread global/EntityCleanup.scr::EntityCleanup "clerkbuddy" 1
 	thread global/EntityCleanup.scr::EntityCleanup "deleteguy2" 1
 	thread global/EntityCleanup.scr::EntityCleanup "1stgateguard" 1
 	thread global/EntityCleanup.scr::EntityCleanup "drunkguy" 1
-End
+}End
 
-
-//-------------------------------------------------------------------------
-alarmGuy:
-
+//============================================================
+alarmGuy: {
+//============================================================
 	$maproomheyguy show
 	$maproomheyguy solid
 	$maproomheyguy ai_on
@@ -281,10 +265,11 @@ alarmGuy:
 	// println "DEBUG: alarm sequence done"
 	$maproomheyguy waitexec global/enable_ai.scr
 	waitframe
+
 	$maproomheyguy type_attack "alarm"
 	// iprintln "ALARM ACTIVATED"
 	
 	$maproomheyguy takedamage
 	$maproomheyguy attackplayer
-end
+}end
 	

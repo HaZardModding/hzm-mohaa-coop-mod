@@ -1,23 +1,23 @@
-//chrissstrahl - 30.12.2019 started modifying for coop
+//============================================================
+main: {
+//============================================================
+	level.script = "maps/e1l4.scr" 							//chrissstrahl
+	level.coopPrevMap = "e1l3"								//chrissstrahl - set previouse map (for mom voteing)
+	level.coopNextMap = "e2l1"								//chrissstrahl - set next map (for mom voteing)
+	level.coop_threatbias = ignoreme						//Crimewavez - For now only way to manage cover from start of scripts.
+	//level.coop_forcePrimary = weapons/Uk_W_Vickers.tik 	//chrissstrahl - make players spawn with this weapon from start
+	//level.coop_forceSecondary = weapons/Uk_W_Vickers.tik 	//chrissstrahl - make players spawn with this weapon from start
+	level.coop_disableSpawnWarper	= TRUE					//chrissstrahl - disable respawn warper
+	waitthread coop_mod/main.scr::main 						//chrissstrahl - start coop mod
+	//thread coop_mod/butler.scr::e1l4_start				//chrissstrahl - remove stuff that we don't need in mp
 
-// el14.scr
-//============================================================
-main:{
-//============================================================
-	level.script = "maps/e1l4.scr" //chrissstrahl
 	exec global/auto.scr e1l4
 	waitexec maps/e1l4/hacks.scr
-	
-	level.coopPrevMap = "e1l3"				//chrissstrahl - set previouse map (for mom voteing)
-	level.coopNextMap = "e2l1"				//chrissstrahl - set next map (for mom voteing)
-	//level.coop_forcePrimary = weapons/Uk_W_Vickers.tik //chrissstrahl - make players spawn with this weapon from start
-	//level.coop_forceSecondary = weapons/Uk_W_Vickers.tik //chrissstrahl - make players spawn with this weapon from start
-	
-	level.coop_disableSpawnWarper	= TRUE	//chrissstrahl - disable respawn warper
-	waitthread coop_mod/main.scr::main 		//chrissstrahl - start coop mod
-	//thread coop_mod/butler.scr::e1l4_start	//chrissstrahl - remove stuff that we don't need in mp
 
-	level waittill prespawn
+	//Crimewavez - coop compatibility.
+	//level waittill prespawn
+	waitthread coop_mod/replace.scr::waitTillPrespawn
+
 	exec global/ambience.scr e1l4
 	
 	// this is what scales the enemy health, 1.0 = 100%
@@ -38,7 +38,10 @@ main:{
 	waitthread InitLevel
 
 	$mg42 thread initMg42
-	level waittill spawn
+
+	//Crimewavez - coop compatibility.
+	//level waittill spawn
+	waitthread coop_mod/replace.scr::waitForPlayer
 
 	// have hack, have gun...
 	if (level.skipintro != 0 || level.skipobtainpapers != 0 || level.skipboardship != 0 || 
@@ -64,8 +67,11 @@ main:{
 	// Intro
 	waitthread maps/e1l4/Intro.scr::DoIntro
 
-	exec global/autosave.scr level.autosave	//"Arrival"
-	level.autosave++
+	//Crimewavez - Only in SP.
+	if(level.gametype == 0) {
+		exec global/autosave.scr level.autosave	//"Arrival"
+		level.autosave++
+	}
 
 	// Find a way aboard the ship...
 	waitthread global/objectives.scr::add_objectives level.objObtainPapers 2
@@ -87,8 +93,11 @@ main:{
 	level.playerBoardedShip = 1
 	waitthread global/objectives.scr::add_objectives level.objObtainPapers 3
 
-	exec global/autosave.scr level.autosave	//"All Aboard"
-	level.autosave++
+	//Crimewavez - Only in SP.
+	if(level.gametpye == 0) {
+		exec global/autosave.scr level.autosave	//"All Aboard"
+		level.autosave++
+	}
 
 	// Steal Documents
 	waitthread global/objectives.scr::add_objectives level.objStealDocuments 2
@@ -132,8 +141,12 @@ main:{
 
 	// Explode the ship
 	waitthread maps/e1l4/SunkShip.scr::ExplodeShip
-	exec global/autosave.scr level.autosave	//"Scuttled"
-	level.autosave++
+	
+	//Crimewavez - only in SP.	
+	if(level.gametype == 0)  {
+		exec global/autosave.scr level.autosave	//"Scuttled"
+		level.autosave++
+	}
 
 	thread autoSaveAtBoatExit
 	level.abortCompassTracker = 1
@@ -146,8 +159,11 @@ main:{
 	waitthread maps/e1l4/PostShip.scr::ObjectiveReturnToSpy
 	waitthread global/objectives.scr::add_objectives level.objReturnToSpy 3
 
-	exec global/autosave.scr level.autosave	//"The Edge of Town"
-	level.autosave++
+	//Crimewavez - Only in SP, as you can guess.
+	if(level.gametype == 0) {
+		exec global/autosave.scr level.autosave	//"The Edge of Town"
+		level.autosave++
+	}
 
 	// Escape!
 	waitthread global/objectives.scr::add_objectives level.objEscape 2
@@ -402,7 +418,10 @@ autoSaveAtBoatExit:{
 	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "deleteguy4spawner"
 	local.trigger waittill trigger
 	
-	exec global/autosave.scr level.autosave	//"The Getaway"
-	level.autosave++
+	//Crimewavez - and again, only in SP, who could predict it.
+	if(level.gametype == 0) { 
+		exec global/autosave.scr level.autosave	//"The Getaway"
+		level.autosave++
+	}
 }end 
 
