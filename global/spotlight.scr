@@ -51,7 +51,8 @@ main:
 		//println ("The spotlight script does not work correctly in multiplayer" )
 	   //	end
 	//}
-
+	//DK - check player closest to spotlight
+	thread player_closest_to_spotlight
 	
 
 	if (level.spotrespondtime == NIL)
@@ -175,8 +176,11 @@ main:
 
 	level waittill spawn
 
-	if (level.spottarget == NIL)
-	level.spottarget = waitthread player_closest_to_spotlight
+	if (level.spottarget == NIL){
+		//DK - thread to get player closest to spotlight
+		thread player_closest_to_spotlight
+	}
+
 
 	//DK -  changed player and add error check
 	//while (isalive $player)
@@ -581,13 +585,16 @@ end
 
 light_corona:
 
+//DK - thread to get player closest to spotlight
+thread player_closest_to_spotlight
+
 
 	while (self.checkdeath == 0)
 	{	
 		
-		level.spottarget = $player[1]
+		
 
-		if(level.spottarget != NULL)
+		if(level.spottarget != NULL && level.spottarget != NIL)
 		{
 
 		if (!self.flare)
@@ -702,10 +709,19 @@ aimspot:
 	local.angles[1] = 0
 	self.bulb.angles = local.angles
 
+	//DK - wait to get the player
+	while(local.spottargetorigin == NIL)
+	{
+		if(level.spottarget != NIL && level.spottarget != NULL)
+		{
 
-	local.spottarget = level.spottarget
-	local.spottargetorigin = level.spottarget.origin
+		local.spottargetorigin = level.spottarget.origin
+		local.spottarget = level.spottarget
 
+		}
+
+		waitframe
+	}
 //	if (level.spot
 	if (vector_length(self.spotlight.origin - local.spottargetorigin) < self.lightdist)
 	{
@@ -988,9 +1004,10 @@ corona local.obj local.tag local.offset local.bothsides local.magnitude:
 	while (local.obj && (isalive local.obj) && (local.obj.corona == 1))
 	{
 
-		//DK - Added player for corona
-		level.spottarget = $player[1]
+		//DK - thread to get player closest to spotlight
+		thread player_closest_to_spotlight
 
+		
 		if(level.spottarget != NULL)
 		{
 
@@ -1041,8 +1058,8 @@ end
 // light left   light right
 deadcorona local.obj local.tag: 
 
-	//DK - Added player for truck
-	level.spottarget = $player[1]
+	//DK - thread to get player closest to spotlight
+	thread player_closest_to_spotlight
 
 	// local.obj is the object with the light on it
 	// local.tag is the tag where the light appears
@@ -1111,7 +1128,9 @@ end
 // a larger scaled corona befitting a train
 traincorona local.obj local.tag: 
 
-	
+	//DK - thread to get player closest to spotlight
+	thread player_closest_to_spotlight
+
 
 	// local.obj is the object with the light on it
 	// local.tag is the tag where the light appears
@@ -1129,9 +1148,7 @@ traincorona local.obj local.tag:
 	while (local.obj.corona == 1)
 	{
 
-		//DK - Added player for train
-		level.spottarget = $player[1]
-
+		
 		//DK - check for player error
 		if(level.spottarget != NULL && level.spottarget.origin != NIL)
 		{
@@ -1194,53 +1211,53 @@ end
 
 player_closest_to_spotlight:
 
-for (local.i = 1; local.i <= $player.size; local.i++) {
-	local.player = $player[local.i];
+if(level.is_running == 1)
+end
 
-	local.spot_1 = vector_length(local.player.origin - $spotlight[1].origin)
-	local.spot_2 = vector_length(local.player.origin - $spotlight[2].origin)
-	local.spot_3 = vector_length(local.player.origin - $spotlight[3].origin)
+level.is_running = 1
 
-	if(!local.distance)
-	{
-		if(local.spot_1 < local.spot_2 && local.spot_1 < local.spot_3)
+local.index = 1
+
+while(1)
+{
+
+waitframe
+
+	local.distance = NIL
+
+	for (local.i = 1; local.i <= $player.size; local.i++) {
+		local.player = $player[local.i];
+
+		if(local.player == NULL)
+		end
+
+		if($spotlight[local.index] == NULL)
+		end
+
+		local.spotlight_distance = vector_length(local.player.origin - $spotlight[local.index].spotlight.origin)
+
+		if(local.distance == NIL)
 		{
-			local.distance = local.spot_1
+			local.distance = local.spotlight_distance
+			level.spottarget = local.player
 		}
-
-		if(local.spot_2 < local.spot_1 && local.spot_2 < local.spot_3)
+		else
 		{
-			local.distance = local.spot_2
+			if(local.spotlight_distance < local.distance)
+			{
+				local.distance = local.spotlight_distance
+				level.spottarget = local.player
+			}
 		}
-
-		if(local.spot_3 < local.spot_2 && local.spot_3 < local.spot_1)
-		{
-			local.distance = local.spot_3
-		}
-
-		level.spottarget = local.player
+				
 	}
-	else
-	{
-		if(local.spot_1 < local.distance && local.spot_1 < local.spot_2 && local.spot_1 < local.spot_3)
-		{
-			local.distance = local.spot_1
-			level.spottarget = local.player
-		}
 
-		if(local.spot_2 < local.distance && local.spot_2 < local.spot_1 && local.spot_2 < local.spot_3)
-		{
-			local.distance = local.spot_2
-			level.spottarget = local.player
-		}
+		local.index++
 
-		if(local.spot_3 < local.distance && local.spot_3 < local.spot_1 && local.spot_1 < local.spot_2)
+		if(local.index == 4)
 		{
-			local.distance = local.spot_3
-			level.spottarget = local.player
+			local.index = 1
 		}
-	}	
 }
-
-end level.spottarget
+end 
 
