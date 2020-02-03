@@ -1379,43 +1379,34 @@ withinDistanceOf local.ent local.distance:{
 		error ( "coop_mod/replace.scr::withinDistanceOf - parameter1 was NIL" ) 1000
 		end 0
 	}
-	
-	//[200] chrissstrahl - test
-	//println("local.ent[1].size: "+local.ent[1].size+"#")
-	//println("local.ent.size: "+local.ent.size+"#")
-	
-	//[200] chrissstrahl - added to detect arrays
-	if( int(local.ent.size) > 1 ){
-		error ( "coop_mod/replace.scr::withinDistanceOf - parameter1 was VECTOR or ENTITY-ARRAY" ) 1000
-		end 0
-	}
 
 	//[200] chrissstrahl - added to detect vector or entity
-	local.isEntity = 0
 	local.vOrigin = (0 0 0)
-	//local.varType = waitthread coop_mod/main.scr::returnVarType local.ent //chrissstrahl - this did break several map-scripts...
 	local.varType = thread coop_mod/main.scr::returnVarType
 
+	//[200] chrissstrahl - fixed type detection
 	if(local.varType == 3){
 		local.vOrigin = local.ent
-//println("is vector")
-	}else{
-		local.isEntity = 1
-//println("is entity")
+	}else if(local.varType == 2){
+		//[200] chrissstrahl - added to detect arrays
+		if( int(local.ent.size) > 1 ){
+			error ( "coop_mod/replace.scr::withinDistanceOf - parameter1 was VECTOR or ENTITY-ARRAY" ) 1000
+			end 0
+		}
+		local.vOrigin = local.ent.origin
+	}
+	//[200] chrissstrahl - added error info if bad type
+	else{
+		error ( "coop_mod/replace.scr::withinDistanceOf - parameter1 was ("+(waitthread returnVarTypename(local.varType))+") needs to be VECTOR or ENTITY" ) 1000
+		end 0
 	}
 	
+	//[200] chrissstrahl - simplified code
 	for (local.i = 1;local.i <= $player.size;local.i++){
 		local.player =  $player[local.i]
 		if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
-			if(local.isEntity == 1){
-				if( vector_length(local.player.origin - local.ent.origin) <= local.distance ){
-					end 1
-				}
-			}
-			else{
-				if( vector_length(local.player.origin - local.vOrigin) <= local.distance ){
-					end 1
-				}	
+			if( vector_length((local.player.origin) - (local.vOrigin)) <= local.distance ){
+				end 1
 			}
 		}
 	}
