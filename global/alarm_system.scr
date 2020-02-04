@@ -28,7 +28,10 @@ alarm_system_setup:{
 	//Another thing is that we did not keep the sp approach to store data on the player
 	//because obviously in mp/coop you don't have the player, you have or don't have multiple
 	//versions of players, so we thought it best to use a level wide variable
-	level.playerZone_index = 1 //chrissstrahl - not sure if 1 is the right inizial value
+	level.playerZone_index = NIL //chrissstrahl - default starts off with NIL
+	
+	//[200] chrissstrahl - this makes sure we have the correct zone set
+	thread maintainZoneTracking
 	
 	//*** CHECK EXISTENCE OF CRITICAL COMPONENTS
 
@@ -910,3 +913,58 @@ find_guy local.find_name:
 	println "^~^~^ ALARM SYSTEM FIND GUY: There was no $ai_alarm with a .find_name of: " local.find_name
 find_guy_end:
 end local.result
+
+//[200] chrissstrahl - this makes sure we have the correct zone set
+//in sp the value is directly read from player, we can't do taht for obviouse reasons in coop
+//this checks every player and uses the zone the most players reside in
+//============================================================================
+maintainZoneTracking:{
+//============================================================================
+	if(level.gametype == 0){
+		while(1){
+			if($player){
+				level.playerZone_index = $player.zone_index
+			}
+			waitframe
+		}
+		end
+	}
+	
+	//[200] chrissstrahl - keep track of players in which zones they are and how many
+	//level.playerZone_index //already set above
+	while(1){
+		//[200] chrissstrahl - reset zone player count
+		for(local.i = 1;local.i <= $zone_trigger.size;local.i++){
+			$world.flags["coop_alarm_system_player"+local.i+"Zone"] = 0
+		}
+		
+		//[200] chrissstrahl - keep track of player count in zones
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+			if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1){
+				 if(local.player.zone_index != NIL){
+					$world.flags["coop_alarm_system_player"+local.player.zone_index+"Zone"] += 1
+				 }
+			}
+		}
+		//[200] chrissstrahl - get zone with most players
+		local.zoneWithMostPlayers = NIL
+		local.zoneMostPlayersCount = NIL
+		for(local.i = 1;local.i <= $zone_trigger.size;local.i++){
+			local.currentZonePlayerCount = $world.flags["coop_alarm_system_player"+local.i+"Zone"]
+			if(local.currentZonePlayerCount != NIL){
+				if(local.zoneMostPlayersCount == NIL || local.currentZonePlayerCount > local.zoneMostPlayersCount ){
+					local.zoneMostPlayersCount = local.currentZonePlayerCount
+					local.zoneWithMostPlayers = local.i
+				}
+			}
+		}
+		//[200] chrissstrahl - not sure if we need to check for that
+		//if(local.zoneWithMostPlayers != NIL){
+		level.playerZone_index = local.zoneWithMostPlayers
+		//}
+		waitframe
+	}
+}end
+
+
