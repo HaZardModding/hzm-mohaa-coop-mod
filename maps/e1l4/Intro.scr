@@ -9,9 +9,8 @@ InitIntro: {
 
 	// Crimewavez = Only in SP.
 	// Disguise managed in e1l4.scr, line 7.
-	if(level.gametype == 0) {
-		$player.has_disguise = 1 	
-	}
+	//[200] chrissstrahl - we are using the replacment in any case, so that if we get it working in the future all scripts are prpared
+	exec coop_mod/replace.scr::has_disguise 1
 
 	waitthread AIdisable
 	level.RideOver = 0
@@ -64,7 +63,10 @@ DoIntro: {
 	$starttruck waittill drive
 
 	waitthread GateGuardDialogue
-	$gate1 open $player
+	
+	//[200] chrissstrahl - we can't trust a player to be there, so open differently
+	//$gate1 open $player
+	$gate1 open $starttruck
 
 	wait 2.0
 	$starttruck drive $gatetruckpath 300 200 200 128		//256
@@ -80,8 +82,17 @@ DoIntro: {
 	thread DontBeCaught
 	
 	// Hand the player the gun
-	$player item weapons/silencedpistol.tik  
-	$player ammo pistol 16
+	//[200] chrissstrahl - force weapon in coop
+	if(level.gametype == 0){
+		$player item weapons/silencedpistol.tik  
+		$player ammo pistol 16	
+	}else{
+		level.coop_forceSecondary = "weapons/silencedpistol.tik"
+		//[200] chrissstrahl - give item/ammo and make player use it right away
+		thread coop_mod/replace.scr::item "weapons/silencedpistol.tik" 1
+		thread coop_mod/replace.scr::ammo pistol 32
+	}
+
 	
 	$starttruck setcollisionentity $truckcollide
 	thread maps/e1l4/PreShip.scr::DontMoveUnlessIAmNear

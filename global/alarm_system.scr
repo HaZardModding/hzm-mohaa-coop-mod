@@ -292,64 +292,64 @@ alarm_system_setup:{
 //*************************************************************************************
 //*************************************************************************************
 
-
+//[200] chrissstrahl - fixed self -> changed all local.self to self (why they have been like that I can not explain)
 //**************************************************************************
 //*** alarm system zone trigger thread
 //**************************************************************************
 zone_trigger_thread local.index:
 
 zone_trigger_loop:
-local.self waittill trigger
+self waittill trigger
 
 local.dude = parm.other
 
-//println "ALARM SYSTEM ZONE TRIGGER: " local.dude " just passed through zone: " local.self.zone " : zone number : " local.self.zone_number " : zone index : " local.self.zone_index
+//println "ALARM SYSTEM ZONE TRIGGER: " local.dude " just passed through zone: " self.zone " : zone number : " self.zone_number " : zone index : " self.zone_index
 
-local.dude.zone = local.self.zone
-local.dude.zone_number = local.self.zone_number
-local.dude.zone_index = local.self.zone_index
+local.dude.zone = self.zone
+local.dude.zone_number = self.zone_number
+local.dude.zone_index = self.zone_index
 
 goto zone_trigger_loop
 
 end
 
-
+//[200] chrissstrahl - fixed self -> changed all local.self to self (why they have been like that I can not explain)
 //**************************************************************************
 //*** alarm system $ai_alarm setup thread
 //**************************************************************************
 ai_alarm_setup:
 
 //*** check to make sure the AI is targeting the zone center, if not, remove him from the world
-if (local.self.target == NIL || local.self.target == "")
+if (self.target == NIL || self.target == "")
 {
-	println "^~^~^ ALARM SYSTEM ERROR:  $ai_alarm guy at coordinates: " local.self.origin " :has no target!  Removing him from the alarm system!!!"
-	local.self remove	
+	println "^~^~^ ALARM SYSTEM ERROR:  $ai_alarm guy at coordinates: " self.origin " :has no target!  Removing him from the alarm system!!!"
+	self remove	
 	goto ai_alarm_setup_end
 }
 
 //*** stuff the zone and zone_number into the AI
-local.self.zone = local.self.target.zone
-local.self.zone_number = local.self.target.zone_number
-local.self.zone_index = local.self.target.zone_index
+self.zone = self.target.zone
+self.zone_number = self.target.zone_number
+self.zone_index = self.target.zone_index
 
 //*** set his type_attack to alarm, and his alarmthread to run
-local.self.type_attack = "alarm"
-local.self.alarmthread = global/alarm_system.scr::ai_alarm_alerted
+self.type_attack = "alarm"
+self.alarmthread = global/alarm_system.scr::ai_alarm_alerted
 
 ai_alarm_setup_end:
 end
 
-
+//[200] chrissstrahl - fixed self -> changed all local.self to self (why they have been like that I can not explain)
 //**************************************************************************
 //*** alarm system backup guy death thread
 //**************************************************************************
 ai_backup_death:
 
-local.self waittill death
+self waittill death
 
 level.ai_alarm_backup_total --
 
-local.self.targetname = ""
+self.targetname = ""
 
 end
 
@@ -362,7 +362,7 @@ end
 //*************************************************************************************
 //*************************************************************************************
 
-
+//[200] chrissstrahl - fixed self -> changed all local.self to self (why they have been like that I can not explain)
 //**************************************************************************
 //*** alarm system ai alerted stack - adding to
 //**************************************************************************
@@ -386,7 +386,7 @@ ai_alarm_alerted:
 	level.ai_alerted_isprocessing = 1
 
 	level.ai_alerted_index ++
-	level.ai_alerted_stack[level.ai_alerted_index] = local.self
+	level.ai_alerted_stack[level.ai_alerted_index] = self
 
 	//println "AI ALARM THREAD: added ai to stack index: " level.ai_alerted_index
 
@@ -603,8 +603,11 @@ ai_gofor_alarm_reset:
 	//println "SWITCH USED: " $alarm_switch_trigger[$zone_trigger[local.ai_alerted.zone_index].alarm_switch_index]
 	
 	//chrissstrahl - compability to coop
-	while((waitthread coop_mod/replace.scr::player_closestTo $alarm_switch_trigger[$zone_trigger[local.ai_alerted.zone_index].alarm_switch_index]) == NULL){
+	//[200] chrissstrahl - fixed bug introduced with code optimisation
+	local.player = (waitthread coop_mod/replace.scr::player_closestTo $alarm_switch_trigger[$zone_trigger[local.ai_alerted.zone_index].alarm_switch_index])
+	while(local.player == NULL){
 		wait 1
+		local.player = (waitthread coop_mod/replace.scr::player_closestTo $alarm_switch_trigger[$zone_trigger[local.ai_alerted.zone_index].alarm_switch_index])
 	}	
 	$alarm_switch_trigger[$zone_trigger[local.ai_alerted.zone_index].alarm_switch_index] douse local.player //chrissstrahl - coop
 	local.ai_alerted exec global/enable_ai.scr
@@ -620,16 +623,16 @@ ai_gofor_alarm_reset:
 	goto ai_gofor_alarm_processnext
 end
 
-
+//[200] chrissstrahl - fixed self -> changed all local.self to self (why they have been like that I can not explain)
 //**************************************************************************
 //*** alarm switch trigger thread
 //**************************************************************************
 alarm_switch_thread:
 
 alarm_switch_thread_loop:
-local.self waittill trigger
+self waittill trigger
 
-//println "ALARM SWITCH THREAD " local.self.alarm_switch_index " : has been triggered"
+//println "ALARM SWITCH THREAD " self.alarm_switch_index " : has been triggered"
 
 //*** trigger the master alarm thread to go
 trigger $waittrigger_alarm_master
@@ -842,41 +845,41 @@ goto alarm_system_backup_spawn_loop
 
 end
 
-
+//[200] chrissstrahl - fixed self -> changed all local.self to self (why they have been like that I can not explain)
 //**************************************************************************
 //*** alarm system backup dude's routine
 //**************************************************************************
 alarm_system_backup_dude:
 
-//println "ALARM DUDE: " local.self " setting movedone radius"
-local.self.movedoneradius = 256
-local.self forceactivate
+//println "ALARM DUDE: " self " setting movedone radius"
+self.movedoneradius = 256
+self forceactivate
 
-//println "ALARM DUDE: " local.self " running to player"
-//local.self exec global/runto.scr $player //chrissstrahl
-local.self exec coop_mod/replace.scr::runtoClosest	//chrissstrahl - coop
-local.self waittill movedone
+//println "ALARM DUDE: " self " running to player"
+//self exec global/runto.scr $player //chrissstrahl
+self exec coop_mod/replace.scr::runtoClosest	//chrissstrahl - coop
+self waittill movedone
 
-local.self exec global/stand.scr
+self exec global/stand.scr
 
 wait 5
 alarm_system_backup_dude_loop:
 //*** check to see if the player is far enough away to remove the guy
-while (local.self.thinkstate != "attack" && isalive local.self){
-	//println "ALARM DUDE: " local.self " cansee player: " (local.self cansee $player 90 16000)
-	//println "ALARM DUDE: " local.self " is within " level.backup_remove_distance " units of player: " (vector_within local.self.origin $player.origin level.backup_remove_distance)
+while (self.thinkstate != "attack" && isalive self){
+	//println "ALARM DUDE: " self " cansee player: " (self cansee $player 90 16000)
+	//println "ALARM DUDE: " self " is within " level.backup_remove_distance " units of player: " (vector_within self.origin $player.origin level.backup_remove_distance)
 	//entity cansee entity fov distance
 	
-	//if ($player cansee local.self 90 16000 == 0 && vector_within local.self.origin $player.origin level.backup_remove_distance == 0){ //chrissstrahl
-	if (local.self exec coop_mod/replace.scr::cansee 90 16000 == 0 && !(exec coop_mod/replace.scr::withinDistanceOf local.self level.backup_remove_distance)){ //chrissstrahl - coop
+	//if ($player cansee self 90 16000 == 0 && vector_within self.origin $player.origin level.backup_remove_distance == 0){ //chrissstrahl
+	if (self exec coop_mod/replace.scr::cansee 90 16000 == 0 && !(exec coop_mod/replace.scr::withinDistanceOf self level.backup_remove_distance)){ //chrissstrahl - coop
         goto alarm_system_backup_dude_gone
     }
 	wait 1
 }
 
-if !(isalive local.self)
+if !(isalive self)
 {
-	//println "ALARM DUDE: " local.self " is dead"
+	//println "ALARM DUDE: " self " is dead"
 	goto alarm_system_backup_dude_done
 }
 
@@ -885,8 +888,8 @@ wait 3
 goto alarm_system_backup_dude_loop
 
 alarm_system_backup_dude_gone:
-//println "ALARM DUDE: " local.self " is being removed"
-local.self remove
+//println "ALARM DUDE: " self " is being removed"
+self remove
 
 alarm_system_backup_dude_done:
 end
