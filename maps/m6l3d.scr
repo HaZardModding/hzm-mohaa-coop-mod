@@ -381,13 +381,32 @@ explode_controller local.target:{
 	
 	local.firespawned = spawn animate/adam-hallfire2.tik
 	//local.firespawned.origin = $player.origin //Criminal - coop comp.
-	local.firespawned.origin = exec coop_mod/replace.scr::player_origin //Criminal - cooop comp/
+	//radiusdamage $player.origin 1500 800 //Criminal - coop comp.
+	
+	
+	//[200] chrissstrahl - fix using player_origin - use cloeset player to the effect instead
+	//we can't have the effect spawned for every player that would be overkill
+	//so we pick any player, with the hope players are close together to all see the beauty of them self being burned up
+	waitframe
+	local.player = exec coop_mod/replace.scr::player_closestTo local.firespawned
+	while(local.player == null){
+		wait 1
+		local.player = exec coop_mod/replace.scr::player_closestTo local.firespawned
+	}
+	local.firespawned.origin = local.player.origin
 	local.firespawned anim start
 	waitframe
 
-	//radiusdamage $player.origin 1500 800 
-	local.bb22 = exec coop_mod/replace.scr::player_origin 	//Criminal - coop com - added to use in radiusdamage, it's clearer that way I think.
-	radiusdamage local.bb22 1500 800 						//Criminal - coop comp.
+	//[200] chrissstrahl - this should kill ya all, even works in sp
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if(local.player != NULL && local.player.health > 0){
+			if(level.gametype == 0 || local.player.dmteam != "spectator"){
+				local.bb22 = local.player.origin
+				radiusdamage local.bb22 1500 800
+			}
+		}
+	}
 }end
 
 //============================================================================
