@@ -1311,26 +1311,31 @@ flagthread1:
 	
 	//if (vector_length (self.origin - $player.origin) < level.chatdistance) //chrissstrahl
 	if (exec coop_mod/replace.scr::withinDistanceOf self level.chatdistance){ //chrissstrahl - coop compatible //[200] chrissstrahl - fixed bad type parameter 1
-		println "02a"
 		self say dfr_m1l2_118m_1 // I'll show you how to avoid the spotlights.
 //		wait 4
 		self waittill saydone
-		println "02a2"
 	}
 
 	waitthread canteen
-	println "02"
 
 		
 	self turnto local.spotlight
 	self lookat local.spotlight.currentaim
-	while ((level.spottime["spot1_1"] == NIL) && (thread checkspotlights != 1) )
-	{	
-		println "02b"
-		waitframe
-	}
+	
 
-	println "03"
+//[200] chrissstrahl - this fixes grillo waiting for the spotlights
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+iprintlnbold_noloc("DEV: workaround spotlights not working, this needs fixing")
+	if(0){
+		while ((level.spottime["spot1_1"] == NIL) && (thread checkspotlights != 1) ){	
+			println "DEV: SAS Agent waiting for the Spotlight to allow passage"
+			waitframe
+		}
+	}
 
 	if ((thread checkspotlights == 1) || (level.spotplayer[1] == 1))
 	{
@@ -1338,12 +1343,13 @@ flagthread1:
 		thread PUREfillused 330
 		self.friendtype = 4
 		self.avoidplayer = 1
+		println "DEV: Front door approach 1"
 		end
 	}
 
-	while ((level.spottime["spot1_1"] < level.time - 0.05) && (thread checkspotlights != 1))
+	while ((level.spottime["spot1_1"] < level.time - 0.05) && (thread checkspotlights != 1)){
 		waitframe
-	println "04"
+	}
 
 
 	if ((thread checkspotlights == 1) || (level.spotplayer[1] == 1))
@@ -1352,6 +1358,7 @@ flagthread1:
 		thread PUREfillused 330
 		self.friendtype = 4
 		self.avoidplayer = 1
+		println "DEV: Front door approach 2"
 		end
 	}
 	if !(isalive self)
@@ -1363,7 +1370,7 @@ flagthread1:
 		if (level.friendlynode[local.i].set == 250)
 			local.node = level.friendlynode[local.i]
 
-	println "05"
+	
 	self lookat local.spotlight
 
 	self runto local.node
@@ -1375,6 +1382,7 @@ flagthread1:
 		thread PUREfillused 330
 		self.friendtype = 4
 		self.avoidplayer = 1
+		println "DEV: Front door approach 3"
 		end
 	}
 
@@ -1422,6 +1430,7 @@ flagthread1:
 		thread PUREfillused 330
 		self.friendtype = 4
 		self.avoidplayer = 1
+		println "DEV: Front door approach 4"
 		end
 	}
 
@@ -1701,63 +1710,92 @@ sayflaks:
 
 	self say dfr_M1L2_139m_2 // You get that one
 	self waittill saydone
-
 end
 
 
-flagthread9:
-
+//[200] chrissstrahl - this is where this thread is started from:
+// global/friendly.scr -> 	::friendlythinkstart	->	//leadplayer section
+//							else if (self.friendtype == 4){
+//
+//
+/*
+// entity 701
+{
+"_color" "0.176471 0.796078 0.925490"
+"origin" "-1360 -3320 -264"
+"classname" "info_pathnode"
+"$targetname" "friendlynode"
+"#set" "760"
+"spawnflags" "0"
+"#flag" "9"
+}
+*/
+//
+//
+//[200] chrissstrahl - info
+//This thread is started near level end when player has to blow up a flak and grillo blows up the other
+//============================================================
+flagthread9:{
+//============================================================
 	level.friendly1.friendtype = -1
 	level.flags[friendlyflak] = 1
-	println "test01"
-	if (level.flags[flak] == 0)
-	{
+	
+	if (level.flags[flak] == 0){
 		self say dfr_M1L2_138m_2 // We need to destroy these flak88s, I'll take care of this one.
 		self waittill saydone
 		wait 0.25
 	}
-
-	println "test02"
 	
-	if (level.flags[flak] == 0)
-	{
+	if (level.flags[flak] == 0){
 		self say dfr_M1L2_139m_2 // You get that one
-		self waittill saydone
+		
+		//[200] chrissstrahl - fix script getting stuck here
+		/*
+		self waittill saydone -> was stuck because of:
+		Couldn't find animation 'dfr_M1L2_139m_2' trying alias sound instead
+		Callbnack of sound 'dfr_M1L2_139m_2' ignored
+		*/
+		if(level.gametype == 0){
+			self waittill saydone
+		}else{
+			wait 1.5
+		}
 	}
 
-	println "test03"
-
-
-	while (level.flags[flak] == 0)
+	while (level.flags[flak] == 0){
 		wait 0.1
-
-	println "test04"
+	}
 
 	wait 0.5
 	local.ent = spawn script_origin
+	waitframe //[200] chrissstrahl - added to wait for the entity to be spawned in multiplayer
 	local.ent thread explosives 102
-	if (getcvar(debug) == "1")
+	if (getcvar(debug) == "1"){
 		println "setting explosives on 102"
+	}
 	wait 0.5
 	self runto $avoidflak
 	self waittill movedone
 	level.friendly1.friendtype = 4
+}end
 
-
-end
-
-flagthread10:
-
-	if (!(isalive level.friendly3) || (level.flags[botch] == 1) || (level.flags[hostage] == 1))
+//[200] chrissstrahl - info
+//started when grillo reaches the room a prisoner is held
+//============================================================
+flagthread10:{
+//============================================================
+	if (!(isalive level.friendly3) || (level.flags[botch] == 1) || (level.flags[hostage] == 1)){
 		end
+	}
 
 	self lookat level.friendly3
 	level.friendly1.friendtype = -1
 
 	thread fillused 8000
 	
-	if (getcvar(debug) == "1")
+	if (getcvar(debug) == "1"){
 		println "unfillup in flagthread10"
+	}
 
 	thread unfillup 566
 		
@@ -1766,20 +1804,17 @@ flagthread10:
 	$decision1 delete
 	$decision2 delete
 	
-	while ((level.flags[hostage] == 0) && (level.friendlynode[self.destinationnum].set > level.playernodset - 20))
+	//[200] chrissstrahl - i have no fucking idea how the fuck this fuck is meant to work
+	//so i have the fuck decided that this fuck should the fuck wait until the fucking player
+	//hav the fucking prisoner fucking freed and the fucking prisoner is ready to fucking move out
+	//while ((level.flags[hostage] == 0) && (level.friendlynode[self.destinationnum].set > level.playernodset - 20)){
+	level.prisonerReadyGrilloCanLeadAgain = 0
+	while ((level.flags[hostage] == 0) && level.prisonerReadyGrilloCanLeadAgain != 0){
 		wait 0.1
-
-	/*
-	wait 3
-
-	if (getcvar(debug) == "1")
-		println "time to run!"
-
-	wait 3
-	*/
+	}
+	//[200] chrissstrahl - now grillo can lead player again
 	level.friendly1.friendtype = 4
-	
-end
+}end
 
 flagthread11:
 
@@ -2055,7 +2090,7 @@ flagthread18:{
 
 	self lookat $vent
 	self.friendtype = -1
-	println "inter 01"
+	println "DEV: flagthread18 started"
 	
 	//while (((vector_length (level.friendly1.origin - $player.origin) > 250) || (level.friendly1.thinkstate != "idle")) && (self.chairsound == 0)){
 	while (((exec coop_mod/replace.scr::withinDistanceOf level.friendly1 250) != 1 || (level.friendly1.thinkstate != "idle")) && (self.chairsound == 0)){
@@ -2070,17 +2105,12 @@ flagthread18:{
 		goto resetter
 	}
 
-	println "inter 02"
 	level.friendly1 say dfr_m1l2_add02 // It looks like they took more American prisoners.  We should rescue them when we get the chance.
-
-	println "inter 03"
 
 	//while ((vector_length (level.friendly1.origin - $player.origin) < 300) && (self.chairsound == 0)){		//chrissstrahl
 	while ((exec coop_mod/replace.scr::withinDistanceOf level.friendly1 300) != 1 && (self.chairsound == 0)){	//chrissstrahl - made coop compatible
 		wait 0.2
 	}
-
-	println "inter 04"
 
 	level.friendly1.friendtype = 4
 }end
@@ -2646,19 +2676,20 @@ explosives local.set:{
 
 			if (local.set == 101){
 				level.flags[flak] = 1
+				println("DEV: level.flags[flag] set to 1")
 			}
 
 			if (local.set == 100){	
 				thread openenddoor
 				level.flags[door] = 1
 				if (level.friendly3)
-				if (level.friendly3.friendtype == 1)
-				level.friendly3 thread fleeboom $POWflee
+					if (level.friendly3.friendtype == 1)
+						level.friendly3 thread fleeboom $POWflee
 			}
 			else if (local.set == 101){
 				if (isalive level.friendly3)
-				if (level.friendly3.friendtype == 1)
-				level.friendly3 thread fleeboom $POWfleeflak
+					if (level.friendly3.friendtype == 1)
+						level.friendly3 thread fleeboom $POWfleeflak
 			}
 
 
@@ -2717,6 +2748,9 @@ explosives local.set:{
 			}
 
 			if (local.set == 101){
+				//level.flags[flak] = 1
+				//println("DEV: level.flags[flag] set to 1 again!!!!")
+			
 //				level.flags[flak] = 2
 				waitthread global/objectives.scr::add_objectives 5 3 "Use explosives to destroy a Flak88." $flak88b.origin
 				waitthread global/objectives.scr::add_objectives 6 2 "Meet Grillo by the gate and exfiltrate." $endtrigger.origin
@@ -3278,37 +3312,30 @@ chairhealth local.thread:{
 	wait 0.5
 	level.friendly3 exec coop_mod/replace.scr::turnto //chrissstrahl - made coop compatible
 	$pow_gun hide
-	println "01"
 	level.friendly3 gun "Mauser KAR 98D Sniper"
 	level.friendly3 playsound kar98sniper_snd_pickup
-	println "02"
 	level.friendly3 threatbias 0
-	println "03"
 	level.friendly3 exec global/enable_ai.scr
-	println "04"
 	level.friendly3 thread global/friendly.scr::friendlythink
 	level.friendly3 takedamage
 
 //		level.friendly3 item weapons/colt45.tik
-	println "05"
-
-	println "06"
 	level.friendly3.distance = 150
-	println "07"
 //		level.friendly3.leash = 150
-	println "08"
 	level.friendly3.no_idle = 0
 //		level.friendly3 tether $player
 	wait 2
 	if (isalive level.friendly3)
 		level.friendly3 exec coop_mod/replace.scr::lookat //chrissstrahl - made coop compatible
-	println "09"
 
 //		thread lockdown 565
 //		thread PUREfillused 565
 	thread fillused 565
 
 	println ("friendtype is " + level.friendly3.friendtype)
+	
+	//[200] chrissstrahl - allow grillo now to lead player again, see func 
+	level.prisonerReadyGrilloCanLeadAgain = 1
 }end
 
 //=========================================================================

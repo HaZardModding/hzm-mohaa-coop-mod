@@ -725,7 +725,16 @@ friendlythinkstart:
 //LEAD PLAYER////////////////////////////////////////////////////
 //LEAD PLAYER////////////////////////////////////////////////////
 //LEAD PLAYER////////////////////////////////////////////////////
+//[200] chrissstrahl - added mapname
+//m1l2a, 
 			else if (self.friendtype == 4){
+//[200] chrissstrahl - set allowed distance for multiplayer
+//maybe criminal will stop complaining about grillo now :D
+				local.leadingAiPlayerMaxDistance = 200
+				if(level.gametype != 0){
+					local.leadingAiPlayerMaxDistance = 500
+				}
+				
 				local.set = 5000
 				local.nodenum = -1
 
@@ -742,6 +751,10 @@ friendlythinkstart:
 					}
 				}
 
+
+//[200] chrissstrahl - debug
+//println ( self.targetname+" nodenum("+local.nodenum+") ")
+
 				if (local.nodenum == -1)
 					local.nodenum = self.destinationnum
 					
@@ -756,6 +769,10 @@ friendlythinkstart:
 				self.turndoneerror = 70
 
 				while (local.break == 0){
+//[200] chrissstrahl - debug
+//println ( self.targetname+" waiting for player")
+				
+				
 					if (level.time > local.turntime){
 						//self lookat $player //chrissstrahl
 						self exec coop_mod/replace.scr::lookat //chrissstrahl - friendtype 4 only - use closest player					
@@ -771,21 +788,22 @@ friendlythinkstart:
 //						println ("nodenum is " + local.nodenum) // + " and the origin of friendlynode of such nodenum is " + level.friendlynode[local.nodenum].origin)
 
 					// 200 was self.distance
-					local.break = 1
+					
+local.break = 1 //[200] chrissstrahl INFO - set abbort on default - use checks below to keep wating for player
+					
 					if (!(self exec coop_mod/replace.scr::cansee) && (local.set > level.playernodeset + local.offset) ){ //chrissstrahl - friendtype 4 only - use any player
 						local.break = 0
 					}
-					//else if ((vector_length (self.origin - $player.origin) > 200) && (level.friendlyused[local.nodenum] == 1) && (local.set > level.playernodeset + local.offset)) //chrissstrahl
-					else if (	((exec coop_mod/replace.scr::withinDistanceOf self 200) != 1) &&
+					else if (	((exec coop_mod/replace.scr::withinDistanceOf self local.leadingAiPlayerMaxDistance ) != 1) && //[200] chrissstrahl - changed max distance
 								(level.friendlyused[local.nodenum] == 1) &&
 								(local.set > level.playernodeset + local.offset)) //chrissstrahl - make coop compatible
 					{					
 						local.break = 0
 					}
-					//else if ((vector_length (self.origin - $player.origin) > 200 ) && (local.set > level.playernodeset + local.offset) && !(sighttrace $player.origin level.friendlynode[local.nodenum].origin 1)){ //chrissstrahl
-					else if (	((exec coop_mod/replace.scr::withinDistanceOf self 200) != 1) &&		//chrissstrahl - friendtype 4 only - use any player
+					//chrissstrahl - friendtype 4 only - use any player
+					else if (	((exec coop_mod/replace.scr::withinDistanceOf self local.leadingAiPlayerMaxDistance ) != 1) &&		//[200] chrissstrahl - changed max distance
 								(local.set > level.playernodeset + local.offset) &&
-								!((exec coop_mod/replace.scr::sighttrace (0 0 0) level.friendlynode[local.nodenum].origin 1)) )	//chrissstrahl - friendtype 4 only - use any player
+								!((exec coop_mod/replace.scr::sighttrace (0 0 0) level.friendlynode[local.nodenum].origin 1)) )
 					{ 
 						local.break = 0
 					}
@@ -834,6 +852,9 @@ friendlythinkstart:
 					}
 
 				}
+
+//[200] chrissstrahl - debug
+//println ( self.targetname+" no longer waiting for player ")
 
 				if (level.friendlynode[self.destinationnum + 1])
 					self thread lookpastlow level.friendlynode[self.destinationnum + 1] 0.6
@@ -889,6 +910,10 @@ friendlythinkstart:
 
 					while (local.broke == 0){
 						self runto self.destination
+						
+						
+//[200] chrissstrahl - debug
+//println ( self.targetname+" running to "+self.destination+" ")
 
 //						println ("set is " + self.destination.set)
 
@@ -915,6 +940,9 @@ friendlythinkstart:
 							if (level.time > local.elapsedtime)
 								self runto self.destination
 							*/
+							
+//[200] chrissstrahl - debug
+//println ( self.targetname+" waiting for the move to be done")
 						}
 
 						if (self.checkthread)
@@ -945,31 +973,41 @@ friendlythinkstart:
 					{
 //						self waittill movedone
 //						while (parm.movedone == 0)
-						self.movedoneradius = 0					
-						while (vector_length (self.origin - level.friendlynode[local.nodenum].origin) > 100)
-						{
-							if (getcvar(hangin) == "1")
+						self.movedoneradius = 0
+
+//[200] chrissstrahl - debug
+//println ( self.targetname+" has reached a node that has flag set")
+
+						
+						while (vector_length (self.origin - level.friendlynode[local.nodenum].origin) > 100){
+								if (getcvar(hangin) == "1")
 								println (self.entref + " is hangin out at 4 " + local.set)
 
 								if (getcvar(debug) == "1")
-									println ("======================== local.set is " + local.set + " and playerset is " + level.playernodeset)
+								println ("======================== local.set is " + local.set + " and playerset is " + level.playernodeset)
 
 								if (local.break == 1)
-										self runto self.destination
-									else
-										self walkto self.destination
+									self runto self.destination
+								else
+									self walkto self.destination
 
-									self waittill movedone
-									waitframe
+								self waittill movedone
+								waitframe
+								
+//[200] chrissstrahl - debug
+//println ( self.targetname+" going to node with flag set but still > 100 units away from node origin")
 
-							if (getcvar(hangin) == "1")
+								if (getcvar(hangin) == "1")
 								println (self.entref + " is hangin out at 3 " + local.set)
-
 						}
 
-						if (level.friendlynode[local.nodenum].flag != NIL) 
-						if (level.friendlyused[local.nodenum] == 1)
-						{
+						if (level.friendlynode[local.nodenum].flag != NIL)
+//[200] chrissstrahl - debug
+//println ( self.targetname+" flag node not NIL")
+						if (level.friendlyused[local.nodenum] == 1){
+//[200] chrissstrahl - debug
+//println ( self.targetname+" node used == 1")
+
 							self.avoidplayer = 1
 							self exec level.script::("flagthread" + level.friendlynode[local.nodenum].flag) //chrissstrahl - using exec with waitframe here instead of thread
 							waitframe
@@ -978,6 +1016,8 @@ friendlythinkstart:
 							level.friendlynode[local.nodenum].flag = NIL
 						}
 						else{
+//[200] chrissstrahl - debug
+//println ( self.targetname+" node used != 1")
 							if (getcvar(debug) == "1"){
 								println ("Didn't run flagthread " + ("flagthread" + level.friendlynode[local.nodenum].flag))
 							}
@@ -985,6 +1025,10 @@ friendlythinkstart:
 					}
 				}
 			}
+//Medic Behavior ///////////////////////////////////////////////		
+//Medic Behavior ///////////////////////////////////////////////		
+//Medic Behavior ///////////////////////////////////////////////		
+//Medic Behavior ///////////////////////////////////////////////		
 			else if (self.friendtype == 5){
 				if (level.time > self.lasthealed){
 					self.lasthealed = level.time + level.medictime
