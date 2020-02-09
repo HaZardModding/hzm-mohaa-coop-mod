@@ -596,8 +596,10 @@ halftrack_mg_targeting:{
 
 	local.player = NULL
 	//while !($halftrack_gunner cansee $player 0 3050)	//chrissstrahl
+	//[200] chrissstrahl - make sure we grab player right away
+	local.player = $halftrack_gunner exec coop_mod/replace.scr::canseeGetClosest 0 3050 //chrissstrahl - coop mod replacment
 	while (local.player == NULL){		
-		wait 2
+		wait 1 //[200] chrissstrahl - changed to 1 from 2 secs - this function needs to be reworked anyway
 		local.player = $halftrack_gunner exec coop_mod/replace.scr::canseeGetClosest 0 3050 //chrissstrahl - coop mod replacment
 		println "+++++ I CANT SEE YOU ++++++"
 		if !(isAlive $halftrack)
@@ -643,7 +645,13 @@ halftrack_mg_targeting:{
 	}
 	
 	for (local.i = 1; local.i < 16; local.i ++){
-		local.player = $halftrack_gunner exec coop_mod/replace.scr::canseeGetClosest 0 3050 //chrissstrahl - coop mod replacment
+		//[200] chrissstrahl - fix gunner grabbing NULL player
+		local.player = $halftrack_gunner exec coop_mod/replace.scr::canseeGetClosest 0 3050
+		while(local.player == NULL){
+			waitframe
+			local.player = $halftrack_gunner exec coop_mod/replace.scr::canseeGetClosest 0 3050
+		}
+		//end chrissstrahl
 		if !(isAlive $halftrack){ end }
 		
 		if (vector_within local.player $halftrack 2300){
@@ -726,7 +734,10 @@ trigger_bomber:{
 bomb_explodes:{
 //=========================================================================
 	//===Called by global/bomber.scr when the bomb explodes
-	$halftrack.health = 1
+	//[200] chrissstrahl - VICTORY!!! One less anoying console error
+	if($halftrack.health > 1){
+		$halftrack.health = 1
+	}
 	radiusdamage ( ($halftrack.origin) + (0 0 16) ) 200 200
 
 	println "z:       running the bomb explosion thread"
@@ -2462,7 +2473,7 @@ scene4_tank_targeting:
 	
 		for (local.i = 1;local.i <= 5;local.i++){ //chrissstrahl - coop - make compact
 			if (exec coop_mod/replace.scr::istouching $scene4_tankshot1_trigger){ //chrissstrahl - coop
-				println "TOUCHING TRIGGER 1 - Targetpoint"
+//println "TOUCHING TRIGGER 1 - Targetpoint"
 				self waitthread ("scene4_tank_attack"+local.i)
 
 				if !(isAlive self){ end }
@@ -2470,14 +2481,14 @@ scene4_tank_targeting:
 		}
 
 		if (exec coop_mod/replace.scr::istouching $scene4_tankshot5a_trigger){ //chrissstrahl - coop
-			println "TOUCHING TRIGGER 5a - Player"
+//println "TOUCHING TRIGGER 5a - Player"
 			self waitthread scene4_tank_attack5
 
 			if !(isAlive self){ end }
 		}
 
 		if (exec coop_mod/replace.scr::istouching $scene4_tankshot5b_trigger){ //chrissstrahl - coop
-			println "TOUCHING TRIGGER 5b - Player"
+//println "TOUCHING TRIGGER 5b - Player"
 			self waitthread scene4_tank_attack5
 
 			if !(isAlive self){ end }
@@ -2485,7 +2496,7 @@ scene4_tank_targeting:
 
 		for (local.i = 6;local.i <= 9;local.i++){ //chrissstrahl - coop - make compact
 			if ( (exec coop_mod/replace.scr::istouching $("scene4_tankshot"+local.i+"_trigger")) ){ //chrissstrahl - coop
-				println ("TOUCHING TRIGGER "+local.i+" - Player")
+//println ("TOUCHING TRIGGER "+local.i+" - Player")
 				self waitthread scene4_tank_attack5
 
 				if !(isAlive self){ end }
@@ -2497,7 +2508,7 @@ scene4_tank_targeting:
 			if (exec coop_mod/replace.scr::istouching $("scene4_tanklos"+local.i+"_trigger")){
 				local.gun = self QueryTurretSlotEntity 0
 				local.gun setaimtarget $scene4_tanklos1_target
-				println ("TOUCHING LOS "+local.i)
+//println ("TOUCHING LOS "+local.i)
 			}
 		}
 
@@ -2505,7 +2516,7 @@ scene4_tank_targeting:
 			local.gun = self QueryTurretSlotEntity 0
 			local.player = exec coop_mod/replace.scr::player_closestTo local.gun //chrissstrahl - coop get cloeset player
 			local.gun setaimtarget local.player
-			println "TOUCHING LOS 5"
+//println "TOUCHING LOS 5"
 		}
 		waitframe
 	}
@@ -2978,14 +2989,18 @@ scene4_spawndetector2_control:
 				level.scene4_spawn2_currentalive ++							//increment the max allowed alive at any given time
 				level.scene4_spawn2_teamvalue ++							//track the scene's enemy population
 				local.tName = $("scene4_spawn2_ai"+local.i+"_" + level.scene4_spawn2_teamvalue)
-				$("scene4_spawn2_ai"+local.i+"_" + level.scene4_spawn2_teamvalue) thread scene4_spawn2_detect_death 	//call a waittill death thread
-				$(local.tName).mindist = 128			
-				$(local.tName).leash = 10000
-				$(local.tName).fixedleash = 0
-				$(local.tName).hearing = 4000
-				$(local.tName).interval = 128
-				$(local.tName).noticescale = 20
-				$(local.tName).sight = 2000
+				//[200] chrissstrahl - fixed reference to NULL entity
+				if($(local.tName) != NULL){
+					$(local.tName) thread scene4_spawn2_detect_death 	//call a waittill death thread
+					$(local.tName).mindist = 128			
+					$(local.tName).leash = 10000
+					$(local.tName).fixedleash = 0
+					$(local.tName).hearing = 4000
+					$(local.tName).interval = 128
+					$(local.tName).noticescale = 20
+					$(local.tName).sight = 2000
+				}
+				//end chrissstrahl
 			}
 			
 			$(local.scene4_spawn2_ai_name1).origin = local.org1				//place the guy in the correct spot
@@ -3106,15 +3121,19 @@ scene4_spawndetector3_control:
 			for (local.i = 1;local.i <= 3;local.i++){ //chrissstrahl - make compact
 				local.ai = $("scene4_spawn3_ai"+local.i+"_" + level.scene4_spawn3_teamvalue)
 				level.scene4_spawn3_currentalive ++							//increment the max allowed alive at any given time
-				level.scene4_spawn3_teamvalue ++							//track the scene's enemy population		
-				$(local.ai) thread scene4_spawn3_detect_death 	//call a waittill death thread
-				$(local.ai).mindist = 128
-				$(local.ai).maxdist = 4000
-				$(local.ai).leash = 10000
-				$(local.ai).interval = 128
-				$(local.ai).fixedleash = 0
-				$(local.ai).hearing = 4000
-				$(local.ai).noticescale = 1
+				level.scene4_spawn3_teamvalue ++							//track the scene's enemy population
+				//[200] chrissstrahl - fix NULL entity reference
+				if($(local.ai) != NULL){
+					$(local.ai) thread scene4_spawn3_detect_death 	//call a waittill death thread
+					$(local.ai).mindist = 128
+					$(local.ai).maxdist = 4000
+					$(local.ai).leash = 10000
+					$(local.ai).interval = 128
+					$(local.ai).fixedleash = 0
+					$(local.ai).hearing = 4000
+					$(local.ai).noticescale = 1
+				}
+				//end chrissstrahl
 			}
 //			centerprint(level.scene4_spawn3_currentalive + "<" + level.scene4_spawn3_currentalivemax + "\n" + level.scene4_spawn3_deactivator + "=" + level.scene4_spawn3_deactivator+ "\n" + level.scene4_spawn3_teamvalue + "<" + level.scene4_spawn3_teamlimitmax )
 		}
@@ -3198,19 +3217,28 @@ scene4_spawndetector4_control:
 
 		//===Spawn 3 enemy soldiers in a wave
 			spawn models/human/german_panzer_shutze "targetname" (local.scene4_spawn4_ai_name1) "type_attack" "cover"
-			$(local.scene4_spawn4_ai_name1).origin = local.org1				//place the guy in the correct spot
+			
+			//$(local.scene4_spawn4_ai_name1).origin = local.org1				//place the guy in the correct spot
+			$(local.scene4_spawn4_ai_name1) origin local.org1 //[200] chrissstrahl - made bt compatible
+			
 			$(local.scene4_spawn4_ai_name1) thread scene4_spawn4_ai_navigate1 	//call navigation thread
 			$(local.scene4_spawn4_ai_name1) exec maps/m3l3/coopified.scr::ai_accuracy 20 40 70 NIL //chrissstrahl - e,m,h,c - manage for coop and sp skill
 
 			spawn models/human/german_waffenss_nco "targetname" (local.scene4_spawn4_ai_name2) "type_attack" "cover"
-			$(local.scene4_spawn4_ai_name2).origin = local.org2				//place the guy in the correct spot
+			
+			//$(local.scene4_spawn4_ai_name2).origin = local.org2				//place the guy in the correct spot
+			$(local.scene4_spawn4_ai_name2) origin local.org2	 //[200] chrissstrahl - made bt compatible
+			
 			$(local.scene4_spawn4_ai_name2) thread scene4_spawn4_ai_navigate2 	//call navigation thread
 			$(local.scene4_spawn4_ai_name2) gun "mp40"
 			$(local.scene4_spawn4_ai_name2) exec maps/m3l3/coopified.scr::ai_accuracy 20 40 70 NIL //chrissstrahl - e,m,h,c - manage for coop and sp skill
 			$(local.scene4_spawn4_ai_name2) dontdropweapons
 
 			spawn models/human/german_panzer_shutze "targetname" (local.scene4_spawn4_ai_name3) "type_attack" "cover"
-			$(local.scene4_spawn4_ai_name3).origin = local.org3				//place the guy in the correct spot
+			
+			//$(local.scene4_spawn4_ai_name3).origin = local.org3				//place the guy in the correct spot
+			$(local.scene4_spawn4_ai_name3) origin local.org3	//[200] chrissstrahl - made bt compatible
+			
 			$(local.scene4_spawn4_ai_name3) thread scene4_spawn4_detect_death 	//call a waittill death thread
 			$(local.scene4_spawn4_ai_name3) thread scene4_spawn4_ai_navigate3  	//call navigation thread
 			$(local.scene4_spawn4_ai_name3) exec maps/m3l3/coopified.scr::ai_accuracy 20 45 75 NIL //chrissstrahl - e,m,h,c - manage for coop and sp skill	
@@ -3218,15 +3246,19 @@ scene4_spawndetector4_control:
 			for (local.i = 1;local.i <= 3;local.i++){ //chrissstrahl - make compact
 				local.ai = $("scene4_spawn3_ai"+local.i+"_" + level.scene4_spawn3_teamvalue)
 				level.scene4_spawn3_currentalive ++							//increment the max allowed alive at any given time
-				level.scene4_spawn3_teamvalue ++							//track the scene's enemy population		
-				$(local.ai) thread scene4_spawn3_detect_death 	//call a waittill death thread
-				$(local.ai).mindist = 128
-				$(local.ai).maxdist = 4000
-				$(local.ai).leash = 10000
-				$(local.ai).interval = 128
-				$(local.ai).fixedleash = 0
-				$(local.ai).hearing = 4000
-				$(local.ai).noticescale = 1
+				level.scene4_spawn3_teamvalue ++							//track the scene's enemy population	
+				//[200] chrissstrahl - fix NULL entity reference
+				if($(local.ai) != NULL){
+					$(local.ai) thread scene4_spawn3_detect_death 	//call a waittill death thread
+					$(local.ai).mindist = 128
+					$(local.ai).maxdist = 4000
+					$(local.ai).leash = 10000
+					$(local.ai).interval = 128
+					$(local.ai).fixedleash = 0
+					$(local.ai).hearing = 4000
+					$(local.ai).noticescale = 1
+				}
+				//end chrissstrahl
 			}
 			$(local.scene4_spawn4_ai_name1).noticescale = 50
 
@@ -3885,13 +3917,10 @@ scene6_mgspawn_targeting local.machinegun:
 		}
 
 		local.player = self exec coop_mod/replace.scr::canseeGetClosest 0 local.effrange //chrissstrahl - coop
-		while(local.player == NULL){ //chrissstrahl - wait until a valid player is there
+		while(local.player == NULL && (isAlive self)){ //chrissstrahl - wait until a valid player is there
 			wait 0.25
 			local.player = self exec coop_mod/replace.scr::canseeGetClosest 0 local.effrange //chrissstrahl - coop
 		}
-		
-		if(local.player == NIL){ iprintlnbold_noloc("local.player == NIL") }
-		
 		
 		local.machinegun setaimtarget local.player //chrissstrahl - coop
 		
