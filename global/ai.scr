@@ -587,33 +587,30 @@ deaththread:
 	thread level.script::self.setthread
 end
 
-
-foealarm:
+//[200] chrissstrahl - fixed $player references
+//=========================================================================
+foealarm:{
+//=========================================================================
 //	println ("-*-*- " + self + " saw somebody!")
 	local.seen = 0
-	if (self cansee $player)
-	{
+	if (self exec coop_mod/replace.scr::cansee){ //[200] chrissstrahl - make work in multi
 		self exec global/disable_ai.scr
-		self lookat $player
+		self exec coop_mod/replace.scr::lookat //[200] chrissstrahl - make work in multi
 		wait 2
-		if (self cansee $player)
-		{
-			if (self.alarming == 0)
-			{
+		if (self exec coop_mod/replace.scr::cansee){
+			if (self.alarming == 0){
 				thread setupalarm
 				local.seen = 1
 			}
 		}
 	}
 
-	if (local.seen == 0)
-	{
+	if (local.seen == 0){
 		wait 1
 		self type_attack "alarm"
 		self alarmthread foealarm
 	}
-
-end
+}end
 
 
 fortfoegen:
@@ -695,74 +692,31 @@ setupalarm:
 	}
 end
 
-
-foealarmhit:
-/*
-	local.ent = -1
-
-	for (local.i=1;local.i<level.fortalarms+1;local.i++)
-	{
-		if (level.fortalarm[local.i].set == self.set)
-		local.ent = level.fortalarm[local.i]
-	}
-
-	if (local.ent != -1)
-	{
-		if (getcvar(debug) == "1")
-			println ("-*-*- " + self + " is running to sound the alarm")
-		
-		self exec global/disable_ai.scr
-		self runto local.ent
-
-		self alarmthread ai_alarm_fired
-		self type_attack "alarm"
-
-		while (parm.movedone == 0)
-		{
-			self runto local.ent
-			waittill movedone
-		}
-		self exec global/enable_ai.scr
-
-*/
-	if (getcvar(debug) == "1")
+//[200] chrissstrahl - cleaned up code
+//=========================================================================
+foealarmhit:{
+//=========================================================================
+	if (getcvar(debug) == "1"){
 		println ("Setting OFF alarm " + self.set)
+	}
 
-	if (self.setthread)
+	if (self.setthread){
 		thread level.script::self.setthread
-	thread spawn self.set
-	end
-
-
-	if (level.fortflag[self.set] == NIL)
-		level.fortflag[self.set] = 0
-
-	for (local.i=1;local.i<level.fortfriends+1;local.i++)
-	{
-		if ((level.fortfriend[local.i].set == self.set) && (level.fortflag[self.set] != 1))
-			level.fortfriend[local.i] thread spawnfortfriend
-
 	}
-
-	if (level.fortflag[self.set] == 0)
-	{
-		level.fortflag[self.set] = 1
-		if (self.setthread != NIL)
-			thread level.script::self.setthread
-	}
-//	}
-
-//		self exec global/enable_ai.scr
-		self runto $player
 	
-end
+	thread spawn self.set
+}end
 
-spawnfortfriend:
-	self runto $player
+//[200] chrissstrahl - made coop compatible
+//=========================================================================
+spawnfortfriend:{
+//=========================================================================
+	self thread coop_mod/replace.scr::runto
 	self waittill death
-	if (self.setthread != NIL)
+	if (self.setthread != NIL){
 		thread level.script::self.setthread
-end
+	}
+}end
 
 spawngroup local.set local.group local.enemyname:
 	thread spawn local.set NIL NIL NIL local.group local.enemyname
@@ -858,7 +812,7 @@ spawn local.set local.pause local.thread local.off local.group local.enemyname l
 			//chrissstrahl - added dropgun support for 1337Smithy his morocco map
 			if (level.enemyspawner[local.i].dropgun == 0 ){
 				local.ent dontdropweapons
-println("dev: ai.scr level.enemyspawner["+local.i+"].dropgun == "+level.enemyspawner[local.i].dropgun) //[200] chrissstrahl - give us some info here
+//println("dev: ai.scr level.enemyspawner["+local.i+"].dropgun == "+level.enemyspawner[local.i].dropgun) //[200] chrissstrahl - give us some info here
 			}
 			//end chrissstrahl
 
@@ -876,7 +830,7 @@ println("dev: ai.scr level.enemyspawner["+local.i+"].dropgun == "+level.enemyspa
 			
 			if ((level.dontdropweapons != NIL) && (level.dontdropweapons == 1)){
 				local.ent dontdropweapons
-println("dev: ai.scr level.dontdropweapons == 1") //[200] chrissstrahl - give us some info here
+//println("dev: ai.scr level.dontdropweapons == 1") //[200] chrissstrahl - give us some info here
 			}
 
 			local.ent forceactivate
@@ -901,22 +855,24 @@ println("dev: ai.scr level.dontdropweapons == 1") //[200] chrissstrahl - give us
 
 end
 
-alarmspawn local.set local.pause local.alarmthread local.alarmnode local.extra:
-
-	if (local.pause != NIL)
+//[200] chrissstrahl - made coop compatible
+//=========================================================================
+alarmspawn local.set local.pause local.alarmthread local.alarmnode local.extra:{
+//=========================================================================
+	if (local.pause != NIL){
 		wait local.pause
+	}
 
-	for (local.i=1;local.i<level.enemyspawners+1;local.i++)
-	{
-		if (level.enemyspawner[local.i].set == local.set)
-		{
-			if (getcvar(debug) == "1")
-				println "spawned an enemy"
+	for (local.i=1;local.i<level.enemyspawners+1;local.i++){
+		if (level.enemyspawner[local.i].set == local.set){
+			if (getcvar(debug) == "1"){ println "spawned an enemy" }
 
-			if (level.totalbaddies == NIL)
+			if (level.totalbaddies == NIL){
 				level.totalbaddies = 1
-				else
+			}
+			else{
 				level.totalbaddies++
+			}
 
 			local.ent = waitthread global/spawner.scr::spawner_activate level.enemyspawner[local.i]
 			local.ent.targetname = "enemyspawnguy"
@@ -926,29 +882,26 @@ alarmspawn local.set local.pause local.alarmthread local.alarmnode local.extra:
 			local.ent.creator = level.enemyspawner[local.i]
 			local.ent type_idle "idle"
 
-			if ($player istouching $endtriggergun)
-			{
+			if (exec coop_mod/replace.scr::istouching $endtriggergun){
 				local.ent type_attack "alarm"
 				local.ent alarmnode local.alarmnode
 				local.ent alarmthread local.alarmthread
+			}else{
+				local.ent type_attack "turret"
 			}
-			else
-			local.ent type_attack "turret"
 
 			local.ent forceactivate
 			local.ent thread enemyspawned
 			local.ent thread deathcheck
 
-			if ((local.extra != NIL) && (local.extra == 1) && ($player istouching $endtrigger))
-			{
+			if ((local.extra != NIL) && (local.extra == 1) && (exec coop_mod/replace.scr::istouching $endtrigger)){
 				local.ent.health = 250
 				local.ent.accuracy = 100
 				local.ent type_attack "turret"
 			}
 		}
 	}
-
-end
+}end
 
 
 deathcheck:
@@ -957,159 +910,96 @@ deathcheck:
 	level.totalbaddies--
 end
 
-
-
-enemyspawnertrigger:
+//[200] chrissstrahl - made coop compatible
+//=========================================================================
+enemyspawnertrigger:{
+//=========================================================================
 	//chrissstrahl - replace level waittill spawn
 	waitthread coop_mod/replace.scr::waitForPlayer
 	
-	if (getcvar(notrigger) == "1")
-	{
+	if (getcvar(notrigger) == "1"){
 		wait 4
 		self delete
 		end
 	}
 
-	if (game.medic != NIL)
+	if (game.medic != NIL){
 		end
+	}
 
-	if (self.friendly != NIL)
-	{
+	if (self.friendly != NIL){
 		local.break = 0
-		while (local.break == 0)
-		{
-			
+		
+		while (local.break == 0){
 			self waittill trigger
 
-			if ((parm.other == $player) || (parm.other.targetname == "friendly"))
-			{
-				if (getcvar(debug) == "1")
+			if ((parm.other == parm.other.targetname == "player") || (parm.other.targetname == "friendly")){ //[200] chrissstrahl - made coop compatible
+				if (getcvar(debug) == "1"){
 					println (parm.other + " set off the trigger")
+				}
 			
-		for (local.i=1;local.i<level.enemyspawnertriggers+1;local.i++)
-		if ((level.enemyspawnertrigger[local.i]) && (level.enemyspawnertrigger[local.i].set == self.set) && (level.enemyspawnertrigger[local.i] != self))
-			level.enemyspawnertrigger[local.i] delete
+				for (local.i=1;local.i<level.enemyspawnertriggers+1;local.i++){
+					if ((level.enemyspawnertrigger[local.i]) && (level.enemyspawnertrigger[local.i].set == self.set) && (level.enemyspawnertrigger[local.i] != self)){
+						level.enemyspawnertrigger[local.i] delete
+					}
+				}
 
 				thread spawn self.set
 				local.break = 1
 			}
 			wait 0.5
 		}
-	}
-	else
-	{
+	}else{
 		println ("origin " + self.origin)
 		self waittill trigger
-		if (getcvar(debug) == "1")
+		
+		if (getcvar(debug) == "1"){
 			println (parm.other + " set off the triggerB")
+		}
 
-		for (local.i=1;local.i<level.enemyspawnertriggers+1;local.i++)
-		if ((level.enemyspawnertrigger[local.i]) && (level.enemyspawnertrigger[local.i].set == self.set) && (level.enemyspawnertrigger[local.i] != self))
-			level.enemyspawnertrigger[local.i] delete
+		for (local.i=1;local.i<level.enemyspawnertriggers+1;local.i++){
+			if ((level.enemyspawnertrigger[local.i]) && (level.enemyspawnertrigger[local.i].set == self.set) && (level.enemyspawnertrigger[local.i] != self)){
+				level.enemyspawnertrigger[local.i] delete
+			}
+		}
 
 		thread spawn self.set
 	}
 
-	if (self.thread)
-	{
+	if (self.thread){
 		self thread level.script::self.thread
 //		println ("TRIGGER RAN THREAD " + self.thread)
 	}
-//	else
-//		println "TRIGGER HAD NO THREAD"
-
 	self delete
-
-	
-
-end
+}end
 
 
-
-areaspawner:
+//[200] chrissstrahl - cleaned up code
+//=========================================================================
+areaspawner:{
+//=========================================================================
 	level waittill spawn
-	end
-	local.range = 7750
-	local.minrange = 1000
-	local.spawn = -1
-	level.currentspawnedenemies = 0
-
-	if (level.maxspawnedenemies == NIL)
-		level.maxspawnedenemies = -1
-	
-	if (getcvar(nospawn) == "1")
-		end
-
-	while (1)
-	{
-		while (level.currentspawnedenemies < level.maxspawnedenemies)
-		{
-			local.last = -1
-			local.spawn = -1
-			for (local.i=1;local.i<level.areaspawners+1;local.i++)
-			{
-				if (level.enemyarea[level.areaspawner[local.i].area] !=  0)
-				if !($player canseenoents level.areaspawner[local.i].origin)
-				{
-//					println (vector_length ($player.origin - level.areaspawner[local.i].origin))
-					local.newrange = vector_length ($player.origin - level.areaspawner[local.i].origin)
-					if ((local.newrange < local.range) && (local.newrange > local.minrange))
-					{
-						local.last = local.spawn
-						local.range = local.newrange
-						local.spawn = local.i
-
-					}
-					wait 0.25
-				}
-
-				if (local.last != -1)
-					local.spawn = local.last
-
-				if (local.spawn != -1)
-				{
-					if (getcvar(debug) == "1")
-						println ("spawned area number " + level.currentspawnedenemies)
-					level.bombnum++
-					local.bombnum = level.bombnum + 35617
-					level.currentspawnedenemies++
-			
-					spawn level.areaspawner[local.spawn].spawn_model "targetname" ("areaspawned_" + local.bombnum)
-					$("areaspawned_" + local.bombnum).origin = level.areaspawner[local.spawn].origin
-					$("areaspawned_" + local.bombnum) type_idle "idle"
-					$("areaspawned_" + local.bombnum) type_attack "cover"
-					$("areaspawned_" + local.bombnum) forceactivate
-					$("areaspawned_" + local.bombnum) thread areathink
-					local.i = level.areaspawners+5
-				}
-			}
-
-			wait (8 + randomfloat(8))
-		}
-		
-		wait 3
-	}
-
-end
+}end
 
 dthink:
 	self waittill death
 	level.currentspawnedenemies--
 end
 
-
-areathink:
+//[200] chrissstrahl - made coop compatible
+//=========================================================================
+areathink:{
+//=========================================================================
 	thread dthink
 	self.health = 80
 	wait 2
-	self runto $player
+	self exec coop_mod/replace.scr::runto
 	self waittill movedone
-	while (isalive self)
-	{
-		self runto $player
+	while (isalive self){
+		self exec coop_mod/replace.scr::runto
 		self waittill movedone
 	}
-end
+}end
 
 
 hudprint local.string local.r local.g local.b:
@@ -2052,7 +1942,10 @@ friendlydead:
 
 end
 
-friendlythink:
+//[200] chrissstrahl - made coop compatible
+//=========================================================================
+friendlythink:{
+//=========================================================================
 	self exec global/disable_ai.scr
 	self thread friendlydead
 	self threatbias ignoreme
@@ -2063,28 +1956,41 @@ friendlythink:
 	self.mins = -30
 	self.maxs = 50
 	self.distance = 400
+	
+	//[200] chrissstrahl - make this work in coop
+	local.player = exec coop_mod/replace.scr::player_closestTo self
+	while(local.player == NULL){
+		wait 1
+		local.player = exec coop_mod/replace.scr::player_closestTo self
+	}
 
-	self runto $player
+
+	self runto local.player
 	wait 4
 	self exec global/enable_ai.scr
 	self threatbias 0
 	
 	self.movedoneradius = 300
 
-	while ((isalive self) && (vector_length (self.origin - $player.origin) > 500))
-	{
-		self runto $player
+	//[200] chrissstrahl - make this work in coop
+	local.player = exec coop_mod/replace.scr::player_closestTo self
+	while(local.player == NULL){
+		wait 1
+		local.player = exec coop_mod/replace.scr::player_closestTo self
+	}
+
+	//[200] chrissstrahl - make this work in coop
+	while ((isalive self) && (vector_length (self.origin - local.player.origin) > 500)){
+		self runto local.player
 		self waittill movedone
 		waitframe
 	}
 
-	if (isalive self)
-	{
+	if (isalive self){
 		self.friendtype = 0
 		self thread global/friendly.scr::friendlythink
 	}
-
-end
+}end
 
 
 sniperthink:
@@ -2131,139 +2037,124 @@ sniperthink:
 end
 
 // jsl--> local.get_there means turn off ai so that they get to their target.  Once there, turn ai back on...
-enemyspawned local.off local.get_there:
-
-
-	if (self.creator.type != NIL)
-	{
-		if (self.creator.type == "sniper")
-		{
+//[200] chrissstrahl - made coop compatible
+//=========================================================================
+enemyspawned local.off local.get_there:{
+//=========================================================================
+	if (self.creator.type != NIL){
+		if (self.creator.type == "sniper"){
 			self.accuracy = 100
 			self.noticescale = 1
 			self gun KAR98sniper
 			self item weapons/KAR98sniper.tik
 			self gun "KAR98sniper"
 			self useweaponclass rifle
-
 		}
 	}
 
-	if ( local.get_there==NIL )
+	if ( local.get_there==NIL ){
 		local.get_there = 0
-
-//	self.angles = self.creator.angles
-//	self.angle = self.creator.angle
-
-	/*
-	if (getcvar(debug) == "1")
-	{
-		if (self.creator.group != NIL)
-		{
-			println ("Group is " + self.creator.group + " and Set is " + self.creator.set)
-		}
 	}
-	*/
 
 	local.targ = NIL
-	if (self.creator.group != -1)
-	{
-		for (local.i=1;local.i<level.enemyspawnerdestinations+1;local.i++)
-		{
-			if ((level.enemyspawnerdestination[local.i].group == self.creator.group) && (level.enemyspawnerdestination[local.i].set == self.creator.set))
-			{
-				if (getcvar(debug) == "1")
-					println (self + " spawned and is running to " + self.creator.set + "/" + self.creator.group)
+	if (self.creator.group != -1){
+		for (local.i=1;local.i<level.enemyspawnerdestinations+1;local.i++){
+			if ((level.enemyspawnerdestination[local.i].group == self.creator.group) && (level.enemyspawnerdestination[local.i].set == self.creator.set)){
+				if (getcvar(debug) == "1"){ println (self + " spawned and is running to " + self.creator.set + "/" + self.creator.group) }
 				local.targ = level.enemyspawnerdestination[local.i]
 			}
 		}
 	}
-	else
-	if (self.creator.spawn_target != "")
-	{
-		local.targ = $(self.creator.spawn_target)
-//		println ("local.targ is " + local.targ + " and creator target is " + self.creator.target)
-//		println (" oh and local.targ's origin is " + local.targ.origin)
+	else{
+		if (self.creator.spawn_target != ""){
+			local.targ = $(self.creator.spawn_target)
+	//		println ("local.targ is " + local.targ + " and creator target is " + self.creator.target)
+	//		println (" oh and local.targ's origin is " + local.targ.origin)
+		}
+	}
+
+	if (self.creator.pause != NIL){
+		wait self.creator.pause
 	}
 
 
-	if (self.creator.pause != NIL)
-		wait self.creator.pause
-
-
-	if ((local.targ != NIL) && (local.targ != NULL))
-	{
+	if ((local.targ != NIL) && (local.targ != NULL)){
 		local.break = 0
 
 //		self tether local.targ
 
 		local.disabledAI = 0
 
-		if (self.type_attack == "balcony_attack" || level.disableAI==1)
-		{
+		if (self.type_attack == "balcony_attack" || level.disableAI==1){
 			local.disabledAI = 1
 			exec global/disable_ai.scr
 		}
 
-		if ( local.get_there==1 )
-		{
+		if ( local.get_there==1 ){
 //			dprintln self.targetname ": running to target with AI off!"
 			self exec global/disable_ai.scr
 		}
 
-		while (local.break == 0)
-		{
-			if (isalive self)
-			{
-				if (self.creator.walk == 1)
+		while (local.break == 0){
+			if (isalive self){
+				if (self.creator.walk == 1){
 					self walkto local.targ
-				else
+				}else{
 					self runto local.targ
+				}
 
 				self waittill movedone
 				self resetleash
 
 //				if (parm.movedone == 1)
-				if (vector_length (self.origin - local.targ.origin) < 80)
+				if (vector_length (self.origin - local.targ.origin) < 80){
 					local.break = 1
-				else
+				}
+				else{
 					wait 1
+				}
 			}
-			else
+			else{
 				local.break = 1
+			}
 		}
-		if(self && isalive self)
+		if(self && isalive self){
 			self resetleash
+		}
 
-		if ( local.get_there==1 && isAlive self )
-		{
+		if ( local.get_there==1 && isAlive self ){
 //			dprintln self.targetname ": got there, turning ai back on!!!"
 			self exec global/enable_ai.scr
 		}
-		if(self && isalive self)
+		
+		if(self && isalive self){
 			self tether local.targ
+		}
 
-		if (local.disabledAI==1)
+		if (local.disabledAI==1){
 			exec global/enable_ai.scr
+		}
 
-		if (getcvar(debug) == "1")
+		if (getcvar(debug) == "1"){
 			println (self + " ran to and reached " + self.creator.set + "/" + self.creator.group)
+		}
 	}
 
 	//chrissstrahl - modified for coop use
 	if (isalive self){
-		if (level.coop_singleplayer == 1 && self.team == $player.team || level.coop_singleplayer != 1 && self.team == "american" ){
-			println ("#coop info: friendly american")
+		//[200] chrissstrahl - fixed handle using deprecated level var
+		if((level.gametype == 0 && self.team == $player.team) || (level.gametype != 0 && self.team == "american")){
 			if ( level.auto_friendly==1 ){
 				level.friendlys++
 				level.friendly[level.friendlys] = self
 				if (self.creator.fnum){
-					println ("*fnum 1")
+					println ("dev: ai.scr *fnum 1")
 					if !(level.fnum[self.creator.fnum]){
 						level.fnum[self.creator.fnum] = self
-						println ("*fnum 2")
+						println ("edv: ai.scr *fnum 2")
 					}
 				}
-				println ("*fnum 3")
+				println ("dev: ai.scr *fnum 3")
 
 				self.targetname = "friendly"
 				self thread global/friendly.scr::friendlythink
@@ -2273,48 +2164,27 @@ enemyspawned local.off local.get_there:
 		}
 	}
 	//end chrissstrahl
-	
-	println "..........................."
-
 
 //	println ("playerseek is " + self.creator.playerseek)
 
-	if (self && self.creator.playerseek != 0)
+	if (self && self.creator.playerseek != 0){
 		self.nosurprise = 1
-
-
-	/*
-	if (isalive self)
-	if (self.team == $player.team)
-	{
-		level.friendlys++
-		level.friendly[level.friendlys] = self
-		self.targetname = "friendly"
-		self thread global/friendly.scr::friendlythink
-		self.friendtype = 0
-		end
 	}
-	*/
 	
-	if (self && self.creator.playerseek == 1)
-	{
-
+	if (self && self.creator.playerseek == 1){
 		local.ent = spawn script_origin
 		local.ent.origin = self.origin
-		if (local.off != NIL)
-		{
+		if (local.off != NIL){
 			self exec global/disable_ai.scr
 			self.nosurprise = 1
 //			self hearing 0
 //			self sight 0
 		}
 
-		while (isalive self)
-		{
-			self runto $player
+		while (isalive self){
+			self exec coop_mod/replace.scr::runto //[200] chrissstrahl - made coop compatible
 
-			if (local.off != NIL)
-			{
+			if (local.off != NIL){
 				wait local.off
 				self exec global/enable_ai.scr
 				self exec global/aimat.scr $player
@@ -2329,50 +2199,54 @@ enemyspawned local.off local.get_there:
 			self waittill movedone
 			waitframe
 		}
-
 		local.ent delete
-
 	}
-	else
-	if (self && self.creator.playerseek == 2)
-	{
+	else{
+		if (self && self.creator.playerseek == 2){
+			local.range = randomint(250) + 350
+			self.movedoneradius = local.range - 35
+			self exec global/disable_ai.scr
+			
+			//[200] chrissstrahl - made coop compatible
+			local.player = exec coop_mod/replace.scr::player_closestTo self
+			while(local.player == NULL){
+				wait 1
+				if(!(isalive self)){//[200] chrissstrahl - make sure we don't introduce strange behaviour
+					self exec global/enable_ai.scr
+					end
+				}
+				local.player = exec coop_mod/replace.scr::player_closestTo self
+			}
+			
+			//[200] chrissstrahl - made coop compatible
+			while ((isalive self) && (vector_length (self.origin - local.player.origin) > local.range)){
+				self runto local.player
+				self waittill movedone
+				waitframe
+			}
 
-		local.range = randomint(250) + 350
-		self.movedoneradius = local.range - 35
-		self exec global/disable_ai.scr
-		while ((isalive self) && (vector_length (self.origin - $player.origin) > local.range))
-		{
-			self runto $player
-			self waittill movedone
-			waitframe
+			self exec global/enable_ai.scr
+
+			while ((isalive self) && (self.thinkstate != "attack")){
+				self exec coop_mod/replace.scr::runto //[200] chrissstrahl - made coop compatible
+				self waittill movedone
+				waitframe
+			}
 		}
+		else{
+			if (self && self.creator.playerseek == 3){
+				wait 3.5
 
-		self exec global/enable_ai.scr
+				while ((isalive self) && (self.thinkstate != "attack")){
+					self exec coop_mod/replace.scr::runto //[200] chrissstrahl - made coop compatible
+					self waittill movedone
+					waitframe
+				}
 
-		while ((isalive self) && (self.thinkstate != "attack"))
-		{
-			self runto $player
-			self waittill movedone
-			waitframe
+			}
 		}
-
 	}
-	else
-	if (self && self.creator.playerseek == 3)
-	{
-		wait 3.5
-
-		while ((isalive self) && (self.thinkstate != "attack"))
-		{
-			self runto $player
-			self waittill movedone
-			waitframe
-		}
-
-	}
-
-	
-end
+}end
 
 
 /*		
