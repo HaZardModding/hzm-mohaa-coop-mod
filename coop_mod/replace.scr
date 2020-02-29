@@ -1220,17 +1220,19 @@ glue local.entity local.angle:{
 //seperate thread fot this and new glue function
 //maybe glueing only once will stop shaking when glued while object is moving
 //
-//chrissstrahl - updated with 2.00
+//[200] chrissstrahl - rewritten
 //=========================================================================
 glueHandle local.glueTo local.angle:{
 //=========================================================================
 
 	//detect if it is a entity or a string, if it is a string we want each player to have a seperate spot
-	local.individualSpots = 0
 	if(local.glueTo.size > 1){
-		local.individualSpots = 1
+		level.coop_playerGlueIndividual = 1
+	}else{
+		level.coop_playerGlueIndividual = 0
 	}
 	
+	//loop and handle each player while glue is active
 	while(level.coop_playerGlue == 1){
 		for (local.i = 1;local.i <= $player.size;local.i++){
 			local.player =  $player[local.i]
@@ -1240,33 +1242,13 @@ glueHandle local.glueTo local.angle:{
 				}else{
 					local.entity = local.glueTo
 				}
-				
-				//skip null entity
+				//print error if there is one
 				if(local.entity == NULL){
-					println("DEV: replace.scr glue - local.entity was NULL for $player["+local.i+"]")
+					println("ERROR: replace.scr::glueHandle - local.entity was NULL for $player["+local.i+"]")
 					continue
 				}
-				
 				local.player.flags["coop_glueAngle"] = local.angle
-				local.player.flags["coop_glue"] = local.entity
-				
-				if( local.player.dmteam != "spectator" && local.player.health > 0 ){
-					//if they all go on one spot we can't have them solid and visible
-					if(local.individualSpots == 0){
-						local.player notsolid
-						local.player physics_off
-						local.player hide
-					}
-					
-					if(local.entity == NIL){ iprintlnbold_noloc("DEV: local.ent is NIL")	}
-					if(local.player == NIL){ iprintlnbold_noloc("DEV: local.player is NIL")	}
-					
-					if(local.angle != NIL){
-						local.player glue local.entity local.angle
-					}else{
-						local.player glue local.entity
-					}
-				}
+				local.player.flags["coop_glue"] = local.entity				
 			}
 		}
 		waitframe
@@ -1281,6 +1263,7 @@ glueHandle local.glueTo local.angle:{
 unglue local.entity:{
 //=========================================================================
 	level.coop_playerGlue = 0
+	level.coop_playerGlueIndividual = 0
 
 	//local.entity keept only for compatibility reasons
 	if( level.gametype == 0 ){

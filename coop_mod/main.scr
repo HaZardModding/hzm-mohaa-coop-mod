@@ -74,7 +74,8 @@ main:{
 	//if(level.coop_physicsOn			== NIL){ level.coop_physicsOn				= 1 }		//used for replacement of $player physicson
 	//if(level.coop_specialSpawn		== NIL){ level.coop_specialSpawn			= 0 }		//used for replacement of $player hide
 	if(level.coop_inJeep				== NIL){ level.coop_inJeep					= 0 }		//used to check if player should be in jeep or not
-	if(level.coop_playerGlue			== NIL){ level.coop_playerGlue				= 0 }		//used for replacement of $player glue
+	if(level.coop_playerGlue			== NIL){ level.coop_playerGlueIndividual	= 0 }		//used for replacement of $player glue (individual spots)
+	if(level.coop_playerGlue			== NIL){ level.coop_playerGlue				= 0 }		//used for replacement of $player glue (glue is active)
 	if(level.coop_playerHide			== NIL){ level.coop_playerHide				= 0 }		//used for replacement of $player hide
 	if(level.coop_player				== NIL){ level.coop_player					= NULL }	//follow player for gloabal/fiendly.scr
 	if(level.coop_playerTank			== NIL){ level.coop_playerTank				= NULL }	//tank driving player for gloabal/vehicles_thinkers.scr
@@ -588,26 +589,31 @@ managePlayers:{
 								local.player hide
 							}
 							
-							//move player to spawn
+//move player to spawn
 							thread playerPlaceAtSpawn local.i
-
-							//glue player
+//[200] chrissstrahl - handle glueing, used to be managed in replace.scr::glueHandle
 							if( level.coop_playerGlue ){
-								if( local.player.flags["coop_glue"] != NIL && (local.player.flags["coop_glue"]) != NULL){
-								
-									local.player physics_off
-									local.player notsolid
-									local.player hide
-									local.player threatbias ignoreme
-									local.player glue (local.player.flags["coop_glue"])
+								if(local.player.flags["coop_glue"] != NIL && local.player.flags["coop_glue"] != NULL){
+									local.entity	= local.player.flags["coop_glue"]
+									local.angle		= local.player.flags["coop_glueAngle"]
 									
-									if( local.player.flags["coop_glueAngle"] ){
-										local.face = (0 0 0)
-										local.face[1] = local.player.flags["coop_glueAngle"]
-										local.player face local.face
+									if(local.entity == NIL || local.entity == NULL){
+										println("ERROR: main.scr::managePlayers(glueing) - local.entity was NULL/NIL for $player["+local.i+"]")
+									}else{
+										if(local.angle != NIL){
+											local.player glue local.entity local.angle
+										}else{
+											local.player glue local.entity
+										}
+										
+										if(!level.coop_playerGlueIndividual){
+											local.player notsolid
+											local.player physics_off
+											local.player hide
+										}
 									}
 								}
-							}
+							}						
 						}
 // RESPAWNING & RESTORE /////////////////////////////////////////
 						if(local.player.flags["coop_respawning"] == TRUE){
