@@ -38,6 +38,22 @@ main:{
 
 	//===STOP THE PANZERSCHRECK SCRIPTMODEL FROM CUTTING OFF THE PATHFINDING
 	$scene0_panzerschreck notsolid
+	$$scene4_panzerschreck notsolid //[200] chrissstrahl - added for coop
+	
+	//[200] chrissstrahl - remove useless and place panzerschreck near halftrack loc
+	if(level.gametype != 0){
+		$scene0_panzerschreck origin ( -3183 3776 -150 )
+		$scene0_panzerschreck notsolid
+		$scene0_shell1 remove
+		$scene0_shell2 remove
+		$scene0_shell3 remove
+		$scene0_shell4 remove
+		$scene0_shell5 remove
+		$scene0_shell6 remove
+		$scene0_shell7 remove
+		waitframe
+		thread coop_spawnBazooka
+	}
 
 //-------------------------------------------------------
 	level waittill prespawn
@@ -480,26 +496,26 @@ end
 scene0_panzerschreck_trigger:
 	//===Vanish the panzerschreck and rocket scriptmodels when the player gets close
 
-	$scene0_panzerschreck remove
-	$scene0_shell1 remove
-	$scene0_shell2 remove
-	$scene0_shell3 remove
-	$scene0_shell4 remove
-	$scene0_shell5 remove
-	$scene0_shell6 remove
-	$scene0_shell7 remove
-
 	//===Add a panzerschreck and some rockets to the player's inventory and play the pickup sounds
-	if(level.gametype == 0){//chrissstrahl - do only in sp
+	if(level.gametype == 0){//chrissstrahl - do only in sp - we place PANZERSCHRECK near halftrack in coop - see main:
+		$scene0_panzerschreck remove
+		$scene0_shell1 remove
+		$scene0_shell2 remove
+		$scene0_shell3 remove
+		$scene0_shell4 remove
+		$scene0_shell5 remove
+		$scene0_shell6 remove
+		$scene0_shell7 remove
+	
 		$player playsound panzerschreck_snd_pickup
 		//$player playsound panzerschreck_snd_pickup_ammo //chrissstrahl
 		$player item weapons/panzerschreck.tik
 		//$player ammo heavy 6 //chrissstrahl
 		iprintln "You have the Panzerschreck."
-	}
-	
-	//chrissstrahl - this will only happen in coop
-	exec coop_mod/replace.scr::ammo heavy 6 panzerschreck_snd_pickup_ammo
+		
+		//chrissstrahl - this will only happen in coop
+		exec coop_mod/replace.scr::ammo heavy 6 panzerschreck_snd_pickup_ammo
+	}	
 end
 
 //==============================================================================================================================================//
@@ -602,7 +618,7 @@ halftrack_mg_targeting:{
 	while (local.player == NULL){		
 		wait 1 //[200] chrissstrahl - changed to 1 from 2 secs - this function needs to be reworked anyway
 		local.player = $halftrack_gunner exec coop_mod/replace.scr::canseeGetClosest 0 3050 //chrissstrahl - coop mod replacment
-		println "+++++ I CANT SEE YOU ++++++"
+		//println "+++++ I CANT SEE YOU ++++++" //[200] chrissstrahl - stop console spam
 		if !(isAlive $halftrack)
 			end
 	}
@@ -627,7 +643,7 @@ halftrack_mg_targeting:{
 		if !(isAlive $halftrack){ end }
 	}
 	
-	println "Aiming for PLAYER!!!!!"
+	//println "Aiming for PLAYER!!!!!" //[200] chrissstrahl - stop console spam
 	self setaimtarget local.player
 
 	//===*DIFFICULTY* SELECTOR
@@ -656,7 +672,7 @@ halftrack_mg_targeting:{
 		if !(isAlive $halftrack){ end }
 		
 		if (vector_within local.player $halftrack 2300){
-			println "SUPER POWERFUL MODE"
+			//println "SUPER POWERFUL MODE" //[200] chrissstrahl - stop console spam
 			self bulletdamage 5000
 			self bulletspread 10 10
 		}else{			
@@ -2205,23 +2221,10 @@ scene4_panzerschreck_trigger:{
 		$player item weapons/panzerschreck.tik
 		$player ammo heavy 1
 		end
-	}else{
-		local.player = parm.other
-		local.mins = ( -20 -20 -20 )
-		local.maxs = ( 20 20 50 )
-		local.origin = self.origin
-		spawn trigger_use origin local.origin targetname "coop_getPanzerschreck" setthread "coop_getPanzerSchreck"
-		waitframe 
-		$coop_getPanzerschreck setsize local.mins local.maxs
-		
-		//chrissstrahl - removed the indicator lamp, it does not fit in there - floating lamp
-		//spawn script_model model "models/items/Af_P_Lantern.tik" origin (local.origin) notsolid 1
-		waitframe
-		local.player usestuff
-		local.player trigger $coop_getPanzerschreck
 	}
+	//[200] chrissstrahl - coop is handled in 
 
-	//chrissstrahl - this will only happen in mp/coo
+	//chrissstrahl - this will only happen in mp/coop
 	exec coop_mod/replace.scr::ammo heavy 3 panzerschreck_snd_pickup
 }end
 
@@ -2658,12 +2661,12 @@ scene4_tank_shoot_player:{
 	local.player = exec coop_mod/replace.scr::player_closestTo self //chrissstrahl - coop
 	self setaimtarget local.player
 
-	println "TRACKING PLAYER"
+	//println "TRACKING PLAYER" //[200] chrissstrahl - stop console spam
 
 	self waittill ontarget
 
 	if !(sighttrace (local.player.origin + (0 0 320)) self.origin 1){
-		println "DENIED BY NO LINE OF SIGHT"
+		//println "DENIED BY NO LINE OF SIGHT" //[200] chrissstrahl - stop console spam
 		end
 	}else if (sighttrace (local.player.origin + (0 0 320)) self.origin 1){
 		if(level.gametype == 0){ //chrissstrahl - do in sp
@@ -2686,7 +2689,7 @@ scene4_tank_shoot_player:{
 		if !(isAlive $scene4_tank){ end }
 
 		if !(sighttrace (local.player.origin + (0 0 320)) self.origin 1){
-			println "DENIED BY NO LINE OF SIGHT"
+			//println "DENIED BY NO LINE OF SIGHT" //[200] chrissstrahl - stop console spam
 			end
 		}
 
@@ -5838,4 +5841,63 @@ quick_farplane_near_extra:
 end
 
 
+//chrissstrahl - spawn bazooka for players to kill tank
+//============================================================================
+coop_spawnBazooka:{
+//============================================================================
+	local.trigg1 = spawn trigger_multiple origin ( -3183 3776 -150 ) setthread coop_bazookaSwitch wait 2
+	local.trigg2 = spawn trigger_multiple origin ( 4123 2053 183 ) setthread coop_bazookaSwitch wait 2
+	//spawn script_model model "models/weapons/bazooka.tik" targetname "theOneAndOnlyTrueBazooka1" origin ( -782 -5153 110 ) notsolid 1
+	//spawn script_model model "models/weapons/bazooka.tik" targetname "theOneAndOnlyTrueBazooka2" origin ( 0 -6227 110 ) notsolid 1
+	waitframe
+	local.trigg1 setsize ( -10 -10 0 ) ( 10 10 30 )
+	local.trigg2 setsize ( -10 -10 0 ) ( 10 10 30 )
+	$scene0_panzerschreck rotateY 100
+	$$scene4_panzerschreck rotateY 100
+}end
+
+//chrissstrahl - allow players to switch their weapons
+//============================================================================
+coop_bazookaSwitch:{
+//============================================================================
+	//iprintlnbold_noloc("coop_bazookaSwitch")
+	if( parm.other.targetname == "player"){
+		local.player = parm.other
+		if( local.player.flags["coop_BaZookaSwitch"] == NIL ){	
+			local.isPrimary = 0
+			local.primary = waitexec coop_mod/main.scr::getActiveWeapon local.player
+			for(local.x=0;local.x<4;local.x++){
+				for(local.y=0;local.y<4;local.y++){
+					if(local.player == NULL || local.player.health < 1 || local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1){ end }
+					if		(local.y == 0){ local.type = "heavy" }
+					else if	(local.y == 1){ local.type = "smg" }
+					else if	(local.y == 2){ local.type = "rifle" }
+					else if	(local.y == 3){ local.type = "mg" }
+					local.player useweaponclass (local.type)
+					waitframe
+				}
+				local.primary = waitexec coop_mod/main.scr::getActiveWeapon local.player
+				local.isPrimary = waitexec coop_mod/main.scr::isPrimaryWeapon local.primary
+				if(local.isPrimary == 1){
+					local.player.flags["coop_BaZookaSwitch"] = local.primary
+					break					
+				}
+			}
+			//if no more player
+			if(local.player == NULL || local.player.health < 1 || local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1){ end }
+			
+			//if the player still does not have a primary weapon stop right here
+			if(	local.isPrimary == 0 ){
+				local.player iprint ("You need a Primary Weapon in order to Trade your Weapon!") 1
+				end
+			}
+			
+			exec coop_mod/main.scr::playerForcePrimary local.player "weapons/bazooka.tik"
+			local.player item heavy
+		}else{
+			exec coop_mod/main.scr::playerForcePrimary local.player local.player.flags["coop_BaZookaSwitch"]
+			local.player.flags["coop_BaZookaSwitch"] = NIL
+		}
+	}
+}end
 
