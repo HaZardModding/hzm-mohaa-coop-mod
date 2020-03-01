@@ -587,28 +587,7 @@ managePlayers:{
 //move player to spawn
 							thread playerPlaceAtSpawn local.i
 //[200] chrissstrahl - handle glueing, used to be managed in replace.scr::glueHandle
-							if( level.coop_playerGlue ){
-								if(local.player.flags["coop_glue"] != NIL && local.player.flags["coop_glue"] != NULL){
-									local.entity	= local.player.flags["coop_glue"]
-									local.angle		= local.player.flags["coop_glueAngle"]
-									
-									if(local.entity == NIL || local.entity == NULL){
-										println("ERROR: main.scr::managePlayers(glueing) - local.entity was NULL/NIL for $player["+local.i+"]")
-									}else{
-										if(local.angle != NIL){
-											local.player glue local.entity local.angle
-										}else{
-											local.player glue local.entity
-										}
-										
-										if(!level.coop_playerGlueIndividual){
-											local.player notsolid
-											local.player physics_off
-											local.player hide
-										}
-									}
-								}
-							}						
+							waitthread playerGlue local.player
 						}
 // RESPAWNING & RESTORE /////////////////////////////////////////
 						if(local.player.flags["coop_respawning"] == TRUE){
@@ -1598,7 +1577,6 @@ cleanText local.source local.text:{
 	}
 }end local.newString
 
-
 //return type of variable
 //performs a series of checks to determine the variable type ?
 //type: 0-NIL, 1-string,2-entity,3-vector,4-int/float
@@ -1710,7 +1688,6 @@ isFloat local.var:{
 	if(local.afterDot == 3){ end 1 }
 }end 0
 
-
 //[200] chrissstrahl - text to print if developer needs to be activated
 //=========================================================================
 checkCoopDeveloper local.text:{
@@ -1718,4 +1695,32 @@ checkCoopDeveloper local.text:{
 	if(int(getcvar("coop_dev")) == 1){ end 0 }
 	self iprint (local.text+" is not allowed, cvar coop_dev needs to be 1") 1
 }end 1
+
+//[200] chrissstrahl - (new) glue player to object coop handle
+//=========================================================================
+playerGlue local.player:{
+//=========================================================================
+	if( level.coop_playerGlue ){
+		if(local.player.flags["coop_glue"] != NIL && local.player.flags["coop_glue"] != NULL){
+			local.entity	= local.player.flags["coop_glue"]
+			local.angle		= local.player.flags["coop_glueAngle"]
+			
+			if(local.entity == NIL || local.entity == NULL){
+				println("ERROR: main.scr::managePlayers(glueing) - local.entity was NULL/NIL for $player["+local.i+"]")
+			}else{
+				if(local.angle != NIL){
+					local.player glue local.entity local.angle
+				}else{
+					local.player glue local.entity
+				}
+				
+				if(!level.coop_playerGlueIndividual){
+					local.player notsolid
+					local.player physics_off
+					local.player hide
+				}
+			}
+		}
+	}
+}end
 
