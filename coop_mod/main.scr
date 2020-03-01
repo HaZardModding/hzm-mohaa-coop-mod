@@ -64,17 +64,12 @@ main:{
 	level.coop_debugSpawn				= 0 //show (1) spawnlocations or not (0)
 	level.coop_playerReady				= 0	//player(s) are not ready/not joined
 	
+	level.coop_getActiveWeapon_entity	= NULL		//[200] chrissstrahl - used to retrive active weapon of player in ::getActiveWeapon, ::getActiveWeapon_detect
 	level.coop_musicCommandVol			= NIL
 	level.coop_musicCommand				= NIL
-	//I belive we don't need this
-	//level.coop_musicCommandIndx				= 0
-	//level.coop_musicCommandLoop				= NIL
-	//level.coop_musicCommandLoopIndx			= 0
 	
-	//if(level.coop_physicsOn			== NIL){ level.coop_physicsOn				= 1 }		//used for replacement of $player physicson
-	//if(level.coop_specialSpawn		== NIL){ level.coop_specialSpawn			= 0 }		//used for replacement of $player hide
 	if(level.coop_inJeep				== NIL){ level.coop_inJeep					= 0 }		//used to check if player should be in jeep or not
-	if(level.coop_playerGlue			== NIL){ level.coop_playerGlueIndividual	= 0 }		//used for replacement of $player glue (individual spots)
+	if(level.coop_playerGlueIndividual	== NIL){ level.coop_playerGlueIndividual	= 0 }		//used for replacement of $player glue (individual spots)
 	if(level.coop_playerGlue			== NIL){ level.coop_playerGlue				= 0 }		//used for replacement of $player glue (glue is active)
 	if(level.coop_playerHide			== NIL){ level.coop_playerHide				= 0 }		//used for replacement of $player hide
 	if(level.coop_player				== NIL){ level.coop_player					= NULL }	//follow player for gloabal/fiendly.scr
@@ -1306,6 +1301,34 @@ getPlayerId local.player:{
 	}
 }end NIL
 
+//[200] chrissstrahl - used to retrive the current weapon
+//=========================================================================
+getActiveWeapon_detect:{
+//=========================================================================
+	level.coop_getActiveWeapon_entity = self
+}end
+
+//[200] chrissstrahl - using a less resource intense method sugessted by DoubleKill
+//return weapon of given player
+//=========================================================================
+getActiveWeapon local.player:{
+//=========================================================================
+	if(local.player != NULL && local.player.health > 0 ){
+		//[200] chrissstrahl - made singleplayer compatible
+		if(level.gametype == 0 || local.player.dmteam != "spectator"){
+			level.coop_getActiveWeapon_entity = NULL
+			local.player weaponcommand "tag_weapon_right" waitthread "getActiveWeapon_detect"
+			local.ent = level.coop_getActiveWeapon_entity
+			if(local.ent != NULL){
+				if( waitthread isWeaponModel local.ent.model ){
+					end local.ent.model
+				}
+			}
+		}
+	}
+}end "weaponless"
+
+/*
 //return weapon of given player
 //=========================================================================
 getActiveWeapon local.player:{
@@ -1332,6 +1355,7 @@ getActiveWeapon local.player:{
 		}
 	}
 }end "weaponless"
+*/
 
 //check if primary weapon of given player is active
 //=========================================================================
