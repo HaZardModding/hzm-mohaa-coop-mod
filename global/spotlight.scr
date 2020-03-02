@@ -37,15 +37,17 @@
 //============================================================================
 main:{
 //============================================================================
-	if(level.gametype == 0){
-		level waittill prespawn
-	}
-	else{
-		level waittill playerspawn
-	}
-
+	//[200] chrissstrahl - prespawn is prespawn will be prespawn and allways shall be prespawn - AMEN
+	level waittill prespawn
+	
+	//[200] chrissstrahl - set to NULL making all NIL checks unnessary
+	level.coop_spotlightPlayer = NULL
+	
+	//level.spottarget = NULL //[200] chrissstrahl - fixme
+	
+	//[200] chrissstrahl - disabled because we test a different solution
 	//DK - get player closest to spotlight
-	thread player_closest_to_spotlight
+	//thread player_closest_to_spotlight
 
 	if (level.spotrespondtime == NIL)
 		level.spotrespondtime = 5
@@ -167,10 +169,21 @@ main:{
 
 	//DK -  changed player and add error check
 	//while (isalive $player)
-	//[200] chrissstrahl - fixed scripts abborting if player dies
+	//[200] chrissstrahl - fixed scripts abborting if player dies in coop
 	while ( level.gametype != 0 || isalive $player ){
+		//if !(isalive level.spottarget){ //[200] chrissstrahl - fixme
+		
 		if !(isalive level.coop_spotlightPlayer){
-			level.coop_spotlightPlayer = level.coop_spotlightPlayer
+			//[200] chrissstrahl - grab player if target (Teammate-AI) is dead
+			if(level.gametype == 0){
+				level.coop_spotlightPlayer = $player
+			}
+			else{
+			//[200] chrissstrahl - let us try this solution instead (this might be to slow for coop checking only every 3 sec)
+				for(local.i=1;local.i<=$spotlight.size;local.i++){
+					level.coop_spotlightPlayer = waitthread coop_mod/replace.scr::player_closestTo $spotlight[local.i].spotlight
+				}
+			}
 			
 			for (local.i=1;local.i<level.spotlights+1;local.i++){
 				level.spotplayertime[level.spotlight[local.i].set] = level.time - 5
@@ -178,6 +191,7 @@ main:{
 				level.spotnervous[level.spotlight[local.i].set]++
 			}
 		}
+		//[200] chrissstrahl - fixme - the 3 sec might give troubles in coop we might need to make a new handle for players only
 		wait 3
 	}
 }end
@@ -244,10 +258,14 @@ spotowner:{
 	while (self.parent.checkdeath != 1){
 		wait (randomint(level.spotrespondtime) + 1.5)
 		if ((level.spotplayer[self.parent.set] == 1) && (self.parent.on_target == 1)){
-			self.gun setAimTarget level.coop_spotlightPlayer
-			self.gun burstFireSettings level.spot_burstmin level.spot_burstmax level.spot_burstdownmin level.spot_burstdownmax
-			self.gun startFiring
-			local.shooting = 1
+			//[200] chrissstrahl - don't fire if there is no target
+			if(level.coop_spotlightPlayer != NULL){
+				//self.gun setAimTarget level.spottarget //[200] chrissstrahl - fixme
+				self.gun setAimTarget level.coop_spotlightPlayer
+				self.gun burstFireSettings level.spot_burstmin level.spot_burstmax level.spot_burstdownmin level.spot_burstdownmax
+				self.gun startFiring
+				local.shooting = 1
+			}
 		}
 		else if (local.shooting == 1){
 			if (( level.spotplayer[self.parent.set] != 1 ) || (self.parent.on_target != 1)){
@@ -268,7 +286,9 @@ spotowner:{
 		wait (randomint(level.spotrespondtime) + 1.5)
 
 		if (self.visible == 1){
-			if (self cansee level.coop_spotlightPlayer && level.coop_spotlightPlayer != NULL){
+			//if (level.spottarget != NULL && self cansee level.spottarget){ //[200] chrissstrahl - fixme
+			if (level.coop_spotlightPlayer != NULL && self cansee level.coop_spotlightPlayer){
+				//self.gun setAimTarget level.spottarget //[200] chrissstrahl - fixme
 				self.gun setAimTarget level.coop_spotlightPlayer
 				self.gun burstFireSettings level.spot_burstmin level.spot_burstmax level.spot_burstdownmin level.spot_burstdownmax
 
@@ -305,7 +325,8 @@ spotowner_death:{
 	self.parent.spotterdeath = 1
 
 	for (local.i=1;local.i<level.spotlights+1;local.i++){
-		if (level.spotlight[local.i].set == self.parent.set){
+		//[200] chrissstrahl - added NULL check 
+		if (level.spotlight[local.i].set == self.parent.set && level.spotlight[local.i].spotter != NULL){
 			level.spotlight[local.i].spotter threatbias 100
 		}
 	}
@@ -442,7 +463,6 @@ spotwatch:{
 			}
 		}
 
-
 		if (self.on_target == 1){
 			self.on_target_time--
 
@@ -514,23 +534,9 @@ spotwatch:{
 //============================================================================
 light_corona:{
 //============================================================================
-
-//DK - thread to get player closest to spotlight
-thread player_closest_to_spotlight
-
 	while (self.checkdeath == 0){
-		waitframe
-		//[200] chrissstrahl - wait another frame extra then continue the loop
-		if(level.coop_spotlightPlayer == NULL || level.coop_spotlightPlayer.origin == NIL){
-			waitframe
-			continue
-		}
-
-		if (!self.flare){
-			end
-		}
-
-		if( self.spotterdeath == 1){
+		//[200] chrissstrahl - lets check this in one if
+		if (!self.flare || self.spotterdeath == 1 ){
 			end
 		}
 
@@ -557,12 +563,18 @@ thread player_closest_to_spotlight
 
 		//DK - replaced code
 		//local.vect = $player.origin - self.origin
-		local.vect = level.coop_spotlightPlayer.origin - self.origin
+		//[200] chrissstrahl - fixed using wrong entity
+		local.player = exec coop_mod/replace.scr::player_closestTo self
+		if(local.player == NULL){ //if there is no player use self instead
+			local.player = self
+		}
+		local.vect = (local.player.origin - self.origin)
 		local.vect = vector_normalize (local.vect)
 
 		//DK - replaced code
 		//local.angles = angles_toforward ($player.angles)
-		local.angles = angles_toforward (level.coop_spotlightPlayer.angles)
+		//[200] chrissstrahl - fixed using wrong entity
+		local.angles = angles_toforward (local.player.angles)
 		local.vect[0] = local.vect[0] * local.angles[0]
 		local.vect[1] = local.vect[1] * local.angles[1]
 		local.vect[2] = local.vect[2] * local.angles[2]
@@ -571,8 +583,9 @@ thread player_closest_to_spotlight
 		//DK - replaced code 
 		//local.org1 = $player.origin + (0 0 64)
 		//local.ang1 = $player.angles
-		local.org1 = level.coop_spotlightPlayer.origin + ( 0 0 64 )
-		local.ang1 = level.coop_spotlightPlayer.angles
+		//[200] chrissstrahl - fixed using wrong entity
+		local.org1 = local.player.origin + ( 0 0 64 )
+		local.ang1 = local.player.angles
  
 		local.org2 = self.bulb.origin
 		local.ang2 = local.vect1
@@ -589,6 +602,7 @@ thread player_closest_to_spotlight
 		}
 		// corona
 		self.flare scale (local.returnvalue * 25)
+		waitframe
 	}
 }end
 
@@ -609,15 +623,18 @@ aimspot:{
 	local.angles[1] = 0
 	self.bulb.angles = local.angles
 
-	//DK - wait to get the player
-	while(local.spottargetorigin == NIL){
-		//DK - check for player error
-		if(level.coop_spotlightPlayer != NIL && level.coop_spotlightPlayer != NULL){
-			local.spottargetorigin = level.coop_spotlightPlayer.origin
-			local.spottarget = level.coop_spotlightPlayer
-		}
-		waitframe
+
+	//[200] chrissstrahl - function does now exit as it should, rather than
+	//waiting for a player to become valid and making all the other scripts wait
+	//if(level.spottarget == NULL){ //[200] chrissstrahl - fixme
+	if(level.coop_spotlightPlayer == NULL){
+		end
 	}
+	//[200] chrissstrahl - fixme //local.spottargetTemp = level.spottarget	//chrissstrahl - use this to save us time to rework this func
+	local.spottargetorigin = level.coop_spotlightPlayer.origin
+	local.spottarget = level.coop_spotlightPlayer	
+
+	
 //	if (level.spot
 	if (vector_length(self.spotlight.origin - local.spottargetorigin) < self.lightdist){
 		local.vect = trace self.spotlight.origin local.spottargetorigin 1
@@ -629,8 +646,21 @@ aimspot:{
 				local.break = 1
 			}
 
+			//[200] chrissstrahl - fixed targeting NULL, DEAD, inactive or spectator player
+			//[200] chrissstrahl - fixme (level.spottarget)
+			if( level.gametype != 0){
+				if( level.coop_spotlightPlayer == NULL ||
+					level.coop_spotlightPlayer.health <= 0 ||
+					level.coop_spotlightPlayer.dmteam == "spectator" ||
+					level.coop_spotlightPlayer.flags["coop_isActive"] != 1 )
+				{
+					local.break = 1
+				}
+			}
+			
 			//if (($player.is_disguised == 1) && (level.coop_spotlightPlayer == $player))
-			if ((level.coop_spotlightPlayer.is_disguised == 1) && (level.coop_spotlightPlayer.classname == "Player")){
+			//[200] chrissstrahl - fixme (level.spottarget)
+			if ((level.coop_spotlightPlayer.is_disguised == 1) && (level.coop_spotlightPlayer.classname == "Player") ){
 				local.break = 1
 			}
 
@@ -692,126 +722,111 @@ swaptarg:{
 	self.searchnum = -1
 }end
 
-search:
+//============================================================================
+search:{
+//============================================================================
 	local.trans = 0
 	local.trans2 = 0
 	self.lastorigin = self.origin
 	self.found_target = 0
 
-	while (self.checkdeath == 0)
-	{
-		if (self.currentaim != self.search)
-		{
+	while (self.checkdeath == 0){
+		if (self.currentaim != self.search){
 			local.trans = 0
 			self.search.origin =  self.org.origin
 			local.start =  self.org.origin
 		}
 
-	if(self.search.origin != NIL || level.coop_spotlightPlayer != NIL){
-
-		if (level.spotplayer[self.set] == 1)
-		{
-
-			if (self.found_target == 1)
-			{
-				if (self.on_target == 1)
-				{
+		//[200] chrissstrahl - wait a moment and then continue
+		//this was wrong and also not commented
+		if(self.search.origin == NIL || level.coop_spotlightPlayer == NULL){
+			waitframe
+			continue
+		}
+		
+		if (level.spotplayer[self.set] == 1){
+			if (self.found_target == 1){
+				if (self.on_target == 1){
 					self.fastcheck = 1
 					local.org = self.search.origin
+					//local.dest = level.spottarget.origin //[200] chrissstrahl - fixme
 					local.dest = level.coop_spotlightPlayer.origin
 					local.trans = 0.1
-						for (local.i=0;local.i<3;local.i++)
+					for (local.i=0;local.i<3;local.i++){
 						local.org[local.i] = (local.org[local.i] * (1 - local.trans)) + (local.dest[local.i] * local.trans)
-							self.search.origin = local.org
+					}
+					self.search.origin = local.org
 				}
-				else
-				{
+				else{
 					self.fastcheck = 1
 					local.org = self.lastorigin
 					local.dest = self.lastorigin
 					local.trans = 0.1
-						for (local.i=0;local.i<3;local.i++)
+					for (local.i=0;local.i<3;local.i++){
 						local.org[local.i] = (local.org[local.i] * (1 - local.trans)) + (local.dest[local.i] * local.trans)
-							self.search.origin = local.org
+					}
+					self.search.origin = local.org
 				}
 			}
-			else
-			{
+			else{
 				self.fastcheck = 1
 				local.org = self.search.origin
+				//local.dest = level.spottarget.origin //[200] chrissstrahl - fixme
 				local.dest = level.coop_spotlightPlayer.origin
 				local.trans = 0.1
-					for (local.i=0;local.i<3;local.i++)
+				for (local.i=0;local.i<3;local.i++){
 					local.org[local.i] = (local.org[local.i] * (1 - local.trans)) + (local.dest[local.i] * local.trans)
-						self.search.origin = local.org
+				}
+				self.search.origin = local.org
 			}
-
 		}
-		else
-		if (level.time > self.searchtime)
-		{
+		else if (level.time > self.searchtime){
 			self.fastcheck = 1
 
 			local.org = self.search.origin
 			local.dest = self.org.origin
 
-			for (local.i=0;local.i<3;local.i++)
+			for (local.i=0;local.i<3;local.i++){
 				local.org[local.i] = (local.org[local.i] * (1 - local.trans2)) + (local.dest[local.i] * local.trans2)
+			}
 
 			self.search.origin = local.org
 			local.trans2 = local.trans2 + 0.01
-	
 
-			if (self.spotplayer == 1)
-			{
+			if (self.spotplayer == 1){
 				self.spotplayer = 0
 				self.searchtime = level.time + 5 + randomint(5)
-
 				self.searchnum = -1 
 				local.trans = 1
-	
 				wait (0.4 + randomfloat(1))
 			}
-			else
-			if (local.trans2 > 1.0)
-			{
+			else if (local.trans2 > 1.0){
 				self.currentaim = self.org
 				self.searchtime = level.time + 99999
 				self.fastcheck = 0
 
 			}
-
 		}
-		else
-		{
-			
+		else{
 			local.trans2 = 0
 
-			if ((local.trans == 1) || (self.searchnum == -1))
-			{
-			
-
+			if ((local.trans == 1) || (self.searchnum == -1)){
 				self.fastcheck = 1
 				local.oldnum = self.searchnum
-				while (self.searchnum == local.oldnum)
-				{
-					
+				while (self.searchnum == local.oldnum){
 					self.searchnum = randomint(level.spotsearchs) + 1
-					
-					if ((level.spotsearch[self.searchnum].set == self.set) && (level.spotsearch[self.searchnum].group == self.group))
-					{
+					if ((level.spotsearch[self.searchnum].set == self.set) && (level.spotsearch[self.searchnum].group == self.group)){
 						local.start = self.search.origin
 						local.trans = 0
 						local.transrate = 0.01
 						local.transratemax = 0.12
 						local.transratemax = 0.12
 						local.transratemin = 0.03
-						
 						wait (0.4 + randomfloat(1))
 					}
-					else
-					self.searchnum = local.oldnum
-
+					else{
+						self.searchnum = local.oldnum
+					}
 					waitframe
 				}
 			}
@@ -819,35 +834,34 @@ search:
 			local.org = local.start
 			local.dest = level.spotsearch[self.searchnum].origin
 
-			for (local.i=0;local.i<3;local.i++)
+			for (local.i=0;local.i<3;local.i++){
 				local.org[local.i] = (local.org[local.i] * (1 - local.trans)) + (local.dest[local.i] * local.trans)
+			}
 
 			self.search.origin = local.org
 			local.trans = local.trans + local.transrate
 
-			if (local.trans > 1)
+			if (local.trans > 1){
 				local.trans = 1
-			if (local.trans < 0.7)
-			{
-				if (local.transrate < local.transratemax)
-				local.transrate = local.transrate + 0.005
 			}
-			else
-			{
+			
+			if (local.trans < 0.7){
+				if (local.transrate < local.transratemax){
+					local.transrate = local.transrate + 0.005
+				}
+			}
+			else{
 				if (local.transrate > local.transratemin)
 				local.transrate = local.transrate - 0.01
 			}
 		}
-
-	}
 		waitframe
 		self.lastorigin = local.org
-}
-end
-
+	}
+}end
 
 //============================================================================
-corona local.obj local.tag local.offset local.bothsides local.magnitude:{ 
+corona local.obj local.tag local.offset local.bothsides local.magnitude: { 
 //============================================================================
 	if (!local.offset){
 		local.offset = ( 0 0 0 )
@@ -864,27 +878,21 @@ corona local.obj local.tag local.offset local.bothsides local.magnitude:{
 	local.obj.corona = 1
 	local.flare attach local.obj local.tag 0 local.offset
 
-	//DK - thread to get player closest to spotlight
-	thread player_closest_to_spotlight
-
 	while (local.obj && (isalive local.obj) && (local.obj.corona == 1)){
-		waitframe
-			
-		//DK - add check for player error
-		//[200] chrissstrahl - wait another frame extra then continue the loop
-		if(level.coop_spotlightPlayer == NULL || level.coop_spotlightPlayer.origin == NIL){
-			waitframe
-			continue
+		//[200]chrissstrahl - fixed using wrong entity
+		local.player = exec coop_mod/replace.scr::player_closestTo local.flare
+		if(local.player == NULL){
+			local.player = $world
 		}
 
 		//DK - replaced code
 		//local.vect = $player.origin - local.flare.origin
-		local.vect = level.coop_spotlightPlayer.origin - local.flare.origin
+		local.vect = local.player.origin - local.flare.origin
 		local.vect = vector_normalize (local.vect)
 
 		//DK - replaced code
 		//local.angles = angles_toforward ($player.angles)
-		local.angles = angles_toforward (level.coop_spotlightPlayer.angles)
+		local.angles = angles_toforward (local.player.angles)
 		local.vect[0] = local.vect[0] * local.angles[0]
 		local.vect[1] = local.vect[1] * local.angles[1]
 		local.vect[2] = local.vect[2] * local.angles[2]
@@ -892,8 +900,8 @@ corona local.obj local.tag local.offset local.bothsides local.magnitude:{
 		//DK - replaced code
 		//local.org1 = $player.origin + (0 0 64)
 		//local.ang1 = $player.angles
-		local.org1 = level.coop_spotlightPlayer.origin + (0 0 64)
-		local.ang1 = level.coop_spotlightPlayer.angles
+		local.org1 = local.player.origin + (0 0 64)
+		local.ang1 = local.player.angles
  
 		local.org2 = local.flare.origin
 		local.ang2 = local.obj.angles
@@ -908,6 +916,7 @@ corona local.obj local.tag local.offset local.bothsides local.magnitude:{
 			local.returnvalue = 0
 		}
 		local.flare scale (local.returnvalue * local.magnitude)
+		waitframe
 	}
 	if ((isalive local.obj) && (local.obj.corona == 0)){
 		local.flare delete
@@ -918,9 +927,6 @@ corona local.obj local.tag local.offset local.bothsides local.magnitude:{
 //============================================================================
 deadcorona local.obj local.tag:{
 //============================================================================
-	//DK - thread to get player closest to spotlight
-	thread player_closest_to_spotlight
-
 	local.flare = spawn script_model
 	local.flare model "fx/searchlight.tik"
 	local.flare notsolid
@@ -929,23 +935,21 @@ deadcorona local.obj local.tag:{
 	local.flare attach local.obj local.tag 0 ( 0 0 0 )
 
 	while (local.obj != NIL && local.obj != NULL && local.obj.corona == 1){
-		waitframe
-		
-		//DK - check for player error
-		//[200] chrissstrahl - wait another frame extra then continue the loop
-		if(level.coop_spotlightPlayer == NULL || level.coop_spotlightPlayer.origin == NIL){
-			waitframe
-			continue
-		}
-
 		//DK - replaced code
 		//local.vect = $player.origin - local.flare.origin
-		local.vect = level.coop_spotlightPlayer.origin - local.flare.origin
+			
+		//[200]chrissstrahl - fixed using wrong entity
+		local.player = exec coop_mod/replace.scr::player_closestTo local.flare
+		if(local.player == NULL){
+			local.player = $world
+		}
+		local.vect = local.player.origin - local.flare.origin
 		local.vect = vector_normalize (local.vect)
 
 		//DK - replaced code
 		//local.angles = angles_toforward ($player.angles)
-		local.angles = angles_toforward (level.coop_spotlightPlayer.angles)
+		//[200]chrissstrahl - fixed using wrong entity
+		local.angles = angles_toforward (local.player.angles)
 		
 		local.vect[0] = local.vect[0] * local.angles[0]
 		local.vect[1] = local.vect[1] * local.angles[1]
@@ -954,8 +958,9 @@ deadcorona local.obj local.tag:{
 		//DK - replaced code
 		//local.org1 = $player.origin + (0 0 64)
 		//local.ang1 = $player.angles
-		local.org1 = level.coop_spotlightPlayer.origin + (0 0 64)
-		local.ang1 = level.coop_spotlightPlayer.angles
+		//[200]chrissstrahl - fixed using wrong entity
+		local.org1 = local.player.origin + (0 0 64)
+		local.ang1 = local.player.angles
  
 		local.org2 = local.flare.origin
 		local.ang2 = local.obj.angles
@@ -970,6 +975,7 @@ deadcorona local.obj local.tag:{
 			local.returnvalue = 0
 		}
 		local.flare scale (local.returnvalue * 5)
+		waitframe
 	}
 	local.flare delete
 }end
@@ -977,9 +983,6 @@ deadcorona local.obj local.tag:{
 //============================================================================
 traincorona local.obj local.tag:{
 //============================================================================
-	//DK - thread to get player closest to spotlight
-	thread player_closest_to_spotlight
-
 	local.flare = spawn script_model
 	local.flare model "fx/searchlight.tik"
 	local.flare notsolid
@@ -989,21 +992,22 @@ traincorona local.obj local.tag:{
 	local.flare attach local.obj local.tag 0 ( 0 0 0 )
 
 	while (local.obj.corona == 1){
-		waitframe
-		//DK - check for player error
-		//[200] chrissstrahl - wait another frame extra then continue the loop
-		if(level.coop_spotlightPlayer == NULL || level.coop_spotlightPlayer.origin == NIL){
-			waitframe
-			continue
+		//[200]chrissstrahl - fixed using wrong entity
+		local.player = exec coop_mod/replace.scr::player_closestTo local.flare
+		if(local.player == NULL){
+			local.player = $world
 		}
+		
 		//DK - replaced code
 		//local.vect = $player.origin - local.flare.origin
-		local.vect = level.coop_spotlightPlayer.origin - local.flare.origin
+		//[200]chrissstrahl - fixed using wrong entity
+		local.vect = local.player.origin - local.flare.origin
 		local.vect = vector_normalize (local.vect)
 
 		//DK- replaced code
 		//local.angles = angles_toforward ($player.angles)
-		local.angles = angles_toforward (level.coop_spotlightPlayer.angles)
+		//[200]chrissstrahl - fixed using wrong entity
+		local.angles = angles_toforward (local.player.angles)
 		local.vect[0] = local.vect[0] * local.angles[0]
 		local.vect[1] = local.vect[1] * local.angles[1]
 		local.vect[2] = local.vect[2] * local.angles[2]
@@ -1011,8 +1015,9 @@ traincorona local.obj local.tag:{
 		//DK - replaced code
 		//local.org1 = $player.origin + (0 0 64)
 		//local.ang1 = $player.angles
-		local.org1 = level.coop_spotlightPlayer.origin + (0 0 64)
-		local.ang1 = level.coop_spotlightPlayer.angles
+		//[200]chrissstrahl - fixed using wrong entity
+		local.org1 = local.player.origin + (0 0 64)
+		local.ang1 = local.player.angles
  
 		local.org2 = local.flare.origin
 		local.ang2 = local.obj.angles
@@ -1027,6 +1032,7 @@ traincorona local.obj local.tag:{
 			local.returnvalue = 0
 			local.flare scale (local.returnvalue * 10)
 		}
+		waitframe
 	}
 	local.flare delete
 }end
@@ -1040,10 +1046,6 @@ end
 //============================================================================
 player_closest_to_spotlight:{
 //============================================================================
-	//[200] chrissstrahl - changed var name to something uniqe
-	if(level.coop_spotlightClosestRunning == 1){ end }
-	level.coop_spotlightClosestRunning = 1
-
 	//[200] chrissstrahl - changed into for loop for more scalability
 	while(1){
 		for(local.i=1;local.i<=$spotlight.size;local.i++){
