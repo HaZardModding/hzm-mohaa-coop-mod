@@ -42,12 +42,11 @@ main:{
 	
 	//[200] chrissstrahl - set to NULL making all NIL checks unnessary
 	level.coop_spotlightPlayer = NULL
-	
-	//level.spottarget = NULL //[200] chrissstrahl - fixme
+	level.spottarget = NULL
 	
 	//[200] chrissstrahl - disabled because we test a different solution
 	//DK - get player closest to spotlight
-	//thread player_closest_to_spotlight
+	thread player_closest_to_spotlight
 
 	if (level.spotrespondtime == NIL)
 		level.spotrespondtime = 5
@@ -163,36 +162,43 @@ main:{
 	if (level.spotcovers > 0)
 		level.spotcover = exec global/makearray.scr $spotcover
 
+	//[200] chrissstrahl - grab player right away in sp
+	//player entity is already created in sp even if player is not yet there
+	if (level.gametype == 0 ){
+		if(level.spottarget == NULL || level.spottarget == NIL){
+			level.spottarget = $player
+		}
+	}
 
 	//level.coop_spotlightPlayer = $player
 	level waittill spawn
 
-	//DK -  changed player and add error check
-	//while (isalive $player)
 	//[200] chrissstrahl - fixed scripts abborting if player dies in coop
 	while ( level.gametype != 0 || isalive $player ){
-		//if !(isalive level.spottarget){ //[200] chrissstrahl - fixme
-		
-		if !(isalive level.coop_spotlightPlayer){
-			//[200] chrissstrahl - grab player if target (Teammate-AI) is dead
-			if(level.gametype == 0){
-				level.coop_spotlightPlayer = $player
-			}
-			else{
-			//[200] chrissstrahl - let us try this solution instead (this might be to slow for coop checking only every 3 sec)
-				for(local.i=1;local.i<=$spotlight.size;local.i++){
-					level.coop_spotlightPlayer = waitthread coop_mod/replace.scr::player_closestTo $spotlight[local.i].spotlight
-				}
-			}
-			
-			for (local.i=1;local.i<level.spotlights+1;local.i++){
-				level.spotplayertime[level.spotlight[local.i].set] = level.time - 5
-				level.spotplayer[level.spotlight[local.i].set] = 0
-				level.spotnervous[level.spotlight[local.i].set]++
+		//[200] chrissstrahl - if we have a spot target there is nothing to worry
+		//changed wait time from 3 to 1 sec, this should be better for coop
+		if (level.spottarget != NIL && isalive level.spottarget){
+			wait 1
+			continue
+		}
+		//[200] chrissstrahl - grab player if target (Teammate-AI) is dead
+		if(level.gametype == 0){
+			level.spottarget = $player
+		}
+		else{
+		//[200] chrissstrahl - let us try this solution instead (this might be to slow for coop checking only every 3 sec)
+			for(local.i=1;local.i<=$spotlight.size;local.i++){
+				level.coop_spotlightPlayer = waitthread coop_mod/replace.scr::player_closestTo $spotlight[local.i].spotlight
 			}
 		}
-		//[200] chrissstrahl - fixme - the 3 sec might give troubles in coop we might need to make a new handle for players only
-		wait 3
+		
+		for (local.i=1;local.i<level.spotlights+1;local.i++){
+			level.spotplayertime[level.spotlight[local.i].set] = level.time - 5
+			level.spotplayer[level.spotlight[local.i].set] = 0
+			level.spotnervous[level.spotlight[local.i].set]++
+		}
+		//[200] chrissstrahl - get a valid player asap
+		waitframe
 	}
 }end
 
@@ -260,8 +266,8 @@ spotowner:{
 		if ((level.spotplayer[self.parent.set] == 1) && (self.parent.on_target == 1)){
 			//[200] chrissstrahl - don't fire if there is no target
 			if(level.coop_spotlightPlayer != NULL){
-				//self.gun setAimTarget level.spottarget //[200] chrissstrahl - fixme
-				self.gun setAimTarget level.coop_spotlightPlayer
+				//[200] chrissstrahl - fixed level.spottarget
+				self.gun setAimTarget level.spottarget
 				self.gun burstFireSettings level.spot_burstmin level.spot_burstmax level.spot_burstdownmin level.spot_burstdownmax
 				self.gun startFiring
 				local.shooting = 1
@@ -286,12 +292,10 @@ spotowner:{
 		wait (randomint(level.spotrespondtime) + 1.5)
 
 		if (self.visible == 1){
-			//if (level.spottarget != NULL && self cansee level.spottarget){ //[200] chrissstrahl - fixme
-			if (level.coop_spotlightPlayer != NULL && self cansee level.coop_spotlightPlayer){
-				//self.gun setAimTarget level.spottarget //[200] chrissstrahl - fixme
-				self.gun setAimTarget level.coop_spotlightPlayer
+			//[200] chrissstrahl - fixed level.spottarget
+			if (level.spottarget != NULL && self cansee level.spottarget){
+				self.gun setAimTarget level.spottarget
 				self.gun burstFireSettings level.spot_burstmin level.spot_burstmax level.spot_burstdownmin level.spot_burstdownmax
-
 				self.gun startFiring
 				local.shooting = 1
 			}
@@ -626,14 +630,13 @@ aimspot:{
 
 	//[200] chrissstrahl - function does now exit as it should, rather than
 	//waiting for a player to become valid and making all the other scripts wait
-	//if(level.spottarget == NULL){ //[200] chrissstrahl - fixme
-	if(level.coop_spotlightPlayer == NULL){
+	//[200] chrissstrahl - fixed level.spottarget and 
+	if(level.spottarget == NULL){
 		end
 	}
-	//[200] chrissstrahl - fixme //local.spottargetTemp = level.spottarget	//chrissstrahl - use this to save us time to rework this func
-	local.spottargetorigin = level.coop_spotlightPlayer.origin
-	local.spottarget = level.coop_spotlightPlayer	
-
+	//[200] chrissstrahl - fixed using wrong entity
+	local.spottarget = level.spottarget
+	local.spottargetorigin = level.spottarget.origin
 	
 //	if (level.spot
 	if (vector_length(self.spotlight.origin - local.spottargetorigin) < self.lightdist){
@@ -645,23 +648,24 @@ aimspot:{
 				if (local.spottarget istouching level.spotcover[local.i])
 				local.break = 1
 			}
-
-			//[200] chrissstrahl - fixed targeting NULL, DEAD, inactive or spectator player
-			//[200] chrissstrahl - fixme (level.spottarget)
-			if( level.gametype != 0){
-				if( level.coop_spotlightPlayer == NULL ||
-					level.coop_spotlightPlayer.health <= 0 ||
-					level.coop_spotlightPlayer.dmteam == "spectator" ||
-					level.coop_spotlightPlayer.flags["coop_isActive"] != 1 )
-				{
-					local.break = 1
-				}
-			}
 			
-			//if (($player.is_disguised == 1) && (level.coop_spotlightPlayer == $player))
-			//[200] chrissstrahl - fixme (level.spottarget)
-			if ((level.coop_spotlightPlayer.is_disguised == 1) && (level.coop_spotlightPlayer.classname == "Player") ){
-				local.break = 1
+			//[200] chrissstrahl - handle for player (sp/coop)
+			if(level.spottarget.classname == "Player"){
+				if(level.gametype == 0){
+					if($player.is_disguised){
+						local.break = 1
+					}
+				}else{
+					//pay attention that coop has to use has_disguise because is_disguised only works in sp
+					if( level.coop_spotlightPlayer == NULL ||
+						level.coop_spotlightPlayer.has_disguise == 1 ||
+						level.coop_spotlightPlayer.health <= 0 ||
+						level.coop_spotlightPlayer.dmteam == "spectator" ||
+						level.coop_spotlightPlayer.flags["coop_isActive"] != 1 )
+					{
+						local.break = 1
+					}
+				}
 			}
 
 			if (local.break == 0) {
@@ -749,8 +753,8 @@ search:{
 				if (self.on_target == 1){
 					self.fastcheck = 1
 					local.org = self.search.origin
-					//local.dest = level.spottarget.origin //[200] chrissstrahl - fixme
-					local.dest = level.coop_spotlightPlayer.origin
+					//[200] chrissstrahl - fixed using wrong entity
+					local.dest = level.spottarget.origin
 					local.trans = 0.1
 					for (local.i=0;local.i<3;local.i++){
 						local.org[local.i] = (local.org[local.i] * (1 - local.trans)) + (local.dest[local.i] * local.trans)
@@ -771,8 +775,8 @@ search:{
 			else{
 				self.fastcheck = 1
 				local.org = self.search.origin
-				//local.dest = level.spottarget.origin //[200] chrissstrahl - fixme
-				local.dest = level.coop_spotlightPlayer.origin
+				//[200] chrissstrahl - fixed using wrong entity
+				local.dest = level.spottarget.origin
 				local.trans = 0.1
 				for (local.i=0;local.i<3;local.i++){
 					local.org[local.i] = (local.org[local.i] * (1 - local.trans)) + (local.dest[local.i] * local.trans)
