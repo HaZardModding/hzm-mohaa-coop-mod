@@ -146,11 +146,12 @@ isPlayerArray local.entity:{
 }end 0
 
 //this function is deprecated and should no longer be used
+//use .classname == "Player" comparison instead
 //use .targetname == "player" comparison instead
 //=========================================================================
 isPlayer local.entity:{
 //=========================================================================
-	error ( "coop_mod/replace.scr::isPlayer - USED! Function is deprecated fall back to targetname comparison" ) 1000
+	error ( "coop_mod/replace.scr::isPlayer - USED! Function is deprecated fall back to classname or targetname comparison" ) 1000
 	/* deprecated */
 }end
 
@@ -1272,7 +1273,6 @@ glue local.entity local.angle:{
 //=========================================================================
 glueHandle local.glueTo local.angle:{
 //=========================================================================
-
 	//detect if it is a entity or a string, if it is a string we want each player to have a seperate spot
 	if(local.glueTo.size > 1){
 		level.coop_playerGlueIndividual = 1
@@ -1285,7 +1285,7 @@ glueHandle local.glueTo local.angle:{
 		for (local.i = 1;local.i <= $player.size;local.i++){
 			local.player =  $player[local.i]
 			if( local.player != NULL ){
-				if(local.individualSpots == 1){
+				if(level.coop_playerGlueIndividual == 1){
 					local.entity = $(local.glueTo+local.i)
 				}else{
 					local.entity = local.glueTo
@@ -1295,8 +1295,12 @@ glueHandle local.glueTo local.angle:{
 					println("ERROR: replace.scr::glueHandle - local.entity was NULL for $player["+local.i+"]")
 					continue
 				}
+				//[200] chrissstrahl - added forcelegsstate to avoid:
+				//ERROR: Stopping due to possible infinite leg state loop //e1l3 entering rowboat at level start
+				local.player forcelegsstate "STAND"
 				local.player.flags["coop_glueAngle"] = local.angle
-				local.player.flags["coop_glue"] = local.entity				
+				local.player.flags["coop_glue"] = local.entity
+				thread coop_mod/main.scr::playerGlue local.player
 			}
 		}
 		waitframe
