@@ -40,6 +40,9 @@ main:{
 	//[200] chrissstrahl - prespawn is prespawn will be prespawn and allways shall be prespawn - AMEN
 	level waittill prespawn
 	
+	//[200] chrissstrahl - reduce spotlights to 1, for testing purpose and debugging
+	//waitthread coop_debugRemove
+	
 	//[200] chrissstrahl - set to NULL making all NIL checks unnessary
 	level.coop_spotlightPlayer = NULL
 	level.spottarget = NULL
@@ -180,6 +183,7 @@ main:{
 		if (level.spottarget != NIL && isalive level.spottarget){
 			wait 1
 			continue
+			println "----------level.spottarget exists----continue----------"
 		}
 		//[200] chrissstrahl - grab player if target (Teammate-AI) is dead
 		if(level.gametype == 0){
@@ -187,8 +191,13 @@ main:{
 		}
 		else{
 		//[200] chrissstrahl - let us try this solution instead (this might be to slow for coop checking only every 3 sec)
-			for(local.i=1;local.i<=$spotlight.size;local.i++){
-				level.coop_spotlightPlayer = waitthread coop_mod/replace.scr::player_closestTo $spotlight[local.i].spotlight
+			if($spotlight != NULL){
+				for(local.i=1;local.i<=$spotlight.size;local.i++){
+					level.spottarget = level.coop_spotlightPlayer
+				}
+			}
+			else{
+				println "----------$spotlight does not exists--------------------"
 			}
 		}
 		
@@ -222,8 +231,7 @@ spotdamage:{
 	}
 
 	while (1){
-		self.damage waittill trigger
-		
+		self.damage waittill trigger		
 		if (parm.other != $("world")){
 			self.destroyed = 1
 			if (self.checkdeath != 1){
@@ -264,8 +272,9 @@ spotowner:{
 		wait (randomint(level.spotrespondtime) + 1.5)
 		if ((level.spotplayer[self.parent.set] == 1) && (self.parent.on_target == 1)){
 			//[200] chrissstrahl - don't fire if there is no target
-			if(level.coop_spotlightPlayer != NULL){
+			if(level.spottarget != NULL){
 				//[200] chrissstrahl - fixed level.spottarget
+println "::spotowner targeting 1: level.spottarget"
 				self.gun setAimTarget level.spottarget
 				self.gun burstFireSettings level.spot_burstmin level.spot_burstmax level.spot_burstdownmin level.spot_burstdownmax
 				self.gun startFiring
@@ -275,11 +284,10 @@ spotowner:{
 		else if (local.shooting == 1){
 			if (( level.spotplayer[self.parent.set] != 1 ) || (self.parent.on_target != 1)){
 				wait 4
-
 				self.gun clearAimTarget
 				self.gun stopFiring
 				self.gun setAimTarget local.ent2
-
+println "::spotowner clearaimtarget 1"
 				local.shooting = 0
 			}
 		}
@@ -293,6 +301,7 @@ spotowner:{
 		if (self.visible == 1){
 			//[200] chrissstrahl - fixed level.spottarget
 			if (level.spottarget != NULL && self cansee level.spottarget){
+println "::spotowner targeting 2: level.spottarget"
 				self.gun setAimTarget level.spottarget
 				self.gun burstFireSettings level.spot_burstmin level.spot_burstmax level.spot_burstdownmin level.spot_burstdownmax
 				self.gun startFiring
@@ -301,16 +310,16 @@ spotowner:{
 			else if (local.shooting == 1){
 				if ( level.spotplayer[self.parent.set] != 1 ){	
 					wait 5
-
 					self.gun clearAimTarget
 					self.gun stopFiring
 					self.gun setAimTarget local.ent2
-
+println "::spotowner clearaimtarget 2"
 					local.shooting = 0
 				}
 			}
 		}
 		else{
+println "::spotowner clearaimtarget 2 b"
 			self.gun clearAimTarget
 			self.gun stopFiring
 		}
@@ -355,10 +364,10 @@ seepath:{
 spotwatch:{
 //============================================================================
 	level waittill spawn
-
+	println("::spotwatch start") //[200] chrissstrahl - debug
+	
 	if (self.target){
 		self.spotter = $(self.target)
-
 		if (self.spotter.target){
 			self.spotter type_idle "machinegunner"
 			self.spotter type_attack "machinegunner"
@@ -439,8 +448,7 @@ spotwatch:{
 	self.spotter.health = 1
 	self.spotter.parent = self
 	self.spotter thread spotowner
-
-	waitthread swaptarg		
+	waitthread swaptarg	
 	self thread search
 	local.thread1 = parm.previousthread
 	self.mode = 0
@@ -456,7 +464,7 @@ spotwatch:{
 	local.threadtimer = level.time + 0.15
 	self thread light_corona
 
-	while ((self.checkdeath == 0) && (isalive $(self.spotter))){
+	while ((self.checkdeath == 0) && (isalive $(self.spotter))){		
 		if (getcvar(spotlight) == "1"){
 			if (self.on_target == 1){
 				println ("Spotlight" + self.set + "/" + self.group + " is ON target")
@@ -537,6 +545,8 @@ spotwatch:{
 //============================================================================
 light_corona:{
 //============================================================================
+	println "::light_corona start" //[200] chrissstrahl - debug
+	
 	while (self.checkdeath == 0){
 		//[200] chrissstrahl - lets check this in one if
 		if (!self.flare || self.spotterdeath == 1 ){
@@ -631,6 +641,7 @@ aimspot:{
 	//waiting for a player to become valid and making all the other scripts wait
 	//[200] chrissstrahl - fixed level.spottarget and 
 	if(level.spottarget == NULL){
+		println("::aimspot NULL") //[200] chrissstrahl - debug
 		end
 	}
 	//[200] chrissstrahl - fixed using wrong entity
@@ -656,11 +667,11 @@ aimspot:{
 					}
 				}else{
 					//pay attention that coop has to use has_disguise because is_disguised only works in sp
-					if( level.coop_spotlightPlayer == NULL ||
-						level.coop_spotlightPlayer.has_disguise == 1 ||
-						level.coop_spotlightPlayer.health <= 0 ||
-						level.coop_spotlightPlayer.dmteam == "spectator" ||
-						level.coop_spotlightPlayer.flags["coop_isActive"] != 1 )
+					if( level.spottarget == NULL ||
+						level.spottarget.has_disguise == 1 ||
+						level.spottarget.health <= 0 ||
+						level.spottarget.dmteam == "spectator" ||
+						level.spottarget.flags["coop_isActive"] != 1 )
 					{
 						local.break = 1
 					}
@@ -742,8 +753,9 @@ search:{
 
 		//[200] chrissstrahl - wait a moment and then continue
 		//this was wrong and also not commented
-		if(self.search.origin == NIL || level.coop_spotlightPlayer == NULL){
+		if(self.search.origin == NIL || level.spottarget == NULL){
 			waitframe
+			println("::search loop continue") //[200] chrissstrahl - debug
 			continue
 		}
 		
@@ -1055,5 +1067,29 @@ player_closest_to_spotlight:{
 			level.coop_spotlightPlayer = waitthread coop_mod/replace.scr::player_closestTo $spotlight[local.i].spotlight
 		}
 		waitframe
+	}
+}end
+
+//[200] chrissstrahl - reduce spotlights to 1, for testing purpose and debugging
+//============================================================================
+coop_debugRemove:{
+//============================================================================
+	for(local.i=1;local.i<$spotdamage.size;local.i++){
+		if($spotdamage[local.i].set != NIL && int( $spotdamage[local.i].set ) > 1){
+			$spotdamage[local.i] delete
+			println("Removed SPOTLIGHTDAMAGE "+$spotdamage[local.i].set)
+		}
+	}
+	for(local.i=1;local.i<$spotlight.size;local.i++){
+		if($spotlight[local.i].set != NIL && int( $spotlight[local.i].set ) > 1){
+			$spotlight[local.i] delete
+			println("Removed SPOTLIGHT "+$spotlight[local.i].set)
+		}
+	}
+	for(local.i=1;local.i<$spotsearch.size;local.i++){
+		if($spotsearch[local.i].set != NIL && int( $spotsearch[local.i].set ) > 1){
+			$spotsearch[local.i] delete
+			println("Removed SPOTSEARCH "+$spotsearch[local.i].set)
+		}
 	}
 }end
