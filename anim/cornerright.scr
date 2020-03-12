@@ -1,0 +1,246 @@
+//-----
+// Cornerright.scr
+//-----
+// Script for right corner combat
+//-----
+// MODIFIED BY SMITHY TO FIX SH/BT CANSHOOT BUG
+// 
+//
+// Bug explanation:
+// 						In SH and BT, if an AI is part of a 'squad' (in engine) then 'canshoot' seems to 
+//                      take the other squadmates' sight trace into consideration.
+//                      What this means is if one guy is peaking around a corner looking for a player,
+//                      and the guy's squadmate is out of sight (thus cannot see player), the peaking AI will not shoot.
+//                      As soon as the guy's squadmate sees the player, the guy will be able to shoot, 
+//                      as canshoot will return true. Guys who are not part of a squad act correctly.
+//						As most AI ARE part of a squad, this causes dumb behaviour most of the time.
+//                      The AI will just peak around a corner and look at you without firing like an idiot.
+//
+//						Squads are formed internally when AI spawn within 1024 units of eachother
+//                      When one spawns it calls either Sentient::EventGerman or Sentient::EventAmerican in the engine
+//                      They then call Sentient::JoinNearbySquads via JoinNearbySquads( 1024.0f ); <-- hardcoded to 1024 units
+//                      Which picks any AI in this distance of the same team and then calls a merge: MergeWithSquad( pFriendly );
+//                      Squads give each other perfect info of enemies and their location (but obviously sometimes wrong info in the case of SH and BT)
+//-----
+
+iprintlnbold_noloc("CALLING EDITED CORNER RIGHT SCR")
+
+CornerrightStart:
+	waitexec anim/reload.scr::ReloadInit
+	local.canseetarget = 0
+
+	//save our current position
+	local.curpos = self.origin
+
+	self setmotionanim (self.weapongroup + "_wall_alert_right")
+	wait 0.25
+	//self waittill flaggedanimdone
+	//local.randnum = randomint 2
+	//wait local.randnum
+
+Cornerright:
+	waitexec anim/smoking.scr::SmokeRemoveCigarette
+	self.painhandler = anim/cornerright.scr::cornerrightpain
+	self.deathhandler = anim/cornerright.scr::cornerrightdeath
+	self.blendtime = 0.25
+
+
+	// Taunt the enemy
+	local.randnum = randomint 100
+	if (local.randnum<50)
+	{
+		//println "taunting from behind a right corner"
+		self exec anim/say_taunt.scr
+	}
+
+	//local.randnum = (randomint 2) + 1
+	//wait local.randnum
+
+	self.origin = local.curpos
+
+	self.painhandler = anim/cornerright.scr::cornerrightshootpain
+	local.randnum = randomint 100
+	
+	if (local.randnum<50 && local.canseetarget > 0)
+		{
+		switch (self.weapongroup)
+			{
+			case mp40:
+			case mp44:
+				if (self.roundsinclip > 0)
+					{
+					//unload the whole clip to the target
+					self setmotionanim (self.weapongroup + "_wall_blindfire_right_intro")
+					self waittill flaggedanimdone	
+					//canshoot is buggy in expansions					
+					//local.canseetarget = self canshoot self.enemy 
+					local.canseetarget = 1 //SMITHY - hacked due to enemy unable to see (blind fire) yet could be able to shoot 
+					
+					while (self.roundsinclip > 0 && local.canseetarget > 0)
+						{
+						self.origin = local.curpos
+						self setmotionanim (self.weapongroup + "_wall_blindfire_right")
+						self waittill flaggedanimdone
+						self.roundsinclip = self.roundsinclip - 4
+						//canshoot is buggy in expansions
+						//local.canseetarget = self canshoot self.enemy
+						local.canseetarget = 1 //SMITHY - hacked due to enemy unable to see (duh...blind fire) player yet could be able to shoot player
+						}
+					self.origin = local.curpos
+					self setmotionanim (self.weapongroup + "_wall_blindfire_right_outtro")
+					self waittill flaggedanimdone
+					self.origin = local.curpos
+					waitexec anim/reload.scr::Reload 1 0
+					}
+					else
+					{
+					self.origin = local.curpos
+					waitexec anim/reload.scr::Reload 1 0
+					}
+				break
+			default:
+				self setmotionanim (self.weapongroup + "_wall_blindfire_right")
+				switch (self.weapongroup)
+					{
+					rifle:
+					bar:
+					thompson:
+						wait 0.42
+						break
+
+					pistol:
+						wait 0.20
+						break
+					default:
+						wait 0.40
+						break
+					}
+
+				//local.canseetarget = self canshoot self.enemy
+				//local.canseetarget = self cansee self.enemy
+				local.randnum2 = randomint 200
+				if (local.randnum<50)
+					{
+					self setmotionanim (self.weapongroup + "_wall_alert_right")
+					wait 0.25
+					}
+				else
+					{
+					self waittill flaggedanimdone
+					}
+				self.origin = local.curpos
+				waitexec anim/reload.scr::Reload 1 0
+				break
+			}
+		}
+	else
+		{
+		self setmotionanim (self.weapongroup + "_wall_right_shoot_intro")
+		self waittill flaggedanimdone
+		local.canseetarget = 0
+		if (self.enemy)
+			{
+			local.canseetarget = self cansee self.enemy //SMITHY - swapped this in from canshoot
+			//local.canseetarget = self canshoot self.enemy
+			}
+
+		if (local.canseetarget <=0)
+		{
+			// JBW, timeout is to stop waiting and exit corner behavior (will return on sight)
+			local.timeout = level.time + (3 + randomfloat(3) );
+			//wait 'till we see the target and stagger the sight checks
+			while (local.canseetarget <=0)
+			{
+				wait ( 0.5 + randomfloat(0.5) );
+				local.canseetarget = self cansee self.enemy //SMITHY - swapped this in from canshoot
+				//local.canseetarget = self canshoot self.enemy;
+//				println ("timeout- " + (local . timeout - level.time) );
+				if ( level.time > local.timeout )
+					self  breakspecial;
+			}
+		}
+
+
+		switch (self.weapon)
+			{
+			case "springfield '03 sniper":
+			case "mauser kar 98k":
+			case "mauser kar 98d sniper":
+				self setmotionanim (self.weapongroup + "_wall_right_shoot")
+				self waittill flaggedanimdone
+				//local.canseetarget = self canshoot self.enemy
+				local.canseetarget = self cansee self.enemy //SMITHY - swapped this in from canshoot
+				break
+			default:
+				while (self.roundsinclip > 0)
+					{
+					//self.origin = local.curpos
+					self setmotionanim (self.weapongroup + "_wall_right_shoot")
+					self waittill flaggedanimdone
+					//self.roundsinclip = self.roundsinclip - 4
+					//self.origin = local.curpos
+					waitexec anim/Reload.scr::CheckForCornerReload
+					local.canseetarget = self cansee self.enemy //SMITHY - swapped this in from canshoot
+					//local.canseetarget = self canshoot self.enemy
+					if (local.canseetarget <= 0)
+						{
+						break
+						}
+					}
+				break
+			}
+
+		self setmotionanim (self.weapongroup + "_wall_right_shoot_outro")
+		self waittill flaggedanimdone
+		self.origin = local.curpos
+		waitexec anim/reload.scr::Reload 1 0
+		}
+
+	self.origin = local.curpos
+
+	self.painhandler = anim/cornerright.scr::cornerrightpain
+
+	//local.randnum = randomint 100
+	//if (local.randnum<5)
+	if (local.canseetarget <= 0)
+		{
+		self setmotionanim (self.weapongroup + "_wall_peek_right")
+		wait 1.20
+		if (self.enemy)
+			{
+			local.canseetarget = self cansee self.enemy //SMITHY - swapped this in from canshoot
+			//local.canseetarget = self canshoot self.enemy
+			}
+
+		self waittill flaggedanimdone
+		}
+
+
+	//
+	goto Cornerright
+
+end
+
+
+cornerrightpain:
+	waitexec anim/smoking.scr::SmokeRemoveCigarette
+	local.curpos = self.origin
+	self setmotionanim (self.weapongroup + "_wall_pain_right")
+	self waittill flaggedanimdone
+	self.origin = local.curpos
+end
+
+cornerrightshootpain:
+	waitexec anim/smoking.scr::SmokeRemoveCigarette
+	local.curpos = self.origin
+	self setmotionanim (self.weapongroup + "_wall_shoot_pain_right")
+	self waittill flaggedanimdone
+	self.origin = local.curpos
+end
+
+cornerrightdeath:
+	waitexec anim/smoking.scr::SmokeRemoveCigarette
+	self setmotionanim ("rifle_wall_death_right")
+	self waittill flaggedanimdone
+	self.position="dead"
+end
