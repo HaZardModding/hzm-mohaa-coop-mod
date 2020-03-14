@@ -65,6 +65,8 @@ main:{
 	level.coop_playerReady				= 0	//player(s) are not ready/not joined
 	
 	level.coop_getActiveWeapon_entity	= NULL		//[200] chrissstrahl - used to retrive active weapon of player in ::getActiveWeapon, ::getActiveWeapon_detect
+	level.coop_lmsAllowJoin				= 1			//[200] chrissstrahl - allow players who just enter the game to join in in lms (once any player leaves server this will be 0)
+	level.coop_lmsLifes					= 0			//[200] chrissstrahl - number of lifes players have in LMS
 	level.coop_musicCommandVol			= NIL
 	level.coop_musicCommand				= NIL
 	
@@ -402,6 +404,9 @@ managePlayers:{
 	//might need to experiment further with level waittill playerspawn once we are on dedicated servers
 	level waittill spawn
 	
+	//[200] chrissstrahl - used for LMS to detect when a player leaves
+	local.prevPlayerCount = 0
+	
 	while(1){
 		//if no player on server - also needed for dedicated servers
 		if( $player == NULL || $player.size == 0 ){
@@ -431,9 +436,20 @@ managePlayers:{
 		for (local.i = 1;local.i <= $player.size;local.i++){
 			local.player = $player[local.i]
 			if( local.player != NULL ){
+				//[200] chrissstrahl - used for LMS to detect when a player leaves
+				local.playerCount++
+				
 				//local.weaponTargetName = "playerWeapon" + local.i + ""
 /////////////////////////////////////////SETUP
 				if(	local.player.flags["coop_isActive"] == NIL){
+//[200] chrissstrahl - LMS if not allowed to join, add deaths
+					if( level.coop_lmsAllowJoin != 1){
+						local.lmsLifes = level.coop_lmsLifes
+						//add only deaths if lms is actually active
+						if(local.lmsLifes > 0){ 
+							local.player.flags["coop_deaths"] = local.lmsLifes
+						}
+					}
 				
 					//[200] chrissstrahl - detect host
 					if(level.coop_dedicated == 0){
@@ -499,7 +515,7 @@ managePlayers:{
 /////////////////////////////////////////ALIVE
 					if( local.player.health > 0 ){
 						//CHANGED TEAM/////////////////////////////////////////
-						if( local.player.flags["coop_team"] != local.player.dmteam ){
+						if( local.player.flags["coop_team"] != local.player.dmteam ){			
 							local.player.flags["coop_team"] = local.player.dmteam
 							local.player.flags["coop_justSpawnedDone"] = NIL
 							local.player.flags["coop_isActive"] = 0
@@ -588,6 +604,8 @@ managePlayers:{
 							thread playerPlaceAtSpawn local.i
 //[200] chrissstrahl - handle glueing, used to be managed in replace.scr::glueHandle
 							waitthread playerGlue local.player
+//[200] CHRISSTRAHL /// LMS /// ///////////// check if player should be spectator in LMS
+							thread lmsForceSpectatorHandle local.player
 						}
 // RESPAWNING & RESTORE /////////////////////////////////////////
 						if(local.player.flags["coop_respawning"] == TRUE){
@@ -639,6 +657,9 @@ managePlayers:{
 					else{
 						local.player.flags["coop_iAmTruelyActive"] = 0
 						if(	local.player.flags["coop_isActive"] != -2 ){
+//[200] CHRISSTRAHL /// LMS /// ///////////// check if player should be spectator in LMS
+							thread lmsForceSpectatorHandle local.player
+							
 							local.player.flags["coop_isActive"] = -2
 							local.player.flags["coop_justSpawnedDone"] = NIL
 							local.player.flags["coop_respawning"] = TRUE
@@ -667,7 +688,24 @@ managePlayers:{
 				}
 			}
 		}
-		waitframe
+		
+//[200] chrissstrahl - LMS - check if new players should be allowed to join
+		local.prevLifes = level.coop_lmsLifes
+		level.coop_lmsLifes = int(getcvar("coop_lmsLifes"))
+		if(level.coop_lmsLifes <= 0 ){
+			level.coop_lmsLifes = 0
+		}else{
+			if(level.coop_lmsAllowJoin != 1){
+				//[200] chrissstrahl - prevent players from rejoining when all lifes are used up
+				if(local.prevPlayerCount > local.playerCount && level.time > 30){
+					iprintlnbold_noloc("COOP: LMS active - No late joining")
+					level.coop_lmsAllowJoin = 0
+				}
+				//[200] chrissstrahl - used for LMS to detect when a player leaves
+				local.prevPlayerCount = local.playerCount
+			}
+		}
+		waitframe		
 	}
 }end
 
@@ -1725,6 +1763,70 @@ playerGlue local.player:{
 				}
 			}
 		}
+	}
+}end
+
+//[200] Chrissstrahl - used to to check if a player should be for into spectator
+//=========================================================================
+lmsGetRemainingLifes local.player:{
+//=========================================================================
+	if(local.player == NULL){ end 0 }
+	
+	//grab values
+	local.lifes = level.coop_lmsLifes
+	local.deaths = local.player.flags["coop_deaths"]
+	
+	//check values
+	if(local.deaths == NIL){ local.player.flags["coop_deaths"] = 1 }
+	else{
+		local.player.flags["coop_deaths"] = (local.deaths + 1)
+		local.deaths = 1
+	}
+	
+	//check if player is out - if value is 0 we assume LMS if OFF
+	if(local.lifes > 0){
+		if(local.deaths >= local.lifes){
+			local.remaining = (local.lifes - local.deaths)
+			if(local.remaining < 0){
+				local.remaining = 0
+			}
+			end local.remaining
+		}
+	}
+}end 1
+
+//[200] Chrissstrahl - used to force a player into spectator
+//=========================================================================
+lmsForceSpectatorHandle local.player:{
+//=========================================================================
+	if(local.player.flags["lmsForceSpectatorHandleActive"] != NIL){ end }
+	
+	while(local.player != NULL){
+		//check if player should be forced in spec
+		if( thread lmsGetRemainingLifes local.player < 1 ){
+			local.player.flags["lmsForceSpectatorHandleActive"] = 1
+			
+			//check if player already is in spec, if not force
+			if(local.player.dmteam != "spectator"){
+				if(local.player.health == 0){
+					local.player hide
+				}
+				local.player.flags["coop_lmsForcedInSpectator"] = 1
+				local.player iprint "You have no more lifes left - LastManStanding is active!" 0
+				local.player spectator
+			}
+		}
+		else{
+			//if previously forced auto rejoin
+			if(local.player.flags["coop_lmsForcedInSpectator"] == 1){
+				local.player iprint "You are allowed back in the game!" 0
+				local.player join_team ( "allies" )
+			}
+			local.player.flags["coop_lmsForcedInSpectator"] = NIL
+			local.player.flags["lmsForceSpectatorHandleActive"] = NIL
+			end
+		}
+		waitframe
 	}
 }end
 
