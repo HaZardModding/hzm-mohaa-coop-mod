@@ -1,0 +1,297 @@
+//[200] Smithy - this script is called every time an actor enters the world by exec it on their tiki (via shared new_generic_human.tik)
+// Note: 'team' for SP actors is either 'german' or 'american'.
+//       'german' is all axis actors, including Italian. 
+//       'american' is all allied actors, including British and Russian.
+//       Turn off accuracy calculations for individual actors with .flags["coop_actorStopAccuracy"] = 1
+//       Turn off accuracy calculations for all ai by changing level.coop_actorAccuracyCalcs to 0
+//       Turn off custom pain handler with level.coop_actorPainHandler = 0
+//
+//       (internal use only)
+//=========================================================================
+main:{
+//=========================================================================
+	if(level.gametype == 0){
+		end
+	}
+	//self cannot be NIL, only entity (NULL is entity type) 
+	if(self == NULL || self.classname != "Actor"){
+		error ("coop_mod/aihandler.scr::main - never call this func from outside Actor tik")
+		end
+	}
+
+	waitframe // so Actors have properly initialised
+
+	if(self == NULL){ end }
+
+	group.mainActorThread = 1 //used to check if internal funcs have been called externally
+	group.team = self.team
+	
+	//store original data
+	//self.flags["coop_actorHandled"] 			= 1
+	self.flags["coop_actorAccuracy"] 			= self.accuracy
+	self.flags["coop_actorAccuracyRange"] 		= (100 - self.accuracy) //100 is max accuracy
+	//self.flags["coop_actorHealth"] 				= self.health
+	/* use these in future???
+	self.flags["coop_actorGun"] 				= self.gun
+	self.flags["coop_actorNoticeScale"] 		= self.noticescale
+	*/
+
+	//replace painhandler with our own
+	if(level.coop_actorPainHandler){
+		thread initialisePainVars
+	}
+
+	if(level.coop_aaMap == 1){ // restores allied actors to their original AA run speed
+		if(group.team == "american"){
+			self.runanimrate = level.coop_aaRunSpeed[group.team]
+		}
+	}
+
+	thread updateEnemyDifficulty // update this guy's difficulty
+	thread addActorToArray
+
+	self waittill death //'death' event is unregistered if an AI is killed or if they are removed
+
+	thread removeActorFromArray
+}end
+
+//adds the actor to the level.coop_actorArray array (internal use only)
+//=========================================================================
+addActorToArray:{
+//=========================================================================
+	if(self == NULL || self.classname != "Actor" || !group.mainActorThread){
+		error ("coop_mod/aihandler.scr::addActorToArray - never call this func from outside aihandler.scr")
+		end
+	}
+
+	group.index = level.coop_actorArray[group.team].size + 1
+	level.coop_actorArray[group.team][group.index] = self
+}end
+
+//removes the dead or removed actor from the actor array (internal use only)
+//=========================================================================
+removeActorFromArray:{
+//=========================================================================
+	if(self == NULL || self.classname != "Actor" || !group.mainActorThread){
+		error ("coop_mod/aihandler.scr::removeActorFromArray - never call this func from outside aihandler.scr")
+		end
+	}
+
+	if(level.coop_actorArray[group.team].size > 1){
+		local.oldArray[group.team] 		= level.coop_actorArray[group.team]
+		local.newArray[group.team][1] 	= NIL
+		local.j = 1
+		for(local.i = 1; local.i <= local.oldArray[group.team].size; local.i++){
+			if(local.i != group.index){
+				local.newArray[group.team][local.j] = local.oldArray[group.team][local.i]
+				local.j++
+			}
+		}
+		level.coop_actorArray[group.team] = local.newArray[group.team]
+	}else{
+		level.coop_actorArray[group.team][1] = NIL
+	}
+}end
+
+//updates the run speed for a specific actor team
+//=========================================================================
+updateTeamRunSpeed local.team local.speed:{
+//=========================================================================
+	if((local.team != "american" && local.team != "german") || local.speed == NIL){ end }
+	if(local.speed < 0){ local.speed = 0 }
+
+	level.coop_aaRunSpeed[local.team] = local.speed
+	for(local.i = 1; local.i <= level.coop_actorArray[local.team].size; local.i++){
+		local.actor = level.coop_actorArray[local.team][local.i]
+		local.actor.runanimrate = local.speed
+	}
+}end
+
+//updates the difficulty variables for individual enemy
+//=========================================================================
+updateEnemyDifficulty:{
+//=========================================================================
+	if($player == NULL || $player.size == 0 || self == NULL || self.classname != "Actor"){ end }
+
+	thread calculateProperties self
+
+}end
+
+//updates the difficulty variables for all existing enemies
+//=========================================================================
+updateEnemyTeamDifficulty:{
+//=========================================================================
+	if($player == NULL || $player.size == 0){ end }
+	
+	local.team = "german"
+	local.actorArray[local.team] = level.coop_actorArray[local.team]
+
+	if(local.actorArray[local.team] == NIL || local.actorArray[local.team].size == 0){
+		end 
+	}
+
+	for(local.i = 1; local.i <= local.actorArray[local.team].size; local.i++){
+		thread calculateProperties local.actorArray[local.team][local.i]
+	}
+}end
+
+
+//call all difficulty calculcations. we can use this to add more calculations later (internal use only)
+//=========================================================================
+calculateProperties local.actor:{
+//=========================================================================
+	if(local.actor == NULL || local.actor.classname != "Actor" || !group.mainActorThread){
+		error ("coop_mod/aihandler.scr::calculateProperties - never call this func from outside aihandler.scr")
+		end
+	}
+
+	if(!local.actor.flags["coop_actorStopAccuracy"] && level.coop_actorAccuracyCalcs){
+		thread calculateAccuracy local.actor
+	}
+	// add more here later ???
+
+}end 
+
+//do accuracy calculation (internal use only)
+//=========================================================================
+calculateAccuracy local.actor:{
+//=========================================================================
+	if(local.actor == NULL || local.actor.classname != "Actor" || !group.mainActorThread){
+		error ("coop_mod/aihandler.scr::calculateAccuracy - never call this func from outside aihandler.scr")
+		end
+	}
+	if(local.actor.flags["coop_actorNewAccuracy"] && local.actor.accuracy != local.actor.flags["coop_actorNewAccuracy"]){
+		local.actor.flags["coop_actorStopAccuracy"] = 1
+		println(local.actor + " has had his accuracy changed elsewhere. Ignore accuracy calculations in future.")
+		end
+	}
+
+	if(level.coop_maxPlayerScalar < 0){
+		level.coop_maxPlayerScalar = 0
+	}
+	local.accuracyMult = $player.size
+	if(local.accuracyMult > level.coop_maxPlayerScalar){
+		local.accuracyMult = level.coop_maxPlayerScalar
+	}
+
+	// reset to original accuracy before calculating extra accuracy
+	local.actor accuracy local.actor.flags["coop_actorAccuracy"]
+
+	if(local.accuracyMult > 1){
+		local.actor accuracy (local.actor.accuracy + ((local.actor.flags["coop_actorAccuracyRange"] / level.coop_maxPlayerScalar) * local.accuracyMult))
+	}
+
+	local.actor.flags["coop_actorNewAccuracy"] = local.actor.accuracy
+}end
+
+//sets up our pain variables
+//=========================================================================
+initialisePainVars:{
+	if(self == NULL || self.classname != "Actor" || !group.mainActorThread){
+		error ("coop_mod/aihandler.scr::initialisePainVars - never call this func from outside aihandler.scr")
+		end
+	}
+
+	self.flags["coop_actorHandledPain"] = 1
+	
+	//store the health he started with
+	if(!self.flags["coop_actorActualHealth"]){
+		self.flags["coop_actorActualHealth"] = self.health
+	}else if(self.flags["coop_actorActualHealth"] < 0 || self.flags["coop_actorActualHealth"] == 5000){
+		self.flags["coop_actorActualHealth"] = 100
+	}
+
+	//we don't want anyone to kill him outright
+	self health 5000
+}end
+
+//handles all AI pain events (handler is global/pain.scr) (internal use only)
+//=========================================================================
+actorPainHandler local.attacker local.damage local.inflictor local.position local.direction local.normal local.knockback local.dflags local.meansofdeath local.location:{
+//=========================================================================
+
+	if(!self || !local.attacker){ end }
+
+	if(self.fact){ self.fact immediateremove } // optimised
+
+	self.fact = local CreateListener
+	self.fact.attacker = local.attacker
+	self.fact.damage = local.damage
+	self.fact.inflictor = local.inflictor
+	self.fact.position = local.position
+	self.fact.direction = local.direction
+	self.fact.normal = local.normal
+	self.fact.knockback = local.knockback
+	self.fact.dflags = local.dflags
+	self.fact.meansofdeath = local.meansofdeath
+	self.fact.location = local.location
+
+	group.painHandlerThread = 1
+
+	if(self.health != (5000 - self.fact.damage)){
+		//iprintlnbold_noloc(self + " health is " + self.health + ". This shouldn't be...")
+		self.flags["coop_actorActualHealth"] = self.health + self.fact.damage
+	}
+
+	self health 5000 				//restore safe health
+
+	if(thread friendlyFireCheck){ 	//check if we should ignore pain or not
+		end
+	}
+	
+	thread handlePain 				//actually do the pain
+
+}end
+
+//handle when AI are hurt by their teammates
+//this reduces likelihood of teammates accidently killing oneanother.
+//as well reducing chance that players can kill allied actors.
+//this more reflects SP behaviour.
+//will help improve difficulty too.
+//(internal use only)
+//=========================================================================
+friendlyFireCheck:{
+//=========================================================================
+	if(!group.painHandlerThread){
+		error ("coop_mod/aihandler.scr::friendlyFireCheck - never call this func from outside aihandler.scr")
+		end
+	}
+	
+	if(	self.fact.attacker.team == self.team &&
+	 	self.fact.attacker != self && 
+	 	self.fact.inflictor.classname != "BarrelObject" ||
+	 	(self.fact.attacker.classname == "Player" && self.team == "american")){
+
+		println self " was hurt by teammate. ignore pain!"
+		end(1)
+	}else if(self.fact.attacker == self){
+		//println self " was hurt by himself. don't ignore pain!" 
+	}
+
+}end(0)
+
+//actually do pain calculations (internal use only)
+//=========================================================================
+handlePain:{
+//=========================================================================
+	if(!group.painHandlerThread){
+		error ("coop_mod/aihandler.scr::handlePain - never call this func from outside aihandler.scr")
+		end
+	}
+
+	self.flags["coop_actorActualHealth"] -= self.fact.damage
+
+	//nope, not enough damage has been done
+	if(self.flags["coop_actorActualHealth"] > 0){
+		end
+	}
+
+	//fixes melee attacks
+	if(self.fact.meansofdeath == 26){
+		self.fact.location = 0
+	}
+
+	//enough damage has been done to kill this guy!
+	self damage self.fact.attacker 150000 self.fact.attacker self.fact.position self.fact.direction self.fact.normal self.fact.knockback self.fact.dflags self.fact.meansofdeath self.fact.location
+				
+}end
