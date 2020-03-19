@@ -1,10 +1,6 @@
-//chrissstrahl - modified for coop on 2020.01.03
-
-//
-// preShip.scr
-//
-
-InitPreShip:
+//============================================================
+InitPreShip: {
+//============================================================
 	//drunk guy stuff
 	$drunkguy gun "none"
 
@@ -36,17 +32,19 @@ InitPreShip:
 	$ai_alarm thread detectDockFight
 
 	thread sleepDuringOffice
-end
+}end
 
-//-----------------------------------------------------------------------------
-
-DrunkIdle:
+//============================================================
+DrunkIdle: {
+//============================================================
 	$drunkguy anim A_14_DrunkSnap
 	$drunkguy waittill animdone
 	$drunkguy thread global/LoopAnim.scr::LoopAnim A_14_DrunkIdle
-End
+}end
 
-DrunkThrow:
+//============================================================
+DrunkThrow: {
+//============================================================
 	self remove
 	$drunkguy exec global/disable_ai.scr
 	$drunkguy waitthread global/LoopAnim.scr::LoopAnimStop
@@ -54,13 +52,12 @@ DrunkThrow:
 	$drunkguy waittill animdone
 	$drunkguy bedead
 	$drunkguy exec global/bullethit.scr (0 0 250) 5000 0 1
-end
+}end
 
-//-----------------------------------------------------------------------------
-
-ObtainPapers:
-	if (level.skipobtainpapers == 1)
-	{
+//============================================================
+ObtainPapers: {
+//============================================================
+	if (level.skipobtainpapers == 1) {
 		trigger $waitingToGetPapers
 		$goodpapers remove
 		waitthread global/items.scr::add_item "papers_level2" noMessage
@@ -73,35 +70,40 @@ ObtainPapers:
 	thread naughtyFenceHopping
 
 	$waitingToGetPapers waittill trigger
-end
+}end
 
-//-----------------------------------------------------------------------------
-
-naughtyFenceHopping:
-	if ($NaughtyAccessFreighterTrigger)
-	{
+//============================================================
+naughtyFenceHopping: {
+//============================================================
+	if ($NaughtyAccessFreighterTrigger) {
 		$NaughtyAccessFreighterTrigger waittill trigger
 
-		if (level.gateguardaccepted != 1)
-			$player.has_disguise = 0
+		//[200] Crimewavez.
+		if (level.gateguardaccepted != 1) {
+			if(level.gametype == 0) {
+				$player.has_disguise = 0
+			} 
+			else {
+				exec coop_mod/replace.scr::has_disguise  0
+			}
+		}
 
 		if (level.playerBoardedShip != 1) {
 			// if we haven't gotten the papers yet, then don't bother, they are useless at this point
 			trigger $waitingToGetPapers
 		}
 	}
-end
+}end
 
-//-----------------------------------------------------------------------------
-
-clerkGag:
+//============================================================
+clerkGag: {
+//============================================================
 	$clerk ai_on
 	$clerk show
 	$clerkbuddy ai_on
 	$clerkbuddy show
 
-	if (level.alarmSounded == 1) 
-		end
+	if (level.alarmSounded == 1) { end }
 
 	$clerk thread runForAlarm
 	$clerk.killThread = local
@@ -140,26 +142,32 @@ clerkGag:
 	$clerk turnto NULL	
 	$clerkshutup waittill trigger
 
-	while (level.clerkDoneSalute != 1)
-		waitframe
+	while (level.clerkDoneSalute != 1) { waitframe }
 		
 	$clerk thread IfHurtAttack
 	wait 1
 
-	$clerk turnto $player
+	//[200] Crimewavez - coop comp.
+	//$clerk turnto $player
+	$clerk exec coop_mod/replace.scr::turnto
 	$clerk waittill turndone
-	$clerk lookat $player
+	//$clerk lookat $player
+	$clerk exec coop_mod/replace.scr::lookat
 
 	// DO NOT UNHOLSTER NOW, I AM DOING THIS IN THE disguise_papers script
 	//$clerk unholster
 	$clerk waitthread askForPapers
 	wait 5
-end
+}end
 
-abortClerkGag:
+//============================================================
+abortClerkGag: {
+//============================================================
 	if ($clerk && (isalive $clerk)) {
-		if ($clerk.killThread != NIL)
+		if ($clerk.killThread != NIL) {
 			$clerk.killThread remove
+		}
+
 		$clerk unholster
 		$clerk.enableEnemy = 1
 		$clerk.sight = 4096
@@ -168,27 +176,30 @@ abortClerkGag:
 	}
 
 	if ($clerkbuddy && (isalive $clerkbuddy)) {
-		if ($clerkbuddy.killThread != NIL)
+		if ($clerkbuddy.killThread != NIL ) {
 			$clerkbuddy.killThread remove
+		}
+
 		$clerkbuddy unholster
 		$clerkbuddy.enableEnemy = 1
 		$clerkbuddy.sight = 4096
 		$clerkbuddy.hearing = 4096
 		$clerkbuddy attackplayer
 	}
-end
+}end
 
-IfHurtAttack:
+//============================================================
+IfHurtAttack: {
+//============================================================
 	self waittill pain
-
 	self unholster
 	self attackplayer
 	self exec global/enable_ai.scr
-End
+}end
 
-//----------------------------------------------------------------------
-
-invisibleMan:
+//============================================================
+invisibleMan: {
+//============================================================
 	local.placetospawn = $player.origin + (0 -1000 0)
 	local.person = spawn models/human/german_wehrmact_soldier.tik origin local.placetospawn "targetname" "mrinvisible"
 	local.person hide
@@ -196,32 +207,34 @@ invisibleMan:
 	$mrinvisible notsolid
 	$mrinvisible holster
 	$mrinvisible.origin = ( -5199 4979 233 )
-	$mrinvisible turnto $player
-	$mrinvisible lookat $player
+	
+	//[200] Crimewavez - coop comp.
+	//$mrinvisible turnto $player
+	//$mrinvisible lookat $player
+	$mrinvisible exec coop_mod/replace.scr::turnto
+	$mrinvisible exec coop_mod/replace.scr::lookat
 
 	$mrinvisible.sight =  4096
 	$mrinvisible.hearing =  4096
 	
-	while ($mrinvisible != NULL && (isAlive $mrinvisible))
-	{
-		if ($mrinvisible.thinkstate == "attack")
-		{
+	while ($mrinvisible != NULL && (isAlive $mrinvisible)) {
+		if ($mrinvisible.thinkstate == "attack") {
 			waitthread abortClerkGag
 			$mrinvisible remove
 			break
 		}
 		waitframe			
 	}
-end
+}end
 
-//----------------------------------------------------------------------
-
-invisibleAdvice:
-	while(self && (self.thinkstate != "attack" ||  self.thinkstate != attack))
+//============================================================
+invisibleAdvice: {
+//============================================================
+	while(self && (self.thinkstate != "attack" ||  self.thinkstate != attack)) {
 		wait 1
+	}
 	
-	if !(self && isAlive self)
-		end
+	if !(self && isAlive self) { end }
 		
 	$clerk.obtainPapersThread delete
 	$clerk.papersAcceptedThread delete
@@ -231,13 +244,13 @@ invisibleAdvice:
 
 	$clerkbuddy exec global/enable_ai.scr	
 	$clerkbuddy unholster
-	
 	$clerkbuddy attackplayer
 	self remove
-end
+}end
 
-//---------------------------------------------------------------------
-runForTheAlarm:
+//============================================================
+runForTheAlarm: {
+//============================================================
 	$clerk runto $clerkalarmnode
 	$clerk waittill movedone
 	$clerk turnto $clerkalarmtrigger
@@ -249,11 +262,11 @@ runForTheAlarm:
 	$clerkalarmswitch playsound alarm_switch
 
 	thread failedPapers
-end
+}end
 
-	
-//----------------------------------------------------------------------	
-clerkBuddyLeave:
+//============================================================	
+clerkBuddyLeave: {
+//============================================================ 
 	$clerkbuddy.killThread = local
 	$clerkbuddy.leaveThread = local
 
@@ -277,22 +290,25 @@ clerkBuddyLeave:
 	}
 	self lookat NULL
 
-//	self walkto $clerkbuddynode
-//	self waittill movedone
+	//	self walkto $clerkbuddynode
+	//	self waittill movedone
 
 	self exec global/enable_ai.scr
-	if(self.gun == NIL)
+	
+	if(self.gun == NIL) {
 		self.gun = models/weapons/kar98.tik 
+	}
+
 	self unholster
 	$clerkbuddy thread detectDockFight
 
   	self turnto $guysLookat
 	$clerkbuddy thread global/loopanim.scr::LoopAnim rifle_stand_bored_b
-end
+}end
 
-//----------------------------------------------------------------------
-
-askForPapers:
+//============================================================
+askForPapers: {
+//============================================================
 	self disguise_level 1
 	self disguise_period 15
 	self disguise_range 256		//1000
@@ -302,16 +318,18 @@ askForPapers:
 	self waitexec global/enable_ai.scr
 	spawn trigger_relay targetname "clerkAcceptedPapersTrigger"
 	thread clerkWaitForPapers
-end
+}end
 
-//----------------------------------------------------------------------
-
-papersAccepted:
+//============================================================
+papersAccepted: {
+//============================================================
 	trigger $clerkAcceptedPapersTrigger
 	level.clerkaccept = 1
-end
+}end
 
-clerkWaitForPapers:
+//============================================================
+clerkWaitForPapers: {
+//============================================================
 	$clerk thread IfIGetAngryGoForAlarm
 	$clerkAcceptedPapersTrigger waittill trigger
 
@@ -320,8 +338,7 @@ clerkWaitForPapers:
 	level.clerkAccepted = 1	
 	$clerk exec global/disable_ai.scr
 
-	if(!(isalive $clerk) || $clerk.thinkstate == "pain" || $clerk.thinkstate == "attack")
-		end
+	if(!(isalive $clerk) || $clerk.thinkstate == "pain" || $clerk.thinkstate == "attack") { end }
 
 	$clerk playsound DENGM_E1L4_HB8106  //I see.  Give me a moment.
 
@@ -333,12 +350,11 @@ clerkWaitForPapers:
 	$clerk lookat $clerklookhere
 	$clerk walkto $clerkwalkhere
 	$clerk waittill movedone
-
 	$clerk holster
 	wait 3
+
 	// iprintln ("Clerk Think State: " + $clerk.thinkstate)
-	if(!(isalive $clerk) || $clerk.thinkstate == "pain" || $clerk.thinkstate == "attack")
-		end
+	if(!(isalive $clerk) || $clerk.thinkstate == "pain" || $clerk.thinkstate == "attack") { end }
 	
 	$clerk anim A_14_HMTalk2 //What is this?  There is no listing for you.
 	self waittill animdone
@@ -346,9 +362,13 @@ clerkWaitForPapers:
 
 	//when good clerks go bad
 	//$clerk unholster
-	$clerk turnto $player
+
+	//[200] Crimewavez - coop comp.
+	//$clerk turnto $player
+	$clerk exec coop_mod/replace.scr::turnto
 	$clerk waittill turndone
-	$clerk lookat $player
+	//$clerk lookat $player
+	$clerk exec coop_mod/replace.scr::lookat
 	//$clerk aimat $player
 	$clerk anim A_14_HMTalk3     //do not move worm!
 	$clerk waittill animdone
@@ -358,8 +378,7 @@ clerkWaitForPapers:
 	$clerk turnto $clerkalarmtrigger
 	$clerk waittill turndone
 	
-	if($clerk && isAlive $clerk)
-	{
+	if($clerk && isAlive $clerk) {
 		$clerk holster
 		$clerk anim alarm_switchon
 		$clerkalarmtrigger playsound alarm_switch
@@ -373,22 +392,23 @@ clerkWaitForPapers:
 
 		thread failedPapers
 	}
-end
+}end
 
-IfIGetAngryGoForAlarm:
-	while(level.clerkaccept != 1  && (isalive $clerk) && $clerk.thinkstate != "pain" && $clerk.thinkstate != "attack")
+//============================================================
+IfIGetAngryGoForAlarm: {
+//============================================================
+	while(level.clerkaccept != 1  && (isalive $clerk) && $clerk.thinkstate != "pain" && $clerk.thinkstate != "attack") {
 		waitframe
-	
-	if(isalive $clerk && level.clerkaccept != 1)
-	{
+	}
+
+	if(isalive $clerk && level.clerkaccept != 1) {
 		$clerk.enableEnemy = 0
 		$clerk runto $clerkalarmnode
 		$clerk waittill movedone
 		$clerk turnto $clerkalarmtrigger
 		$clerk waittill turndone
 	
-		if($clerk && isAlive $clerk)
-		{
+		if($clerk && isAlive $clerk) {
 			$clerk holster
 			$clerk anim alarm_switchon
 			$clerkalarmtrigger playsound alarm_switch
@@ -399,74 +419,100 @@ IfIGetAngryGoForAlarm:
 			$clerk lookat NULL
 			$clerk.enableEnemy = 1
 			$clerk attackplayer
-
 			thread failedPapers
 		}
 	}
-End
-//----------------------------------------------------------------------
+}end
 
-getPapers:
+//============================================================
+getPapers: {
+//============================================================
 	$goodpaperspickup waittill trigger
 	trigger $waitingToGetPapers
-	$player playsound pickup_papers
+
+	//[200] Crimewavez - coop comp.
+	//$player playsound pickup_papers
+	exec coop_mod/replace.scr::playsound pickup_papers
 	$goodpapers remove
+
 	waitthread global/items.scr::remove_item "papers_level1"
 	waitthread global/items.scr::add_item "papers_level2"
-	$player.hasPapers = 2
+
+	//[200] Crimewavez.
+	if(level.gametype == 0) {
+		$player.hasPapers = 2
+	}
+	else {
+		local.player = waitthread return_players
+		local.player.hasPapers = 2
+	}
+	
 	$clerk.obtainPapersThread delete
-end
+}end
 
-//----------------------------------------------------------------------
+//============================================================
+failedPapers: {
+//============================================================
+	if(level.gametype == 0) {
+		$player.hasPapers = 0
+		$player.hasDisguise = 0
+	}
+	else{
+		local.player = waitthread return_players
+		local.player.hasPapers = 0
+		local.player.hasDisguise = 0
+	}
 
-failedPapers:
-	$player.hasPapers = 0
-	$player.hasDisguise = 0
 	level.alarm = 1
 	thread maps/e1l4/ship.scr::AlarmSounded
 	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "spawnclerkguys"
 
 	wait 3
 	trigger local.trigger
-end
+}end
 
-//----------------------------------------------------------------------
-
-clerkdoortrigger:
+//============================================================
+clerkdoortrigger: {
+//============================================================
 	$clerkdoor unlock
 	waitframe
-	$clerkdoor open $player
+	
+	if(level.gametype == 0) {
+		$clerkdoor open $player
+	}
+	else {
+		$clerkdoor open $world
+	}
+
 	$clerkdoortrigger remove
 
 	if ($clerk && (isalive $clerk)) {
-		if ($clerk.killThread != NIL)
+		if ($clerk.killThread != NIL) {
 			$clerk.killThread remove
+		}
+
 		$clerk unholster
 		$clerk.enableEnemy = 1
 		$clerk.sight = 4096
 		$clerk.hearing = 4096
 		$clerk attackplayer
 	}
-end
+}end
 
-
-////////////////////////////////////////////////////////
-//-------------Board ship Objective-------------------
-////////////////////////////////////////////////////////
-
-
-ObjectiveBoardShip:
-	if (level.skipboardship == 1)
-	{
+//============================================================
+ObjectiveBoardShip: {
+//============================================================
+	if (level.skipboardship == 1) {
 		trigger $boardshiptrigger
 		$player.origin = $shipentrance.origin
 	}
 	
 	$boardshiptrigger waittill trigger
+}end
 
-end
-
-boatguardThinker:
+//============================================================
+boatguardThinker: {
+//============================================================
 	self avoidplayer 0
 	self disguise_level 2
 	self disguise_period 15
@@ -480,26 +526,38 @@ boatguardThinker:
 
 	spawn trigger_relay targetname "boatGuardAcceptedPapersTrigger"
 	self thread waitForPapersAccepted
-end
+}end
 
-watchForPapers:
-end
+//============================================================
+watchForPapers: {
+//============================================================
+}end
 
-boatguardAcceptedPapers:
+//============================================================
+boatguardAcceptedPapers: {
+//============================================================
 	trigger $boatGuardAcceptedPapersTrigger 
-end
+}end
 
-doOpen:
+//============================================================
+doOpen: {
+//============================================================
 	wait 2
 	self unlock
 	while (!self.isOpen && self.stopOpening != 1) {
-		
-		self open $player
+		if(level.gametype == 0) {
+			self open $player
+		}
+		else{
+			self open $world
+		}
 		wait 3
 	}
-end
+}end
 
-waitForPapersAccepted:
+//============================================================
+waitForPapersAccepted: {
+//============================================================
 	$boatGuardAcceptedPapersTrigger waittill trigger
 	self disguise_range 2000
 	level.gateguardaccepted = 1
@@ -511,55 +569,65 @@ waitForPapersAccepted:
 	local.gotoNode = $boatguarddest
 	self.movedoneradius = 30
 	wait 1.5
+	
 	$shipgate thread doOpen
+
 	while (!(vector_within self.origin local.gotoNode.origin 20)) {
 		self walkto local.gotoNode
 		wait 1
 	}
+
 	self lookat NULL
 	self.mood = bored
   	self turnto $guysLookat
 	self thread global/loopanim.scr::LoopAnim rifle_stand_bored_a
-end
+}end
 
-ShowPapers:
-end
+//============================================================
+ShowPapers: {
+//============================================================
+}end
 
-//-----------------------------------------------------------------------------
-
-doCloseShipGate:
+//============================================================
+doCloseShipGate: {
+//============================================================
 	// close the gate when the player starts going up the stairs, but only
 	//   if the gate wasn't opened for combat purposes
 	self.target = NULL
 	self waittill trigger
+	
 	if ($shipgate.isOpen && $shipgate.leaveOpen != 1) {
 		$shipgate.stopOpening = 1
 		$shipgate close
 	}
-end
+}end
 
-detectPlayerCrossedBoatGate:
+//============================================================
+detectPlayerCrossedBoatGate: {
+//============================================================
 	$AccessFreighterTrigger waittill trigger
 	level.playerCrossedBoatGate = 1
-end
+}end
 
-detectDockFight:
+//============================================================
+detectDockFight: {
+//============================================================
 	// detect if the player starts a fight out on the dock
 	while (self != NULL && (isalive self)) {
-		if (self.thinkstate == "attack")
+		if (self.thinkstate == "attack") {
 			break
+		}
 		wait 0.5
 	}
 
 	//iprintlnbold "detected by " self.targetname
-
 	if (level.playerCrossedBoatGate == 1) {
 		// if the player went through the gate, and it is still open,
 		//    then don't bother closing it
 		$shipgate.leaveOpen = 1
 	}
-
 	wait 3
+
 	thread maps/e1l4/ship.scr::AlarmSounded
 
 	/*
@@ -567,54 +635,61 @@ detectDockFight:
 	$shipgate open $player
 	$shipgate lock
 	*/
-end
+}end
 
-//-----------------------------------------------------------------------------
-
-officeSleep:
+//============================================================
+officeSleep: {
+//============================================================
 	self.enableEnemy = 0
 	self ai_off
 	self hide
-end
+}end
 
-officeWake:
+//============================================================
+officeWake: {
+//============================================================
 	self.enableEnemy = 1
 	self ai_on
 	self show
-	if (level.alarmSounded == 1) 
-		self attackplayer
-end
 	
-sleepDuringOffice:
+	if (level.alarmSounded == 1) {
+		self attackplayer
+	}
+}end
 
-	while (level.alarmSounded != 1) 
-	{
+//============================================================	
+sleepDuringOffice: {
+//============================================================
+	while (level.alarmSounded != 1)  {
 		$enterClerksOffice waittill trigger
+		
 		//iprintlnbold "sleep"
-		if (level.alarmSounded == 1)
+		if (level.alarmSounded == 1) {
 			end
+		}
 
 		$boatguard  thread officeSleep
 		$deleteguy2 thread officeSleep
 		$ai_alarm   thread officeSleep
-
 		$exitClerksOffice waittill trigger
 		//iprintlnbold "wake"
 		$boatguard  thread officeWake
 		$deleteguy2 thread officeWake
 		$ai_alarm   thread officeWake
-		
 		waitframe
 	}
-end
+}end
 
-//-----------------------------------------------------------------------------
-
-runForAlarm:
-	while (self != NULL && self != NIL && (isalive self) && self.thinkstate != "pain" && self.thinkstate != "attack")
+//============================================================
+runForAlarm: {
+//============================================================
+	while (self != NULL && self != NIL && (isalive self) && self.thinkstate != "pain" && self.thinkstate != "attack") {
 		waitframe
-	if (self == NULL || self == NIL || !(isalive self))
+	}
+
+	if (self == NULL || self == NIL || !(isalive self)) {
 		end
+	}
 
 	self turnto NULL
 	self lookat NULL
@@ -622,8 +697,8 @@ runForAlarm:
 	self waitthread global/SafeMoveTo.scr::SafeRunTo $clerkalarmnode
 	$clerk turnto $clerkalarmtrigger
 	$clerk waittill turndone
-	if (self == NULL || self == NIL || !(isalive self))
-		end
+	
+	if (self == NULL || self == NIL || !(isalive self)) { end }
 	
 	self holster
 	self anim alarm_switchon
@@ -631,11 +706,24 @@ runForAlarm:
 	$clerkalarmswitch anim turnon
 	$clerkalarmswitch playsound alarm_switch
 	self waittill animdone
-	if (self == NULL || self == NIL || !(isalive self))
-		end
+	
+	if (self == NULL || self == NIL || !(isalive self)) { end }
 
 	thread maps/e1l4/ship.scr::AlarmSounded
 	self unholster
 	self.enableEnemy = 1
 	self attackplayer
-end
+}end
+
+//============================================================
+return_players: {
+//============================================================
+	for(local.i = 1; local.i <= $player.size; local.i++) {
+		local.temp = $player[local.i]
+
+		if(local.temp != NULL && local.temp != NIL && local.temp.dmteam != "spectator" && local.temp.health > 0) {
+			local.player = local.temp
+			end local.player
+		}
+	}
+}end local.player

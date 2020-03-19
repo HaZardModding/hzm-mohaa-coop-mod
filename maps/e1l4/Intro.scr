@@ -7,11 +7,6 @@ InitIntro: {
 	$spy rendereffects "-shadow"
 	//$spy anim jeep_idle_drive
 
-	// Crimewavez = Only in SP.
-	// Disguise managed in e1l4.scr, line 7.
-	//[200] chrissstrahl - we are using the replacment in any case, so that if we get it working in the future all scripts are prpared
-	exec coop_mod/replace.scr::has_disguise 1
-
 	waitthread AIdisable
 	level.RideOver = 0
 }end
@@ -171,21 +166,14 @@ DeleteGuy1: {
 //============================================================
 GateGuardDialogue: {
 //============================================================
-	// Crimewavez - only in SP, again.
-	if(level.gametype == 0) {
+	//[200] Crimewavez - only in SP.
+	if(level.gametype == 0) {	
 		// "press 7 to show your papers" throbbing text...	
 		local.key = getboundkey1 "toggleitem"
 		local.string = (loc_convert_string ("Press " + local.key + " to show your papers."))
 		thread global/throbtext.scr::throbtext local.string 9999
 	}
-	//[200] chrissstrahl - show this also in coop
-	else{
-		local.string = (loc_convert_string ("Show your papers.")) //bitch! :D
-		thread global/throbtext.scr::throbtext local.string 9999
-	}
-	//[200] chrissstrahl - allow player to show papers
-	exec coop_mod/replace.scr::physics_on
-
+	
 	$starttruck setcollisionentity $truckcollide2
 
 	local.placetospawn = $player.origin + (0 -1000 0)
@@ -211,6 +199,11 @@ GateGuardDialogue: {
 	$spy waittill animdone
 	$spy anim A_14_Claus_Opel_idle
 
+	//[200] Crimewavez - bypass papers bullshit.
+	if(level.gametype != 0) {
+		level.GatePapersAccepted = 1
+	}
+
 	if(level.GatePapersAccepted != 1) {
 		$1stgateguard say A_14_GermATalk2    //and you sir?
 		$1stgateguard waittill say
@@ -219,9 +212,6 @@ GateGuardDialogue: {
 	//$1stgateguard waitthread askForPapers
 	//thread keepAskingtillSeePapers
 	while(level.GatePapersAccepted != 1) { wait 0.3 }
-	
-	//[200] chrissstrahl - make sure players work fine with being glued again
-	exec coop_mod/replace.scr::physics_off
 
 	$1stgateguard anim A_14_GermATalk4    //if you want to board the boat you will have to see the HM
 	$1stgateguard waittill animdone
@@ -229,7 +219,7 @@ GateGuardDialogue: {
 	//$spy waitthread global/LoopAnim.scr::LoopAnimStop
     //$spy anim jeep_idle_drive //00A004_driversitstill
 	$mrinvisible2 remove
-}End
+}end
 
 //============================================================
 KillPlayerIfFailPapers: {
@@ -290,6 +280,7 @@ askForPapers: {
 //============================================================
 papersAccepted: {
 //============================================================
+
 	thread global/throbtext.scr::throbtext_off
 	level.GatePapersAccepted = 1
 	waitthread AIenable
@@ -399,11 +390,10 @@ handlePlayer: {
 		$player.viewangles = (0 180 0)
 	}
 	else {
-		for(local.i = 1; local.i <= $player.size; local.i++){
-			local.player = $player[local.i]
-			local.player nodamage
-			local.player notsolid
-		}
+		local.player = waitthread return_players
+		local.player nodamage
+		local.player notsolid
+
 		exec coop_mod/replace.scr::glue level.opelpassengerseat
 		exec coop_mod/replace.scr::viewangles (0 180 0)
 	}
@@ -436,7 +426,7 @@ handleTruckGag:	 {
 	
 	$player playsound opeltruck_snd_doorclose  //sound when player closes door
 	waitthread DeleteGuy1
-	thread PlayerExitVehicle
+	waitthread PlayerExitVehicle
 	level.RideOver = 1
 
 	thread startTruckLightsCheck
@@ -482,29 +472,60 @@ startTruckOptions: {	//self refers to $starttruck
 //============================================================
 PlayerExitVehicle: {
 //============================================================
-	local.startpos = $player.origin
-	local.exitpos = $starttruck gettagposition "passenger_enter"
-	local.exitpos[2] = local.startpos[2]
+	if(level.gametype == 0) {
+		local.startpos = $player.origin
+		local.exitpos = $starttruck gettagposition "passenger_enter"
+		local.exitpos[2] = local.startpos[2]
 
-	thread global/MaintainCamera.scr::StopMaintainCamera
-	$player unglue
-	$player solid
-	$player physics_on
-	$player takedamage
-	$player.origin = local.exitpos
+		thread global/MaintainCamera.scr::StopMaintainCamera
 
-	$starttruck notsolid
-	local.playerspot = spawn script_origin origin local.startpos
-	$player glue local.playerspot 0
+		$player unglue
+		$player solid
+		$player physics_on
+		$player takedamage
+		$player.origin = local.exitpos	
+		
+		$starttruck notsolid
+		local.playerspot = spawn script_origin origin local.startpos
+		$player glue local.playerspot 0
 
-	local.disembark_time = 0.8
-	local.playerspot time local.disembark_time
-	local.playerspot moveto local.exitpos
-	local.playerspot move
+		local.disembark_time = 0.8
+		local.playerspot time local.disembark_time
+		local.playerspot moveto local.exitpos
+		local.playerspot move
 
-	wait local.disembark_time
-	$player unglue
-	drawhud 1
+		wait local.disembark_time
+		$player unglue
+		drawhud 1
+	}
+	else {
+		local.player = waitthread return_players
+			
+		local.startpos = local.player.origin
+		local.exitpos = $starttruck gettagposition "passenger_enter"
+		local.exitpos[2] = local.startpos[2]
+
+		thread global/MaintainCamera.scr::StopMaintainCamera
+
+		exec coop_mod/replace.scr::unglue
+		local.player takedamage
+		local.player.origin = local.exitpos	
+		
+		$starttruck notsolid
+		local.playerspot = spawn script_origin origin local.startpos
+		exec coop_mod/replace.scr::glue local.playerspot
+
+		local.disembark_time = 0.8
+		local.playerspot time local.disembark_time
+		local.playerspot moveto local.exitpos
+		local.playerspot move
+
+		wait local.disembark_time
+		exec coop_mod/replace.scr::unglue
+		local.player show
+		drawhud 1
+	
+	}
 }end
 
 //============================================================
@@ -554,3 +575,16 @@ intro_truck_jitter: {
     	}
 	}
 }end
+
+//============================================================
+return_players: {
+//============================================================
+	for(local.i = 1; local.i <= $player.size; local.i++) {
+		local.temp = $player[local.i]
+
+		if(local.temp != NULL && local.temp != NIL && local.temp.dmteam != "spectator" && local.temp.health > 0) {
+			local.player = local.temp
+			end local.player
+		}
+	}
+}end local.player

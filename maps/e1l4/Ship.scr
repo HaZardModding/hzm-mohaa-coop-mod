@@ -1,19 +1,17 @@
-//---------------------------------------------------------------------
-InitShip:
-//---------------------------------------------------------------------
+//============================================================
+InitShip: {
+//============================================================
 	level.kaboom = 0
-
 	level.ai_alarm_backup_time = 15 
 	level.ai_alarm_backup_max = 4 
 	level.alarm = 0
-//	level.alarm_sound = <ubersound alias> 
+	//	level.alarm_sound = <ubersound alias> 
 	level.alarmlights = 0 
 
 	//lock the doors on level 2
 	$2bdoor lock
 	$2cdoor lock
 	$2ddoor lock
-	
 	$ship1DoorOpen lock
 
 	//listen for the trigger spawning 1stfloorguys, to set their movespots
@@ -28,32 +26,25 @@ InitShip:
 	level.trigger3f = waitthread global/FindTrigger.scr::FindTrigger "3fguysspawner"
 	level.trigger3f nottriggerable
 		
-	//************************************************
 	thread global/alarm_system.scr::alarm_system_setup 
 	thread InitExplosives
-	//************************************************
+	
 	level.numexplosivesset = 0
-
 	level.sirenson = 0
 
 	thread manageOutsideGuys
 	$nettingTrigger thread doNettingTrigger
+}end
 
-end
-//---------------------------------------------------------------------
-CleanupShip:
-//---------------------------------------------------------------------
-end
+//============================================================
+CleanupShip: {
+//============================================================
+}end
 
-
-////////////////////////////////////////////////////////
-//---------Find Explosives Objective-------------------------
-////////////////////////////////////////////////////////
-
-ObjectiveFindExplosives:
-
-	if (level.skipfindexplosives == 1)
-	{
+//============================================================
+ObjectiveFindExplosives: {
+//============================================================
+	if (level.skipfindexplosives == 1) {
 		$player.origin = $engineroom.origin
 		end
 	}
@@ -67,86 +58,81 @@ ObjectiveFindExplosives:
 	
 	$getbombs waittill trigger
 	waitthread global/items.scr::add_item "explosive"
-
 	$2ddoor unlock
 	
-	for (local.i=1;local.i<=$bombs.size;local.i++)
-		if ($bombs[local.i]) $bombs[local.i] delete
+	for (local.i=1;local.i<=$bombs.size;local.i++) {
+		if ($bombs[local.i]) { $bombs[local.i] delete }
+	}
+}end
 
-end
+//============================================================
+setUp1stFloorGuys: {
+//============================================================
+	while !($1stfloorguys[1]) { wait 1 }
 
-//-------------------------------------------------------------
-setUp1stFloorGuys:
-	
-	while !($1stfloorguys[1])
-		wait 1
 	// iprintln "DEBUG:  TRIGGERED"
 	wait 1
 	$1stfloorguys[1].movespot = "t649"
 	$1stfloorguys[2].movespot = "t650"
 	$1stfloorguys[3].movespot = "t683"
 	$1stfloorguys[4].movespot = "t684"
+}end
 
-end
-
-//-------------------------------------------------------------
-moveFirstFloorGuys:
+//============================================================
+moveFirstFloorGuys: {
+//============================================================
 	// iprintln "moving the guys"
-	for (local.i = 1; local.i <= $1stfloorguys.size; local.i++)
-	{
+	for (local.i = 1; local.i <= $1stfloorguys.size; local.i++) {
 		// iprintln ( "my runto = " + $1stfloorguys[local.i].movespot )
 		$1stfloorguys[local.i] thread moveGuy
 	}
-end
+}end
 
-//-------------------------------------------------------------
-moveGuy:
-	if(self && isAlive self)
-		{
-			// iprintln ( "my runto = " + self.movespot )
-			self runto $(self.movespot).origin
-			self waittill movedone
-			// iprintln ( "moving guy # " + self.targetname )
-		}
-end
+//============================================================
+moveGuy: {
+//============================================================
+	if(self && isAlive self) {
+		// iprintln ( "my runto = " + self.movespot )
+		self runto $(self.movespot).origin
+		self waittill movedone
+		// iprintln ( "moving guy # " + self.targetname )
+	}
+}end
 
-//-------------------------------------------------------------
-turnOnTriggers:
+//============================================================
+turnOnTriggers: {
+//============================================================
 	level.trigger2b triggerable
-end
+}end
 
-//-------------------------------------------------------------
-doorClosingGuy:
+//============================================================
+doorClosingGuy: {
+//============================================================
 	//unlock the L2 doors
 	$2bdoor unlock
-	
 	$2bdoor open $player
 	level.trigger2b waittill trigger
 	waitframe
+
 	$2bdoorguy waitexec global/disable_ai.scr
 	wait 1
+
 	$2bdoor close $player
 	waitframe
-	$2bdoorguy nodamage
 
+	$2bdoorguy nodamage
 	$2bdoor lock
 	$2cdoor unlock
 	$2bdoorguy takedamage
 	wait 2
-	$2bdoorguy delete
-	
-end
 
-	
-////////////////////////////////////////////////////////
-//---------------Place explosives Objective-----------
-////////////////////////////////////////////////////////
+	$2bdoorguy delete	
+}end
 
-ObjectivePlaceExplosives:
-
-
-	if (level.skipshipexplode == 1)
-	{
+//============================================================
+ObjectivePlaceExplosives: {
+//============================================================
+	if (level.skipshipexplode == 1) {
 		//$player.origin = $explodeshiptrigger.origin
 		$player.origin = ( -3458 3887 -287 )
 		$player.viewangles = ( 0 90 0 )
@@ -156,15 +142,14 @@ ObjectivePlaceExplosives:
 	local.trigger4a = waitthread global/FindTrigger.scr::FindTrigger "bombresponsetrigger"
 	level.trigger3f = waitthread global/FindTrigger.scr::FindTrigger "3fguysspawner"
 	
-	for (local.i=1;local.i<=$explosives.size;local.i++)
-	{
+	for (local.i=1;local.i<=$explosives.size;local.i++) {
 		$explosives[local.i] show
 	}
 
-	while (level.numexplosivesset < $explosives.size)
-	{
+	while (level.numexplosivesset < $explosives.size) {
 		waitframe
 	}
+
 	waitthread global/items.scr::remove_item "explosive"
 
 	// lock the doors upstairs to force the player into the trigger
@@ -179,130 +164,108 @@ ObjectivePlaceExplosives:
 	//turn on the trigger for player to fight way back up stairs
 	level.trigger3f triggerable
 	// level.trigger3f thread GetridofGuns "deleteguy3"
-end
+}end
 
 // This function takes a trigger as self and will get rid of the guns of local.guys when the trigger is triggered
 // designed specifically for use with enemy spawners
-GetridofGuns local.guys:
-	 self waittill trigger
- 
+//============================================================
+GetridofGuns local.guys: {
+//============================================================
+	self waittill trigger 
 	wait 1.0 // give them time to spawn
  
-	for (local.i=1;local.i<=$(local.guys).size; local.i++)
+	for (local.i=1;local.i<=$(local.guys).size; local.i++) {
 		$(local.guys)[local.i] dontdropweapons
-	
-end //"deleteguy3"
+	}
+}end //"deleteguy3"
 
-InitExplosives:  //called in InitScene2
-	for (local.i=1;local.i<=$explosives.size;local.i++)
-	{
+ //called in InitScene2
+//============================================================
+InitExplosives: {
+//============================================================
+	for (local.i=1;local.i<=$explosives.size;local.i++) {
 		$explosives[local.i] hide
 		$explosives[local.i] setusethread SetExplosive
 		$explosives[local.i] stopwatchduration 0
 		$explosives[local.i] Radius 100
 	}
-end
+}end
 
-
-SetExplosive:
-
+//============================================================
+SetExplosive: {
+//============================================================
 	level.numexplosivesset ++
-end
+}end
 
+//============================================================
+compassTracker local.objNumber local.objMessage local.objOrigin: { 
+//============================================================
+	/*
+	local.objNumber     the number of the objective
+	local.objMessage    the message of the objective
+	local.objDeckNumber the deck number that the objective lies on (1 through 5)
+	local.objOrigin     the origin of the objective
+	
+	The compass tracker will point the compass in the correct direction, no matter what floor you are on...
+	If you are not on the floor of the objective, the compass will point to the stairs leading to the next closet floor
+	*/
 
-
-
-////////////////////////////////////////////////////////
-//---------------Miscellaneous--------------------------
-////////////////////////////////////////////////////////
-
-
-
-//-----------------------------------------------------------------------------------------------------------------
-compassTracker local.objNumber local.objMessage local.objOrigin: 
-//-----------------------------------------------------------------------------------------------------------------
-//local.objNumber     the number of the objective
-//local.objMessage    the message of the objective
-//local.objDeckNumber the deck number that the objective lies on (1 through 5)
-//local.objOrigin     the origin of the objective
-
-//The compass tracker will point the compass in the correct direction, no matter what floor you are on...
-//If you are not on the floor of the objective, the compass will point to the stairs leading to the next closet floor
-//-------------------------------------------------------------------------------------------------------------------
 	level.abortCompassTracker = 0
-
 	local.floorOrigins[1] = $deck1
 	local.floorOrigins[2] = $deck2
 	local.floorOrigins[3] = $deck3
 	local.floorOrigins[4] = $deck4
-
 	local.objectiveFloor = waitthread WhichFloor local.objOrigin
 	local.lastPlayerFloor = -1
 
-	while (local.objNumber == level.currentobjective && level.abortCompassTracker == 0)
-	{
-
+	while (local.objNumber == level.currentobjective && level.abortCompassTracker == 0) {
 		local.playerFloor = waitthread WhichFloor $player.origin
 
-		if (local.playerFloor != local.lastPlayerFloor)
-		{
-			if (local.playerFloor == local.objectiveFloor)
-			{
+		if (local.playerFloor != local.lastPlayerFloor) {
+			if (local.playerFloor == local.objectiveFloor) {
 				waitthread global/objectives.scr::add_objectives local.objNumber 2 local.objMessage local.objOrigin
 				waitthread global/objectives.scr::current_objectives local.objNumber
 			}
-			else if (local.playerFloor < local.objectiveFloor)
-			{
+			else if (local.playerFloor < local.objectiveFloor) {
 				waitthread global/objectives.scr::add_objectives local.objNumber 2 local.objMessage local.floorOrigins[local.playerFloor]
 				waitthread global/objectives.scr::current_objectives local.objNumber	
 			}
-			else
-			{
+			else {
 				waitthread global/objectives.scr::add_objectives local.objNumber 2 local.objMessage local.floorOrigins[local.playerFloor-1]
 				waitthread global/objectives.scr::current_objectives local.objNumber	
 			}
-
 			local.lastPlayerFloor = local.playerFloor
 		}
-
 		waitframe
 	}
 	level.abortCompassTracker = 0
+}end
 
-end
-
-//---------------------------------------------------------------------
-WhichFloor local.objectiveorigin:
-//---------------------------------------------------------------------
+//============================================================
+WhichFloor local.objectiveorigin: {
+//============================================================
 	local.objectiveHeight = local.objectiveorigin[2]
-
 	local.floor1 = $deck1.origin[2]
 	local.floor2 = $deck2.origin[2]
 	local.floor3 = $deck3.origin[2]
 	local.floor4 = $deck4.origin[2]
 
-	if (local.objectiveHeight > local.floor1)
-	{
+	if (local.objectiveHeight > local.floor1) {
 		local.floor = 1
 	}
-	else if (local.objectiveHeight <= local.floor1 && local.objectiveHeight > local.floor2)
-	{
+	else if (local.objectiveHeight <= local.floor1 && local.objectiveHeight > local.floor2) {
 		local.floor = 2
 	}
-	else if (local.objectiveHeight <= local.floor2 && local.objectiveHeight > local.floor3)
-	{
+	else if (local.objectiveHeight <= local.floor2 && local.objectiveHeight > local.floor3) {
 		local.floor = 3
 	}
-	else if (local.objectiveHeight <= local.floor3 && local.objectiveHeight > local.floor4)
-	{
+	else if (local.objectiveHeight <= local.floor3 && local.objectiveHeight > local.floor4) {
 		local.floor = 4
 	}
-	else
-	{
+	else {
 		local.floor = 5
 	}
-
-end local.floor
+}end local.floor
 
 
 /*
@@ -328,11 +291,9 @@ playalarmsound:
 end
 */
 
-
-//---------------------------------------------------------------------
-PlayAlarmSound local.busted: 
-//---------------------------------------------------------------------
-
+//============================================================
+PlayAlarmSound local.busted: {
+//============================================================
 	if (self.alarmOrigin == NULL || self.alarmOrigin == NIL) {
 		self.soundorigin = spawn script_model model "fx/dummy.tik"
 		self.soundorigin.origin = self.origin
@@ -342,6 +303,7 @@ PlayAlarmSound local.busted:
 	if (local.busted == 1) {
 		self.soundorigin stoploopsound
 		waitframe
+
 		while (1) {
 			self.soundorigin loopsound damaged_alarm		
 			local.wait = 3 + (randomfloat 6)
@@ -353,32 +315,30 @@ PlayAlarmSound local.busted:
 	// just play normal alarm sound
 	self.soundorigin loopsound e1l4_alarm
 	self.soundorigin notsolid
-end
+}end
 
-//---------------------------------------------------------------------
-StartSirens: 
-//---------------------------------------------------------------------
+//============================================================
+StartSirens: {
+//============================================================
 	//*** play sounds on all the alarm points
 	level.sirenson = 1
-
 	thread maps/e1l4/light_e1l4.scr::StartFlashing
 	$siren thread PlayAlarmSound
-End
+}end
 
-
-//-----------------------------------------------------------------------------
-
-doNottriggerable:
+//============================================================
+doNottriggerable: {
+//============================================================
 	self nottriggerable
-end
+}end
 
-AlarmSounded: 
-	if (level.alarmSounded == 1)
-		end
+//============================================================
+AlarmSounded: {
+//============================================================
+	if (level.alarmSounded == 1) { end }
 
 	$clerkalarmtrigger thread doNottriggerable
 	$alarm_switch_trigger thread doNottriggerable
-
 	trigger $musicTransitionCoverBlown
 	level.alarmSounded = 1
 
@@ -393,26 +353,31 @@ AlarmSounded:
 		// if we haven't gotten the papers yet, then don't bother, they are useless at this point
 		trigger $waitingToGetPapers
 	}
+
 	waitthread global/items.scr::remove_item "papers_level2"
+}end
 
-end
-
-doDoorLock:
+//============================================================
+doDoorLock: {
+//============================================================
 	while (self.isOpen == 1) {
 		self close
 		wait 0.25
 	}
+
 	self lock
-end
+}end
 
-//-----------------------------------------------------------------------------
-
-manageOutsideGuys:
+//============================================================
+manageOutsideGuys: {
+//============================================================
 	thread manageEnteringShip
 	thread manageLeavingShip
-end
+}end
 
-manageEnteringShip:
+//============================================================
+manageEnteringShip: {
+//============================================================
 	while ($insideShip1) {
 		waitframe
 		$insideShip1 waittill trigger
@@ -421,9 +386,11 @@ manageEnteringShip:
 		$clerkbuddy thread guyOff
 		$ai_alarm thread guyOff
 	}
-end
+}end
 
-manageLeavingShip:
+//============================================================
+manageLeavingShip: {
+//============================================================
 	while ($outsideShip1) {
 		waitframe
 		$outsideShip1 waittill trigger
@@ -432,21 +399,25 @@ manageLeavingShip:
 		$clerkbuddy thread guyOn
 		$ai_alarm thread guyOn
 	}
-end
+}end
 
-guyOff:
+//============================================================
+guyOff: {
+//============================================================
 	self ai_off
 	self hide
-end
+}end
 
-guyOn:
+//============================================================
+guyOn: {
+//============================================================
 	self ai_on
 	self show
-end
+}end
 
-//-----------------------------------------------------------------------------
-
-doNettingTrigger:
+//============================================================
+doNettingTrigger: {
+//============================================================
 	self.offTrigger = spawn trigger_relay
 
 	while (1) {
@@ -457,19 +428,25 @@ doNettingTrigger:
 		self thread nettingTriggerDetectOff
 		self.offTrigger waittill trigger
 	}			
-end
+}end
 
-nettingTriggerTimer:
+//============================================================
+nettingTriggerTimer: {
+//============================================================
 	self.timerThread = local
+	
 	while (1) {
 		self.lastTriggerTime = level.time
 		self waittill trigger
 		//println "still triggering"
 	}
-end
+}end
 
-nettingTriggerDetectOff:
+//============================================================
+nettingTriggerDetectOff: {
+//============================================================
 	self thread nettingTriggerTimer
+	
 	while (1) {
 		if (level.time - self.lastTriggerTime > 0.5) {
 			//iprintlnbold "going sway"
@@ -479,4 +456,17 @@ nettingTriggerDetectOff:
 		}
 		waitframe
 	}
-end
+}end
+
+//============================================================
+return_players: {
+//============================================================
+	for(local.i = 1; local.i <= $player.size; local.i++) {
+		local.temp = $player[local.i]
+
+		if(local.temp != NULL && local.temp != NIL && local.temp.dmteam != "spectator" && local.temp.health > 0) {
+			local.player = local.temp
+			end local.player
+		}
+	}
+}end local.player
