@@ -89,6 +89,15 @@ main:{
 		}
 	}
 	
+    //[200] Smithy - used in coop_mod/aihandler.scr
+    level.coop_actorArray["german"][1]      = NIL
+    level.coop_actorArray["american"][1]    = NIL
+    //if you wish to modify this later on, use 'exec coop_mod/aihandler.scr::updateTeamRunSpeed <team> <speed>'
+    level.coop_aaRunSpeed["american"]       = 0.75  //75% of SH/BT run speed - do not touch, managed in func ::updateTeamRunSpeed
+    level.coop_maxPlayerScalar              = 4     //after this number of players, stop scaling difficulty (lower number means steeper difficulty scaling)
+    level.coop_actorAccuracyCalcs           = 1     //do dynamic enemy accuracy calculations for difficulty
+    level.coop_actorPainHandler             = 1     //use coop method of handling pain
+	
 	//[200] chrissstrahl - make sure to filter what ever is not part of the real filename
 	local.fullMapName = string(getcvar("mapname"));
 	level.coop_mapname = ""
@@ -105,7 +114,7 @@ main:{
 		thread spWaitForPlayer
 		end
 	}
-	//MULTIPLAYER//////////////////////////
+	//MULTIPLAYER//////////////////////////	
 	thread setupServer
 	thread managePlayers
 	
@@ -402,7 +411,6 @@ managePlayers:{
 	//2. sets player max health, based on dificulty settings
 	
 	//[200] chrissstrahl - wait for a player to join the game
-	//might need to experiment further with level waittill playerspawn once we are on dedicated servers
 	level waittill spawn
 	
 	//[200] chrissstrahl - used for LMS to detect when a player leaves
@@ -689,25 +697,27 @@ managePlayers:{
 				}
 			}
 		}
-		
-//[200] chrissstrahl - LMS - check if new players should be allowed to join
-		local.prevLifes = level.coop_lmsLifes
-		level.coop_lmsLifes = int(getcvar("coop_lmsLifes"))
-		if(level.coop_lmsLifes <= 0 ){
-			level.coop_lmsLifes = 0
-		}else{
-			if(level.coop_lmsAllowJoin != 1){
-				//[200] chrissstrahl - prevent players from rejoining when all lifes are used up
-				if(local.prevPlayerCount > local.playerCount && level.time > 30){
-					iprintlnbold_noloc("COOP: LMS active - No late joining")
-					level.coop_lmsAllowJoin = 0
-				}
-				//[200] chrissstrahl - used for LMS to detect when a player leaves
-				local.prevPlayerCount = local.playerCount
-			}
+//[200] chrissstrahl - call player changed func if number of players changed
+		if(local.prevPlayerCount != local.playerCount){
+			waitthread playerCountChanged local.prevPlayerCount local.playerCount
 		}
-		waitframe		
-	}
+		
+//[200] chrissstrahl - LMS - check if condistions have changed
+		waitthread lmsCheckLifes local.prevPlayerCount local.playerCount
+		
+//[200] chrissstrahl - keep track of player count
+		local.prevPlayerCount = local.playerCount
+}end
+
+//[200] chrissstrahl - this is called if the number of player has changed
+//::managePlayers is waiting for this thread
+//=========================================================================
+playerCountChanged local.prevPlayerCount local.playerCount:{
+//=========================================================================
+	PRINTLN "::playerCountChanged"
+	
+	//[200] chrissstrahl - call Smithys ai handler to update
+	exec coop_mod/aihandler.scr::updateEnemyTeamDifficulty
 }end
 
 //chrissstrahl - prints a info to player hud, only each 3 sec
@@ -1831,3 +1841,29 @@ lmsForceSpectatorHandle local.player:{
 	}
 }end
 
+//[200] Chrissstrahl - check if LMS life count has changed
+//=========================================================================
+lmsCheckLifes local.prevPlayerCount local.playerCount:{
+//=========================================================================
+//[200] chrissstrahl - LMS - check if new players should be allowed to join
+		local.prevLifes = level.coop_lmsLifes
+		level.coop_lmsLifes = int(getcvar("coop_lmsLifes"))
+		if(level.coop_lmsLifes <= 0 ){
+			level.coop_lmsLifes = 0
+			level.coop_lmsAllowJoin = 1
+			
+			if(local.prevLifes != 0){
+				iprintlnbold_noloc("COOP: LMS inactive - Joining allowed")
+			}
+		}else{
+			if(level.coop_lmsAllowJoin != 1){
+				//prevent players from rejoining when all lifes are used up
+				if(local.prevPlayerCount > local.playerCount && level.time > 30){
+					iprintlnbold_noloc("COOP: LMS active - No late joining")
+					level.coop_lmsAllowJoin = 0
+				}
+			}
+		}
+		waitframe		
+	}
+}end
