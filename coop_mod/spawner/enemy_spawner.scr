@@ -1,0 +1,89 @@
+/*
+spawn( String entityname, [ String keyname1 ], [ String value1 ], [ String keyname2 ], [ String value2 ], [ String keyname3 ], [ String value3 ], [ String keyname4 ], [ String value4 ] )
+
+    Spawns an entity.
+*/
+//=========================================================================
+main: {
+//=========================================================================
+    if(level.spawnerPrecached == 1) { end }
+    level.spawnerPrecached = 1
+
+    if(level.spawnerActivated == 0 || level.spawnerActivated == NIL) { end }
+    
+    iprintlnbold_noloc("Spawner executed!")
+    level.spawnerUpdateDist = 400
+    level.updateInteger     = 1
+    level.spawnerInterval   = 2
+    level.spawnerRotations  = 5
+
+
+    level.map = getcvar("mapname")
+    thread script_master
+}end
+
+//=========================================================================
+script_master: { 
+//=========================================================================
+    //setup spawner
+    local.models = exec coop_mod/spawner/enemy_models.scr::level.map
+    local.spawner = exec coop_mod/spawner/enemy_spawnlocations.scr::level.map
+
+    while(1) {
+        //check how close to spawner players are, and if too close, update them
+        // get all players
+        local.player = waitthread get_players
+            
+            // check how close valid players are to spawner
+        if(vector_length (local.player.origin - local.spawner ) < level.spawnerUpdateDist) {
+            // if distance is smaller than level.spawnerUpdateDist, update spawner
+            local.spawnerNew = (level.map + "_update" + level.updateInteger)
+            local.spawner = exec coop_mod/spawner/enemy_spawnlocations.scr::local.spawnerNew
+            level.updateInteger++
+        }
+
+        // check if at least one german was alarmed or if alarms are triggered
+        local.alarmedEnemies = waitthread is_alarmed
+        if(local.alarmedEnemies >= 3 || level.alarm_on == 1) {
+            iprintlnbold_noloc("BITCHES ALARMED, TIME FOR SPAWNER TO ROLL!")
+            if !(local.player cansee local.spawner 80) {
+                // Crimewavez - try to think and escape blind circle of spawning infinitely.
+                for(local.i = 1; local.i <= level.spawnerRotations; local.i++){
+                    local.rand = randomint(local.models.size - 1)
+                    // Crimewavez - try to think and add better random model choosing which actually werks.
+                    //spawn local.models[local.rand] targetname "spawner_enemy" origin local.spawner
+                    spawn "models/human/german_afrika_officer.tik" targetname "spawner_enemy" origin local.spawner
+                    //iprintlnbold_noloc(local.models[local.rand])
+                    waitframe
+                    $spawner_enemy attackplayer
+                    wait level.spawnerInterval
+                }
+            }
+        }
+        waitframe
+    }
+}end
+
+//=========================================================================
+is_alarmed: {
+//=========================================================================
+   local.angryGerman = 0
+   
+    for(local.i = 1; local.i <= level.coop_actorArray["german"].size; local.i++){
+        if(level.coop_actorArray["german"][local.i].thinkstate == "attack" ) {
+            local.angryGerman += 1
+        }
+    }
+}end local.angryGerman
+
+//=========================================================================
+get_players: {
+//=========================================================================
+    local.player = NULL
+    
+    for(local.i = 1; local.i <= $player.size; local.i++){
+        if($player[local.i].dmteam != "spectator" && $player[local.i].health > 0) {
+            local.player = $player[local.i]
+        }
+    }
+}end local.player
