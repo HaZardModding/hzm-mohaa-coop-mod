@@ -112,7 +112,7 @@ main:{
 	$scene1_dead_panzer_mask.angles = $scene1_dead_panzer.angles
 
 	//===SETUP THE COLLISION MASK ON THE HALFTRACK BY SETCOLLISIONENTITY
-	//	$halftrack setcollisionentity $halftrack_mask
+	//$halftrack setcollisionentity $halftrack_mask
 
 	//===SETUP THE COLLISION MASK ON THE TIGER TANK IN SCENE4
 	$scene4_tank setcollisionentity $tigertank_mask
@@ -531,16 +531,19 @@ halftrack_ambush:{
 		$halftrack.health = 300
 
 		//===Set up the gunner's shield
-//chrissstrahl - fixme - removed shield to see if gunner then works
-//chrissstrahl - test failed, it will still not work right, gun attachment issue
+		//chrissstrahl - fixme - removed shield to see if gunner then works
+		//chrissstrahl - test failed, it will still not work right, gun attachment issue
 		$halftrack attachmodel "vehicles/sdkfz_shield.tik" "shield" 1.5 "halftrack_gunnershield"
 		$halftrack_gunnershield.angles = (0 270 0)
 
-//		$halftrack.shield = spawn script_model model "vehicles/sdkfz_shield.tik"
-//		$halftrack.shield notsolid
-//		$halftrack.shield nodamage
-//		$halftrack.mg42 = $halftrack queryTurretSlotEntity 0
-//		$halftrack.shield glue $halftrack.mg42
+		//[200] Smithy - WORK, DAMN YOU!
+		$halftrack.mg42 remove
+		$halftrack.mg42 = spawn "models/vehicles/sdkfz_mg42.tik"
+		$halftrack.mg42 notsolid
+		thread bruteForceMGOrigin $halftrack.mg42 $halftrack_gunnershield
+		local.player = exec coop_mod/replace.scr::player_closestTo $halftrack_gunner //[200] Smithy - get a target right away (just to make gun point in right direction)
+		$halftrack.mg42 setAimTarget local.player
+		$halftrack_gunner lookat local.player
 
 		//===Set up the gunner
 		//===Start the halftrack moving
@@ -548,17 +551,35 @@ halftrack_ambush:{
 
 		//===Start the halftrack firing at the player if the player is in the danger zone
 		
+		//[200] Smithy - no need for this here, it can be sorted out in the mg_targeting thread
 		//chrissstrahl - make sure this is coop compatible
-		local.closestVictim = $world
-		while !($halftrack_gunner cansee local.closestVictim 0 3050){
-			local.closestVictim = exec coop_mod/replace.scr::player_closestTo $halftrack_gunner
-			$halftrack_gunner lookAt local.closestVictim
-			wait 0.25
-		}
+		//local.closestVictim = $world
+		//while !($halftrack_gunner cansee local.closestVictim 0 3050){
+		//	local.closestVictim = exec coop_mod/replace.scr::player_closestTo $halftrack_gunner
+		//	$halftrack_gunner lookAt local.closestVictim
+		//	wait 0.25
+		//}
 
 		thread halftrack_hint		
 		$halftrack.mg42 thread halftrack_mg_targeting
 		thread halftrack_final_collision
+}end
+
+//[200] Smithy - NEW FUNC - fuck this shit, I'll brute force it instead
+//=========================================================================
+bruteForceMGOrigin local.mg local.pos:{
+//=========================================================================
+	while (local.pos){
+		local.mg.origin = (local.pos.origin + (0 0 25))
+		waitframe
+	}
+	if (local.mg){
+		local.mg remove
+	}
+	if ($masterhead){ //be resourceful and remove two extra entities we created
+		$masterhead.croid remove
+		$masterhead remove
+	}
 }end
 
 //============================================================//
@@ -603,28 +624,31 @@ halftrack_mg_targeting:{
 //===Make the mg42 target the script_origins bound to the player to simulate near-misses for some amount of time, then go for the player
 
 	if !(isAlive $halftrack){ end }
-	
-//local.closestVictim = exec coop_mod/replace.scr::player_closestTo $halftrack_gunner
-//$halftrack_gunner lookAt local.closestVictim
 
-	local.player = NULL
+	//local.closestVictim = exec coop_mod/replace.scr::player_closestTo $halftrack_gunner
+	//$halftrack_gunner lookAt local.closestVictim
+
+	//local.player = NULL
 	//while !($halftrack_gunner cansee $player 0 3050)	//chrissstrahl
 	//[200] chrissstrahl - make sure we grab player right away
-	local.player = $halftrack_gunner exec coop_mod/replace.scr::canseeGetClosest 0 3050 //chrissstrahl - coop mod replacment
+	local.player = $halftrack_gunner exec coop_mod/replace.scr::canseeGetClosest 200 3750 //[200]Smithy - tweaked //0 3050 //chrissstrahl - coop mod replacment
 	while (local.player == NULL){		
 		wait 1 //[200] chrissstrahl - changed to 1 from 2 secs - this function needs to be reworked anyway
-		local.player = $halftrack_gunner exec coop_mod/replace.scr::canseeGetClosest 0 3050 //chrissstrahl - coop mod replacment
+		local.player = $halftrack_gunner exec coop_mod/replace.scr::canseeGetClosest 200 3750 //[200]Smithy - tweaked //0 3050 //chrissstrahl - coop mod replacment
 		//println "+++++ I CANT SEE YOU ++++++" //[200] chrissstrahl - stop console spam
 		if !(isAlive $halftrack)
 			end
 	}
-		
-	self maxyawoffset 55
-	self bulletdamage 200
-	self bulletspread 1 1 
-	self startfiring		
+	$halftrack_gunner lookat local.player 	//[200] Smithy - make gunner look dynamically	
+	thread setupPlayerHeadPos local.player 	//[200] Smithy - set up the head!
+
+	self startfiring	
+	self maxyawoffset 55	
 	
-	if( level.gametype == 0){ //chrissstrahl - sp only
+	if( level.gametype == 0){ //chrissstrahl - sp only	
+		self bulletdamage 200
+		self bulletspread 1 1 
+
 		self setaimtarget $playertarget_front1
 		println "Aiming for misspoint1"
 			
@@ -639,8 +663,8 @@ halftrack_mg_targeting:{
 		if !(isAlive $halftrack){ end }
 	}
 	
-	//println "Aiming for PLAYER!!!!!" //[200] chrissstrahl - stop console spam
-	self setaimtarget local.player
+	//println "Aiming for PLAYER!!!!!" 	//[200] chrissstrahl - stop console spam
+	self setaimtarget group.head 		//[200] Smithy - aim at head instead
 
 	//===*DIFFICULTY* SELECTOR
 	local.bulletdamage = 50
@@ -658,16 +682,30 @@ halftrack_mg_targeting:{
 	}
 	
 	for (local.i = 1; local.i < 16; local.i ++){
+		//[200] Smithy - we don't need a loop. this gets caught and continues firing indefinitely. it now reflects SP
 		//[200] chrissstrahl - fix gunner grabbing NULL player
-		local.player = $halftrack_gunner exec coop_mod/replace.scr::canseeGetClosest 0 3050
-		while(local.player == NULL){
-			waitframe
-			local.player = $halftrack_gunner exec coop_mod/replace.scr::canseeGetClosest 0 3050
-		}
+		//local.player = $halftrack_gunner exec coop_mod/replace.scr::canseeGetClosest 0 3050
+		//while(local.player == NULL){
+			//waitframe
+			//local.player = $halftrack_gunner exec coop_mod/replace.scr::canseeGetClosest 0 3050
+		//}
 		//end chrissstrahl
+		if (!isAlive local.player){ 															//[200] Smithy - check for NULL or dead players
+			wait 1.5																			//[200] Smithy - breathing space, also looks more realistic															
+			self stopfiring
+			local.player = $halftrack_gunner exec coop_mod/replace.scr::canseeGetClosest 200 3750 //[200]Smithy - tweaked //0 3050
+			if (local.player != NULL){		
+				thread setupPlayerHeadPos local.player 											//[200] Smithy - set up the head!
+				self setaimtarget group.head													//[200] Smithy - target next player	
+				self startfiring
+			}else{
+				break 																			//[200] Smithy - OK, still NULL, lets cycle out and wait at top of func for next valid player
+			}
+			$halftrack_gunner lookat local.player 												//[200] Smithy - make gunner look dynamically
+		}
 		if !(isAlive $halftrack){ end }
 		
-		if (vector_within local.player $halftrack 2300){
+		if (vector_within local.player $halftrack 1400){ //[200] Smithy - tweaked (original: 2300) so we can get closer and pick up zooka
 			//println "SUPER POWERFUL MODE" //[200] chrissstrahl - stop console spam
 			self bulletdamage 5000
 			self bulletspread 10 10
@@ -682,7 +720,8 @@ halftrack_mg_targeting:{
 	//===Give the player some breathing time here
 	//===*DIFFICULTY* SELECTOR
 	//chrissstrahl - adjust for coop
-	local.waitTime = 2
+	//local.waitTime = 2
+	local.waitTime = 1.5 	//[200] Smithy - adjusted a bit more
 	
 	if(level.gametype == 0){ //chrissstrahl - do only in sp
 		if (level.skill == "0"){
@@ -690,13 +729,41 @@ halftrack_mg_targeting:{
 		}else if (level.skill == "2"){
 			local.waitTime =  1.5
 		}
-	}else if($player.size < 3 ){ //chrissstrahl - 1 or 2 players, wait some extra time
-		local.waitTime = 1
+	}else if($player && $player.size < 3 ){ //chrissstrahl - 1 or 2 players, wait some extra time
+		//local.waitTime = 1
+		local.waitTime += 1 //[200] Smithy - I assume you wanted to add instead
 	}
 	wait local.waitTime
 	//===Resume scanning	
 	goto halftrack_mg_targeting
 }end
+
+//[200] Smithy - new func - aim a bit higher from the player's centroid.
+//this is needed because BT's targeting system is a little silly.
+//it constantly aims at the player's centroid (centre mass),
+//even when they are hiding behind a wall or ditch.
+//so it just shoots at the ground (or wall) like a moron.
+//Pair that with the fact that we can now move to the crater to grab a zooka...
+//...and we had a recipe for stupid. This is better.
+//=========================================================================
+setupPlayerHeadPos local.player:{
+//=========================================================================
+	if (!group.head){ 										//only spawn one head for all players
+		group.head 			= spawn script_object
+		group.head.croid	= spawn script_object
+		group.head targetname "masterhead"
+	}
+	if (group.head.player == local.player){					//don't bother doing a setup if player is the same
+		end
+	}
+	group.head.croid unglue 								//reset any previous binds
+	group.head unbind
+	group.head.player = local.player
+	group.head.croid glue group.head.player					//this centroid position is needed for the head to bind			  
+	group.head origin (group.head.croid.origin + (0 0 75))  //make the head near...the head, duh :P
+	group.head bind group.head.croid                  		//make the head follow the player
+}end
+
 	
 //SCENE 1 CAPTAIN BEHAVIOR & AIRSTRIKE
 //=========================================================================
