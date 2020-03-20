@@ -64,6 +64,7 @@ main:{
 	level.coop_debugSpawn				= 0 //show (1) spawnlocations or not (0)
 	level.coop_playerReady				= 0	//player(s) are not ready/not joined
 	
+	level.coop_gameStartedAt			= NIL		//[200] chrissstrahl - used to keep track when the first player was actually active
 	level.coop_getActiveWeapon_entity	= NULL		//[200] chrissstrahl - used to retrive active weapon of player in ::getActiveWeapon, ::getActiveWeapon_detect
 	level.coop_lmsAllowJoin				= 1			//[200] chrissstrahl - allow players who just enter the game to join in in lms (once any player leaves server this will be 0)
 	level.coop_lmsLifes					= 0			//[200] chrissstrahl - number of lifes players have in LMS
@@ -544,6 +545,12 @@ managePlayers:{
 							}
 						//FIST ACTIVE AFTER INACTIVE - SETUP////////////////////
 							//iprintlnbold_noloc("first time active")
+							
+							//[200] chrissstrahl - keep track of when first player was really actve
+							if(level.coop_gameStartedAt == NIL){
+								level.coop_gameStartedAt = level.time
+							}
+							
 							//move player to spawn
 							thread playerPlaceAtSpawn local.i
 							
@@ -1855,9 +1862,17 @@ lmsCheckLifes local.prevPlayerCount local.playerCount:{
 				iprintlnbold_noloc("COOP: LMS inactive - Joining allowed")
 			}
 		}else{
-			if(level.coop_lmsAllowJoin != 1){
-				//prevent players from rejoining when all lifes are used up
-				if(local.prevPlayerCount > local.playerCount && level.time > 30){
+			//prevent players from reconnecting and starting over
+			//effects also players that connect for the first time (we can't detect that)
+			if(local.prevPlayerCount > local.playerCount){
+				local.timePassed = 0
+				if(level.coop_gameStartedAt != NIL){
+					local.timePassed = (level.time - level.coop_gameStartedAt)
+				}else{
+					local.timePassed = 0
+				}
+				
+				if(local.timePassed > 30){
 					iprintlnbold_noloc("COOP: LMS active - No late joining")
 					level.coop_lmsAllowJoin = 0
 				}
