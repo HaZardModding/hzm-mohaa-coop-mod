@@ -2,63 +2,139 @@
 // Note: 'team' for SP actors is either 'german' or 'american'.
 //       'german' is all axis actors, including Italian. 
 //       'american' is all allied actors, including British and Russian.
+//       Find number of axis in the level with level.coop_actorArray["german"].size
+//       Find number of allies in the level with level.coop_actorArray["american"].size
+//       Access actors with level.coop_actorArray[team][index]
 //       Turn off accuracy calculations for individual actors with .flags["coop_actorStopAccuracy"] = 1
-//       Turn off accuracy calculations for all ai by changing level.coop_actorAccuracyCalcs to 0
-//       Turn off custom pain handler with level.coop_actorPainHandler = 0
+//       Turn off accuracy calculations for all with level.coop_actorAccuracyCalcs = 0
+//		 Turn off custom pain handler for individual actors with flags["coop_actorStopPainHandler"] = 1
+//       Turn off custom pain handler for all with level.coop_actorPainHandler = 0
 //
 //       (internal use only)
+//  	 [200] Smithy - added thread functionality. added SP grenade functionality. some other improvements.
 //=========================================================================
-main:{
+main local.thread:{
 //=========================================================================
-	if(level.gametype == 0){
-		end
-	}
-	//self cannot be NIL, only entity (NULL is entity type) 
-	if(self == NULL || self.classname != "Actor"){
-		error ("coop_mod/aihandler.scr::main - never call this func from outside Actor tik")
+	if(level.gametype == 0 || local.thread == NIL){
 		end
 	}
 
-	waitframe // so Actors have properly initialised
+	waitframe // so entities have properly initialised
 
 	if(self == NULL){ end }
+
+	thread local.thread
+
+}end
+
+//[200] Smithy - moved actor stuff out of main into its own func
+//does all actor stuff (internal use only)
+//=========================================================================
+actorHandler:{
+//=========================================================================
+	if(!isAlive self || self.classname != "Actor"){
+		end
+	}
 
 	group.team = self.team
 	
 	//store original data
-	//self.flags["coop_actorHandled"] 			= 1
 	self.flags["coop_actorAccuracy"] 			= self.accuracy
 	self.flags["coop_actorAccuracyRange"] 		= (100 - self.accuracy) //100 is max accuracy
-	//self.flags["coop_actorHealth"] 				= self.health
 	/* use these in future???
+	self.flags["coop_actorHealth"] 				= self.health
 	self.flags["coop_actorGun"] 				= self.gun
 	self.flags["coop_actorNoticeScale"] 		= self.noticescale
 	*/
 
-	//replace painhandler with our own
-	if(level.coop_actorPainHandler){
+	if(level.coop_actorPainHandler){ 	//replace painhandler with our own
 		thread initialisePainVars
 	}
 
-	if(level.coop_aaMap == 1){ // restores allied actors to their original AA run speed
-		if(group.team == "american"){
-			self.runanimrate = level.coop_aaRunSpeed[group.team]
-		}
+	//[200] Smithy - new func
+	if(level.coop_aaMap == 1){ 			// restore any properties that are AA specific
+		thread restoreAAProperties
 	}
+	thread restoreSPProperties 			// restore any properties that are SP specific
+	thread updateEnemyDifficulty 		// update this guy's difficulty
 
-	thread updateEnemyDifficulty // update this guy's difficulty
 	thread addActorToArray
 
-	self waittill death //'death' event is unregistered if an AI is killed or if they are removed
+	self waittill death 				//'death' event is unregistered if an AI is killed or if they are removed
 
 	thread removeActorFromArray
+
+}end
+
+//[200] Smithy - new func
+//restores properties to better reflect SP behavior (internal use only)
+//=========================================================================
+restoreSPProperties:{
+//=========================================================================
+	thread restoreGrenCount
+}end
+
+//[200] Smithy - new func
+//restores properties to better reflect AA behavior (internal use only)
+//=========================================================================
+restoreAAProperties:{
+//=========================================================================
+	if(group.team == "american"){
+		self.runanimrate = level.coop_aaRunSpeed[group.team]
+	}
+}end
+
+//[200] Smithy - new func
+//restores grenade counts for all AI to match default SP behavior
+//=========================================================================
+restoreGrenCount:{
+//=========================================================================
+	if (!isAlive self || self.classname != "Actor" || !self.gun){ end }
+
+	//check weapons
+	switch (self.weapontype){
+		case "rifle":
+			switch (self.gun){
+				case "mauser kar 98k":
+				case "m1 garand":
+				case "enfield":
+				case "carcano":
+				case "mosin nagant rifle":
+					local.grencount = -4; break
+				case "g 43":
+				case "mauser kar 98d sniper":
+				case "springfield '03 sniper":
+				case "svt 40":
+				case "enfield l42a1":
+					local.grencount = -1; break
+			}
+			break
+		case "smg":
+		case "mg":
+			local.grencount = -2; break
+		case "heavy":
+			switch (self.gun){
+				case "shotgun":
+					local.grencount = -2; break
+				default: 
+					local.grencount = -1; break
+			}
+			break
+		default:
+			local.grencount = self.ammo_grenade; break
+	}
+
+	if (local.grencount != NIL && self.ammo_grenade > 0){
+		self ammo_grenade local.grencount
+	}
+
 }end
 
 //adds the actor to the level.coop_actorArray array (internal use only)
 //=========================================================================
 addActorToArray:{
 //=========================================================================
-	if(self == NULL || self.classname != "Actor"){
+	if(!isAlive self || self.classname != "Actor"){
 		//error ("coop_mod/aihandler.scr::addActorToArray - never call this func from outside aihandler.scr")
 		end
 	}
@@ -179,17 +255,24 @@ calculateAccuracy local.actor:{
 //sets up our pain variables
 //=========================================================================
 initialisePainVars:{
-	if(self == NULL || self.classname != "Actor"){
+	if(!isAlive self || self.classname != "Actor"){
 		//error ("coop_mod/aihandler.scr::initialisePainVars - never call this func from outside aihandler.scr")
+		end
+	}
+
+	//[200] Smithy - don't do certain actors that use their own health systems
+	if (self.targetname == "friendly" || self.friendtype){
+		self.flags["coop_actorStopPainHandler"] = 1 
 		end
 	}
 
 	self.flags["coop_actorHandledPain"] = 1
 	
 	//store the health he started with
-	if(!self.flags["coop_actorActualHealth"]){
+	//[200] Smithy - improved these conditions
+	if(self.flags["coop_actorActualHealth"] == NIL){
 		self.flags["coop_actorActualHealth"] = self.health
-	}else if(self.flags["coop_actorActualHealth"] < 0 || self.flags["coop_actorActualHealth"] == 5000){
+	}else if(self.flags["coop_actorActualHealth"] <= 0 || self.flags["coop_actorActualHealth"] >= 1000){
 		self.flags["coop_actorActualHealth"] = 100
 	}
 
@@ -202,7 +285,7 @@ initialisePainVars:{
 actorPainHandler local.attacker local.damage local.inflictor local.position local.direction local.normal local.knockback local.dflags local.meansofdeath local.location:{
 //=========================================================================
 
-	if(!self || !local.attacker){ end }
+	if(!isAlive self || !local.attacker){ end }
 
 	if(self.fact){ self.fact immediateremove } // optimised
 
@@ -220,9 +303,13 @@ actorPainHandler local.attacker local.damage local.inflictor local.position loca
 
 	group.painHandlerThread = 1
 
+	//[200] Smithy - added fix to stop handler for this guy if their health changed elsewhere
 	if(self.health != (5000 - self.fact.damage)){
-		//iprintlnbold_noloc(self + " health is " + self.health + ". This shouldn't be...")
-		self.flags["coop_actorActualHealth"] = self.health + self.fact.damage
+		//iprintlnbold_noloc(self + " health is " + self.health + ". This shouldn't be. Don't use pain handler anymore")
+		self.flags["coop_actorStopPainHandler"] = 1
+		self health 100
+		self damage self.fact.attacker self.fact.damage self.fact.attacker self.fact.position self.fact.direction self.fact.normal self.fact.knockback self.fact.dflags self.fact.meansofdeath self.fact.location
+		end
 	}
 
 	self health 5000 				//restore safe health
