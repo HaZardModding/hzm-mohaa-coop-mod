@@ -16,6 +16,7 @@
 // coop_obj - responsible for toggeling menu
 //
 //MISC
+// level.dmrespawning
 // game.skill
 // self.enemy
 // level.pilot type_attack weaponless
@@ -58,11 +59,13 @@ main:{
 	//[200] chrissstrahl - restore default speed
 	if( int(getcvar("coop_dev")) == 1 || int(getcvar("developer")) > 0 ){ setcvar "timescale" 1 }
 	
-	level.gametype						= int(getCvar("g_gametype"))		//[200] chrissstrahl - this seams not to work sometimes, this is why we have the coop mod set it, just in case
+	$world.flags["coopHackGametIndex"]	= 0									//[200] chrissstrahl - used to 
+	level.gametype						= int(getCvar("g_gametype"))		//[200] chrissstrahl - have the coop mod set it just to have it work always
 	level.coop_dedicated				= int(getcvar("dedicated"))		//[200] chrissstrahl - have this in a var, as we will need this more often in the future
 	level.coop_svmaxclients				= int(getcvar("sv_maxclients"))	
-	level.coop_debugSpawn				= 0 //show (1) spawnlocations or not (0)
-	level.coop_playerReady				= 0	//player(s) are not ready/not joined
+	level.coop_debugSpawn				= 0									//show (1) spawnlocations or not (0)
+	level.coop_playerReady				= 0									//player(s) are not ready/not joined
+	level.coop_disableSpawnWarper 		= FALSE								//[200] chrissstrahl - moved here for inizialisation
 	
 	level.coop_gametypeHackOn			= 0			//[200] chrissstrahl - used to keep track when some script commands are executed that require the gametype to be set to Singleplayer
 	level.coop_gameStartedAt			= NIL		//[200] chrissstrahl - used to keep track when the first player was actually active
@@ -84,22 +87,13 @@ main:{
 	if(level.coop_aaMap					== NIL){ level.coop_aaMap					= 0 }		//sets a map to be handles like in aa
 	if(level.coop_prespawn				== NIL){ level.coop_prespawn				= 1 }		//used for replace.scr::waitTillPrespawn
 	if(level.coopMedicHealth			== NIL){ level.coopMedicHealth				= 1000 }	//sets medic AI health
-	if(level.coop_health				== NIL){	//sets players health (only multiplayer)
+	if(level.coop_health				== NIL){												//sets players health (only multiplayer)
 		level.coop_health				= (int(getcvar("coop_health")))
 		if(level.coop_health == 0){
 			level.coop_health = 1000
 		}
 	}
-	
-    //[200] Smithy - used in coop_mod/aihandler.scr
-    level.coop_actorArray["german"][1]      = NIL
-    level.coop_actorArray["american"][1]    = NIL
-    //if you wish to modify this later on, use 'exec coop_mod/aihandler.scr::updateTeamRunSpeed <team> <speed>'
-    level.coop_aaRunSpeed["american"]       = 0.75  //75% of SH/BT run speed - do not touch, managed in func ::updateTeamRunSpeed
-    level.coop_maxPlayerScalar              = 4     //after this number of players, stop scaling difficulty (lower number means steeper difficulty scaling)
-    level.coop_actorAccuracyCalcs           = 1     //do dynamic enemy accuracy calculations for difficulty
-    level.coop_actorPainHandler             = 1     //use coop method of handling pain
-	
+		
 	//[200] chrissstrahl - make sure to filter what ever is not part of the real filename
 	local.fullMapName = string(getcvar("mapname"));
 	level.coop_mapname = ""
@@ -116,23 +110,21 @@ main:{
 		thread spWaitForPlayer
 		end
 	}
-	//MULTIPLAYER//////////////////////////	
-	thread setupServer
-	thread managePlayers
+	//MULTIPLAYER//////////////////////////
+    //[200] Smithy - used in coop_mod/aihandler.scr
+    level.coop_actorArray["german"][1]      = NIL
+    level.coop_actorArray["american"][1]    = NIL
+    //if you wish to modify this later on, use 'exec coop_mod/aihandler.scr::updateTeamRunSpeed <team> <speed>'
+    level.coop_aaRunSpeed["american"]       = 0.75  //75% of SH/BT run speed - do not touch, managed in func ::updateTeamRunSpeed
+    level.coop_maxPlayerScalar              = 4     //after this number of players, stop scaling difficulty (lower number means steeper difficulty scaling)
+    level.coop_actorAccuracyCalcs           = 1     //do dynamic enemy accuracy calculations for difficulty
+    level.coop_actorPainHandler             = 1     //use coop method of handling pain
 	
-	//chrissstrahl - create spawnpoints for coop
-	thread coop_mod/spawnlocations.scr::main
-	
-	//chrissstrahl - set coop mod specific mom file
-	thread mom/mom.scr::setup "coop_mod/mom_actions.scr" 2 "coop_mom" 
-	
-	//chrissstrahl - check if mapceck should be done
-	thread coop_checkMaps
-
-	//while(1){
-		//iprintlnbold_noloc("gametype:"+level.gametype)
-		//waitframe
-	//}
+	thread setupServer															//chrissstrahl - inizial setup, might be deprecated
+	thread managePlayers														//chrissstrahl - handles spawning, respawning spectator, generic stuff each frame
+	waitthread coop_mod/spawnlocations.scr::main								//chrissstrahl - create spawnpoints for coop
+	waitthread mom/mom.scr::setup "coop_mod/mom_actions.scr" 2 "coop_mom"		//chrissstrahl - set coop mod specific mom file
+	waitthread coop_checkMaps													//chrissstrahl - check if mapceck should be done
 }end
 
 //[200] chrissstrahl - have a seperate handle for singleplayer
@@ -212,21 +204,13 @@ autoSpawnHost:{
 //=========================================================================
 setupServer:{
 //=========================================================================
-	local.spawnInterval = 0
-	
-	if( level.coop_disableSpawnWarper == NIL ){
-		level.coop_disableSpawnWarper = FALSE
-	}else if( level.coop_disableSpawnWarper == 1){
+	//[200] chrissstrahl - make sure to correct value
+	if( level.coop_disableSpawnWarper == 1){
 		level.coop_disableSpawnWarper = TRUE
 	}
-	
-	if( int(getCvar("coop_lifes")) > 0 ){
-		level.dmrespawning = int(getCvar("coop_lifes"))
-	}
-	
+
 	//send this also to each player - this currently sets value only for hosting player
 	//setcvar "ui_team_spawn_interval" 0
-	
 	//check vital server settings
 	local.correct = 0
 	/*
@@ -1620,7 +1604,7 @@ containsText local.source local.text:{
 	}
 }end 0
 
-//removes the given string from the string - removes only a single car, but can be upgraded
+//removes the given string from the string - removes only a single char, but can be upgraded
 //=========================================================================
 cleanText local.source local.text:{
 //=========================================================================
@@ -1832,6 +1816,21 @@ lmsForceSpectatorHandle local.player:{
 				local.player.flags["coop_lmsForcedInSpectator"] = 1
 				local.player iprint "You have no more lifes left - LastManStanding is active!" 0
 				local.player spectator
+				
+				//[200] chrissstrahl - fail mission if all players are dead
+				local.numActivePlayers = 0
+				for (local.i = 1;local.i <= $player.size;local.i++){
+					local.player = $player[local.i]
+					if( local.player != NULL){
+						if(local.player.flags["coop_lmsForcedInSpectator"] != 1 && local.player.dmteam != "spectator"){
+							local.numActivePlayers++
+						}
+					}
+				}
+				if(local.numActivePlayers == 0){
+					iprintlnbold_noloc("LMS failed all players are dead or inactive.")
+					thread coop_mod/replace.scr::missionfailed
+				}					
 			}
 		}
 		else{
@@ -1882,3 +1881,71 @@ lmsCheckLifes local.prevPlayerCount local.playerCount:{
 		waitframe		
 	}
 }end
+
+//[200] Chrissstrahl - turns g_gametype cvar hack on
+//=========================================================================
+hackGametypeOn local.delay:{
+//=========================================================================
+	if(level.gametype == 0){ end }	//no need in sp
+	
+	//get hacknumber and count up
+	local.hackNumber = int($world.flags["coopHackGametIndex"])
+	$world.flags["coopHackGametIndex"] = (local.hackNumber + 1)
+	
+	//if not set, set right away
+	if(int(getCvar("g_gametype")) != 0){
+		setcvar "g_gametype" "0"
+	}
+	
+	iprintlnbold_noloc("hackGametypeOn: "+getcvar("g_gametype")+" : "+level.time)
+	
+	//flag this as active
+	$world.flags[("coopHackGamet"+local.hackNumber)] = 1
+	
+	//turn off automatically if we know it has a delay
+	local.flagTime = local.delayTime
+	if(local.flagTime != NIL){
+		thread 	hackGametypeOff local.hackNumber local.delay
+	}
+}end local.hackNumber
+
+//[200] Chrissstrahl - turns g_gametype cvar hack off
+//=========================================================================
+hackGametypeOff local.hackNumber local.delay:{
+//=========================================================================
+	if(level.gametype == 0){ end }	//no need in sp
+	
+	if(local.hackNumber == NIL){
+		error ( "coop_mod/main.scr::hackGametypeOff - parameter 1 was NIL should be <int> returnval of local.hNum = hackGametypeOn" ) 1000
+		end
+	}
+	
+	//wait provided delay time
+	if(local.delay != NIL){
+		wait 0.0005
+	}
+	
+	//flag this as inactive
+	$world.flags[("coopHackGamet"+local.hackNumber)] = 0
+	
+	local.resetGametype	= 1
+	local.index			= int($world.flags["coopHackGametIndex"])
+	
+	//lets see if all hacks are done
+	for(local.i=0;local.i<local.index;local.i++){
+		if($world.flags[("coopHackGamet"+local.i)] != 0){
+			println ("coopHackGamet"+local.i+" is 0")
+			local.resetGametype = 0
+		}
+	}
+	//all hacks are done, turn back gametype
+	if(local.resetGametype){
+		setcvar "g_gametype" level.gametype
+	}
+	iprintlnbold_noloc("hackGametypeOff: "+getcvar("g_gametype")+" : "+level.time)
+}end
+
+
+
+
+
