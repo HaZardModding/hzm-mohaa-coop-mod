@@ -764,7 +764,7 @@ has_disguise local.disguise:{
 //PLAYSOUND
 //replaces $player playsound
 //=========================================================================
-playsound local.sound:{
+playsound local.sound local.dowait:{
 //=========================================================================
 	if( local.sound == NIL ){
 		error ( "coop_mod/replace.scr::playsound - parameter 1 was NIL" ) 1000
@@ -772,8 +772,12 @@ playsound local.sound:{
 	}
 	
 	if( level.gametype == 0 ){
-		$player playsound local.sound
-		$player waittill sounddone
+		if(local.dowait == NIL){
+			$player playsound local.sound
+		}else{
+			$player playsound local.sound wait
+			$player waittill sounddone		
+		}
 		end
 	}
 	
@@ -781,15 +785,22 @@ playsound local.sound:{
 	for (local.i = 1;local.i <= $player.size;local.i++){
 		local.player =  $player[local.i]
 		if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
-			local.player playsound local.sound
 			if(local.playerWait == NULL){
 				local.playerWait = local.player
+				if(local.dowait == NIL){
+					local.playerWait playsound local.sound
+				}else{
+					local.playerWait playsound local.sound wait
+				}
 				//chrissstrahl - fixme debugme finetune
 				//check if we can use $world instead, because it won't disconnect
 			}
+			else{
+				local.player playsound local.sound
+			}
 		}
 	}
-	if(local.playerWait != NULL){
+	if(local.dowait != NIL && local.playerWait != NULL){
 		local.playerWait waittill sounddone
 	}else{
 		wait 1
@@ -799,6 +810,8 @@ playsound local.sound:{
 //[200] chrissstrahl - replaces $entity waittill sounddone
 //usage:	<entity> waitthread coop_mod/replace.scr::sounddone <soundname> <time>
 //example:	$entity waitthread coop_mod/replace.scr::sounddone mb_101 16
+//
+//Sets gametype cvar to singleplayer as hack to allow the command to execute correctly
 //=========================================================================
 sounddone local.sound local.time:{
 //=========================================================================
@@ -820,7 +833,11 @@ sounddone local.sound local.time:{
 	if(level.gametype == 0){
 		self waittill sounddone
 	}else{
-		wait local.time
+		//wait local.time
+		//[200] chrissstrahl - fix suggested by Smithy using g_gametype hack
+		local.hackNumber = thread coop_mod/main.scr::hackGametypeOn NIL
+		self waittill sounddone
+		thread coop_mod/main.scr::hackGametypeOnff local.hackNumber NIL
 	}
 }end
 
