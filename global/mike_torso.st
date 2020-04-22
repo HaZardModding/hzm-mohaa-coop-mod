@@ -1,3 +1,6 @@
+//[200] Smithy - default file changed to call weaponstate.scr during various anim events
+//               search for 'Smithy' to see changes
+
 	// ======================================================= //
 	// Action state machine for Mike Powell, the hero of MoH PC //
 	// ======================================================= //
@@ -243,7 +246,7 @@ state ATTACK_SMG_PRIMARY
 
 	entrycommands
 	{
-		exec coop_mod/weaponstate.scr "ATTACK_SMG_PRIMARY"
+		exec coop_mod/weaponstate.scr "ATTACK_SMG_PRIMARY" //[200] Smithy - call weaponstate script
 		viewmodelanim fire 1
 	}
 
@@ -289,7 +292,7 @@ state ATTACK_MG_PRIMARY
 
 	entrycommands
 	{
-		exec coop_mod/weaponstate.scr "ATTACK_MG_PRIMARY"
+		exec coop_mod/weaponstate.scr "ATTACK_MG_PRIMARY" //[200] Smithy - call weaponstate script
 		viewmodelanim fire 1
 	}
 
@@ -374,7 +377,7 @@ state ATTACK_RIFLE_PRIMARY
 
 	entrycommands
 	{
-		exec coop_mod/weaponstate.scr "ATTACK_RIFLE_PRIMARY"
+		exec coop_mod/weaponstate.scr "ATTACK_RIFLE_PRIMARY" //[200] Smithy - call weaponstate script
 		viewmodelanim fire 1
 	}
 
@@ -489,7 +492,7 @@ state ATTACK_PISTOL_PRIMARY
 
 	entrycommands
 	{
-		exec coop_mod/weaponstate.scr "ATTACK_PISTOL_PRIMARY"
+		exec coop_mod/weaponstate.scr "ATTACK_PISTOL_PRIMARY" //[200] Smithy - call weaponstate script
 		viewmodelanim fire 1
 	}
 
@@ -550,7 +553,7 @@ state ATTACK_BAZOOKA_PRIMARY
 	
 	entrycommands
 	{
-		exec coop_mod/weaponstate.scr "ATTACK_BAZOOKA_PRIMARY"
+		exec coop_mod/weaponstate.scr "ATTACK_BAZOOKA_PRIMARY" //[200] Smithy - call weaponstate script
 		viewmodelanim fire 1
 	}
 	
@@ -582,7 +585,7 @@ state ATTACK_SHOTGUN_PRIMARY
 	
 	entrycommands
 	{
-		exec coop_mod/weaponstate.scr "ATTACK_SHOTGUN_PRIMARY"
+		exec coop_mod/weaponstate.scr "ATTACK_SHOTGUN_PRIMARY" //[200] Smithy - call weaponstate script
 		viewmodelanim fire 1
 	}
 	
@@ -1295,7 +1298,7 @@ state PUTAWAY_MAIN
 
 	entrycommands
 	{
-		exec coop_mod/weaponstate.scr "PUTAWAY_MAIN"
+		exec coop_mod/weaponstate.scr "PUTAWAY_MAIN" //[200] Smithy - call weaponstate script
 		
 		zoomoff
 		viewmodelanim putaway
@@ -1578,7 +1581,7 @@ state RAISE_WEAPON
 
 	entrycommands
 	{	
-		exec coop_mod/weaponstate.scr "RAISE_WEAPON"
+		exec coop_mod/weaponstate.scr "RAISE_WEAPON" //[200] Smithy - call weaponstate script
 
 		viewmodelanim pullout
 
