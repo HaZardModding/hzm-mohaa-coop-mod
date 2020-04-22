@@ -1,0 +1,58 @@
+//this script is called from global/mike_torso every time a 
+//player holsters/unholsters an item in their hand.
+//you can get a player's active weapon via local.player.flags["coop_activeWeapon"]
+//=========================================================================
+main local.state:{
+//=========================================================================
+	local.player = self
+
+	if (local.state == "RAISE_WEAPON"){							//unholstered
+		wait game.ms 											//so the weapon is classed as activated in engine
+
+		//check if the item is a weapon (it could be papers, and if so we don't want to turn disguise off)
+		local.item = waitthread coop_mod/itemhandler.scr::returnActiveWeapon local.player
+		if (local.item && local.item.classname == "Weapon"){
+			local.player.flags["coop_activeWeapon"] = local.item
+		}else{
+			local.player.flags["coop_activeWeapon"] = NULL
+		}
+		//now see if we can set their isDisguised flag - this is what makes him visible or invisible to ai
+		//if he has no active weapon, he can be disguised. otherwise, pew pew.
+		if (level.coop_enableDisguises){
+			thread coop_mod/itemhandler.scr::setIsDisguised local.player (local.player.flags["coop_activeWeapon"] == NULL)	
+		}
+	}else if (local.state == "PUTAWAY_MAIN"){ 					//holstered
+
+		//item was put away, definitely set isDisguised to true
+		local.player.flags["coop_activeWeapon"] = NULL
+		if (level.coop_enableDisguises){
+			thread coop_mod/itemhandler.scr::setIsDisguised local.player game.true	
+		}
+	}else if (local.state[0] == "A" && local.state[1] == "T"){ 	//fired
+		//if in disguise state, keep track of weaponfire so we can simulate reactions to noise
+		if (level.coop_enableDisguises && local.player.flags["coop_hasDisguise"] && local.player.has_disguise){
+
+			local.item = local.player.flags["coop_activeWeapon"]
+
+			switch (local.item.model){
+				case "models/weapons/silencedpistol.tik": //TODO: ADD MORE SILENT WEAPONS FROM BT HERE
+					local.silentBullet = game.true; break
+				default:
+					local.silentBullet = game.false
+			}
+			
+			if (!local.silentBullet){
+				//iprintlnbold_noloc("LOUD BULLET")
+				thread coop_mod/itemhandler.scr::broadcastSound local.player "explosion" 1024
+				wait 1
+				if (isAlive local.player){
+					thread coop_mod/aihandler.scr::sentientIsHeard local.player local.player
+				}	
+			}else{
+				//iprintlnbold_noloc("SILENT BULLET")
+			}
+		}
+	}
+}end
+
+
