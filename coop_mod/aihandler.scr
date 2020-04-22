@@ -1,6 +1,6 @@
 //[200] Smithy - this script is called every time an actor enters the world by exec it on their tiki (via shared new_generic_human.tik)
 // Note: 'team' for SP actors is either 'german' or 'american'.
-//       'german' is all axis actors, including Italian. 
+//       'german' is all axis actors, including Italian.
 //       'american' is all allied actors, including British and Russian.
 //       Find number of axis in the level with level.coop_actorArray["german"].size
 //       Find number of allies in the level with level.coop_actorArray["american"].size
@@ -12,16 +12,32 @@
 //
 //       (internal use only)
 //  	 [200] Smithy - added thread functionality. added SP grenade functionality. some other improvements.
+// 		 [200] Smithy - added calls to itemhandler.scr for weapon handling purposes
+//		 [200] Smithy - added disguise functionality (disguisehandler)
 //=========================================================================
 main local.thread:{
 //=========================================================================
-	if(level.gametype == 0 || local.thread == NIL){
-		end
+	local.threadName = "coop_mod/aihandler.scr::main"
+
+	if (level.gametype == 0 || local.thread == NIL){ end }
+
+	//make sure main.scr has loaded
+	waitthread coop_mod/main.scr::waitForMainScript
+	if (self == NULL){ end }
+
+	//[200] Smithy - adds maps we don't want to use the custom pain handler on
+	if (!level.coop_painHandlerExclusionInit){
+		thread painHandlerMapExclusions
 	}
 
-	waitframe // so entities have properly initialised
+	//[200] Smithy - handles cover blown logic if this is a disguise map
+	if (!level.coop_disguiseHandlerInit){
+		thread disguiseHandler
+	}
 
-	if(self == NULL){ end }
+	wait game.ms // so entities have properly initialised
+
+	if (self == NULL){ end }
 
 	thread local.thread
 
@@ -37,7 +53,7 @@ actorHandler:{
 	}
 
 	group.team = self.team
-	
+
 	//store original data
 	self.flags["coop_actorAccuracy"] 			= self.accuracy
 	self.flags["coop_actorAccuracyRange"] 		= (100 - self.accuracy) //100 is max accuracy
@@ -61,9 +77,23 @@ actorHandler:{
 	thread addActorToArray
 
 	self waittill death 				//'death' event is unregistered if an AI is killed or if they are removed
+	waitframe 							//[200] Smithy - fixes NULL entities in array and other abnormalities
 
 	thread removeActorFromArray
 
+	if (self == NULL){ end }
+
+	thread coop_mod/itemhandler.scr::enableWeapon 		//[200] Smithy - make it so their weapon can now be triggered (thus picked up)
+
+	if (level.coop_enableDisguises){
+		if (self && self.fact && self.fact.attacker && self.fact.attacker.classname == "Player"){
+			thread sentientIsSeen self self.fact.attacker 360
+		}
+	}
+
+	if (!level.coop_noDropHealth){ 						//[200] Smithy - do our own health drops if the map allows it
+		thread coop_mod/itemhandler.scr::handleHealthDrop
+	}
 }end
 
 //[200] Smithy - new func
@@ -71,7 +101,9 @@ actorHandler:{
 //=========================================================================
 restoreSPProperties:{
 //=========================================================================
-	thread restoreGrenCount
+
+	//restoreNadeCount func moved to itemhandler.scr. it is also called from global/weapon.scr now.
+	//thread restoreNadeCount
 }end
 
 //[200] Smithy - new func
@@ -84,52 +116,6 @@ restoreAAProperties:{
 	}
 }end
 
-//[200] Smithy - new func
-//restores grenade counts for all AI to match default SP behavior
-//=========================================================================
-restoreGrenCount:{
-//=========================================================================
-	if (!isAlive self || self.classname != "Actor" || !self.gun){ end }
-
-	//check weapons
-	switch (self.weapontype){
-		case "rifle":
-			switch (self.gun){
-				case "mauser kar 98k":
-				case "m1 garand":
-				case "enfield":
-				case "carcano":
-				case "mosin nagant rifle":
-					local.grencount = -4; break
-				case "g 43":
-				case "mauser kar 98d sniper":
-				case "springfield '03 sniper":
-				case "svt 40":
-				case "enfield l42a1":
-					local.grencount = -1; break
-			}
-			break
-		case "smg":
-		case "mg":
-			local.grencount = -2; break
-		case "heavy":
-			switch (self.gun){
-				case "shotgun":
-					local.grencount = -2; break
-				default: 
-					local.grencount = -1; break
-			}
-			break
-		default:
-			local.grencount = self.ammo_grenade; break
-	}
-
-	if (local.grencount != NIL && self.ammo_grenade > 0){
-		self ammo_grenade local.grencount
-	}
-
-}end
-
 //adds the actor to the level.coop_actorArray array (internal use only)
 //=========================================================================
 addActorToArray:{
@@ -139,31 +125,29 @@ addActorToArray:{
 		end
 	}
 
-	group.index = level.coop_actorArray[group.team].size + 1
-	level.coop_actorArray[group.team][group.index] = self
+	local.index = level.coop_actorArray[group.team].size + 1
+	group.actor = self
+	level.coop_actorArray[group.team][local.index] = self
 }end
 
 //removes the dead or removed actor from the actor array (internal use only)
 //=========================================================================
 removeActorFromArray:{
 //=========================================================================
-	if(level.coop_actorArray[group.team].size > 1){
-		local.oldArray[group.team] 		= level.coop_actorArray[group.team]
-		local.newArray[group.team][1] 	= NIL
-		local.j = 1
-		for(local.i = 1; local.i <= local.oldArray[group.team].size; local.i++){
-			if(local.i != group.index){
-				local.newArray[group.team][local.j] = local.oldArray[group.team][local.i]
-				local.j++
-			}
+	local.oldArray[group.team] 		= level.coop_actorArray[group.team]
+	local.newArray[group.team][1] 	= NIL
+	local.j = 1
+	for(local.i = 1; local.i <= local.oldArray[group.team].size; local.i++){
+		local.actor = local.oldArray[group.team][local.i]
+		if(local.actor != NULL && local.actor != group.actor){     //[200] Smithy - added a NULL check and actor comparison instead of index
+			local.newArray[group.team][local.j] = local.actor
+			local.j++
 		}
-		level.coop_actorArray[group.team] = local.newArray[group.team]
-	}else{
-		level.coop_actorArray[group.team][1] = NIL
 	}
+	level.coop_actorArray[group.team] = local.newArray[group.team]
 }end
 
-//updates the run speed for a specific actor team
+//updates the run speed for a specified actor team
 //=========================================================================
 updateTeamRunSpeed local.team local.speed:{
 //=========================================================================
@@ -190,12 +174,12 @@ updateEnemyDifficulty:{
 updateEnemyTeamDifficulty:{
 //=========================================================================
 	if($player == NULL || $player.size == 0){ end }
-	
+
 	local.team = "german"
 	local.actorArray[local.team] = level.coop_actorArray[local.team]
 
 	if(local.actorArray[local.team] == NIL || local.actorArray[local.team].size == 0){
-		end 
+		end
 	}
 
 	for(local.i = 1; local.i <= local.actorArray[local.team].size; local.i++){
@@ -218,7 +202,7 @@ calculateProperties local.actor:{
 	}
 	// add more here later ???
 
-}end 
+}end
 
 //do accuracy calculation (internal use only)
 //=========================================================================
@@ -229,7 +213,7 @@ calculateAccuracy local.actor:{
 		end
 	}
 	if(local.actor.flags["coop_actorNewAccuracy"] && local.actor.accuracy != local.actor.flags["coop_actorNewAccuracy"]){
-		local.actor.flags["coop_actorStopAccuracy"] = 1
+		local.actor.flags["coop_actorStopAccuracy"] = game.true
 		println(local.actor + " has had his accuracy changed elsewhere. Ignore accuracy calculations in future.")
 		end
 	}
@@ -262,12 +246,16 @@ initialisePainVars:{
 
 	//[200] Smithy - don't do certain actors that use their own health systems
 	if (self.targetname == "friendly" || self.friendtype){
-		self.flags["coop_actorStopPainHandler"] = 1 
+		self.flags["coop_actorStopPainHandler"] = game.true
 		end
 	}
 
-	self.flags["coop_actorHandledPain"] = 1
-	
+	self.flags["coop_actorHandledPain"] = game.true
+
+	if (self.health > 700){
+		self.health = 100
+	}
+
 	//store the health he started with
 	//[200] Smithy - improved these conditions
 	if(self.flags["coop_actorActualHealth"] == NIL){
@@ -287,26 +275,28 @@ actorPainHandler local.attacker local.damage local.inflictor local.position loca
 
 	if(!isAlive self || !local.attacker){ end }
 
-	if(self.fact){ self.fact immediateremove } // optimised
+	if(self.fact){ self.fact delete } // optimised
 
-	self.fact = local CreateListener
-	self.fact.attacker = local.attacker
-	self.fact.damage = local.damage
-	self.fact.inflictor = local.inflictor
-	self.fact.position = local.position
-	self.fact.direction = local.direction
-	self.fact.normal = local.normal
-	self.fact.knockback = local.knockback
-	self.fact.dflags = local.dflags
-	self.fact.meansofdeath = local.meansofdeath
-	self.fact.location = local.location
+	self.fact 				= local CreateListener
+	self.fact.attacker 		= local.attacker
+	self.fact.damage 		= local.damage
+	self.fact.inflictor 	= local.inflictor
+	self.fact.position 		= local.position
+	self.fact.direction 	= local.direction
+	self.fact.normal 		= local.normal
+	self.fact.knockback 	= local.knockback
+	self.fact.dflags 		= local.dflags
+	self.fact.meansofdeath 	= local.meansofdeath
+	self.fact.location 		= local.location
 
-	group.painHandlerThread = 1
+	group.painHandlerThread = game.true
+
+	//println self.health
 
 	//[200] Smithy - added fix to stop handler for this guy if their health changed elsewhere
 	if(self.health != (5000 - self.fact.damage)){
 		//iprintlnbold_noloc(self + " health is " + self.health + ". This shouldn't be. Don't use pain handler anymore")
-		self.flags["coop_actorStopPainHandler"] = 1
+		self.flags["coop_actorStopPainHandler"] = game.true
 		self health 100
 		self damage self.fact.attacker self.fact.damage self.fact.attacker self.fact.position self.fact.direction self.fact.normal self.fact.knockback self.fact.dflags self.fact.meansofdeath self.fact.location
 		end
@@ -317,7 +307,7 @@ actorPainHandler local.attacker local.damage local.inflictor local.position loca
 	if(thread friendlyFireCheck){ 	//check if we should ignore pain or not
 		end
 	}
-	
+
 	thread handlePain 				//actually do the pain
 
 }end
@@ -335,19 +325,19 @@ friendlyFireCheck:{
 		error ("coop_mod/aihandler.scr::friendlyFireCheck - never call this func from outside aihandler.scr")
 		end
 	}
-	
+
 	if(	self.fact.attacker.team == self.team &&
-	 	self.fact.attacker != self && 
+	 	self.fact.attacker != self &&
 	 	self.fact.inflictor.classname != "BarrelObject" ||
 	 	(self.fact.attacker.classname == "Player" && self.team == "american")){
 
-		println self " was hurt by teammate. ignore pain!"
-		end(1)
+		println self " was hurt by teammate: ignoring pain"
+		end(game.true)
 	}else if(self.fact.attacker == self){
-		//println self " was hurt by himself. don't ignore pain!" 
+		//println self " was hurt by himself. don't ignore pain!"
 	}
 
-}end(0)
+}end(game.false)
 
 //actually do pain calculations (internal use only)
 //=========================================================================
@@ -372,5 +362,217 @@ handlePain:{
 
 	//enough damage has been done to kill this guy!
 	self damage self.fact.attacker 150000 self.fact.attacker self.fact.position self.fact.direction self.fact.normal self.fact.knockback self.fact.dflags self.fact.meansofdeath self.fact.location
-				
+
+}end
+
+//exclude our new pain handler on these maps to prevent conflicts and bugs
+//you can exclude entire games from this by using first char and wildcard *.
+//e.g to exlude all BT maps add e* to coop_painHandlerExclusions in main.scr
+//=========================================================================
+painHandlerMapExclusions:{
+//=========================================================================
+	level.coop_painHandlerExclusionInit = game.true
+
+	if (level.coop_painHandlerExclusions[1].size == 1){
+		local.array[1] = level.coop_painHandlerExclusions
+		level.coop_painHandlerExclusions = local.array
+	}
+
+	local.thisMap 	= getcvar("mapname")
+	local.firstChar = local.thisMap[0]
+
+	for (local.i = 1; local.i <= level.coop_painHandlerExclusions.size; local.i++){
+		local.excludedMap = level.coop_painHandlerExclusions[local.i]
+		local.starChar = local.excludedMap[1]
+		if (local.starChar == "*"){
+			if (local.firstChar == local.excludedMap[0]){
+				level.coop_actorPainHandler = game.false
+				end
+			}
+		}else{
+			if (level.coop_painHandlerExclusions[local.i] == local.thisMap){
+				level.coop_actorPainHandler = game.false
+				end
+			}
+		}
+	}
+}end
+
+//the main disguise handler for cover blown logic
+//checks whether enemies can see a player while their
+//isDisguised flag is false (i.e they have a weapon in hand)
+//this func should only run once per map
+//=========================================================================
+disguiseHandler:{
+//=========================================================================
+	level.coop_disguiseHandlerInit = game.true
+	if (!level.coop_enableDisguises || level.coop_disguiseHandlerThread){ end }
+
+	level.coop_disguiseHandlerThread = local
+
+	while (level.coop_enableDisguises && !level.alarm){
+		if ($player){
+			local.enemyArray = level.coop_actorArray["german"]
+			for (local.i = 1; local.i <= local.enemyArray.size; local.i++){
+				local.enemy = local.enemyArray[local.i]
+				if (!isAlive local.enemy){ continue }
+
+				if (local.enemy.flags["coop_isAttacking"]){ 							//if i can see him in attack mode, also send me into attack mode
+					thread sentientIsSeen local.enemy local.enemy.enemy 360
+					continue
+				}
+
+				for (local.j = 1; local.j <= $player.size; local.j++){
+					local.player 	= $player[local.j]
+					if (isAlive local.player && local.player.has_disguise && local.player.flags["coop_hasDisguise"] && !local.player.flags["coop_isDisguised"] && local.player.dmteam != "spectator"){
+						if (local.enemy cansee local.player local.enemy.fov local.enemy.sight){
+							local.enemy thread attackPlayer local.player
+							thread sentientIsSeen local.enemy local.player NIL 	//check to see if anyone can see him spot you
+							thread sentientIsHeard local.enemy local.player 	//check to see if anyone can hear him spot you
+						}
+					}
+				}
+			}
+		}
+		wait 1 //doesn't have to be super quick, so no need wasting precious resources
+	}
+}end
+
+//forces an enemy actor to attack the player, even when they are disguised
+//=========================================================================
+attackPlayer local.player:{
+//=========================================================================
+	local.enemy = self
+	local.enemy say den_head_sighted_a //TODO: MAKE THIS COMPATIBLE WITH BT DIALOGUE
+	local.enemy.enablePain = 1
+	local.enemy.flags["coop_isAttacking"] = game.true
+	local.enemy attackplayer
+	local.enemy favoriteenemy local.player
+}end
+
+//checks to see if any enemies can 'hear' this sentient.
+//if yes, then force them into attack mode
+//does a vector_within using hearing value to simulate hearing distance
+//=========================================================================
+sentientIsHeard local.sentient local.target:{
+//=========================================================================
+	local.enemies = level.coop_actorArray["german"]
+	for (local.i = 1; local.i <= local.enemies.size; local.i++){
+		local.enemy = local.enemies[local.i]
+		if (!local.enemy || local.enemy.flags["coop_isAttacking"] || local.enemy == local.sentient){
+			continue
+		}
+
+		local.awareness = local.enemy.sound_awareness
+		if (local.awareness == 0){
+			local.awareness = 100.000
+		}
+
+		local.inpvs = local.enemy inpvs local.sentient
+		if (!local.inpvs){
+			local.fullRange = 512		//if their areas aren't connected, just do an arbitrary range
+		}else{
+			local.fullRange = local.enemy.hearing
+			local.halfRange = local.fullRange * 0.5
+		}
+
+		//this is how engine behaves. half of hearing range will always be heard
+		if (local.inpvs && vector_within local.enemy local.sentient local.halfRange){
+			local.enemy thread attackPlayer local.target
+			continue
+		}
+		//if not, check for percentage chance (awareness) to hear at full range
+		if (vector_within local.enemy local.sentient local.fullRange){
+			if ((randomint(99) + 1) <= local.awareness){
+				local.enemy thread attackPlayer local.target
+			}
+		}
+	}
+}end
+
+//checks to see if any enemies can see this sentient.
+//if yes, then force them to attack players
+//=========================================================================
+sentientIsSeen local.sentient local.target local.fov:{
+//=========================================================================
+	local.enemies = level.coop_actorArray["german"]
+	for (local.i = 1; local.i <= local.enemies.size; local.i++){
+		local.enemy = local.enemies[local.i]
+		//no point checking enemies not inside the same PVS (technically the same areaportal)
+		if (!local.enemy || local.enemy.flags["coop_isAttacking"] || !local.enemy inpvs local.sentient || local.enemy == local.sentient){
+			continue
+		}
+
+		if (local.fov == NIL){
+			local.fov = local.enemy.fov
+		}
+		if (local.enemy cansee local.sentient local.fov local.enemy.sight){
+			local.enemy thread attackPlayer local.target
+			//thread sentientIsSeen local.enemy local.target //check to see if anyone can see him spot you
+		}
+	}
+}end
+
+//check if he can see any undisguised players (!isDisguised)
+//i.e are they are holding a weapon
+//=========================================================================
+canseeUndisguisedPlayers:{
+//=========================================================================
+	local.actor 	= self
+	local.cansee 	= game.false
+	if ($player){
+		for (local.i = 1; local.i <= $player.size; local.i++){
+			local.player = $player[local.i]
+			if (!local.player.flags["coop_isDisguised"] && local.actor cansee local.player local.actor.fov local.actor.sight){
+				local.cansee = game.true
+			}
+		}
+	}
+}end (local.cansee)
+
+//checks to see if any enemies in level are in attack state
+//=========================================================================
+anyEnemiesInAttackState:{
+//=========================================================================
+	for (local.i = 1; local.i <= level.coop_actorArray["german"].size; local.i++){
+		local.enemy = level.coop_actorArray["german"][local.i]
+		if (local.enemy.thinkstate == "attack" || local.enemy.thinkstate == "pain"){
+			end (game.true)
+		}
+	}
+}end (game.false)
+
+//this turns any attacking enemies into idle state so that we can
+//enable disguises on players. called from itemhandler::giveDisguiseToAll
+//their attack state is remembered so AI don't just forget about you when
+//handling them inside disguiseHandler
+//=========================================================================
+resetEnemyThinkstates:{
+//=========================================================================
+	for (local.i = 1; local.i <= level.coop_actorArray["german"].size; local.i++){
+		local.enemy = level.coop_actorArray["german"][local.i]
+		if (local.enemy.thinkstate == "attack" || local.enemy.thinkstate == "pain"){
+			local.enemy.enableEnemy = 0
+			local.enemy.flags["coop_actorResetThinkstate"] 	= game.true
+			local.enemy.no_idle 							= game.true
+		}
+	}
+	waitframe
+}end
+
+//these are actors that were attacking before resetEnemyThinkstates was called on them
+//make sure they continue attacking after we've done processing them
+//=========================================================================
+setEnemyAttackStates:{
+//=========================================================================
+	for (local.i = 1; local.i <= level.coop_actorArray["german"].size; local.i++){
+		local.enemy = level.coop_actorArray["german"][local.i]
+		if (local.enemy.flags["coop_actorResetThinkstate"]){
+			local.enemy.enableEnemy = 1
+			local.enemy attackplayer
+			local.enemy.no_idle 							= game.false
+			local.enemy.flags["coop_isAttacking"] 			= game.true
+			local.enemy.flags["coop_actorResetThinkstate"] 	= game.false
+		}
+	}
 }end
