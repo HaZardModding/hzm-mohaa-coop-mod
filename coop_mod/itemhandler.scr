@@ -105,7 +105,7 @@ main local.thread local.arg1 local.arg2:{
 	//don't reinitialise respawned items
 	if (self.flags["coop_respawnedItem"]){ end }
 
-	thread local.thread local.arg1
+	thread local.thread local.arg1 
 }end
 
 //this will do the required checks and fire off the required handlers.
@@ -136,6 +136,8 @@ initialiseItem local.ammotype:{
 	}
 
 	thread getItemWorldProperties
+
+	println "initialising " group.model
 
 	//player weapons we spawn in
 	if (group.item.flags["coop_playerNewWeapon"]){
@@ -196,6 +198,8 @@ initialiseItem local.ammotype:{
 
 	if (!group.item){ end }
 	group.item triggerable
+
+	println "doing events for " group.model
 
 	thread waitTillPickupEvent			//initialises the pickup event checker
 	thread itemDropCheck				//checks to see if this item was dropped
@@ -552,7 +556,19 @@ dropItem local.model local.doVelocity local.targetname local.angles local.mass:{
 		local.mass = 900
 	}
 
-	local.item = spawn local.model targetname local.targetname	//this is the actual item
+	//[200] Smithy - check if this is a custom item (has a prefix of 'spawn')
+	local.customPrefix = "spawn"
+	local.isCustomItem = game.true
+	for (local.i = 0; local.i <= (local.customPrefix.size - 1); local.i++){
+		local.isCustomItem = local.isCustomItem && local.model[local.i] == local.customPrefix[local.i]
+	}
+
+	if (local.isCustomItem){
+		local.item = thread coop_mod/custom_items.scr::local.model  //[200] Smithy - spawn our custom item	
+	}else{
+		local.item = spawn local.model targetname local.targetname  //this is the actual item
+	}
+
 	local.item.flags["coop_droppedItem"] = game.true
 	local.item angles local.dropAngles
 	local.item origin (self.origin + (0 0 40))
