@@ -2,8 +2,10 @@
 //2018.07.15
 
 main local.nextlevel local.bsp local.skipFade:{
+	local.threadName = "global/missioncomplete.scr::main"			//[200] Smithy - store the thread name
+
 	//chrissstrahl - make sure this only is done in sp
-	if(	int(getcvar("g_gametype")) == 0 && $player.health <= 0 ){
+	if(	level.gametype == 0 && $player.health <= 0 ){
 		pause
 	}
 	
@@ -16,6 +18,12 @@ main local.nextlevel local.bsp local.skipFade:{
 	
 	if (local.nextlevel != NIL)
 	{
+		level.coop_preventGameTypeChanges = game.true 				//[200] Smithy - stop any further changes via main.scr::changeGameType if there are any
+		if (level.coop_changeGameTypeThread){  						//[200] Smithy - stop the thread if one is running					
+			thread coop_mod/main.scr::changeGameTypeDebug ("(" + local.threadName + "): Terminating " + level.coop_changeGameTypeThread.threadName + " thread for level change, and stopping any future calls.")
+			level.coop_changeGameTypeThread end
+			setcvar "g_gametype" "2"
+		} 
 		local.gametype = getcvar( "g_gametype" )
 		setcvar "g_gametype" "0"
 		
@@ -30,6 +38,6 @@ main local.nextlevel local.bsp local.skipFade:{
 			leveltransition local.nextlevel local.skipFade
 		}
 		
-		setcvar "g_gametype" local.gametype
+		setcvar "g_gametype" local.gametype	
 	}
 }end
