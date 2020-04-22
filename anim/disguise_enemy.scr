@@ -5,27 +5,42 @@
 //if (level.disguise_debug)
 //	iprintlnbold "Holy smack, it's Powell!"
 
-if (level.script == "maps/e1l3.scr") 
-	thread maps/e1l3/courtyard.scr::enableEnemyOnAll
 
-self lookat self.enemy
-self.blendtime = 0.50
-self setmotionanim (self.weapongroup + "_stand_alert_legs")
-self setupperanim ("den_actor_alert_" + self.voicetype)
-self waittill upperanimdone
+	if (level.script == "maps/e1l3.scr") 
+		thread maps/e1l3/courtyard.scr::enableEnemyOnAll //TODO: This needs to be handled with new disguise stuff
 
-thread playaggressivewaitanim
-self lookat self.enemy
+	self lookat self.enemy
+	self.blendtime = 0.50
+	self setmotionanim (self.weapongroup + "_stand_alert_legs")
+	self setupperanim ("den_actor_alert_" + self.voicetype)
+	self waittill upperanimdone
 
-//chrissstrahl - we are waiting for this to end in coop
-if(level.gametype==0){
+	thread playaggressivewaitanim
+	self lookat self.enemy
+
+	//[200] Smithy - make them work with coop
+	if (level.gametype != 0){
+		if (self.enemy.classname == "Player" && !self.flags["coop_isAttacking"]){
+			//thread coop_mod/itemhandler.scr::takeDisguise self.enemy
+			//if (!self.enemy.flags["coop_reDisguiseHandlerThread"]){
+			//	thread coop_mod/aihandler.scr::reDisguiseHandler self.enemy
+			//}
+			thread coop_mod/aihandler.scr::attackPlayer self.enemy
+			thread coop_mod/aihandler.scr::sentientIsSeen self self.enemy NIL 	//check to see if anyone can see him spot you
+			thread coop_mod/aihandler.scr::sentientIsHeard self self.enemy 		//check to see if anyone can hear him spot you	
+			self aimat self.enemy
+			wait 0.1
+			end
+		}
+		self.enemy.flags["coop_clickablePapersEnabled"] = game.false
+	}
+
 	wait 10
-}
 
 //iprintlnbold "Warning: disguise_papers.scr has ended."
 
 end
 
 playaggressivewaitanim:
-waitthread anim/disguise_papers.scr::playaggressivewaitanim
+	waitthread anim/disguise_papers.scr::playaggressivewaitanim
 end

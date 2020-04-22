@@ -2,155 +2,114 @@
 // disguise_papers.scr
 //------
 
-//chrissstrahl - i need this in a function/label so we can end it in the coop mod
-main:{
-	if (level.disguise_debug)
-		iprintlnbold "Gimme some papers"
+if (level.disguise_debug)
+	iprintlnbold "Gimme some papers"
 
-	// Initialise say manager
-	self waitthread anim/SayManager.scr::Init
+// Initialise say manager
+self waitthread anim/SayManager.scr::Init
 
-	//iprintlnbold "Dude, you got any papers?"
-
-
-	self.blendtime = 0.3
-
-	if (level.script == "maps/e1l4.scr" && self.shuddup == 1) {
-		//iprintlnbold "papers, shuddup detected"
-		//chrissstrahl - we are waiting for this to end in coop
-		//if(level.gametype==0){
-			wait 10
-		//}
-		end
-	}
-	else if (level.script == "maps/e1l3.scr") {
-		$askPlayerForPapers waittill trigger
-		self thread maps/e1l3/FinalEscape.scr::pressEToShow
-		self lookat self.enemy
-		self setmotionanim A_13_germdial4
-	}
-	else if (level.script == "maps/e1l4.scr" && self == $clerk) {
-		self lookat self.enemy
-		self setmotionanim A_14_HMTalk1
-		self waittill flaggedanimdone
-		self.noidle = 1
-		self setmotionanim A_14_gunreach
-		self waittill flaggedanimdone
-		self unholster
-		self setmotionanim A_14_gunpullout
-		self.noidle = 0
-		self waittill flaggedanimdone
-	}
-	else if (level.script == "maps/e1l4.scr" && self == $boatguard) {
-		self lookat self.enemy
-		self setmotionanim A_14_GermBTalk1
-		self waittill flaggedanimdone
-	}
-	else {
-		//self setmotionanim (self.weapongroup + "_stand_alert_legs")
-		self lookat self.enemy
-		thread playidleanim
-		local.legsanimthread = parm.previousthread
-
-		self setupperanim ("den_actor_ask_" + self.voicetype)
-		self waittill upperanimdone
-	}
-
-	thread playwaitface
-	local.waitfacethread = parm.previousthread
-	wait 1 //[200] chrissstrahl - changed from 3 to 1
-	if(local.waitfacethread != NULL && local.waitfacethread != NIL){ //[200] chrissstrahl - fix NULL
-		local.waitfacethread end
-	}
-
-
-	//chrissstrahl - coop mod - does not exist anymore or has accepted/denied/enemy the papers or player
-	if(level.gametype != 0){
-		if(self == NULL || self.flags["coop_disguiseAccepted"] != NIL ){
-			end
-		}
-	}
-
-	if (level.disguise_debug)
-		iprintlnbold "C'mon, help me out here."
-
-	self lookat self.enemy
-
-	self.blendtime = 0.3
-	//chrissstrahl - only end if it exists
-	if(local.legsanimthread){
-		local.legsanimthread end	// Stop the idle legs pose so we can assume a more aggressive one
-	}
-	self setmotionanim (self.weapongroup + "_stand_alert_legs")
-	self setupperanim ("den_actor_suspicion_" + self.voicetype)
-	self waittill upperanimdone
+//iprintlnbold "Dude, you got any papers?"
 	
-	//chrissstrahl - coop mod - does not exist anymore or has accepted/denied/enemy the papers or player
-	if(level.gametype != 0){
-		if(self == NULL || self.flags["coop_disguiseAccepted"] != NIL ){
-			end
-		}
+	//[200] Smithy - allow players to click for papers during this time
+	if (level.gametype != 0){
+		thread coop_mod/itemhandler.scr::enableClickablePapers self self.enemy
+		//self.enemy.flags["coop_clickablePapersEnabled"] = game.false
 	}
 
-	if (level.disguise_debug)
-		iprintlnbold "I'm waiting for awhile..."
+self.blendtime = 0.3
 
-	thread playwaitface
-	local.waitfacethread = parm.previousthread
-	wait 3
-	local.waitfacethread end
-	
-	//chrissstrahl - coop mod - does not exist anymore or has accepted/denied/enemy the papers or player
-	if(level.gametype != 0){
-		if(self == NULL || self.flags["coop_disguiseAccepted"] != NIL ){
-			end
-		}
-	}
-
+if (level.script == "maps/e1l4.scr" && self.shuddup == 1) {
+	//iprintlnbold "papers, shuddup detected"
+	wait 10
+	end
+}
+else if (level.script == "maps/e1l3.scr") {
+	$askPlayerForPapers waittill trigger
+	self thread maps/e1l3/FinalEscape.scr::pressEToShow
 	self lookat self.enemy
-	self.blendtime = 0.3
-	self setmotionanim ("den_fullbody_interrogate_" + self.voicetype)
+	self setmotionanim A_13_germdial4
+}
+else if (level.script == "maps/e1l4.scr" && self == $clerk) {
+	self lookat self.enemy
+	self setmotionanim A_14_HMTalk1
 	self waittill flaggedanimdone
+	self.noidle = 1
+	self setmotionanim A_14_gunreach
+	self waittill flaggedanimdone
+	self unholster
+	self setmotionanim A_14_gunpullout
+	self.noidle = 0
+	self waittill flaggedanimdone
+}
+else if (level.script == "maps/e1l4.scr" && self == $boatguard) {
+	self lookat self.enemy
+	self setmotionanim A_14_GermBTalk1
+	self waittill flaggedanimdone
+}
+else {
+	//self setmotionanim (self.weapongroup + "_stand_alert_legs")
+	self lookat self.enemy
+	thread playidleanim
+	local.legsanimthread = parm.previousthread
 
-	//chrissstrahl - coop mod - does not exist anymore or has accepted/denied/enemy the papers or player
-	if(level.gametype != 0){
-		if(self == NULL || self.flags["coop_disguiseAccepted"] != NIL ){
-			end
-		}
-	}
+	self setupperanim ("den_actor_ask_" + self.voicetype)
+	self waittill upperanimdone
+}
 
-	thread playwaitface
-	thread playaggressivewaitanim
-	wait 4
+thread playwaitface
+local.waitfacethread = parm.previousthread
+wait 3
+local.waitfacethread end
 
-	//iprintlnbold "Warning: disguise_papers.scr has ended."
-}end
+if (level.disguise_debug)
+	iprintlnbold "C'mon, help me out here."
+
+self lookat self.enemy
+
+self.blendtime = 0.3
+local.legsanimthread end	// Stop the idle legs pose so we can assume a more aggressive one
+self setmotionanim (self.weapongroup + "_stand_alert_legs")
+self setupperanim ("den_actor_suspicion_" + self.voicetype)
+self waittill upperanimdone
+
+if (level.disguise_debug)
+	iprintlnbold "I'm waiting for awhile..."
+
+thread playwaitface
+local.waitfacethread = parm.previousthread
+wait 3
+local.waitfacethread end
+
+self lookat self.enemy
+self.blendtime = 0.3
+self setmotionanim ("den_fullbody_interrogate_" + self.voicetype)
+self waittill flaggedanimdone
+
+thread playwaitface
+thread playaggressivewaitanim
+wait 4
+
+//iprintlnbold "Warning: disguise_papers.scr has ended."
+
+end
 
 
 
 playidleanim:
-//println "Playing leg idle for disguise response"
-self setmotionanim "generic_stand_bored_a"
-self waittill flaggedanimdone
-//iprintlnbold "playidleanim"
-//chrissstrahl - we can't have that in coop, this might work if controled by gamecode but we need this working right with scripts
-if(level.gametype == 0){
+	//println "Playing leg idle for disguise response"
+	self setmotionanim "generic_stand_bored_a"
+	self waittill flaggedanimdone
 	goto playidleanim
-}
 end
 
 playaggressivewaitanim:
-println "Im aiming at you now, since I'm really, really suspicious of you"
-self setmotionanim (self.weapongroup + "_stand_alert_legs")
-self setupperanim (self.weapongroup + "_aim")
+	println "Im aiming at you now, since I'm really, really suspicious of you"
+	self setmotionanim (self.weapongroup + "_stand_alert_legs")
+	self setupperanim (self.weapongroup + "_aim")
 end
 
 playwaitface:
-self waitexec anim/SayManager.scr::SayManager head_idle_interrogate 4
-//self waittill saydone
-//iprintlnbold "playwaitface"
-	//chrissstrahl - we don't want to get stuck in coop
-	if(level.gametype == 0){
-		goto playwaitface
-	}
+	self waitexec anim/SayManager.scr::SayManager head_idle_interrogate 4
+	//self waittill saydone
+	goto playwaitface
 end

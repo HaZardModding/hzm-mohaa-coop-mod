@@ -2,39 +2,49 @@
 // disguise_accept.scr
 //------
 
-if (level.disguise_debug == 1)
-	iprintlnbold "Oh, those papers are lovely!"
+	if (level.disguise_debug == 1)
+		iprintlnbold "Oh, those papers are lovely!"
 
-self lookat self.enemy
-self.blendtime = 0.50
-//self setmotionanim (self.weapongroup + "_stand_alert_legs")
-
-if (level.script == "maps/e1l4.scr" && self.shuddup == 1) {
-	//iprintlnbold "accept, shuddup detected"
-}
-else if (level.script == "maps/e1l4.scr" && self == $clerk) {
-}
-else if (level.script == "maps/e1l4.scr" && self == $boatguard) {
-	self setupperanim A_14_GermBTalk3
-	self waittill upperanimdone
-}
-else {
-	thread playidleanim
-	self setupperanim ("den_actor_appease_" + self.voicetype)
-	self waittill upperanimdone
-}
-
-self lookat self.enemy
-	//chrissstrahl - we are waiting for this to end in coop, so we can't have this wait here
-	if(level.gametype == 0){
-		wait 10
+	//[200] Smithy - make them work with coop
+	if (level.gametype != 0){
+		if (self.enemy.classname == "Player" && !self.flags["coop_isAttacking"] && thread coop_mod/aihandler.scr::canseeUndisguisedPlayers){
+			thread coop_mod/aihandler.scr::attackPlayer self.enemy
+			thread coop_mod/aihandler.scr::sentientIsSeen self self.enemy NIL 	//check to see if anyone can see him spot you
+			thread coop_mod/aihandler.scr::sentientIsHeard self self.enemy 		//check to see if anyone can hear him spot you	
+			self aimat self.enemy
+			wait 0.1
+			end
+		}
+		self.enemy.flags["coop_clickablePapersEnabled"] = game.false
 	}
 
-//iprintlnbold "Warning: disguise_papers.scr has ended."
+	self lookat self.enemy
+	self.blendtime = 0.50
+	//self setmotionanim (self.weapongroup + "_stand_alert_legs")
 
+	if (level.script == "maps/e1l4.scr" && self.shuddup == 1) {
+		//iprintlnbold "accept, shuddup detected"
+	}
+	else if (level.script == "maps/e1l4.scr" && self == $clerk) {
+	}
+	else if (level.script == "maps/e1l4.scr" && self == $boatguard) {
+		self setupperanim A_14_GermBTalk3
+		self waittill upperanimdone
+	}
+	else {
+		thread playidleanim
+		self setupperanim ("den_actor_appease_" + self.voicetype)
+		self waittill upperanimdone
+	}
+
+	self lookat self.enemy
+	wait 10
+
+	//iprintlnbold "Warning: disguise_papers.scr has ended."
 end
 
 
 playidleanim:
-waitthread anim/disguise_papers.scr::playidleanim
+	waitthread anim/disguise_papers.scr::playidleanim
 end
+
