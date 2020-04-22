@@ -1,0 +1,249 @@
+TIKI
+setup
+{
+	scale 0.52			// Set default scale to 16/30.5 since world
+						// is in 16 units per foot and model is in cm's
+	path models/weapons/nagent_revolver
+	skelmodel nagent_revolver.skd
+	surface all shader nagent_revolver
+}
+
+init
+{
+	server
+	{
+
+	//========================================//
+	//		WEAPON NAME		  //
+	//========================================//
+
+		classname		Weapon
+		weapontype		pistol
+		name			"Nagant Revolver"
+		rank			140 140
+
+	//========================================//
+	//		WEAPON ACCURACY 	  //
+	//========================================//
+
+		//soviet_nagant-m1895
+
+		sp bulletrange		3120 	//the range at which bulletspread is applied fully
+		sp bulletspread		40 40 56 56 //  minpitch minyaw maxpitch maxyaw(offsets in world units)
+		sp firespreadmult	0.38 0.7 200 0.6			//add falloff cap maxtime
+
+		dm bulletrange		4000 	//the range at which bulletspread is applied fully (65 yards)
+		dm bulletspread		55 55 78 78 //  minpitch minyaw maxpitch maxyaw(offsets in world units) spread is maximum at top movement speed
+
+		dm firespreadmult	0.68 0.5 200 .8	//add falloff cap maxtime 0.38 0.7 200 0.6 (original)
+
+		realism bulletrange		4000 	//the range at which bulletspread is applied fully (65 yards)
+		realism bulletspread	55 55 78 78  //  minpitch minyaw maxpitch maxyaw(offsets in world units) spread is maximum at top movement speed
+		realism firespreadmult	0.68 0.5 200 .8	//add falloff cap maxtime 0.38 0.7 200 0.6 (original)
+
+	//========================================//
+	//		DAMAGE / RATE OF FIRE	  //
+	//========================================//
+
+		sp bulletdamage		33	//original 25
+		dm bulletdamage		37	//original 25 // 2nd pass 33
+		realism bulletdamage	55	//original 25 // 2nd pass 33
+
+		sp firedelay		0.15
+		dm firedelay		0.16	//was 0.15
+		realism firedelay		0.16	//was 0.15
+
+	//========================================//
+	//		PLAYER MOVEMENT		  //
+	//========================================//
+
+		sp movementspeed 	1.0
+		dm movementspeed	1.0
+		realism movementspeed	1.0
+
+	//========================================//
+	//		RIFLE BUTT / SECONDARY FIRE//
+	//========================================//
+
+		secondary firetype			melee
+		secondary ammotype			none
+		secondary ammorequired		0
+		secondary meansofdeath		bash
+		secondary bulletknockback	50
+		secondary quiet
+
+		sp secondary bulletrange	64
+		sp secondary bulletdamage	20
+
+		dm secondary bulletrange	96
+		dm secondary bulletdamage	35
+
+		realism secondary bulletrange	96
+		realism secondary bulletdamage	35
+
+	//========================================//
+	//		AMMO			  //
+	//========================================//
+
+		firetype		bullet
+		ammotype		"Pistol"
+		meansofdeath	bullet
+		semiauto
+		bulletcount		1
+		clipsize		7
+		ammorequired	1
+//		usenoammo		1 // allow the pistol to be used when it has no ammo
+
+		sp startammo	7
+		dm startammo	28
+		sprealism startammo	7
+		dmrealism startammo	14
+
+	//========================================//
+	//		CROSSHAIR, ZOOM, TRACERS  //
+	//========================================//
+
+		sp tracerfrequency 	1
+		dm tracerfrequency 	0
+		sprealism tracerfrequency 	1
+		dmrealism tracerfrequency 	0
+
+		crosshair		1
+
+	//========================================//
+	//		SOUND, AI, OTHER	  //
+	//========================================//
+
+		pickupsound		p38_snd_pickup
+		ammopickupsound	p38_snd_pickup_ammo
+		noammosound		p38_snd_noammo
+
+		// Holstering info
+//		holstertag		"Bip01 Pelvis"
+//		holsteroffset	"1.5 -4 -10.0"
+//		holsterangles	"5 190 195"
+//		holsterScale	1.0
+
+		// AI animation group info
+		weapongroup		pistol
+		airange			short
+
+		//[200] Smithy - get handled
+		exec coop_mod/itemhandler.scr "initialiseItem" "pistol" "Nagant Revolver"
+	}
+	client
+	{
+		// this is attached to the player during reload
+		cache models/ammo/nagant_pistol_shell.tik
+
+		cache tracer.spr
+		cache muzsprite.spr
+		cache models/fx/muzflash.tik
+	}
+}
+
+animations
+{
+	idle		nagent_revolver.skc
+	reload		nagant_reload_start.skc
+	{
+		client
+		{
+				entry sound mnrevolver_snd_reload_start item
+		}
+	}
+	reload_single 	nagant_reload_loop.skc
+	{
+		client
+		{
+				entry sound mnrevolver_snd_reload_single item
+		}
+	}
+	reload_end	 	nagant_reload_end.skc
+	{
+		server
+		{
+			last idle
+		}
+		client
+		{
+				entry sound mnrevolver_snd_reload_end item
+		}
+	}
+
+	secondaryfire	nagent_revolver.skc
+	{
+		server
+		{
+			entry shoot secondary
+		}
+	}
+	fire     nagant_fire.skc
+	{
+		server
+		{
+			entry shoot primary
+		}
+		client
+		{
+			entry stopaliaschannel mnrevolver_snd_fire
+			entry sound mnrevolver_snd_fire
+
+			// By now, the server has already fired the weapon, so it's
+			// ok to apply the view kick apon entry to avoid problems
+			// with multiple application on single frame animations.
+
+			////////////////////////////////////////////////////////////////////////////////////////
+			// View Kick Controls
+			//
+			// View Kicking works based on the assumptions that every weapon has its own tendencies to kick in
+			// a paticular fashion. In MOH we call then scatter patterns. Currently we have 2 scatter patterns which
+			// will be explained.
+			// Scatter Patterns:
+			// "V" - the cone. The longer you shoot the more random your shots will be in the horizontal axis.
+			// "T" - the T shape. The gun has a tendancy to push in a paticular direction. //not used much...too artificial looking
+			//
+			//
+			//             		+-------------------------------------------- Scatter Pitch Min
+			//              		|    +--------------------------------------- Scatter Pitch Max
+			//              		|    |       +------------------------------- Scatter Yaw Min
+			//             		|    |       |   +--------------------------- Scatter Yaw Max
+			//             		|    |       |   |     +--------------------- The Recentering speed in fraction per second
+			//              		|    |       |   |     |    +---------------- The Scatter Pattern
+			//              		|    |       |   |     |    |     +---------- The absolute pitch min/max
+			//              		|    |       |   |     |    |     |  +------- The absolute yaw min/max
+			//              		|    |       |   |     |    |     |  | +----- This is the pitch at which you loose all
+			//              		|    |       |   |     |    |     |  | |      control of the weapon and its behavior is
+			//             	 	|    |       |   |     |    |     |  | |      purely random.
+			//				V    V       V   V     V    V     V  V V
+			entry viewkick 	    -1.0 -1.0    -0.16 0.16  1.2 "V"  2.8 0.8 1.2
+
+			//entry viewkick 	    -1.2 -1.2    -0.2 0.2    1   "V"  3.0 1.0 1.6 (Colt .45 stats)
+
+			// muzzle flash
+			entry tagdlight tag_barrel 0.25 0.2 0.15 120 0.11
+			entry tagspawnlinked tag_barrel
+			(
+				scale 0.2
+				offsetalongaxis 2 0 0
+				count 1
+				scale 0.30
+				model muzsprite.spr
+				life 0.06
+			)
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				scalemin 0.15
+				scalemax 0.25
+				model models/fx/muzflash.tik
+				randomroll
+				life 0.04
+			)
+		}
+	}
+}
+
+/*QUAKED addon_playerweapon_soviet_nagant-m1895 (0.0 0.0 1.0) (-8 -8 -8) (8 8 8)
+Soviet pistol - Nagant revolver M1895.
+*/

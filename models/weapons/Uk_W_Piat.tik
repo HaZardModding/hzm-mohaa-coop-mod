@@ -1,0 +1,239 @@
+TIKI
+
+setup
+{
+	scale 0.52			
+	path models/weapons/Piat
+        
+	skelmodel Uk_W_Piat.skd
+	surface gun shader Uk_W_Piat
+	surface gun shader Uk_W_Piat
+	surface rocket shader Uk_W_Piatrocket
+		
+}
+
+init
+{
+	server
+	{
+	//========================================//
+	//		WEAPON NAME		  //
+	//========================================//
+		classname		Weapon
+		weapontype		heavy
+		name			"PIAT"
+		rank			630 630
+
+	//========================================//
+	//		WEAPON ACCURACY 	  //
+	//========================================//
+
+		sp bulletspread		5 5 500 500
+		dm bulletspread		5 5 500 500
+		realism bulletspread	5 5 545 545
+
+	//========================================//
+	//		PLAYER MOVEMENT		  //
+	//========================================//
+
+		sp movementspeed	0.8
+		sp maxfiremovement	0.2
+
+		dm movementspeed	0.75
+		dm maxfiremovement	0.2
+
+		realism movementspeed	0.75
+		realism maxfiremovement	0.2
+
+	//========================================//
+	//		AMMO			  //
+	//========================================//
+
+		firetype			projectile
+		ammotype			"heavy"
+		semiauto
+		clipsize			1
+		ammorequired		        1  
+		firedelay			1.0
+
+		sp startammo			5 
+		sp projectile			models/projectiles/Piat_Rocket.tik 
+		dm startammo			10  
+		dm projectile			models/projectiles/Piat_Rocket_dm.tik 
+		sprealism startammo		3
+		dmrealism startammo		6
+		realism projectile		models/projectiles/Piat_Rocket.tik 
+
+		// Additional DM Loadout
+		dm additionalstartammo "grenade"        1
+		dm additionalstartammo "smokegrenade"   3
+		dm startitem "items/binoculars.tik"
+
+		// Additional DM Realism Loadout
+		dmrealism additionalstartammo "grenade" 1
+		dmrealism startitem "items/binoculars.tik"
+
+		cache	models/projectiles/Piat_Rocket.tik
+		cache	models/projectiles/Piat_Rocket_dm.tik
+
+	//========================================//
+	//	CROSSHAIR, ZOOM, TRACERS 	  //
+	//========================================//
+
+		crosshair		1
+
+	//========================================//
+	//	SOUND, AI, OTHER		  //
+	//========================================//
+
+		pickupsound		PIAT_snd_pickup
+		ammopickupsound		PIAT_snd_pickup_ammo
+		noammosound		PIAT_snd_noammo
+		maxmovementsound	PIAT_snd_noammo
+
+		// AI animation group info
+		weapongroup		bazooka
+		airange			medium
+
+		// this is attached to the player during reload
+		cache	models/ammo/piat_shell.tik
+
+		surface Rocket -nodraw
+
+		//[200] Smithy - get handled
+		exec coop_mod/itemhandler.scr "initialiseItem" "heavy" "PIAT"
+	}
+	client
+	{
+		cache vsssource.spr
+                cache explosion_burst.spr
+	}
+}
+
+animations
+{
+	idle	Uk_W_Piat.skc
+	raise	Uk_W_Piat.skc
+	{
+		server
+		{
+			last idle
+		}
+	}
+	reload	A_W_Piat_load_W.skc
+	{
+		server
+		{
+			entry dm movementspeed 0.83
+			entry realism movementspeed 0.83
+  
+			//These are handeled by the owner
+			//entry surface rocket +nodraw                        
+			//48 surface rocket -nodraw
+			//last surface rocket  -nodraw
+		}
+		client
+		{
+			first sound PIAT_snd_reload
+		}
+	}
+	fire	A_W_Piat_load_W.skc 
+	{
+		server
+		{
+			entry dm movementspeed		0.93
+			entry realism movementspeed     0.93
+
+			entry shoot
+			entry surface Rocket +nodraw
+		}
+		client
+		{
+			entry stopaliaschannel PIAT_snd_fire
+			entry sound PIAT_snd_fire
+
+			// By now, the server has already fired the weapon, so it's
+			// ok to apply the view kick apon entry to avoid problems
+			// with multiple application on single frame animations.
+
+			////////////////////////////////////////////////////////////////////////////////////////
+			// View Kicking
+			//
+			// View Kicking works based on the assumptions that every weapon has its own tendencies to kick in
+			// a paticular fashion. In MOH we call then scatter patterns. Currently we have 2 scatter patterns which
+			// will be explained.
+			// Scatter Patterns:
+			// "V" - the cone. The longer you shoot the more random your shots will be in the horizontal axis.
+			// "T" - the T shape. The gun has a tendancy to push in a paticular direction.
+			//
+			//
+			//             		+-------------------------------------------- Scatter Pitch Min
+			//              	|    +--------------------------------------- Scatter Pitch Max
+			//              	|    |       +------------------------------- Scatter Yaw Min
+			//             		|    |       |   +--------------------------- Scatter Yaw Max
+			//             		|    |       |   |     +--------------------- The Recentering speed in degrees per second
+			//              	|    |       |   |     |    +---------------- The Scatter Pattern
+			//              	|    |       |   |     |    |     +---------- The absolute pitch min/max
+			//              	|    |       |   |     |    |     |  +------- The absolute yaw min/max
+			//              	|    |       |   |     |    |     |  | +----- This is the pitch at which you loose all
+			//              	|    |       |   |     |    |     |  | |      control of the weapon and its behavior is
+			//             	 	|    |       |   |     |    |     |  | |      purely random.
+			//			V    V       V   V     V    V     V  V V
+			//entry viewkick 	        0    0   -0.05 0.05    56  "T"   15 15 15
+			entry viewkick 	       -5.5 -5.5 -0.05 0.05    56  "T"   15 15 15
+		}
+	}
+	secondaryfire	A_W_Piat_load_W.skc 
+	{
+		server
+		{
+			entry dm movementspeed		0.93
+			entry realism movementspeed     0.93
+
+			entry shoot secondary
+			entry surface Rocket +nodraw
+		}
+		client
+		{
+			entry stopaliaschannel PIAT_snd_fire
+			entry sound PIAT_snd_fire
+
+			// By now, the server has already fired the weapon, so it's
+			// ok to apply the view kick apon entry to avoid problems
+			// with multiple application on single frame animations.
+
+			////////////////////////////////////////////////////////////////////////////////////////
+			// View Kicking
+			//
+			// View Kicking works based on the assumptions that every weapon has its own tendencies to kick in
+			// a paticular fashion. In MOH we call then scatter patterns. Currently we have 2 scatter patterns which
+			// will be explained.
+			// Scatter Patterns:
+			// "V" - the cone. The longer you shoot the more random your shots will be in the horizontal axis.
+			// "T" - the T shape. The gun has a tendancy to push in a paticular direction.
+			//
+			//
+			//             		+-------------------------------------------- Scatter Pitch Min
+			//              	|    +--------------------------------------- Scatter Pitch Max
+			//              	|    |       +------------------------------- Scatter Yaw Min
+			//             		|    |       |   +--------------------------- Scatter Yaw Max
+			//             		|    |       |   |     +--------------------- The Recentering speed in degrees per second
+			//              	|    |       |   |     |    +---------------- The Scatter Pattern
+			//              	|    |       |   |     |    |     +---------- The absolute pitch min/max
+			//              	|    |       |   |     |    |     |  +------- The absolute yaw min/max
+			//              	|    |       |   |     |    |     |  | +----- This is the pitch at which you loose all
+			//              	|    |       |   |     |    |     |  | |      control of the weapon and its behavior is
+			//             	 	|    |       |   |     |    |     |  | |      purely random.
+			//			V    V       V   V     V    V     V  V V
+			//entry viewkick 	        0    0   -0.05 0.05    56  "T"   15 15 15
+			entry viewkick 	       -5.5 -5.5 -0.05 0.05    56  "T"   15 15 15
+
+
+
+
+		}
+	}
+}
+
+/*QUAKED addon_weapon_Piat (0.0 0.0 0.0) (-8 -8 -8) (8 8 8) Piat
+*/

@@ -1,0 +1,297 @@
+TIKI
+setup
+{
+	scale 0.52			// Set default scale to 16/30.5 since world is in 16 units per foot and model is in cm's
+	path models/weapons/bazooka
+	skelmodel bazooka.skd
+	surface bazooka shader bazooka
+	surface bazookarim shader bazookarim
+	surface bazookashell shader bazookashell
+}
+
+init
+{
+	server
+	{
+		classname		Weapon
+		weapontype		heavy
+		name			"Bazooka"
+		rank			610 610
+
+		pickupsound			bazooka_snd_pickup
+		ammopickupsound		bazooka_snd_pickup_ammo
+		noammosound			bazooka_snd_noammo
+		maxmovementsound	bazooka_snd_noammo
+
+		// Holstering info
+//		holstertag		"Bip01 Spine2"
+//		holsteroffset	"8.0 -7.75 6.5"
+//		holsterangles	"0 185 -25"
+//		holsterScale	1.0
+
+		// Primary fire type info
+		firetype			projectile
+		ammotype			"heavy"
+		semiauto
+		clipsize			1
+		ammorequired		1
+		firedelay			1.0
+		crosshair			1
+
+		sp startammo		3
+		sp projectile		models/projectiles/bazookashell.tik
+		sp bulletspread		5 5 500 500
+
+		sp movementspeed	0.8
+		sp maxfiremovement	0.2
+
+
+		cache			models/projectiles/bazookashell.tik
+		cache			models/projectiles/bazookashell_dm.tik
+
+		// AI animation group info
+		weapongroup		bazooka
+		airange			medium
+
+		//=================================
+		// DM Attributes
+		dm startammo		8
+		dm projectile		models/projectiles/bazookashell_dm.tik
+		dm bulletspread		5 5 500 500
+
+		dm movementspeed	0.75
+		dm maxfiremovement	0.2
+
+		// Additional DM Loadout
+		dm additionalstartammo "grenade" 1
+		dm additionalstartammo "smokegrenade" 3
+		dm startitem "items/binoculars.tik"
+
+		// Additional DM Realism Loadout
+		dmrealism additionalstartammo "grenade" 1
+//		dmrealism additionalstartammo "smokegrenade" 3
+		dmrealism startitem "items/binoculars.tik"
+
+		//=================================
+		// Realism Attributes
+		sprealism startammo		3
+		dmrealism startammo		6
+		realism projectile		models/projectiles/bazookashell_dm.tik
+		realism bulletspread		5 5 545 545
+
+		realism movementspeed	0.75
+		realism maxfiremovement	0.2
+
+		// this is attached to the player during reload
+		cache models/ammo/bazooka_shell.tik
+
+		surface bazookashell +nodraw
+
+		//[200] Smithy - get handled
+		exec coop_mod/itemhandler.scr "initialiseItem" "heavy" "Bazooka"
+	}
+	client
+	{
+//		cache muzsprite.spr
+		cache vsssource.spr
+//		cache models/fx/muzflash.tik
+	}
+}
+
+animations
+{
+	raise	bazooka.skc
+	{
+		// make sure the shell in the end is not there
+		server
+		{
+			entry surface bazookashell +nodraw
+			last idle
+		}
+	}
+	idle	bazooka.skc
+	{
+		// make sure the shell in the end is not there
+		server
+		{
+			first surface bazookashell +nodraw
+		}
+	}
+	reload 	bazooka_reload.skc
+	{
+		server
+		{
+			0 surface bazookashell +nodraw
+			75 surface bazookashell -nodraw
+			last surface bazookashell +nodraw
+			last idle
+		}
+		client
+		{
+			entry sound bazooka_snd_reload
+		}
+
+	}
+	fire	bazooka.skc
+	{
+		server
+		{
+			entry shoot
+			entry surface bazookashell +nodraw
+		}
+		client
+		{
+			entry stopaliaschannel bazooka_snd_fire
+			entry sound bazooka_snd_fire
+
+			// By now, the server has already fired the weapon, so it's
+			// ok to apply the view kick apon entry to avoid problems
+			// with multiple application on single frame animations.
+
+			////////////////////////////////////////////////////////////////////////////////////////
+			// View Kicking
+			//
+			// View Kicking works based on the assumptions that every weapon has its own tendencies to kick in
+			// a paticular fashion. In MOH we call then scatter patterns. Currently we have 2 scatter patterns which
+			// will be explained.
+			// Scatter Patterns:
+			// "V" - the cone. The longer you shoot the more random your shots will be in the horizontal axis.
+			// "T" - the T shape. The gun has a tendancy to push in a paticular direction.
+			//
+			//
+			//             		+-------------------------------------------- Scatter Pitch Min
+			//              		|    +--------------------------------------- Scatter Pitch Max
+			//              		|    |       +------------------------------- Scatter Yaw Min
+			//             		|    |       |   +--------------------------- Scatter Yaw Max
+			//             		|    |       |   |     +--------------------- The Recentering speed in degrees per second
+			//              		|    |       |   |     |    +---------------- The Scatter Pattern
+			//              		|    |       |   |     |    |     +---------- The absolute pitch min/max
+			//              		|    |       |   |     |    |     |  +------- The absolute yaw min/max
+			//              		|    |       |   |     |    |     |  | +----- This is the pitch at which you loose all
+			//              		|    |       |   |     |    |     |  | |      control of the weapon and its behavior is
+			//             	 	|    |       |   |     |    |     |  | |      purely random.
+			//				V    V       V   V     V    V     V  V V
+//			entry viewkick 	    -28.5 -28.5   -0.05 0.05 56  "T"   15 15 15
+			entry viewkick 	      0    0   -0.05 0.05 56  "T"   15 15 15
+
+//			entry viewkick -15 -16   -10 -11
+
+			// muzzle flash
+			entry tagdlight tag_barrel 0.25 0.2 0.15 140 0.11
+//			entry tagspawnlinked tag_barrel
+//			(
+//				model models/fx/muzflash.tik
+//				color 1.00 1.00 1.00
+//				scale 0.30
+//				life 0.05
+//				scalerate 2.00
+//				velocity 1000.00
+//				offsetalongaxis 0 0 0
+//				angles 0 0 220
+//				avelocity 0 0 crandom -7000
+//				fade
+//				alignstretch 0.15
+//				randomroll
+//			)
+
+			// smoke out the front
+			entry tagspawn tag_eject
+			(
+				model vsssource.spr
+				count 1
+				alpha 0.70
+				color 0.30 0.30 0.30
+				spritegridlighting
+				life 1.20
+				scalerate 5.00
+				cone 10.00 10.00
+				velocity -800.00
+				randvel 0 40 0
+				friction 4.00
+				fade
+				fadein 0.2
+				fadedelay 0.4
+			)
+
+			// more smoke out the front
+			entry tagspawn tag_eject
+			(
+				model vsssource.spr
+				count 1
+				alpha 0.70
+				color 0.30 0.30 0.30
+				spritegridlighting
+				life 1.20
+				scale 0.8
+				scalerate 4.00
+				cone 10.00 10.00
+				velocity -600.00
+				randvel 0 40 0
+				friction 4.00
+				fade
+				fadein 0.2
+				fadedelay 0.4
+			)
+
+			// smoke out the back
+			entry tagspawn tag_barrel
+			(
+				model vsssource.spr
+				count 1
+				alpha 0.70
+				color 0.30 0.30 0.30
+				spritegridlighting
+				life 1.40
+				scalerate 8.00
+				velocity -800.00
+				randvel 0 40 0
+				friction 4.00
+				fadein 0.1
+				fadedelay 0.3
+			)
+
+			// more smoke out the back
+			entry tagspawn tag_barrel
+			(
+				model vsssource.spr
+				count 1
+				alpha 0.70
+				color 0.30 0.30 0.30
+				spritegridlighting
+				life 1.40
+				scale 0.8
+				scalerate 7.00
+				velocity -600.00
+				friction 4.00
+				fadein 0.1
+				fadedelay 0.3
+			)
+
+//			entry tagspawnlinked tag_eject
+//			(
+//				model muzsprite.spr
+//				count 1
+//				alpha 0.90
+//				color 1.00 1.00 1.00
+//				life 0.20
+//				scalerate 7.00
+//				cone 8.00 2.00
+//				velocity 700.00
+//				radialvelocity -10.00 1.00 30.00
+//				randvelaxis range 30 -708 range -70 60 crandom -40
+//				friction 2.00
+//				offsetalongaxis 133 0 0
+//				angles 80 80 8
+//				avelocity 60 60 random 6
+//				scalemin 1.00
+//				scalemax 1.40
+//				fade
+//				randomroll
+//			)
+		}
+	}
+}
+
+/*QUAKED addon_playerweapon_allied_bazooka (0.0 0.0 1.0) (-8 -8 -8) (8 8 8)
+Weapon - bazooka - US bazooka.
+*/

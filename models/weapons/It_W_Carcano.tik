@@ -1,0 +1,342 @@
+TIKI
+
+setup
+{
+	scale 0.52			
+	path models/weapons/Carcano
+	skelmodel It_W_Carcano.skd
+	surface material1 shader It_W_Carcano
+	surface material2 shader It_W_Carcano
+}
+
+init
+{
+	server
+		{
+	//========================================//
+	//		WEAPON NAME		  //
+	//========================================//
+
+		classname		Weapon
+		weapontype		rifle
+//		sp weaponsubtype           17
+		name			"Carcano"
+		rank			230 230
+
+
+	//========================================//
+	//		WEAPON ACCURACY 	  //
+	//========================================//
+
+		sp bulletrange		4000	 		//the range at which bulletspread is applied
+		dm bulletrange		4000
+		realism bulletrange	4000
+
+		sp bulletspread		10 10 65 65	//minpitch minyaw maxpitch maxyaw
+		dm bulletspread		4 4 45 45
+		realism bulletspread	4 4 45 45
+
+
+	//========================================//
+	//		DAMAGE / RATE OF FIRE	  //
+	//========================================//
+
+		sp bulletdamage		85
+		dm bulletdamage		100
+
+		sprealism bulletdamage	120
+		dmrealism bulletdamage	120
+
+		sp firedelay 		1.5	// was 1.1; caused bugs because delay was shorter than animation
+		dm firedelay		1.5	// was 1.0; caused bugs because delay was shorter than animation
+		realism firedelay	1.5	// was 1.0; caused bugs because delay was shorter than animation
+
+		realism throughwood	24
+		realism throughmetal	8
+
+	//========================================//
+	//		PLAYER MOVEMENT		  //
+	//========================================//
+
+		sp movementspeed		0.94
+		dm movementspeed		1.05
+		realism movementspeed		1.05
+
+	//========================================//
+	//	RIFLE BUTT / SECONDARY FIRE       //
+	//========================================//
+
+		secondary firetype			melee
+		secondary ammotype			none
+		secondary ammorequired		0
+		secondary meansofdeath		bash
+		secondary bulletknockback	50
+		secondary quiet
+
+		sp secondary bulletrange	64
+		sp secondary bulletdamage	60
+
+		dm secondary bulletrange	96
+		dm secondary bulletdamage	60
+
+		realism secondary bulletrange	96
+		realism secondary bulletdamage	60
+
+	//========================================//
+	//		AMMO			  //
+	//========================================//
+
+		firetype		bullet
+		ammotype		"rifle"
+		meansofdeath	        bullet
+		semiauto
+		bulletcount		1
+		clipsize		6
+		ammorequired	        1
+		bulletlarge		1
+
+		sp startammo	        72
+		dm startammo	        72
+		sprealism startammo	72
+		dmrealism startammo	72
+
+		// Additional DM Loadout
+		dm additionalstartammo "grenade"      4
+		dm additionalstartammo "smokegrenade" 2
+		dm startitem "items/binoculars.tik"
+
+		// Additional DM Realism Loadout
+		dmrealism additionalstartammo "grenade"      4
+		dmrealism additionalstartammo "smokegrenade" 2
+		dmrealism startitem "items/binoculars.tik"
+
+	//========================================//
+	//	CROSSHAIR, ZOOM, TRACERS  	  //
+	//========================================//
+
+		sp tracerfrequency 		2 
+		dm tracerfrequency 		0
+		sprealism tracerfrequency 	0 
+		dmrealism tracerfrequency 	0
+
+		crosshair		        1
+
+	//========================================//
+	//	SOUND, AI, OTHER	  	  //
+	//========================================//
+
+		pickupsound		Carcano_snd_pickup
+		ammopickupsound		Carcano_snd_pickup_ammo
+		noammosound		Carcano_snd_noammo
+
+		// AI animation group info
+		weapongroup		rifle
+		airange			long
+
+		// this is attached to the player during reload
+		cache models/ammo/It_W_Carcano_clip.tik  //fixme!!
+
+		//[200] Smithy - get handled
+		exec coop_mod/itemhandler.scr "initialiseItem" "rifle" "Carcano"
+	}
+	client
+	{
+		cache tracer.spr
+		cache muzsprite.spr
+		cache models/fx/snipesmoke.tik
+		cache models/ammo/rifleshell.tik
+	}
+}
+
+animations
+{
+	idle		A_W_Carcano_idle_W.skc
+	{
+	}
+
+	reload	        A_W_Carcano_reload_W.skc      
+	{
+		client
+		{
+			entry sound Carcano_snd_reload item
+		}
+		server
+		{
+	
+			last idle
+		}
+	}
+	rechamber	A_W_Carcano_rechamber_W.skc
+	{
+		client
+		{
+			entry sound Carcano_snd_bolt item
+			18 tagspawn tag_eject 1024
+			(
+				spawnrange 2048
+				count 1
+				model models/ammo/rifleshell.tik
+				scale 1.0
+				velocity 70
+				randvel crandom 10 crandom 10 random 20
+				emitterangles 0 0 0
+				avelocity crandom 90 crandom 90 0
+				accel 0 0 -800
+				physicsrate 20
+				life 2.0
+				fadedelay 1.7
+				collision
+				bouncefactor 0.2
+				bouncesoundonce snd_rifle_shell
+			)
+		}
+	}
+	secondaryfire   A_W_Carcano_idle_W.skc
+	{
+		server
+		{
+			entry shoot secondary
+		}
+	}
+	fire		A_W_Carcano_fire_W.skc
+	{
+		server
+		{
+			entry shoot
+		}
+		client
+		{
+			entry stopaliaschannel Carcano_snd_fire
+			entry sound Carcano_snd_fire
+
+			// By now, the server has already fired the weapon, so it's
+			// ok to apply the view kick apon entry to avoid problems
+			// with multiple application on single frame animations.
+
+			////////////////////////////////////////////////////////////////////////////////////////
+			// View Kicking
+			//
+			// View Kicking works based on the assumptions that every weapon has its own tendencies to kick in
+			// a paticular fashion. In MOH we call then scatter patterns. Currently we have 2 scatter patterns which
+			// will be explained.
+			// Scatter Patterns:
+			// "V" - the cone. The longer you shoot the more random your shots will be in the horizontal axis.
+			// "T" - the T shape. The gun has a tendancy to push in a paticular direction.
+			//
+			//
+			//             	+-------------------------------------------- Scatter Pitch Min
+			//              |  	+--------------------------------------- Scatter Pitch Max
+			//          	|    	|       +------------------------------- Scatter Yaw Min
+			//             	|    	|       |   +--------------------------- Scatter Yaw Max
+			//             	|    	|       |   |     +--------------------- The Recentering speed in fraction per second
+			//              |   	|       |   |     |    +---------------- The Scatter Pattern
+			//             	|    	|       |   |     |    |     +---------- The absolute pitch min/max
+			//             	|    	|       |   |     |    |     |  +------- The absolute yaw min/max
+			//             	|    	|       |   |     |    |     |  | +----- This is the pitch at which you loose all
+			//             	|    	|       |   |     |    |     |  | |      control of the weapon and its behavior is
+			//             	|    	|       |   |     |    |     |  | |      purely random.
+			//			V    	V       V   V     V    V     V  V V
+			entry viewkick  -1.5 -2.0    -0.5 -0.5 4.5  "T"   5.0 2.0 5
+
+			// muzzle flash
+			entry tagdlight tag_barrel 0.25 0.2 0.15 150 0.11
+			entry tagspawnlinked tag_barrel
+			(
+				model muzsprite.spr
+				count 1
+				alpha .5
+				color 1.00 1.00 1.00
+				varycolor
+				scale 0.70
+				life 0.05
+				scalerate 1.00
+				velocity 4.00
+				friction 3.00
+				fade
+				alignstretch 1.00
+				randomroll
+			)
+			entry tagspawnlinked tag_barrel
+			(
+				model muzsprite.spr
+				count 1
+				alpha .5
+				color 1.00 1.00 1.00
+				scale 0.60
+				life 0.05
+				scalerate 0.70
+				velocity 17.00
+				offsetalongaxis 5 0 0
+				fade
+				alignstretch 0.40
+				randomroll
+			)
+
+			entry tagspawnlinked tag_barrel
+			(
+				model muzsprite.spr
+				count 1
+				alpha .5
+				color 1.00 1.00 1.00
+				scale 0.60
+				life 0.05
+				velocity 18.00
+				offsetalongaxis 9 0 0
+				fade
+			)
+
+			// smoke puff used on sniper version of kar98
+			entry commanddelay 0.020 tagspawn tag_barrel
+			(
+				model vsssource.spr
+				count 1
+				alpha 0.10
+				color 1.00 1.00 1.00
+				spritegridlighting
+				scale 0.09
+				life .9
+				scalerate 23.00
+				velocity 429.00
+				accel 0.00 20.00 30.00
+				friction 2.00
+				fade
+				offsetalongaxis random 4 0 0
+			)
+
+			entry tagspawn tag_barrel
+			(
+				count 1
+				scale .7
+				model models/fx/snipesmoke.tik
+			)
+
+			// bolt sound
+			8 sound Carcano_snd_bolt item
+
+			// shell eject
+			26 tagspawn tag_eject
+			(
+				count 1
+				model models/ammo/rifleshell.tik
+				spawnrange 1024
+				scale 1.0
+				velocity 50
+				randvel crandom 10 crandom 10 random 20
+				emitterangles 0 0 0
+				avelocity crandom 90 crandom 90 0
+				accel 0 0 -800
+				physicsrate 20
+				life 2.0
+				fadedelay 1.7
+				collision
+				bouncefactor 0.6
+				bouncesoundonce snd_rifle_shell
+			)
+		}
+	}
+}
+
+/*QUAKED addon_weapon_Carcano (0.0 0.0 0.0) (-65 -40 0) (65 40 120) Carcano
+*/	
+
+

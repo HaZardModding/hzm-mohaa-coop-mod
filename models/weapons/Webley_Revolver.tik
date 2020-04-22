@@ -1,0 +1,275 @@
+TIKI
+setup
+{
+	scale 0.52			// Set default scale to 16/30.5 since world
+						// is in 16 units per foot and model is in cm's
+	path models/weapons/webley_revolver
+	skelmodel webley_revolver.skd
+	surface webley shader webley
+	surface shellmetal_cull shader shellmetal
+}
+
+init
+{
+	server
+	{
+
+	//========================================//
+	//		WEAPON NAME		  //
+	//========================================//
+
+		classname		Weapon
+		weapontype		pistol
+		name			"Webley Revolver"
+		rank			130 130
+
+	//========================================//
+	//		WEAPON ACCURACY 	  //
+	//========================================//
+
+//		Walther P-38 Pistol: Max Eff. Range is 75 yds with a muzzle velocity of 1150 ft/s. (9mm Parabellum round)
+
+		sp bulletrange		3120 	//the range at which bulletspread is applied fully
+		sp bulletspread		40 40 56 56 //  minpitch minyaw maxpitch maxyaw(offsets in world units)
+		sp firespreadmult	0.38 0.7 200 0.6			//add falloff cap maxtime
+
+		dm bulletrange		4000 	//the range at which bulletspread is applied fully (65 yards)
+
+		dm bulletspread		52 52 73 73 //  minpitch minyaw maxpitch maxyaw(offsets in world units) spread is maximum at top movement speed
+
+		dm firespreadmult	0.68 0.5 200 0.6	//add falloff cap maxtime 0.38 0.7 200 0.6 (original)
+
+		realism bulletrange	4000 	//the range at which bulletspread is applied fully (65 yards)
+		realism bulletspread	52 52 73 73
+		realism firespreadmult	0.68 0.5 200 0.6	//add falloff cap maxtime 0.38 0.7 200 0.6 (original)
+
+	//========================================//
+	//		DAMAGE / RATE OF FIRE	  //
+	//========================================//
+
+		sp bulletdamage		33	//original 25
+		dm bulletdamage		40	//original 25 // 2nd pass 33
+		realism bulletdamage		60	//original 25 // 2nd pass 33
+
+		sp firedelay		0.12
+		dm firedelay		0.12	//was 0.15
+		realism firedelay		0.16	//was 0.15
+
+	//========================================//
+	//		PLAYER MOVEMENT		  //
+	//========================================//
+
+		sp movementspeed 	1.0
+		dm movementspeed	1.0
+		realism movementspeed	1.0
+
+	//========================================//
+	//		RIFLE BUTT / SECONDARY FIRE//
+	//========================================//
+
+		secondary firetype			melee
+		secondary ammotype			none
+		secondary ammorequired		0
+		secondary meansofdeath		bash
+		secondary bulletknockback	50
+		secondary quiet
+
+		sp secondary bulletrange	64
+		sp secondary bulletdamage	20
+
+		dm secondary bulletrange	96
+		dm secondary bulletdamage	35
+
+		realism secondary bulletrange	96
+		realism secondary bulletdamage	35
+
+	//========================================//
+	//		AMMO			  //
+	//========================================//
+
+		firetype		bullet
+		ammotype		"Pistol"
+		meansofdeath	bullet
+		semiauto
+		bulletcount		1
+		clipsize		6
+		ammorequired	1
+//		usenoammo		1 // allow the pistol to be used when it has no ammo
+
+		sp startammo	6
+		dm startammo	30
+		sprealism startammo	6
+		dmrealism startammo	18
+
+	//========================================//
+	//		CROSSHAIR, ZOOM, TRACERS  //
+	//========================================//
+
+		sp tracerfrequency 	1
+		dm tracerfrequency 	0
+		sprealism tracerfrequency 	1
+		dmrealism tracerfrequency 	0
+
+		crosshair		1
+
+	//========================================//
+	//		SOUND, AI, OTHER	  //
+	//========================================//
+
+		pickupsound		webley_snd_pickup
+		ammopickupsound	webley_snd_pickup_ammo
+		noammosound		webley_snd_noammo
+
+		// Holstering info
+//		holstertag		"Bip01 Pelvis"
+//		holsteroffset	"1.5 -4 -10.0"
+//		holsterangles	"5 190 195"
+//		holsterScale	1.0
+
+		// AI animation group info
+		weapongroup		pistol
+		airange			short
+		
+		// this is attached to the player during reload
+
+		//[200] Smithy - get handled
+		exec coop_mod/itemhandler.scr "initialiseItem" "pistol" "Webley Revolver"
+	}
+	client
+	{
+		cache tracer.spr
+		cache muzsprite.spr
+		cache models/fx/muzflash.tik
+		cache models/ammo/pistolshell.tik
+	}
+}
+
+animations
+{
+	idle    webley_revolver.skc
+	reload 	webley_revolver_reload_start.skc
+	{
+		client
+		{
+			7 sound webley_snd_reload_start
+		}
+
+	}
+
+	reload_single 	webley_revolver_reload_single.skc
+	{
+		server
+		{
+			2	surface shellmetal_cull -nodraw
+			8	surface shellmetal_cull +nodraw
+		}
+		client
+		{
+			3 sound webley_snd_reload_single
+
+			3 tagspawn tag_eject
+			(
+				count 1
+				model models/ammo/pistolshell.tik
+				spawnrange 1024
+				scale .75
+				velocity 50
+				randvelaxis range 1 2 range 1 2 0
+				emitterangles 0 0 45
+				avelocity crandom 90 crandom 90 0
+				accel 0 0 -800
+				physicsrate 20
+				life 2.0
+				fadedelay 1.7
+				collision
+				bouncefactor 0.2
+				bouncesoundonce snd_pistol_shell
+			)
+
+		}
+	}
+	reload_end 	webley_revolver_reload_end.skc
+	{
+		client
+		{
+			3 sound webley_snd_reload_end
+		}
+	}
+	
+	secondaryfire     webley_revolver.skc
+	{
+		server
+		{
+			entry shoot secondary
+		}
+	}
+	fire    webley_revolver_fire.skc
+	{
+		server
+		{
+			entry shoot primary
+		}
+		client
+		{
+			entry stopaliaschannel webley_snd_fire
+			entry sound webley_snd_fire
+
+			// By now, the server has already fired the weapon, so it's
+			// ok to apply the view kick apon entry to avoid problems
+			// with multiple application on single frame animations.
+
+			////////////////////////////////////////////////////////////////////////////////////////
+			// View Kick Controls
+			//
+			// View Kicking works based on the assumptions that every weapon has its own tendencies to kick in
+			// a paticular fashion. In MOH we call then scatter patterns. Currently we have 2 scatter patterns which
+			// will be explained.
+			// Scatter Patterns:
+			// "V" - the cone. The longer you shoot the more random your shots will be in the horizontal axis.
+			// "T" - the T shape. The gun has a tendancy to push in a paticular direction. //not used much...too artificial looking
+			//
+			//
+			//             		+-------------------------------------------- Scatter Pitch Min
+			//              		|    +--------------------------------------- Scatter Pitch Max
+			//              		|    |       +------------------------------- Scatter Yaw Min
+			//             		|    |       |   +--------------------------- Scatter Yaw Max
+			//             		|    |       |   |     +--------------------- The Recentering speed in fraction per second
+			//              		|    |       |   |     |    +---------------- The Scatter Pattern
+			//              		|    |       |   |     |    |     +---------- The absolute pitch min/max
+			//              		|    |       |   |     |    |     |  +------- The absolute yaw min/max
+			//              		|    |       |   |     |    |     |  | +----- This is the pitch at which you loose all
+			//              		|    |       |   |     |    |     |  | |      control of the weapon and its behavior is
+			//             	 	|    |       |   |     |    |     |  | |      purely random.
+			//				V    V       V   V     V    V     V  V V
+			entry viewkick 	    -1.0 -1.0    -0.16 0.16  1.2 "V"  2.8 0.8 1.2
+
+			//entry viewkick 	    -1.2 -1.2    -0.2 0.2    1   "V"  3.0 1.0 1.6 (Colt .45 stats)
+
+			// muzzle flash
+			entry tagdlight tag_barrel 0.25 0.2 0.15 120 0.11
+			entry tagspawnlinked tag_barrel
+			(
+				scale 0.2
+				offsetalongaxis 2 0 0
+				count 1
+				scale 0.30
+				model muzsprite.spr
+				life 0.06
+			)
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				scalemin 0.15
+				scalemax 0.25
+				model models/fx/muzflash.tik
+				randomroll
+				life 0.04
+			)
+
+		}
+	}
+}
+
+/*QUAKED addon_playerweapon_british_webley-mk6 (0.0 0.0 1.0) (-8 -8 -8) (8 8 8)
+British pistol - Webley Mark 6.
+*/

@@ -1,0 +1,275 @@
+TIKI
+setup
+{
+	scale 0.52			// Set default scale to 16/30.5 since world is in 16 units per foot and model is in cm's
+	path models/weapons/panzerschreck
+	skelmodel panzerschreck.skd
+	surface panzerschreck shader panzerschreck
+	surface shell shader bazookashell
+}
+
+init
+{
+	server
+	{
+		classname		Weapon
+		weapontype		heavy
+		name			"Panzerschreck"
+		rank			620 620
+
+		pickupsound			panzerschreck_snd_pickup
+		ammopickupsound		panzerschreck_snd_pickup_ammo
+		noammosound			panzerschreck_snd_noammo
+		maxmovementsound	panzerschreck_snd_noammo
+
+		// Holstering info
+//		holstertag		"Bip01 Spine2"
+//		holsteroffset	"8.0 -7.75 6.5"
+//		holsterangles	"0 185 -25"
+//		holsterScale	1.0
+
+		// Primary fire type info
+		firetype		projectile
+		ammotype		"heavy"
+		semiauto
+		clipsize		1
+		ammorequired	1
+		firedelay		1.0
+		crosshair		1
+
+		sp projectile	models/projectiles/panzerschreckshell.tik
+		sp startammo	1
+
+		sp movementspeed		0.8
+		sp maxfiremovement		0.2
+
+		// AI animation group info
+		weapongroup		bazooka
+		airange			medium
+
+		// DM Attributes
+		dm projectile		models/projectiles/bazookashell_dm.tik
+		dm bulletspread		5 5 500 500
+		dm startammo		8
+
+		dm movementspeed	0.75
+		dm maxfiremovement	0.2
+
+		// Additional DM Loadout
+		dm additionalstartammo "grenade" 1
+		dm additionalstartammo "smokegrenade" 3
+		dm startitem "items/binoculars.tik"
+
+		// Realism Attributes
+		realism projectile		models/projectiles/bazookashell_dm.tik
+		realism bulletspread	5 5 550 550
+		sprealism startammo		1
+		dmrealism startammo		6
+
+		realism movementspeed	0.75
+		realism maxfiremovement	0.2
+
+		// Additional DM Realism Loadout
+		dmrealism additionalstartammo "grenade" 1
+//		dmrealism additionalstartammo "smokegrenade" 3
+		dmrealism startitem "items/binoculars.tik"
+
+
+		cache			models/projectiles/panzerschreckshell.tik
+		cache			models/projectiles/bazookashell_dm.tik
+		
+		// this is attached to the player during reload
+		cache models/ammo/panzer_shell.tik
+
+		surface shell +nodraw
+
+		//[200] Smithy - get handled
+		exec coop_mod/itemhandler.scr "initialiseItem" "heavy" "Panzerschreck"
+	}
+	client
+	{
+		cache muzsprite.spr
+		cache vsssource.spr
+//		cache models/fx/muzflash.tik
+	}
+}
+
+animations
+{
+	raise	panzerschreck.skc
+	{
+		// make sure the shell in the end is not there
+		server
+		{
+			entry surface shell +nodraw
+			last idle
+		}
+	}
+	idle	panzerschreck.skc
+	{
+		server
+		{
+			first surface shell +nodraw
+		}
+	}
+	reload 	panzer_reload.skc
+	{
+		server
+		{
+			0 surface shell +nodraw
+			69 surface shell -nodraw
+			last surface shell +nodraw
+			last idle
+		}
+		client
+		{
+			entry sound panzerschreck_snd_reload item
+		}
+	}
+	fire	panzerschreck.skc
+	{
+		server
+		{
+			entry shoot
+			enter surface shell +nodraw
+		}
+		client
+		{
+			entry stopaliaschannel panzerschreck_snd_fire
+			entry sound panzerschreck_snd_fire
+
+			// By now, the server has already fired the weapon, so it's
+			// ok to apply the view kick apon entry to avoid problems
+			// with multiple application on single frame animations.
+			////////////////////////////////////////////////////////////////////////////////////////
+			// View Kicking
+			//
+			// View Kicking works based on the assumptions that every weapon has its own tendencies to kick in
+			// a paticular fashion. In MOH we call then scatter patterns. Currently we have 2 scatter patterns which
+			// will be explained.
+			// Scatter Patterns:
+			// "V" - the cone. The longer you shoot the more random your shots will be in the horizontal axis.
+			// "T" - the T shape. The gun has a tendancy to push in a paticular direction.
+			//
+			//
+			//             		+-------------------------------------------- Scatter Pitch Min
+			//              		|    +--------------------------------------- Scatter Pitch Max
+			//              		|    |       +------------------------------- Scatter Yaw Min
+			//             		|    |       |   +--------------------------- Scatter Yaw Max
+			//             		|    |       |   |     +--------------------- The Recentering speed in degrees per second
+			//              		|    |       |   |     |    +---------------- The Scatter Pattern
+			//              		|    |       |   |     |    |     +---------- The absolute pitch min/max
+			//              		|    |       |   |     |    |     |  +------- The absolute yaw min/max
+			//              		|    |       |   |     |    |     |  | +----- This is the pitch at which you loose all
+			//              		|    |       |   |     |    |     |  | |      control of the weapon and its behavior is
+			//             	 	|    |       |   |     |    |     |  | |      purely random.
+			//				V    V       V   V     V    V     V  V V
+//			entry viewkick 	    -28.5 -28.5   -0.05 0.05 56  "T"   15 15 15
+			entry viewkick 	      0    0   -0.05 0.05 56  "T"   15 15 15
+
+//			entry viewkick -15 -16   -10 -11
+
+			// muzzle flash
+			entry tagdlight tag_barrel 0.25 0.2 0.15 140 0.11
+//			entry tagspawnlinked tag_barrel
+//			(
+//				model models/fx/muzflash.tik
+//				color 1.00 1.00 1.00
+//				scale 0.20
+//				life 0.10
+//				scalerate 2.00
+//				velocity 1000.00
+//				offsetalongaxis 20 0 0
+//				angles 0 0 220
+//				avelocity 0 0 crandom -7000
+//				fade
+//				alignstretch 0.15
+//				randomroll
+//			)
+
+			entry tagspawn tag_barrel
+			(
+				model vsssource.spr
+				count 1
+				alpha 0.70
+				color 0.30 0.30 0.30
+				spritegridlighting
+				life 1.00
+				scalerate 8.00
+				cone 10.00 10.00
+				velocity -1000.00
+				randvel 0 40 0
+				friction 5.00
+				fade
+				fadein 0.1
+				fadedelay 0.3
+			)
+
+			entry tagspawn tag_barrel
+			(
+				model vsssource.spr
+				count 1
+				alpha 0.70
+				color 0.30 0.30 0.30
+				spritegridlighting
+				life 1.00
+				scale 0.8
+				scalerate 7.00
+				cone 10.00 10.00
+				velocity -800.00
+				randvel 0 40 0
+				friction 5.00
+				fade
+				fadein 0.1
+				fadedelay 0.3
+			)
+
+			entry tagspawn tag_eject
+			(
+				model vsssource.spr
+//				count 3
+				count 1
+//				alpha 0.70
+				alpha 0.80
+				color 0.30 0.30 0.30
+				spritegridlighting
+				life 1.00
+				scalerate 9.00
+				cone 10.00 10.00
+				velocity -1000.00
+				randvel 0 40 0
+				friction 5.00
+				fade
+				fadein 0.1
+				fadedelay 0.4
+			)
+
+//			entry tagspawnlinked tag_eject
+//			(
+//				model muzsprite.spr
+//				count 1
+//				alpha 0.90
+//				color 1.00 1.00 1.00
+//				spritegridlighting
+//				life 0.20
+//				scalerate 7.00
+//				cone 8.00 2.00
+//				velocity 700.00
+//				radialvelocity -10.00 1.00 30.00
+//				randvelaxis range 30 -708 range -70 60 crandom -40
+//				friction 2.00
+//				offsetalongaxis 133 0 0
+//				angles 80 80 8
+//				avelocity 60 60 random 6
+//				scalemin 1.00
+//				scalemax 1.40
+//				fade
+//				randomroll
+//			)
+		}
+	}
+}
+
+/*QUAKED addon_playerweapon_german_panzerschreck (0.0 0.0 1.0) (-8 -8 -8) (8 8 8)
+Weapon - bazooka - german panzerschreck.
+*/

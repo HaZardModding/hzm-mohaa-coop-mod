@@ -1,0 +1,279 @@
+TIKI
+setup
+{
+	scale 0.52			// Set default scale to 16/30.5 since world is in 16 units per foot and model is in cm's
+	path models/weapons/highstandard
+	skelmodel hs_pistol.skd
+	surface pistol1 shader hi_standard
+	surface pistol2 shader hi_standard
+	surface clip shader hi_standard
+
+}
+$define sounddir sound/weapons
+
+init
+{
+	server
+	{
+
+	//========================================//
+	//		WEAPON NAME		  //
+	//========================================//
+
+		classname		Weapon
+		weapontype		pistol
+		name			"Hi-Standard Silenced"
+		rank			160 160
+
+	//========================================//
+	//		WEAPON ACCURACY 	  //
+	//========================================//
+
+		sp bulletrange		4000
+		sp bulletspread		35 35 150 150	//original 5 5 150 150, was 25 25 150 150 before getting beef up by z
+
+		dm bulletrange		4000
+		dm bulletspread		25 25 150 150	//original 5 5 150 150
+
+		realism bulletrange		4000
+		realism bulletspread	25 25 150 150	//original 5 5 150 150
+
+	//========================================//
+	//		DAMAGE / RATE OF FIRE	  //
+	//========================================//
+
+		sp bulletdamage		100 // was 55 before getting beefed up by z
+		dm bulletdamage		50
+		realism bulletdamage		60
+
+		sp firedelay		1.0
+		dm firedelay		1.0
+		realism firedelay		1.0
+
+	//========================================//
+	//		PLAYER MOVEMENT		  //
+	//========================================//
+
+		sp movementspeed 	1.0
+		dm movementspeed	1.0
+		realism movementspeed	1.0
+
+	//========================================//
+	//		RIFLE BUTT / SECONDARY FIRE//
+	//========================================//
+
+		secondary firetype		melee
+		secondary ammotype		none
+		secondary meansofdeath		bash
+		secondary ammorequired		0
+		secondary bulletknockback	50
+		secondary quiet
+
+		sp secondary bulletrange	64
+		sp secondary bulletdamage	35
+
+		dm secondary bulletrange	96
+		dm secondary bulletdamage	35
+
+		realism secondary bulletrange	96
+		realism secondary bulletdamage	35
+
+	//========================================//
+	//		AMMO			  //
+	//========================================//
+
+		firetype		bullet
+		ammotype		"pistol"
+		meansofdeath	bullet
+		semiauto
+		bulletcount		1
+		clipsize		8
+		ammorequired	1
+
+		sp startammo	8
+		dm startammo	32
+		sprealism startammo	8
+		dmrealism startammo	16
+
+	//========================================//
+	//		CROSSHAIR, ZOOM, TRACERS  //
+	//========================================//
+
+		sp tracerfrequency 	1
+		dm tracerfrequency 	0
+		sprealism tracerfrequency 	1
+		dmrealism tracerfrequency 	0
+
+		crosshair		1
+
+	//========================================//
+	//		SOUND, AI, OTHER	  //
+	//========================================//
+
+		pickupsound		silencer_snd_pickup
+		ammopickupsound	silencer_snd_pickup_ammo
+		noammosound		silencer_snd_noammo
+
+		// Holstering info
+//		holstertag		"Bip01 Pelvis"
+//		holsteroffset	"1.5 -4 -10.0"
+//		holsterangles	"5 190 195"
+//		holsterScale	1.0
+
+		// AI animation group info
+		weapongroup		pistol
+		airange			short
+
+		quiet // don't notify AI of it being fired
+
+		// this is attached to the player during reload
+		cache models/ammo/silencedpistol_clip.tik
+
+		//[200] Smithy - get handled
+		exec coop_mod/itemhandler.scr "initialiseItem" "pistol" "Hi-Standard Silenced"
+	}
+	client
+	{
+		cache tracer.spr
+		cache muzsprite.spr
+		cache models/ammo/pistolshell.tik
+	}
+}
+
+animations
+{
+	idle     hs_pistol.skc
+	reload 	hs_pistol_reload.skc
+	{
+		server
+		{
+			18 surface clip	+nodraw
+			39 surface clip -nodraw
+			last idle
+		}
+		client
+		{
+				entry sound silencer_snd_reload item
+		}
+
+	}
+	secondaryfire     hs_pistol.skc
+	{
+		server
+		{
+			entry shoot secondary
+		}
+	}
+	fire    hs_pistol_fire.skc
+	{
+		server
+		{
+			entry shoot primary
+		}
+		client
+		{
+			entry stopaliaschannel silencer_snd_fire
+			entry sound silencer_snd_fire
+
+			// By now, the server has already fired the weapon, so it's
+			// ok to apply the view kick apon entry to avoid problems
+			// with multiple application on single frame animations.
+
+			////////////////////////////////////////////////////////////////////////////////////////
+			// View Kick Controls
+			//
+			// View Kicking works based on the assumptions that every weapon has its own tendencies to kick in
+			// a paticular fashion. In MOH we call then scatter patterns. Currently we have 2 scatter patterns which
+			// will be explained.
+			// Scatter Patterns:
+			// "V" - the cone. The longer you shoot the more random your shots will be in the horizontal axis.
+			// "T" - the T shape. The gun has a tendancy to push in a paticular direction. not used much...too artificial looking
+			//
+			//
+			//             		+-------------------------------------------- Scatter Pitch Min
+			//              		|    +--------------------------------------- Scatter Pitch Max
+			//              		|    |       +------------------------------- Scatter Yaw Min
+			//             		|    |       |   +--------------------------- Scatter Yaw Max
+			//             		|    |       |   |     +--------------------- The Recentering speed in fraction per second
+			//              		|    |       |   |     |    +---------------- The Scatter Pattern
+			//              		|    |       |   |     |    |     +---------- The absolute pitch min/max
+			//              		|    |       |   |     |    |     |  +------- The absolute yaw min/max
+			//              		|    |       |   |     |    |     |  | +----- This is the pitch at which you loose all
+			//              		|    |       |   |     |    |     |  | |      control of the weapon and its behavior is
+			//             	 	|    |       |   |     |    |     |  | |      purely random.
+			//				V    V       V   V     V    V     V  V V
+
+			entry viewkick 	    -0.2 -0.2   0.0  0.0    1   "V"    3.0 1.0 1.6
+
+
+			// muzzle flash
+			entry tagdlight tag_barrel 0.25 0.2 0.15 120 0.11
+			entry tagspawnlinked tag_barrel
+			(
+				scale 0.2
+				offsetalongaxis 2 0 0
+				count 1
+				alpha 0.5
+				model muzsprite.spr
+				angles 0 0 crandom 25
+				life 0.01
+			)
+
+			// smoke puff
+//			entry commanddelay 0.05 tagspawn tag_barrel
+//			(
+//				volumetric
+//				model gun			// sets the type of smoke
+//				life 10				// amount of smoke
+//				scale 1.0			// radius
+//				alpha 0.3			// density
+//				color 0.7 0.7 0.7		// RBG color of the smoke
+//				velocity 2			// base velocity away from the surface
+//				randvelaxis random 6 0 0	// velocity offset
+//				offsetalongaxis random 4 0 0	// positional offset
+//			)
+
+			// shell eject
+			entry commanddelay 0.1 tagspawn tag_eject
+			(
+				count 1
+				model models/ammo/pistolshell.tik
+				spawnrange 1024
+				scale 1.0
+				velocity 50
+				randvel crandom 10 crandom 10 random 20
+				emitterangles 0 0 0
+				avelocity crandom 90 crandom 90 0
+				accel 0 0 -800
+				physicsrate 20
+				life 2.0
+				fadedelay 1.7
+				collision
+				bouncefactor 0.6
+				bouncesoundonce snd_pistol_shell
+			)
+
+			// shell eject puff
+			entry commanddelay 0.1 tagspawn tag_eject
+			(
+				count 2
+				model vsssource.spr
+				alpha 0.30
+				color 0.50 0.50 0.50
+				spritegridlighting
+				scale 0.10
+				life 1.00
+				scalerate 10.00
+				velocity 60.00
+				randvel range 20 -60 crandom -40 range 20 -60
+				friction 5.00
+				fade
+				randomroll
+			)
+		}
+	}
+}
+
+/*QUAKED addon_playerweapon_allied_highstandard-pistol (0.0 0.0 1.0) (-8 -8 -8) (8 8 8)
+American highperformance Pistol
+*/

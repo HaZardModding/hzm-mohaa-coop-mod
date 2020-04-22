@@ -1,0 +1,693 @@
+TIKI
+setup
+{
+	scale 0.52			// Set default scale to 16/30.5 since world is in 16 units per foot and model is in cm's
+	path models/weapons/sten_smg
+	skelmodel sten_smg.skd
+	surface sten_smg shader sten_smg
+	surface sten_clip shader sten_smg
+}
+
+init
+{
+	server
+	{
+
+	//========================================//
+	//		WEAPON NAME		  //
+	//========================================//
+
+		classname		Weapon
+		weapontype		smg
+		name			"Sten Mark II"
+		rank			330 330
+
+	//========================================//
+	//		WEAPON ACCURACY 	  		//
+	//========================================//
+//		Sten Mark II: Max Eff. Range is 50 yds with a muzzle velocity of 1250 ft/s. (9mm Parabellum round)
+
+		sp bulletrange		4000	 			//the range at which bulletspread is applied
+		sp bulletspread		53 53 70 70 		//minpitch minyaw maxpitch maxyaw
+		sp firespreadmult	0.08 0.35 200 0.25 	//add falloff cap maxtime
+
+		dm bulletrange		4000
+		dm bulletspread		30 30 65 65
+		dm firespreadmult	0.3 0.9 180 0.6
+
+		realism bulletrange	4000
+		realism bulletspread	30 30 65 65
+		realism firespreadmult	0.3 0.9 180 0.6
+
+	//========================================//
+	//		DAMAGE / RATE OF FIRE	  	//
+	//========================================//
+
+		sp bulletdamage 		28	//23.5		
+		dm bulletdamage		20				//26	//33
+		sprealism bulletdamage 	40
+		dmrealism bulletdamage	40			//26	//33
+
+		sp firedelay 		0.09	//0.095 //Adjusted test value
+		dm firedelay		0.07	//0.086
+		realism firedelay	0.07	//0.086
+
+	//========================================//
+	//		PLAYER MOVEMENT		  	//
+	//========================================//
+
+		sp movementspeed 	1.0
+		dm movementspeed	0.96
+		realism movementspeed	0.96
+
+	//========================================//
+	//		RIFLE BUTT / SECONDARY FIRE	//
+	//========================================//
+
+		secondary firetype		melee
+		secondary ammotype		none
+		secondary ammorequired		0
+		secondary meansofdeath		bash
+		secondary bulletknockback	50
+		secondary quiet
+
+		sp secondary bulletrange	64
+		sp secondary bulletdamage	60
+
+		dm secondary bulletrange	96
+		dm secondary bulletdamage	60
+
+		realism secondary bulletrange	96
+		realism secondary bulletdamage	60
+
+	//========================================//
+	//		AMMO			  		//
+	//========================================//
+
+		firetype		bullet
+		ammotype		"smg"
+		meansofdeath	bullet
+		bulletcount		1
+		clipsize		30
+		ammorequired	1
+
+		sp startammo	32
+		dm startammo	192
+		sprealism startammo	32
+		dmrealism startammo	128
+
+		// Additional DM Loadout
+		dm additionalstartammo "grenade" 2
+		dm additionalstartammo "smokegrenade" 1
+		dm startitem "items/binoculars.tik"
+
+		// Additional DM Realism Loadout
+		dmrealism additionalstartammo "grenade" 2
+		dmrealism additionalstartammo "smokegrenade" 1
+		dmrealism startitem "items/binoculars.tik"
+
+	//========================================//
+	//		CROSSHAIR, ZOOM, TRACERS  	//
+	//========================================//
+
+		sp tracerfrequency 	2
+		dm tracerfrequency 	0
+		sprealism tracerfrequency 	0	//2
+		dmrealism tracerfrequency 	0
+
+		crosshair		1
+
+	//========================================//
+	//		SOUND, AI, OTHER	  //
+	//========================================//
+
+
+		pickupsound		mp40_snd_pickup
+		ammopickupsound	mp40_snd_pickup_ammo
+		noammosound		mp40_snd_noammo
+
+		// Holstering info
+//		holstertag		"Bip01 Spine2"
+//		holsteroffset	"8.0 -7.75 6.5"
+//		holsterangles	"0 185 -25"
+//		holsterScale	1.0
+
+		// AI animation group info
+		weapongroup		mp40
+		airange			short
+
+
+		// this is attached to the player during reload
+		cache models/ammo/sten_clip.tik
+
+		//[200] Smithy - get handled
+		exec coop_mod/itemhandler.scr "initialiseItem" "smg" "Sten Mark II"
+	}
+	client
+	{
+		cache tracer.spr
+		cache muzsprite.spr
+		cache corona_util.spr
+		cache models/fx/muzflash.tik
+		cache models/ammo/pistolshell.tik
+	}
+}
+
+
+animations
+{
+	idle	sten_smg.skc
+	reload	sten_bolt_reload.skc
+	{
+		server
+		{
+			12 surface sten_Clip +nodraw
+			42 surface sten_Clip -nodraw
+			last idle
+		}
+		client
+		{
+			entry sound sten_snd_reload item
+		}
+	}
+	secondaryfire     sten_smg.skc
+	{
+		server
+		{
+			entry shoot secondary
+		}
+	}
+	fire	sten_bolt_shoot.skc
+	{
+		server
+		{
+			entry shoot
+		}
+		client
+		{
+			entry stopaliaschannel sten_snd_fire
+			entry sound sten_snd_fire
+
+			// By now, the server has already fired the weapon, so it's
+			// ok to apply the view kick apon entry to avoid problems
+			// with multiple application on single frame animations.
+
+			////////////////////////////////////////////////////////////////////////////////////////
+			// View Kicking
+			//
+			// View Kicking works based on the assumptions that every weapon has its own tendencies to kick in
+			// a paticular fashion. In MOH we call then scatter patterns. Currently we have 2 scatter patterns which
+			// will be explained.
+			// Scatter Patterns:
+			// "V" - the cone. The longer you shoot the more random your shots will be in the horizontal axis.
+			// "T" - the T shape. The gun has a tendancy to push in a paticular direction.
+			//
+			//
+			//             		+-------------------------------------------- Scatter Pitch Min
+			//              		|    +--------------------------------------- Scatter Pitch Max
+			//              		|    |       +------------------------------- Scatter Yaw Min
+			//             		|    |       |   +--------------------------- Scatter Yaw Max
+			//             		|    |       |   |     +--------------------- The Recentering speed in fraction per second
+			//              		|    |       |   |     |    +---------------- The Scatter Pattern
+			//              		|    |       |   |     |    |     +---------- The absolute pitch min/max
+			//              		|    |       |   |     |    |     |  +------- The absolute yaw min/max
+			//              		|    |       |   |     |    |     |  | +----- This is the pitch at which you loose all
+			//              		|    |       |   |     |    |     |  | |      control of the weapon and its behavior is
+			//             	 	|    |       |   |     |    |     |  | |      purely random.
+			//				V    V       V   V     V    V     V  V V
+
+			entry viewkick 	    -0.9 -0.9  	1.2 1.2  0.9   "V"   8.5 10.6 20.0
+//			entry viewkick 	    -1.65 -1.65  -0.04 0.04  1   "V"   8.5 8.6 16.0 (Nov 10 2001)
+//			entry viewkick 	    -1.58 -1.58  -0.16 -0.16 0.9   "V"   8.5 8.6 16.0 (Thompson Nov 10 2001)
+
+
+			// muzzle flash
+			entry tagdlight tag_barrel 0.25 0.2 0.15 110 0.11
+
+/////BIG ONE START
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model models/fx/muzflash.tik
+				color 1.00 1.00 1.00
+				alpha 0.30
+				scale 0.45
+				life 0.05
+				offsetalongaxis 5 1 0
+				fade
+				randomroll
+			)
+
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model muzsprite.spr
+				alpha 0.70
+				color 1.00 1.00 1.00
+				scale 0.50
+				life 0.05
+				offsetalongaxis 5 0 0
+				fade
+				randomroll
+			)
+
+//			entry tagspawnlinked tag_barrel
+//			(
+//				count 1
+//				model corona_util.spr
+//				color 1.00 1.00 1.00
+//				scale 0.10
+//				life 0.05
+//				scalerate 11.00
+//				fade
+//				randomroll
+//			)
+/////BIG ONE END
+			entry tagspawn tag_barrel
+			(
+				model vsssource.spr
+				count 3
+				alpha 0.40
+				color 0.50 0.50 0.50
+				spritegridlighting
+				scale 0.20
+//				life 0.90
+				life 0.30 //orig 1.0
+				scalerate 3.00
+				radius 6.00
+				velocity 23.00
+				accel 0.00 0.00 20.00
+				friction 3.00
+				fade
+				sphere
+			)
+
+//			entry tagspawnlinked tag_barrel
+//			(
+//				count 1
+//				model muzsprite.spr
+//				color 1.00 1.00 1.00
+//				life 0.06
+//				scalerate 56.00
+//				velocity 2555.00
+//				offsetalongaxis 5 0 0
+//				angles 0 0 crandom -90
+//				avelocity 0 0 crandom -80
+//				scalemin 0.04
+//				scalemax 0.08
+//				fade
+//			)
+
+//			entry tagspawnlinked tag_barrel
+//			(
+//				count 1
+//				model models/fx/muzflash.tik
+//				color 1.00 1.00 1.00
+//				scale 0.20
+//				life 0.05
+//				velocity 213.00
+//				offset random 2 0 0
+//				angles -180 0 0
+//				alignstretch 0.10
+//			)
+
+			// smoke puff
+			entry commanddelay 0.1 tagspawn tag_eject
+			(
+				count 1
+				model vsssource.spr
+				alpha 0.20
+				color 1.00 1.00 1.00
+				spritegridlighting
+				scale 0.10
+//				life 0.90
+				life 0.30 //orig 1.0
+				scalerate 14.00
+				velocity 79.00
+				offsetalongaxis 0 0 -12
+				angles 0 0 range 180 360
+				fade
+			)
+
+			// shell eject
+			entry commanddelay 0.1 tagspawn tag_eject
+			(
+				count 1
+				model models/ammo/pistolshell.tik
+				spawnrange 1024
+				scale .75
+				velocity 50
+				randvel crandom 10 crandom 10 random 20
+				emitterangles 0 0 0
+				avelocity crandom 90 crandom 90 0
+				accel 0 0 -800
+				physicsrate 20
+				life 2.0
+				fadedelay 1.7
+				collision
+				offsetalongaxis 0 0 -12
+				bouncefactor 0.2
+				bouncesoundonce snd_pistol_shell
+			)
+		}
+	}
+
+
+
+	guardfire_a	sten_smg.skc
+	{
+
+		client
+		{
+			entry stopaliaschannel sten_snd_fire
+			entry sound sten_snd_fire
+
+			// By now, the server has already fired the weapon, so it's
+			// ok to apply the view kick apon entry to avoid problems
+			// with multiple application on single frame animations.
+
+			////////////////////////////////////////////////////////////////////////////////////////
+			// View Kicking
+			//
+			// View Kicking works based on the assumptions that every weapon has its own tendencies to kick in
+			// a paticular fashion. In MOH we call then scatter patterns. Currently we have 2 scatter patterns which
+			// will be explained.
+			// Scatter Patterns:
+			// "V" - the cone. The longer you shoot the more random your shots will be in the horizontal axis.
+			// "T" - the T shape. The gun has a tendancy to push in a paticular direction.
+			//
+			//
+			//             		+-------------------------------------------- Scatter Pitch Min
+			//              		|    +--------------------------------------- Scatter Pitch Max
+			//              		|    |       +------------------------------- Scatter Yaw Min
+			//             		|    |       |   +--------------------------- Scatter Yaw Max
+			//             		|    |       |   |     +--------------------- The Recentering speed in fraction per second
+			//              		|    |       |   |     |    +---------------- The Scatter Pattern
+			//              		|    |       |   |     |    |     +---------- The absolute pitch min/max
+			//              		|    |       |   |     |    |     |  +------- The absolute yaw min/max
+			//              		|    |       |   |     |    |     |  | +----- This is the pitch at which you loose all
+			//              		|    |       |   |     |    |     |  | |      control of the weapon and its behavior is
+			//             	 	|    |       |   |     |    |     |  | |      purely random.
+			//				V    V       V   V     V    V     V  V V
+			entry viewkick 	    -1.75 -1.75  -0.04 0.04  1   "V"   8.5 8.6 16.0
+
+//			entry viewkick 	    -1.2 -1.2    -0.2  0.2   1   "V"   3.0 1.0 1.6 (Colt .45 Pistol
+//			entry viewkick -2.5 -3.0   -0.8 0.8 (original setting)
+
+			// muzzle flash
+			entry tagdlight tag_barrel 0.25 0.2 0.05 110 0.11
+
+/////BIG ONE START
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model models/fx/muzflash.tik
+				color 1.00 1.00 1.00
+				scale 0.60
+				life 0.05
+				offsetalongaxis -5 0 0
+				fade
+				randomroll
+			)
+
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model muzsprite.spr
+				alpha 0.70
+				color 1.00 1.00 1.00
+				scale 0.60
+				life 0.05
+				offsetalongaxis 3 0 0
+				fade
+				randomroll
+			)
+
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model corona_util.spr
+				color 1.00 1.00 1.00
+				scale 0.10
+				life 0.05
+				scalerate 11.00
+				fade
+				randomroll
+			)
+/////BIG ONE END
+			entry tagspawn tag_barrel
+			(
+				model vsssource.spr
+				count 3
+				alpha 0.40
+				color 0.50 0.50 0.50
+				scale 0.20
+				life 0.90
+				scalerate 3.00
+				radius 6.00
+				velocity 23.00
+				accel 0.00 0.00 20.00
+				friction 3.00
+				fade
+				sphere
+			)
+
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model muzsprite.spr
+				color 1.00 1.00 1.00
+				life 0.06
+				scalerate 56.00
+				velocity 2555.00
+				offsetalongaxis 5 0 0
+				angles 0 0 crandom -90
+				avelocity 0 0 crandom -80
+				scalemin 0.04
+				scalemax 0.08
+				fade
+			)
+
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model models/fx/muzflash.tik
+				color 1.00 1.00 1.00
+				scale 0.20
+				life 0.05
+				velocity 213.00
+				offset random 2 0 0
+				angles -180 0 0
+				alignstretch 0.10
+			)
+
+			// shell eject
+			entry commanddelay 0.1 tagspawn tag_eject
+			(
+				count 1
+				model models/ammo/pistolshell.tik
+				spawnrange 1024
+				scale .75
+				velocity 50
+				randvel crandom 10 crandom 10 random 20
+				emitterangles 0 0 0
+				avelocity crandom 90 crandom 90 0
+				accel 0 0 -800
+				physicsrate 20
+				life 2.0
+				fadedelay 1.7
+				collision
+				offsetalongaxis 0 0 -12
+				bouncefactor 0.2
+				bouncesoundonce snd_pistol_shell
+			)
+
+			// smoke puff
+			entry commanddelay 0.1 tagspawn tag_eject
+			(
+				count 1
+				model vsssource.spr
+				alpha 0.20
+				color 1.00 1.00 1.00
+				scale 0.10
+				life 0.90
+				scalerate 14.00
+				velocity 79.00
+				offsetalongaxis 0 0 -12
+				angles 0 0 range 180 360
+				fade
+			)
+		}
+	}
+
+	guardfire_b	sten_smg.skc
+	{
+
+		client
+		{
+			entry stopaliaschannel sten_snd_fire
+			entry sound sten_snd_fire
+
+			// By now, the server has already fired the weapon, so it's
+			// ok to apply the view kick apon entry to avoid problems
+			// with multiple application on single frame animations.
+
+			////////////////////////////////////////////////////////////////////////////////////////
+			// View Kicking
+			//
+			// View Kicking works based on the assumptions that every weapon has its own tendencies to kick in
+			// a paticular fashion. In MOH we call then scatter patterns. Currently we have 2 scatter patterns which
+			// will be explained.
+			// Scatter Patterns:
+			// "V" - the cone. The longer you shoot the more random your shots will be in the horizontal axis.
+			// "T" - the T shape. The gun has a tendancy to push in a paticular direction.
+			//
+			//
+			//             		+-------------------------------------------- Scatter Pitch Min
+			//              		|    +--------------------------------------- Scatter Pitch Max
+			//              		|    |       +------------------------------- Scatter Yaw Min
+			//             		|    |       |   +--------------------------- Scatter Yaw Max
+			//             		|    |       |   |     +--------------------- The Recentering speed in fraction per second
+			//              		|    |       |   |     |    +---------------- The Scatter Pattern
+			//              		|    |       |   |     |    |     +---------- The absolute pitch min/max
+			//              		|    |       |   |     |    |     |  +------- The absolute yaw min/max
+			//              		|    |       |   |     |    |     |  | +----- This is the pitch at which you loose all
+			//              		|    |       |   |     |    |     |  | |      control of the weapon and its behavior is
+			//             	 	|    |       |   |     |    |     |  | |      purely random.
+			//				V    V       V   V     V    V     V  V V
+			entry viewkick 	    -1.75 -1.75  -0.04 0.04  1   "V"   8.5 8.6 16.0
+
+//			entry viewkick 	    -1.2 -1.2    -0.2  0.2   1   "V"   3.0 1.0 1.6 (Colt .45 Pistol
+//			entry viewkick -2.5 -3.0   -0.8 0.8 (original setting)
+
+			// muzzle flash
+			entry tagdlight tag_barrel 0.25 0.2 0.05 110 0.11
+
+/////BIG ONE START
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model models/fx/muzflash.tik
+				color 1.00 1.00 1.00
+				scale 0.60
+				life 0.05
+				offsetalongaxis -5 0 0
+				fade
+				randomroll
+			)
+
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model muzsprite.spr
+				alpha 0.70
+				color 1.00 1.00 1.00
+				scale 0.60
+				life 0.05
+				offsetalongaxis 3 0 0
+				fade
+				randomroll
+			)
+
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model corona_util.spr
+				color 1.00 1.00 1.00
+				scale 0.10
+				life 0.05
+				scalerate 11.00
+				fade
+				randomroll
+			)
+/////BIG ONE END
+			entry tagspawn tag_barrel
+			(
+				model vsssource.spr
+				count 3
+				alpha 0.40
+				color 0.50 0.50 0.50
+				scale 0.20
+				life 0.90
+				scalerate 3.00
+				radius 6.00
+				velocity 23.00
+				accel 0.00 0.00 20.00
+				friction 3.00
+				fade
+				sphere
+			)
+
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model muzsprite.spr
+				color 1.00 1.00 1.00
+				life 0.06
+				scalerate 56.00
+				velocity 2555.00
+				offsetalongaxis 5 0 0
+				angles 0 0 crandom -90
+				avelocity 0 0 crandom -80
+				scalemin 0.04
+				scalemax 0.08
+				fade
+			)
+
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model models/fx/muzflash.tik
+				color 1.00 1.00 1.00
+				scale 0.20
+				life 0.05
+				velocity 213.00
+				offset random 2 0 0
+				angles -180 0 0
+				alignstretch 0.10
+			)
+
+			// shell eject
+			entry commanddelay 0.1 tagspawn tag_eject
+			(
+				count 1
+				model models/ammo/pistolshell.tik
+				spawnrange 1024
+				scale .75
+				velocity 50
+				randvel crandom 10 crandom 10 random 20
+				emitterangles 0 0 -60
+				avelocity crandom 90 crandom 90 0
+				accel 0 0 -800
+				physicsrate 20
+				life 2.0
+				fadedelay 1.7
+				collision
+				offsetalongaxis 0 0 -12
+				bouncefactor 0.2
+				bouncesoundonce snd_pistol_shell
+			)
+
+			// smoke puff
+			entry commanddelay 0.1 tagspawn tag_eject
+			(
+				count 1
+				model vsssource.spr
+				alpha 0.20
+				color 1.00 1.00 1.00
+				scale 0.10
+				life 0.90
+				scalerate 14.00
+				velocity 79.00
+				offsetalongaxis 0 0 -12
+				angles 0 0 range 180 360
+				fade
+			)
+		}
+	}
+
+}
+
+/*QUAKED addon_playerweapon_british_sten-mk2 (0.0 0.0 1.0) (-8 -8 -8) (8 8 8)
+British submachine gun - Sten Mark 2.
+*/

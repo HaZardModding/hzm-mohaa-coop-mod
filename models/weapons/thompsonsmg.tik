@@ -1,0 +1,332 @@
+TIKI
+setup
+{
+	scale 0.52			// Set default scale to 16/30.5 since world is in 16 units per foot and model is in cm's
+	path models/weapons/ThompsonSMG
+	skelmodel ThompsonSMG.skd
+	surface ThompsonSMG1 shader ThompsonSMG
+	surface ThompsonSMG2 shader ThompsonSMG
+	surface Clip shader ThompsonSMG
+	surface site shader thompsite
+}
+
+$define sounddir sound/weapons
+
+init
+{
+	server
+		{
+
+	//========================================//
+	//		WEAPON NAME		  //
+	//========================================//
+
+		classname		Weapon
+		weapontype		smg
+		name			"Thompson"
+		rank			310 310
+
+	//========================================//
+	//		WEAPON ACCURACY 	  //
+	//========================================//
+
+//		Thompson SMG: Max Eff. Range is 50 yds with a muzzle velocity of 805 ft/s. (.45 ACP round)
+
+		sp bulletrange		4000	 		//the range at which bulletspread is applied
+		sp bulletspread		45 45 72 72 	//minpitch minyaw maxpitch maxyaw original 55 55 72 72
+		sp firespreadmult	0.08 0.35 200 0.25  //add falloff cap maxtime
+
+		dm bulletrange		4000
+		dm bulletspread		28 28 63 63 			//32 32 50 50 		//26 26 48 48		//50 50 120 120		//53 53 70 70	//45 45 72 72
+
+		dm firespreadmult	0.3 0.9 180 0.6		//0.08 0.35 200 0.25	//0.3 0.8 200 0.4 original
+
+		realism bulletrange	4000
+		realism bulletspread	28 28 63 63 			//32 32 50 50 		//26 26 48 48		//50 50 120 120		//53 53 70 70	//45 45 72 72
+		realism firespreadmult	0.3 0.9 180 0.6			//0.08 0.35 200 0.25	//0.3 0.8 200 0.4 original
+
+	//========================================//
+	//		DAMAGE / RATE OF FIRE	  //
+	//========================================//
+
+		sp bulletdamage		35			//damage per round original 25
+		dm bulletdamage		22			//26	
+		sprealism bulletdamage	55			//26	
+		dmrealism bulletdamage	44
+
+		sp firedelay		0.075 //(700 rpm)
+		dm firedelay		0.09
+		realism firedelay		0.09
+
+	//========================================//
+	//		PLAYER MOVEMENT		  //
+	//========================================//
+
+		sp movementspeed 		1.0	
+		dm movementspeed		0.96
+		realism movementspeed		0.96
+
+	//========================================//
+	//		RIFLE BUTT / SECONDARY FIRE//
+	//========================================//
+
+		secondary firetype			melee
+		secondary ammotype			none
+		secondary ammorequired		0
+		secondary meansofdeath		bash
+		secondary bulletknockback	50
+		secondary quiet
+
+		sp secondary bulletrange	64
+		sp secondary bulletdamage	60
+
+		dm secondary bulletrange	96
+		dm secondary bulletdamage	60
+
+		realism secondary bulletrange	96
+		realism secondary bulletdamage	60
+
+	//========================================//
+	//		AMMO			  //
+	//========================================//
+
+		firetype		bullet
+		ammotype		"smg"
+		meansofdeath	bullet
+		bulletcount		1
+		clipsize		30
+		ammorequired	1
+
+		sp startammo	30
+		dm startammo	180
+		sprealism startammo	30
+		dmrealism startammo	120
+
+		// Additional DM Loadout
+		dm additionalstartammo "grenade" 2
+		dm additionalstartammo "smokegrenade" 1
+		dm startitem "items/binoculars.tik"
+
+		// Additional DM Realism Loadout
+		dmrealism additionalstartammo "grenade" 2
+		dmrealism additionalstartammo "smokegrenade" 1
+		dmrealism startitem "items/binoculars.tik"
+
+	//========================================//
+	//		CROSSHAIR, ZOOM, TRACERS  //
+	//========================================//
+
+		sp tracerfrequency 	3
+		dm tracerfrequency 	0
+		sprealism tracerfrequency 	3
+		dmrealism tracerfrequency 	0
+
+		crosshair		1
+
+	//========================================//
+	//		SOUND, AI, OTHER	  //
+	//========================================//
+
+
+		pickupsound		thompson_snd_pickup
+		ammopickupsound	thompson_snd_pickup_ammo
+		noammosound		thompson_snd_noammo
+
+		// Holstering info
+//		holstertag		"Bip01 Spine2"
+//		holsteroffset	"8.0 -7.75 6.5"
+//		holsterangles	"0 185 -25"
+//		holsterScale	1.0
+		
+		// AI animation group info
+		weapongroup		thompson
+		airange			short
+
+		// this is attached to the player during reload
+		cache models/ammo/thompson_clip.tik
+
+		//[200] Smithy - get handled
+		exec coop_mod/itemhandler.scr "initialiseItem" "smg" "Thompson"
+	}
+	client
+	{
+		cache tracer.spr
+		
+		cache muzsprite.spr
+		cache models/ammo/pistolshell.tik
+	}
+}
+
+animations
+{
+	idle	ThompsonSMG.skc
+	reload	ThompsonSMG.skc		crossblend 0.1
+	{
+		server
+		{
+			9 surface Clip +nodraw
+			47 surface Clip -nodraw
+			last idle
+		}
+		client
+		{
+			entry sound thompson_snd_reload
+		}
+	}
+	secondaryfire     ThompsonSMG.skc
+	{
+		server
+		{
+			entry shoot secondary
+		}
+	}
+	fire	ThompsonSMG.skc
+	{
+		server
+		{
+			entry shoot
+		}
+		client
+		{
+			entry stopaliaschannel thompson_snd_fire
+			entry sound thompson_snd_fire
+
+			// By now, the server has already fired the weapon, so it's
+			// ok to apply the view kick apon entry to avoid problems
+			// with multiple application on single frame animations.
+
+			////////////////////////////////////////////////////////////////////////////////////////
+			// View Kicking
+			//
+			// View Kicking works based on the assumptions that every weapon has its own tendencies to kick in
+			// a paticular fashion. In MOH we call then scatter patterns. Currently we have 2 scatter patterns which
+			// will be explained.
+			// Scatter Patterns:
+			// "V" - the cone. The longer you shoot the more random your shots will be in the horizontal axis.
+			// "T" - the T shape. The gun has a tendancy to push in a paticular direction.
+			//
+			//
+			//             		+-------------------------------------------- Scatter Pitch Min
+			//              		|    +--------------------------------------- Scatter Pitch Max
+			//              		|    |       +------------------------------- Scatter Yaw Min
+			//             		|    |       |   +--------------------------- Scatter Yaw Max
+			//             		|    |       |   |     +--------------------- The Recentering speed in fraction per second
+			//              		|    |       |   |     |    +---------------- The Scatter Pattern
+			//              		|    |       |   |     |    |     +---------- The absolute pitch min/max
+			//              		|    |       |   |     |    |     |  +------- The absolute yaw min/max
+			//              		|    |       |   |     |    |     |  | +----- This is the pitch at which you loose all
+			//              		|    |       |   |     |    |     |  | |      control of the weapon and its behavior is
+			//             	 	|    |       |   |     |    |     |  | |      purely random.
+			//				V    V       V   V     V    V     V  V V
+			entry viewkick 	    -1.58 -1.58  -0.16 -0.16 0.9   "V"   8.5 8.6 16.0
+
+//			entry viewkick 	    -2.25 -2.25  -0.16 -0.16 1   "V"   8.5 8.6 16.0 (original)
+
+
+			// muzzle flash
+			entry tagdlight tag_barrel 0.25 0.2 0.15 150 0.11
+// Commented out to prevent hitting the max anim command error
+			entry tagspawnlinked tag_barrel
+			(
+				model muzsprite.spr
+				color 1.00 1.00 1.00
+				scale 0.30
+				life 0.05
+				scalerate 10.00
+				velocity 4.00
+				offsetalongaxis 7 0 0
+				angles 0 0 crandom -30
+				avelocity 0 0 crandom -30
+			)
+
+			entry tagspawnlinked tag_barrel
+			(
+				model muzsprite.spr
+				color 1.00 1.00 1.00
+				life 0.06
+				scale 0.30
+				velocity 3.00
+				scalerate 10.00
+				offsetalongaxis 3 0 0
+				angles 0 0 crandom 400
+				avelocity 0 0 crandom 300
+				fade
+			)
+
+			entry tagspawnlinked tag_barrel
+			(
+				model muzsprite.spr
+				color 1.00 1.00 1.00
+				scale 0.30
+				life 0.07
+				scalerate 10.00
+				offsetalongaxis 10 0 0
+				fade
+			)
+
+			entry tagspawn tag_barrel
+			(
+				model vsssource2.spr
+				alpha 0.13
+				color 1.00 1.00 1.00
+				spritegridlighting
+				scale 0.10
+//				life 1.00
+				life 0.30 //orig 1.0
+				scalerate 7.00
+				velocity 100.00
+				accel 0.00 0.00 100.00
+				friction 4.00
+				offsetalongaxis range 23 -25 0 0
+				scalemin 0.10
+				scalemax 0.50
+				fade
+				randomroll
+			)
+
+			// shell eject
+			entry commanddelay 0.1 tagspawn tag_eject
+			(
+				spawnrange 2048
+				count 1
+				model models/ammo/pistolshell.tik
+				velocity 50
+				emitterangles 0 0 0
+				randvel crandom 10 crandom 10 random 20
+				avelocity crandom 90 crandom 90 0
+				accel 0 0 -800
+				physicsrate 20
+				life 2.0
+				fadedelay 1.7
+				collision
+				bouncefactor 0.2
+				bouncesoundonce snd_pistol_shell
+			)
+
+			// smoke puff
+			entry tagspawn tag_eject
+			(
+				model vsssource2.spr
+				alpha 0.10
+				color 1.00 1.00 1.00
+				spritegridlighting
+				scale 0.10
+//				life 1.00
+				life 0.30 //orig 1.0
+				scalerate 7.00
+				velocity 100.00
+				accel 0.00 0.00 100.00
+				friction 4.00
+				offsetalongaxis range 13 -15 0 0
+				scalemin 0.10
+				scalemax 0.50
+				fade
+				randomroll
+			)
+		}
+	}
+}
+
+/*QUAKED addon_playerweapon_allied_thompson (0.0 0.0 1.0) (-8 -8 -8) (8 8 8)
+Allied submachinegun - Thompson
+*/

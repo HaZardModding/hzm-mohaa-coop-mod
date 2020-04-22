@@ -1,0 +1,292 @@
+TIKI
+
+setup
+{
+	scale 0.52  // proper scale
+	path models/weapons/DeLisle
+	skelmodel delisle.skd
+	surface material1 shader delisle
+}
+
+init
+{
+	server
+		{
+	//========================================//
+	//		WEAPON NAME		  //
+	//========================================//
+
+		classname		Weapon
+		weapontype		rifle
+		name			"DeLisle"
+		rank			280 280
+
+	//========================================//
+	//		WEAPON ACCURACY 	  //
+	//========================================//
+
+		sp bulletrange		4000	 	//the range at which bulletspread is applied
+		sp bulletspread		10 10 65 65 	//minpitch minyaw maxpitch maxyaw
+
+		dm bulletrange		4000
+		dm bulletspread		16 16 95 95
+
+		realism bulletrange	4000
+		realism bulletspread	16 16 95 95
+
+	//========================================//
+	//		DAMAGE / RATE OF FIRE	  //
+	//========================================//
+		quiet
+
+		sp bulletdamage		100
+		dm bulletdamage		70
+
+		sprealism bulletdamage	100	
+		dmrealism bulletdamage	100
+
+		sp firedelay 		1.2
+		dm firedelay		1.1
+		realism firedelay	1.1
+
+		realism throughwood	24
+		realism throughmetal	8
+
+	//========================================//
+	//		PLAYER MOVEMENT		  //
+	//========================================//
+
+		sp movementspeed		0.94
+		dm movementspeed		1.05
+		realism movementspeed		1.05
+
+	//========================================//
+	//	RIFLE BUTT / SECONDARY FIRE	  //
+	//========================================//
+
+		secondary firetype		melee
+		secondary ammotype		none
+		secondary ammorequired		0
+		secondary meansofdeath		bash
+		secondary bulletknockback	50
+		secondary quiet
+
+		sp secondary bulletrange	64
+		sp secondary bulletdamage	60
+
+		dm secondary bulletrange	96
+		dm secondary bulletdamage	60
+
+		realism secondary bulletrange	96
+		realism secondary bulletdamage	60
+
+	//========================================//
+	//		AMMO			  //
+	//========================================//
+
+		firetype		bullet
+		ammotype		"pistol"
+		meansofdeath		bullet
+		semiauto
+		bulletcount		1
+		clipsize		7
+		ammorequired		1
+		//bulletlarge		1
+
+		sp startammo		70 //10
+		dm startammo		70
+		sprealism startammo	70 //10
+		dmrealism startammo	50
+
+		// Additional DM Loadout
+		dm additionalstartammo "grenade" 4
+		dm additionalstartammo "smokegrenade" 2
+		dm startitem "items/binoculars.tik"
+
+		// Additional DM Realism Loadout
+		dmrealism additionalstartammo "grenade" 4
+		dmrealism additionalstartammo "smokegrenade" 2
+		dmrealism startitem "items/binoculars.tik"
+
+	//========================================//
+	//		CROSSHAIR, ZOOM, TRACERS  //
+	//========================================//
+
+		sp tracerfrequency 		2 //original 0
+		dm tracerfrequency 		0
+		sprealism tracerfrequency 	0 //original 2
+		dmrealism tracerfrequency 	0
+
+		crosshair		1
+
+	//========================================//
+	//		SOUND, AI, OTHER	  //
+	//========================================//
+
+		pickupsound		DeLisle_snd_pickup
+		ammopickupsound		DeLisle_snd_pickup_ammo
+		noammosound		DeLisle_snd_noammo
+
+		// Holstering info
+//		holstertag		"Bip01 Spine2"
+//		holsteroffset		"8.0 -7.75 6.5"
+//		holsterangles		"0 185 -25"
+//		holsterScale		1.0
+
+		// AI animation group info
+		weapongroup		rifle
+		airange			long
+
+		// this is attached to the player during reload
+		cache models/ammo/kar98_clip_reload.tik
+
+		//[200] Smithy - get handled
+		exec coop_mod/itemhandler.scr "initialiseItem" "pistol" "DeLisle"
+	}
+	client
+	{
+		cache tracer.spr
+		cache muzsprite.spr
+		cache models/fx/snipesmoke.tik
+		cache models/ammo/rifleshell.tik
+	}
+}
+
+animations
+{
+	idle			delisle.skc
+	{
+	}
+
+	reload			A_W_delisle_reload_W.skc
+	{
+		client
+		{
+			entry sound DeLisle_snd_reload
+			70 sound DeLisle_snd_bolt item
+			84 tagspawn tag_eject 1024
+			(
+				spawnrange 2048
+				count 1
+				model models/ammo/rifleshell.tik
+				scale 1.0
+				velocity 70
+				randvel crandom 10 crandom 10 random 20
+				emitterangles 0 0 0
+				avelocity crandom 90 crandom 90 0
+				accel 0 0 -800
+				physicsrate 20
+				life 2.0
+				fadedelay 1.7
+				collision
+				bouncefactor 0.2
+				bouncesoundonce snd_rifle_shell
+			)
+		}
+	}
+	rechamber		A_W_delisle_rechamber_W.skc
+	{
+		client
+		{
+			entry sound DeLisle_snd_bolt item
+			20 tagspawn tag_eject 1024
+			(
+				spawnrange 2048
+				count 1
+				model models/ammo/rifleshell.tik
+				scale 1.0
+				velocity 70
+				randvel crandom 10 crandom 10 random 20
+				emitterangles 0 0 0
+				avelocity crandom 90 crandom 90 0
+				accel 0 0 -800
+				physicsrate 20
+				life 2.0
+				fadedelay 1.7
+				collision
+				bouncefactor 0.2
+				bouncesoundonce snd_rifle_shell
+			)
+		}
+	}
+	secondaryfire   delisle.skc
+	{
+		server
+		{
+			entry shoot secondary
+		}
+	}
+	fire		delisle.skc
+	{
+		server
+		{
+			entry shoot
+		}
+		client
+		{
+			entry stopaliaschannel DeLisle_snd_fire
+			entry sound DeLisle_snd_fire
+
+			// By now, the server has already fired the weapon, so it's
+			// ok to apply the view kick apon entry to avoid problems
+			// with multiple application on single frame animations.
+
+			////////////////////////////////////////////////////////////////////////////////////////
+			// View Kicking
+			//
+			// View Kicking works based on the assumptions that every weapon has its own tendencies to kick in
+			// a paticular fashion. In MOH we call then scatter patterns. Currently we have 2 scatter patterns which
+			// will be explained.
+			// Scatter Patterns:
+			// "V" - the cone. The longer you shoot the more random your shots will be in the horizontal axis.
+			// "T" - the T shape. The gun has a tendancy to push in a paticular direction.
+			//
+			//
+			//             		+-------------------------------------------- Scatter Pitch Min
+			//              	| 	+--------------------------------------- Scatter Pitch Max
+			//          		|    	|       +------------------------------- Scatter Yaw Min
+			//             		|    	|       |   +--------------------------- Scatter Yaw Max
+			//             		|    	|       |   |     +--------------------- The Recentering speed in fraction per second
+			//             		|   	|       |   |     |    +---------------- The Scatter Pattern
+			//             		|    	|       |   |     |    |     +---------- The absolute pitch min/max
+			//             		|    	|       |   |     |    |     |  +------- The absolute yaw min/max
+			//             		|    	|       |   |     |    |     |  | +----- This is the pitch at which you loose all
+			//             		|    	|       |   |     |    |     |  | |      control of the weapon and its behavior is
+			//             		|    	|       |   |     |    |     |  | |      purely random.
+			//			V    	V       V   V     V    V     V  V V
+			entry viewkick	      -1.5     -2    -0.5 -0.5   4.5  "T"    5  2 5
+
+			//!!!muzzle flash REMOVED!!! this gun was silenced and didn't have a muzzle flash
+			
+			// smoke puff used on sniper version of kar98
+			entry commanddelay 0.020 tagspawn tag_barrel
+			(
+				model vsssource.spr
+				count 1
+				alpha 0.10
+				color 1.00 1.00 1.00
+				spritegridlighting
+				scale 0.09
+				life .9
+				scalerate 23.00
+				velocity 429.00
+				accel 0.00 20.00 30.00
+				friction 2.00
+				fade
+				offsetalongaxis random 4 0 0
+			)
+
+			entry tagspawn tag_barrel
+			(
+				count 1
+				scale .7
+				model models/fx/snipesmoke.tik
+			)
+		}
+	}
+}
+
+/*QUAKED addon_playerweapon_british_delisle (0.0 0.0 1.0) (-8 -8 -8) (8 8 8)
+British rifle - delisle.
+*/
+

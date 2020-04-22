@@ -1,0 +1,180 @@
+setup
+{
+	scale 0.52			// Set default scale to 16/30.5 since world is in 16 units per foot and model is in cm's
+	path models/weapons/M18_smoke_grenade
+	skelmodel M18_smoke_grenade.skd
+	surface m18_smoke_gren shader M18_smoke_gren
+	surface pin shader M18_smoke_gren
+}
+
+init
+{
+	server
+	{
+		classname		Weapon
+		weapontype		grenade
+		name			"M18 Smoke Grenade"
+		rank			575 575
+		weaponsubtype		1	// differentiates smoke grenades from regular grenades
+
+		pickupsound		smokegrenade_snd_pickup
+		ammopickupsound		smokegrenade_snd_pickup_ammo
+		noammosound		m2frag_snd_noammo
+
+		// Holstering info
+//		holstertag		"Bip01 Spine1"
+//		holsteroffset	"3.12 10.5 3.64"
+//		holsterangles	"20 -40 0"
+//		holsterScale	1.0
+
+		// Primary fire type info (fast, arcing throw)
+		firetype		projectile
+		ammotype		"smokegrenade"
+		projectile		models/projectiles/M18_smoke_grenade_primary.tik
+		semiauto
+		clipsize		1
+		ammorequired	1
+		firedelay		0.75
+		maxchargetime	4.0
+		minchargetime	0.6
+		crosshair		1
+		quiet // don't notify AI of it being fired
+		autoputaway 	1 // automatically put the weapon away when out of ammo
+		usenoammo		0 // don't allow it to be used when it has no ammo
+		movementspeed	1.0
+
+		sp startammo	1
+		dm startammo	0
+		sprealism startammo	1
+		dmrealism startammo	0
+
+		// Secondary fire type info (more controllable, straight throw)
+		shareclip
+		secondary firetype		projectile
+		secondary ammotype		"smokegrenade"
+		secondary projectile	models/projectiles/M18_smoke_grenade.tik
+		secondary clipsize		1
+		secondary ammorequired	1
+		secondary firedelay		0.75
+		secondary maxchargetime	1.5
+		secondary minchargetime	0.5
+
+		// AI animation group info
+		weapongroup		grenade
+
+		//[200] Smithy - get handled
+		exec coop_mod/itemhandler.scr "initialiseItem" "grenade" "M18 Smoke Grenade"
+	}
+	client
+	{
+		cache models/projectiles/M18_smoke_grenade_primary.tik
+		cache models/projectiles/M18_smoke_grenade.tik
+	}
+}
+
+animations
+{
+	raise M18_smoke_grenade.skc
+	{
+		// if we're pulling out grenades, we've definatly got 'em
+		server
+		{
+			enter surface all -nodraw
+		}
+	}
+	idle   M18_smoke_grenade.skc
+	{
+		server
+		{
+			enter surface all -nodraw
+		}
+	}
+
+	// this should make sure that it doesn't look like there's a grenade in hand when you don't have one
+	idle_empty M18_smoke_grenade.skc
+	{
+		server
+		{
+			enter surface all +nodraw
+		}
+	}
+
+	charge M18_smoke_grenade_charge.skc
+	{
+		server
+		{
+			8 surface pin +nodraw
+		}
+		client
+		{
+			enter sound smokegrenade_snd_grenade_pull weapon
+
+			8 tagspawn tag_pin
+			(
+				count 1
+				model models/ammo/grenade_pin.tik
+				life 1
+				randvelaxis range 25 30 0 0
+				accel 0 0 -330
+				avelocity crandom 30 crandom 30 crandom 30
+			)
+		}
+	}
+
+	secondarycharge M18_smoke_grenade_charge.skc
+	{
+		server
+		{
+			8 surface pin +nodraw
+		}
+		client
+		{
+			enter sound smokegrenade_snd_grenade_pull weapon
+
+			8 tagspawn tag_pin
+			(
+				count 1
+				model models/ammo/grenade_pin.tik
+				life 1
+				randvelaxis range 25 30 0 0
+				accel 0 0 -330
+				avelocity crandom 30 crandom 30 crandom 30
+			)
+		}
+	}
+
+	fire   M18_smoke_grenade.skc
+	{
+		server
+		{
+			first shoot
+			first surface all +nodraw
+		}
+		client
+		{
+			first sound smokegrenade_snd_grenade_throw weapon
+		}
+	}
+	secondaryfire   M18_smoke_grenade.skc
+	{
+		server
+		{
+			first shoot secondary
+			first surface all +nodraw
+		}
+		client
+		{
+			first sound smokegrenade_snd_grenade_throw weapon
+		}
+	}
+
+	reload  M18_smoke_grenade.skc
+	{
+		server
+		{
+			first sound smokegrenade_snd_reload weapon
+			first surface all -nodraw
+
+		}
+	}
+}

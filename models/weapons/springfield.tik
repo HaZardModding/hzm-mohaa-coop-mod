@@ -1,0 +1,315 @@
+TIKI
+
+setup
+{
+	scale 0.52			// Set default scale to 16/30.5 since world is in 16 units per foot and model is in cm's
+	path models/weapons/springfield
+	skelmodel springfield.skd
+	surface springfield1 shader springfield
+	surface springfield2 shader springfield
+	surface lens shader lens
+}
+$define sounddir sound/weapons
+
+init
+{
+	server
+	{
+	//========================================//
+	//		WEAPON NAME		  //
+	//========================================//
+
+		classname		Weapon
+		weapontype		rifle
+		name			"Springfield '03 Sniper"
+		rank			250 250
+
+	//========================================//
+	//		WEAPON ACCURACY 	  //
+	//========================================//
+
+//		Springfield 1903A4 Sniper's: Max Eff. Range is 650 yds with a muzzle velocity of 2800 ft/s. (30-06 Springfield)
+
+		sp bulletrange		4000	 		//the range at which bulletspread is applied
+		sp bulletspread		0 0 50 50 // 59 59 140 140 	//minpitch minyaw maxpitch maxyaw
+		sp zoomspreadmult	0.055			//bulletspread accuracy boost multiplier when zoomed
+
+		dm bulletrange		4000
+//		dm bulletspread		59 59 150 150
+		dm bulletspread		59 59 300 300	// further increased to encourage standing still while firing
+					// and to counteract the fact that you move slower with the weapon
+		dm zoomspreadmult	0.055
+
+		realism bulletrange	4000
+		realism bulletspread	35 35 80 80
+		realism zoomspreadmult	0.055
+
+	//========================================//
+	//		DAMAGE / RATE OF FIRE	  //
+	//========================================//
+
+		sp bulletdamage		100
+		dm bulletdamage		100
+		sprealism bulletdamage	100	
+		dmrealism bulletdamage 	125
+
+		sp firedelay		1.74
+		dm firedelay		1.74
+		realism firedelay	1.74
+
+		realism throughwood		24
+		realism throughmetal		8
+
+	//========================================//
+	//		PLAYER MOVEMENT		  //
+	//========================================//
+
+		sp movementspeed	0.9
+		sp zoommovement		0.5
+
+		dm movementspeed	0.9		//originally 0.77
+		dm zoommovement		0.5
+
+		realism movementspeed	0.80		//originally 0.77
+		realism zoommovement		0.5
+
+	//========================================//
+	//		RIFLE BUTT / SECONDARY FIRE//
+	//========================================//
+
+	//========================================//
+	//		AMMO			  //
+	//========================================//
+
+		firetype		bullet
+		ammotype		"rifle"
+		meansofdeath	bullet
+		semiauto
+		clipsize		5
+		ammorequired	1
+		bulletlarge		1
+
+		sp startammo	5
+		dm startammo	30
+		sprealism startammo	5
+		dmrealism startammo	30
+
+		// Additional DM Loadout
+		dm additionalstartammo "grenade" 1
+//		dm additionalstartammo "smokegrenade" 1
+
+		// Additional DM Realism Loadout
+		dmrealism additionalstartammo "grenade" 1
+//		dmrealism additionalstartammo "smokegrenade" 1
+
+	//========================================//
+	//		CROSSHAIR, ZOOM		  //
+	//========================================//
+
+		crosshair		1
+		zoom			20
+
+	//========================================//
+	//		SOUND, AI, OTHER	  //
+	//========================================//
+
+		// this is attached to the player during reload
+		cache models/ammo/springfield_clip_reload.tik
+
+		// AI animation group info
+		weapongroup		rifle
+		airange			long
+
+		pickupsound		springfield_snd_pickup
+		ammopickupsound	springfield_snd_pickup_ammo
+		noammosound		springfield_snd_noammo
+
+		// Holstering info
+//		holstertag		"Bip01 Spine2"
+//		holsteroffset	"8.0 -7.75 6.5"
+//		holsterangles	"0 185 -25"
+//		holsterScale	1.0
+
+//		tracerfrequency 	2
+//		viewkick		-2 -3   -1 1
+
+		//[200] Smithy - get handled
+		exec coop_mod/itemhandler.scr "initialiseItem" "rifle" "Springfield '03 Sniper"
+
+	}
+	client
+	{
+		cache tracer.spr
+		cache muzsprite.spr
+		cache models/ammo/rifleshell.tik
+		cache models/fx/muzflash.tik
+		cache model models/fx/snipesmoke.tik
+	}
+}
+
+animations
+{
+
+	idle	springfield.skc
+//	reload	spring_reload.skc
+	reload	spring_reload_start.skc // this is the start of the reloading sequence
+	{
+		client
+		{
+			entry sound springfield_snd_reload_start
+		}
+	}
+	reload_single spring_reload_fill.skc // this is the reload loop that loads in a single shell
+	{
+		client
+		{
+			entry sound springfield_snd_reload_single
+		}
+	}
+	reload_end spring_reload_end.skc
+	{
+		server
+		{
+			last idle
+		}
+		client
+		{
+			entry sound springfield_snd_reload_end
+		}
+	}
+	rechamber	spring_recham.skc
+	{
+		client
+		{
+			entry sound springfield_snd_bolt item
+			20 tagspawn tag_eject 1024
+			(
+				spawnrange 2048
+				count 1
+				model models/ammo/rifleshell.tik
+				scale 1.0
+				velocity 70
+				randvel crandom 10 crandom 10 random 20
+				emitterangles 0 0 0
+				avelocity crandom 90 crandom 90 0
+				accel 0 0 -800
+				physicsrate 20
+				life 2.0
+				fadedelay 1.7
+				collision
+				bouncefactor 0.2
+				bouncesoundonce snd_rifle_shell
+			)
+		}
+	}
+	fire	springfield.skc
+	{
+		server
+		{
+			entry shoot
+		}
+		client
+		{
+			entry stopaliaschannel springfield_snd_fire
+			entry sound springfield_snd_fire
+
+			// By now, the server has already fired the weapon, so it's
+			// ok to apply the view kick apon entry to avoid problems
+			// with multiple application on single frame animations.
+
+			////////////////////////////////////////////////////////////////////////////////////////
+			// View Kicking
+			//
+			// View Kicking works based on the assumptions that every weapon has its own tendencies to kick in
+			// a paticular fashion. In MOH we call then scatter patterns. Currently we have 2 scatter patterns which
+			// will be explained.
+			// Scatter Patterns:
+			// "V" - the cone. The longer you shoot the more random your shots will be in the horizontal axis.
+			// "T" - the T shape. The gun has a tendancy to push in a paticular direction.
+			//
+			//
+			//             		+-------------------------------------------- Scatter Pitch Min
+			//              		|    +--------------------------------------- Scatter Pitch Max
+			//              		|    |       +------------------------------- Scatter Yaw Min
+			//             		|    |       |   +--------------------------- Scatter Yaw Max
+			//             		|    |       |   |     +--------------------- The Recentering speed in degrees per second
+			//              		|    |       |   |     |    +---------------- The Scatter Pattern
+			//              		|    |       |   |     |    |     +---------- The absolute pitch min/max
+			//              		|    |       |   |     |    |     |  +------- The absolute yaw min/max
+			//              		|    |       |   |     |    |     |  | +----- This is the pitch at which you loose all
+			//              		|    |       |   |     |    |     |  | |      control of the weapon and its behavior is
+			//             	 	|    |       |   |     |    |     |  | |      purely random.
+			//				V    V       V   V     V    V     V  V V
+			entry viewkick 	     -4.5 -5.0    -1.0 1.0   6  "T"     8  8 8
+
+			// muzzle flash
+			entry tagdlight tag_barrel 0.3 0.20 0.175 300 0.25 -1.0 -0.75 -0.2
+
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model models/fx/muzflash.tik
+				color 0.00 0.00 1.00
+				scale 0.07
+				life 0.01
+				velocity 300.00
+				offsetalongaxis 3 0 0
+				alignstretch 0.08
+				randomroll
+			)
+
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model muzsprite.spr
+				color 1.00 1.00 1.00
+				scale 0.09
+				life 0.04
+				offsetalongaxis 4 0 0
+			)
+
+			entry commanddelay 0.020 tagspawn tag_barrel
+			(
+				spawnrate 1.00
+				model vsssource.spr
+				count 1
+				alpha 0.10
+				color 1.00 1.00 1.00
+				spritegridlighting
+				scale 0.09
+				life .9
+				scalerate 23.00
+				velocity 429.00
+				accel 0.00 20.00 30.00
+				friction 2.00
+				fade
+				offsetalongaxis random 4 0 0
+			)
+
+			entry tagspawn tag_barrel
+			(
+				count 1
+				scale .7
+				model models/fx/snipesmoke.tik
+			)
+
+			// smoke puff
+//			entry commanddelay 0.05 tagspawn tag_barrel
+//			(
+//				volumetric
+//				model gun			// sets the type of smoke
+//				life 10				// amount of smoke
+//				scale 1.5			// radius
+//				alpha 0.4			// density
+//				color 0.7 0.7 0.7		// RBG color of the smoke
+//				velocity 2			// base velocity away from the surface
+//				randvelaxis random 6 0 0	// velocity offset
+//				offsetalongaxis random 4 0 0	// positional offset
+//			)
+		}
+	}
+}
+
+/*QUAKED addon_playerweapon_allied_springfield (0.0 0.0 1.0) (-8 -8 -8) (8 8 8)
+Allied rifle - Springfield 03 sniper
+*/

@@ -1,0 +1,400 @@
+TIKI
+
+setup
+{
+	scale 0.52			// Set default scale to 16/30.5 since world is in 16 units per foot and model is in cm's
+	path models/weapons/m1_Garand
+	skelmodel garand.skd
+	surface gun1 shader Garand
+	surface gun2 shader Garand
+	surface gun3 shader Garand
+	surface material8 shader m1clip
+}
+
+init
+{
+	server
+	{
+
+	//========================================//
+	//		WEAPON NAME		  		//
+	//========================================//
+
+		classname		Weapon
+		weapontype		rifle
+		name			"M1 Garand"
+		rank			210 210
+
+	//========================================//
+	//		WEAPON ACCURACY 	  		//
+	//========================================//
+
+//		M1 Garand: Max Eff. Range is 300 yds with a muzzle velocity of 2800 ft/s. (30-06 Springfield)
+
+		sp bulletrange		4000	 	//the range at which bulletspread is applied
+		realism bulletrange	4000
+		dm bulletrange		4000
+
+		sp bulletspread		10 10 60 60 //minpitch minyaw maxpitch maxyaw
+		dm bulletspread		10 10 80 80
+		realism bulletspread	4 4 60 60
+
+		sp firespreadmult	0.7 0.6 200 0.8
+		dm firespreadmult 	0.75 0.6 200 0.8
+		realism firespreadmult 	0.75 0.6 200 0.8
+
+	//========================================//
+	//		DAMAGE / RATE OF FIRE	  	//
+	//========================================//
+
+		sp bulletdamage		45
+		dm bulletdamage		50
+
+		sprealism bulletdamage	100
+		dmrealism bulletdamage	75
+
+		sp firedelay		0.15
+		dm firedelay		0.18
+		realism firedelay	0.18
+
+		realism throughwood	24
+		realism throughmetal	8
+
+	//========================================//
+	//		PLAYER MOVEMENT		  	//
+	//========================================//
+
+		sp movementspeed	1.0
+		dm movementspeed	1.05	
+		realism movementspeed	1.05
+
+	//========================================//
+	//		RIFLE BUTT / SECONDARY FIRE	//
+	//========================================//
+
+		secondary firetype			melee
+		secondary ammotype			none
+		secondary ammorequired		0
+		secondary meansofdeath		bash
+		secondary bulletknockback	50
+		secondary quiet
+
+		sp secondary bulletrange	64
+		sp secondary bulletdamage	60
+
+		dm secondary bulletrange	96
+		dm secondary bulletdamage	60
+
+		realism secondary bulletrange	96
+		realism secondary bulletdamage	60
+
+	//========================================//
+	//		AMMO			  		//
+	//========================================//
+
+		firetype			bullet
+		ammotype			"rifle"
+		meansofdeath		bullet
+		semiauto
+		cantpartialreload
+		bulletcount			1
+		clipsize			8
+		ammorequired		1
+		bulletlarge			1
+
+		sp startammo		8
+		dm startammo		24
+		sprealism startammo	8
+		dmrealism startammo	24
+
+	//========================================//
+	//		CROSSHAIR, ZOOM, TRACERS  	//
+	//========================================//
+
+		sp tracerfrequency 	2
+		dm tracerfrequency 	0
+		sprealism tracerfrequency 	2
+		dmrealism tracerfrequency 	0
+
+		crosshair			1
+
+	//========================================//
+	//		SOUND, AI, OTHER	  		//
+	//========================================//
+
+		surface material8 +nodraw		
+
+		pickupsound		m1_snd_pickup
+		ammopickupsound	m1_snd_pickup_ammo
+		noammosound		m1_snd_noammo
+
+		// Holstering info
+//		holstertag		"Bip01 Spine2"
+//		holsteroffset	"8.0 -7.75 6.5"
+//		holsterangles	"0 185 -25"
+//		holsterScale	1.0
+
+		// AI animation group info
+		weapongroup		rifle
+		airange			long
+
+		// this is attached to the player during reload
+		cache models/ammo/garand_clip_reload.tik
+
+
+		//[200] Smithy - get handled
+		exec coop_mod/itemhandler.scr "initialiseItem" "rifle"
+	}
+	client
+	{
+		cache tracer.spr
+		cache muzsprite.spr
+		cache vsssource.spr
+		cache models/fx/muzflash.tik
+		cache models/ammo/rifleshell.tik
+		cache models/fx/snipesmoke.tik
+		cache models/ammo/garand_clip_empty.tik
+	}
+}
+
+animations
+{
+	idle		garand.skc
+	idle_empty	garand_empty.skc
+	reload		garand_reload.skc
+	{
+		server
+		{
+			28 surface material8 -nodraw
+			48 surface material8 +nodraw
+			last idle
+		}
+		client
+		{
+			entry sound m1_snd_reload
+		}
+	}
+	secondaryfire     garand.skc
+	{
+		server
+		{
+			entry shoot secondary
+		}
+	}
+	fire	garand_fire.skc
+	{
+		server
+		{
+			entry shoot
+		}
+		client
+		{
+			entry stopaliaschannel m1_snd_fire
+			entry sound m1_snd_fire
+
+			// By now, the server has already fired the weapon, so it's
+			// ok to apply the view kick apon entry to avoid problems
+			// with multiple application on single frame animations.
+
+			////////////////////////////////////////////////////////////////////////////////////////
+			// View Kick Controls
+			//
+			// View Kicking works based on the assumptions that every weapon has its own tendencies to kick in
+			// a paticular fashion. In MOH we call then scatter patterns. Currently we have 2 scatter patterns which
+			// will be explained.
+			// Scatter Patterns:
+			// "V" - the cone. The longer you shoot the more random your shots will be in the horizontal axis.
+			// "T" - the T shape. The gun has a tendancy to push in a paticular direction. not used much...too artificial looking
+			//
+			//
+			//             		+-------------------------------------------- Scatter Pitch Min
+			//              		|    +--------------------------------------- Scatter Pitch Max
+			//              		|    |       +------------------------------- Scatter Yaw Min
+			//             		|    |       |   +--------------------------- Scatter Yaw Max
+			//             		|    |       |   |     +--------------------- The Recentering speed in fraction per second
+			//              		|    |       |   |     |    +---------------- The Scatter Pattern
+			//              		|    |       |   |     |    |     +---------- The absolute pitch min/max
+			//              		|    |       |   |     |    |     |  +------- The absolute yaw min/max
+			//              		|    |       |   |     |    |     |  | +----- This is the pitch at which you loose all
+			//              		|    |       |   |     |    |     |  | |      control of the weapon and its behavior is
+			//             	 	|    |       |   |     |    |     |  | |      purely random.
+			//				V    V       V   V     V    V     V  V V
+
+			entry viewkick 	    -2.5 -2.5   -0.1 -0.1   0.15   "T"  8.0 8.2 3.6
+
+//			entry viewkick 	    -3.0 -3.0   -0.1 -0.1   0.15   "T"  8.0 8.2 3.6//original recent
+//			entry viewkick 	    -1.0 -1.0   -0.1 -0.1   0.45   "T"  8.0 8.2 3.6//original old
+
+			// muzzle flash
+			entry tagdlight tag_barrel 0.25 0.2 0.15 150 0.11
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model models/fx/muzflash.tik
+				color 0.00 0.00 1.00
+				scale 0.20
+				life 0.01
+				velocity 300.00
+				alignstretch 0.02
+				randomroll
+			)
+
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model muzsprite.spr
+				color 1.00 1.00 1.00
+				scale 0.10
+				scalerate 10
+				life 0.04
+			)
+
+			entry tagspawn tag_barrel
+			(
+				count 1
+				scale .7
+				model models/fx/garandsmoke.tik
+			)
+
+			// shell eject
+			entry tagspawn tag_eject
+			(
+				spawnrange 2048
+				count 1
+				model models/ammo/rifleshell.tik
+				scale 1.0
+				velocity 70
+				randvel crandom 10 crandom 10 random 20
+				emitterangles 0 0 0
+				avelocity crandom 90 crandom 90 0
+				accel 0 0 -800
+				life 2.0
+				fadedelay 1.7
+				collision
+				bouncefactor 0.2
+				bouncesoundonce snd_rifle_shell
+			)
+
+			// smoke puff
+//			entry commanddelay 0.05 tagspawn tag_barrel
+//			(
+//				volumetric
+//				model gun			// sets the type of smoke
+//				life 10				// amount of smoke
+//				scale 1.5			// radius
+//				alpha 0.4			// density
+//				color 0.7 0.7 0.7		// RBG color of the smoke
+//				velocity 2			// base velocity away from the surface
+//				randvelaxis random 6 0 0	// velocity offset
+//				offsetalongaxis random 4 0 0	// positional offset
+//			)
+		}
+	}
+	fire_empty	garand_empty.skc
+	{
+		server
+		{
+			entry shoot
+		}
+		client
+		{
+			entry stopaliaschannel m1_snd_fire
+			entry sound m1_snd_fire
+
+			// this view kick needs to match that in the main fire animation
+			entry viewkick 	    -2.5 -2.5   -0.1 -0.1   0.15   "T"  8.0 8.2 3.6
+
+			// muzzle flash
+			entry tagdlight tag_barrel 0.25 0.2 0.15 150 0.11
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model models/fx/muzflash.tik
+				color 0.00 0.00 1.00
+				scale 0.20
+				life 0.01
+				velocity 300.00
+				alignstretch 0.03
+				randomroll
+			)
+
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model muzsprite.spr
+				color 1.00 1.00 1.00
+				scale 0.10
+				scalerate 10
+				life 0.04
+			)
+
+			entry tagspawn tag_barrel
+			(
+				count 1
+				scale .7
+				model models/fx/garandsmoke.tik
+			)
+
+			// shell eject
+			entry tagspawn tag_eject
+			(
+				spawnrange 2048
+				count 1
+				model models/ammo/rifleshell.tik
+				scale 1.0
+				velocity 70
+				randvel crandom 10 crandom 10 random 20
+				emitterangles 0 0 0
+				avelocity crandom 90 crandom 90 0
+				accel 0 0 -800
+				physicsrate 20
+				life 2.0
+				fadedelay 1.7
+				collision
+				bouncefactor 0.2
+				bouncesoundonce snd_rifle_shell
+			)
+
+			// eject the empty clip
+			entry commanddelay 0.3 tagspawn tag_eject
+			(
+				spawnrange 2048
+				count 1
+				model models/ammo/garand_clip_empty.tik
+				scale 1.0
+				velocity 40
+				randvel crandom 20 crandom 20 60
+				emitterangles 0 0 0
+				avelocity crandom 70 crandom 70 0
+				offset 0 0 2
+				accel 0 0 -800
+				physicsrate 20
+				life 2.0
+				fadedelay 1.7
+				collision
+				bouncefactor 0.2
+				bouncesoundonce snd_rifle_shell
+			)
+			// and make the *ping* sound
+			entry commanddelay 0.3 sound snd_ping
+
+			// smoke puff
+//			entry commanddelay 0.05 tagspawn tag_barrel
+//			(
+//				volumetric
+//				model gun			// sets the type of smoke
+//				life 10				// amount of smoke
+//				scale 1.5			// radius
+//				alpha 0.4			// density
+//				color 0.7 0.7 0.7		// RBG color of the smoke
+//				velocity 2			// base velocity away from the surface
+//				randvelaxis random 6 0 0	// velocity offset
+//				offsetalongaxis random 4 0 0	// positional offset
+//			)
+		}
+	}
+}
+
+/*QUAKED addon_playerweapon_allied_m1-GarandLite (0.0 0.0 1.0) (-8 -8 -8) (8 8 8)
+American rifle - M1 Garand.
+*/

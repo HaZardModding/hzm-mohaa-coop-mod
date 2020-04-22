@@ -1,0 +1,183 @@
+setup
+{
+	scale 0.52			// Set default scale to 16/30.5 since world is in 16 units per foot and model is in cm's
+//	scale 0.55			// Seems to work better than 0.52
+	path models/weapons/nebelhandgranate
+	skelmodel nebelhandgranate.skd
+	surface germ_smoke_gren shader germ_smoke_gren
+	surface pin shader germ_smoke_gren
+}
+
+init
+{
+	server
+	{
+		classname		Weapon
+		weapontype		grenade
+		name			"Nebelhandgranate"
+		rank			580 580
+		weaponsubtype		1	// differentiates smoke grenades from regular grenades
+
+		pickupsound		smokegrenade_snd_pickup
+		ammopickupsound		smokegrenade_snd_pickup_ammo
+		noammosound		m2frag_snd_noammo
+
+		// Holstering info
+//		holstertag		"Bip01 Spine1"
+//		holsteroffset	"3.12 10.5 3.64"
+//		holsterangles	"20 -40 0"
+//		holsterScale	1.0
+
+		// Primary fire type info (fast, arcing throw)
+		firetype		projectile
+		ammotype		"smokegrenade"
+		projectile		models/projectiles/nebelhandgranate_primary.tik
+		semiauto
+		clipsize		1
+		ammorequired	1
+		firedelay		0.75
+		maxchargetime	4.0
+		minchargetime	0.6
+		crosshair		1
+		quiet // don't notify AI of it being fired
+		autoputaway 	1 // automatically put the weapon away when out of ammo
+		usenoammo		0 // don't allow it to be used when it has no ammo
+		movementspeed	1.0
+
+		sp startammo	1
+		dm startammo	0
+		sprealism startammo	1
+		dmrealism startammo	0
+
+		// Secondary fire type info (more controllable, straight throw)
+		shareclip
+		secondary firetype		projectile
+		secondary ammotype		"smokegrenade"
+		secondary projectile	models/projectiles/nebelhandgranate.tik
+		secondary clipsize		1
+		secondary ammorequired	1
+		secondary firedelay		0.75
+		secondary maxchargetime	1.5
+		secondary minchargetime	0.5
+
+		// AI animation group info
+		weapongroup		grenade
+
+		//[200] Smithy - get handled
+		exec coop_mod/itemhandler.scr "initialiseItem" "smokegrenade" "Nebelhandgranate"
+	}
+	client
+	{
+		cache models/projectiles/nebelhandgranate_primary.tik
+		cache models/projectiles/nebelhandgranate.tik
+	}
+}
+
+animations
+{
+	raise nebelhandgranate.skc
+	{
+		// if we're pulling out grenades, we've definatly got 'em
+		server
+		{
+			enter surface all -nodraw
+		}
+	}
+	idle   nebelhandgranate.skc
+	{
+		server
+		{
+			enter surface all -nodraw
+		}
+	}
+
+	// this should make sure that it doesn't look like there's a grenade in hand when you don't have one
+	idle_empty nebelhandgranate.skc
+	{
+		server
+		{
+			enter surface all +nodraw
+		}
+	}
+
+	charge nebelhandgranate_charge.skc
+	{
+		server
+		{
+			8 surface pin +nodraw
+		}
+		client
+		{
+			enter sound smokegrenade_snd_grenade_pull weapon
+
+			8 tagspawn tag_pin
+			(
+				count 1
+				scale 0.75
+				model models/ammo/grenade_pin.tik
+				life 1
+				randvelaxis range 25 30 0 0
+				accel 0 0 -330
+				avelocity crandom 30 crandom 30 crandom 30
+			)
+		}
+	}
+
+	secondarycharge nebelhandgranate_charge.skc
+	{
+		server
+		{
+			8 surface pin +nodraw
+		}
+		client
+		{
+			enter sound smokegrenade_snd_grenade_pull weapon
+
+			8 tagspawn tag_pin
+			(
+				count 1
+				scale 0.75
+				model models/ammo/grenade_pin.tik
+				life 1
+				randvelaxis range 25 30 0 0
+				accel 0 0 -330
+				avelocity crandom 30 crandom 30 crandom 30
+			)
+		}
+	}
+
+	fire   nebelhandgranate.skc
+	{
+		server
+		{
+			first shoot
+			first surface all +nodraw
+		}
+		client
+		{
+			first sound smokegrenade_snd_grenade_throw weapon
+		}
+	}
+	secondaryfire   nebelhandgranate.skc
+	{
+		server
+		{
+			first shoot secondary
+			first surface all +nodraw
+		}
+		client
+		{
+			first sound smokegrenade_snd_grenade_throw weapon
+		}
+	}
+
+	reload  nebelhandgranate.skc
+	{
+		server
+		{
+			first sound smokegrenade_snd_reload weapon
+			first surface all -nodraw
+
+		}
+	}
+}

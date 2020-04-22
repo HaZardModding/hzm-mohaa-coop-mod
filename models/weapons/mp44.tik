@@ -1,0 +1,351 @@
+TIKI
+
+setup
+{
+	scale 0.52			// Set default scale to 16/30.5 since world is in 16 units per foot and model is in cm's
+	path models/weapons/mp44
+	skelmodel mp44.skd
+	surface mp441 shader mp44
+	surface mp442 shader mp44
+	surface mp44clip shader mp44clip
+	surface cock shader mp44
+}
+$define sounddir sound/weapons
+
+init
+{
+	server
+	{
+
+	//========================================//
+	//		WEAPON NAME		  //
+	//========================================//
+
+		classname		Weapon
+		weapontype		mg
+//		name			"MP44"
+		name			"StG 44"
+		rank			420 420
+
+	//========================================//
+	//		WEAPON ACCURACY 	  //
+	//========================================//
+
+//		StG 44 Sturmgewehr: Max Eff. Range is 300 yds with a muzzle velocity of 2125 ft/s. (7.92x33mm Kurz)
+
+		sp bulletrange		4000	 	//the range at which bulletspread is applied
+	//	sp bulletspread		14 14 100 100	//minpitch minyaw maxpitch maxyaw
+		sp bulletspread		16 16 100 100	//minpitch minyaw maxpitch maxyaw
+	//	sp firespreadmult	0.40 0.61 200 0.6			//add falloff cap maxtime
+		sp firespreadmult	0.45 0.61 200 0.6			//add falloff cap maxtime
+
+		dm bulletrange		4000
+		dm bulletspread		33 33 83 83 
+		dm firespreadmult	0.35 0.9 160 0.5
+
+
+		realism bulletrange	4000
+		realism bulletspread	33 33 83 83 			//11 11 54 54		//5th run 10 10 80 80 	//4th run 10 10 100 100 	//3rd run 10 10 95 95		//2nd run 10 10 100 100		//original 14 14 100 100
+		realism firespreadmult	0.35 0.9 160 0.5
+
+
+	//========================================//
+	//		DAMAGE / RATE OF FIRE	  //
+	//========================================//
+
+		sp bulletdamage		40		
+		dm bulletdamage		35			//30
+		realism bulletdamage	70			//30
+
+		sp firedelay		0.086
+		dm firedelay		0.11
+		realism firedelay	0.11
+
+
+		realism throughwood		24
+		realism throughmetal		8
+
+	//========================================//
+	//		PLAYER MOVEMENT		  //
+	//========================================//
+
+		sp movementspeed	0.9
+		dm movementspeed	0.85  //orig 0.76
+		realism movementspeed	0.85  //orig 0.76
+
+	//========================================//
+	//		RIFLE BUTT / SECONDARY FIRE//
+	//========================================//
+
+		secondary firetype		melee
+		secondary ammotype		none
+		secondary ammorequired		0
+		secondary meansofdeath		bash
+		secondary bulletknockback	50
+		secondary quiet
+
+		sp secondary bulletrange	64
+		sp secondary bulletdamage	60
+
+		dm secondary bulletrange	96
+		dm secondary bulletdamage	60
+
+		realism secondary bulletrange	96
+		realism secondary bulletdamage	60
+
+	//========================================//
+	//		AMMO			  //
+	//========================================//
+
+		firetype		bullet
+		ammotype		"mg"
+		meansofdeath	bullet
+		bulletcount		1
+		clipsize		30
+		ammorequired	1
+		bulletlarge		1
+
+		sp startammo	30
+		dm startammo	150
+		sprealism startammo	30
+		dmrealism startammo	100
+
+		// Additional DM Loadout
+		dm additionalstartammo "grenade" 2
+		dm additionalstartammo "smokegrenade" 1
+		dm startitem "items/binoculars.tik"
+
+		// Additional DM Realism Loadout
+		dmrealism additionalstartammo "grenade" 2
+		dmrealism additionalstartammo "smokegrenade" 1
+		dmrealism startitem "items/binoculars.tik"
+
+	//========================================//
+	//		CROSSHAIR, ZOOM, TRACERS  //
+	//========================================//
+
+		sp tracerfrequency 	2  //original 0
+		dm tracerfrequency 	0
+		sprealism tracerfrequency 	2  //original 0
+		dmrealism tracerfrequency 	0
+
+		crosshair		1
+
+	//========================================//
+	//		SOUND, AI, OTHER	  //
+	//========================================//
+
+		pickupsound		mp44_snd_pickup
+		ammopickupsound	mp44_snd_pickup_ammo
+		noammosound		mp44_snd_noammo
+
+		// Holstering info
+//		holstertag		"Bip01 Spine2"
+//		holsteroffset	"8.0 -7.75 6.5"
+//		holsterangles	"0 185 -25"
+//		holsterScale	1.0
+
+		// AI animation group info
+		weapongroup		mp44
+		airange			short
+
+		// this is attached to the player during reload
+		cache models/ammo/mp44_clip.tik
+
+		//[200] Smithy - get handled
+		exec coop_mod/itemhandler.scr "initialiseItem" "mg" "StG 44"
+	}
+	client
+	{
+		cache tracer.spr
+		cache muzsprite.spr
+		cache corona_util.spr
+		cache models/fx/muzflash.tik
+		cache models/ammo/rifleshell.tik
+	}
+}
+
+animations
+{
+	idle	mp44.skc
+	reload	mp44_reload.skc
+	{
+		server
+		{
+			13 surface mp44clip +nodraw
+			42 surface mp44clip -nodraw
+			last idle
+		}
+		client
+		{
+			entry sound mp44_snd_reload item
+		}
+	}
+	secondaryfire     mp44.skc
+	{
+		server
+		{
+			entry shoot secondary
+		}
+	}
+	fire	mp44_fire.skc
+	{
+		server
+		{
+			entry shoot
+		}
+		client
+		{
+			entry stopaliaschannel mp44_snd_fire
+			entry sound mp44_snd_fire
+
+			// By now, the server has already fired the weapon, so it's
+			// ok to apply the view kick apon entry to avoid problems
+			// with multiple application on single frame animations.
+
+			////////////////////////////////////////////////////////////////////////////////////////
+			// View Kicking
+			//
+			// View Kicking works based on the assumptions that every weapon has its own tendencies to kick in
+			// a paticular fashion. In MOH we call then scatter patterns. Currently we have 2 scatter patterns which
+			// will be explained.
+			// Scatter Patterns:
+			// "V" - the cone. The longer you shoot the more random your shots will be in the horizontal axis.
+			// "T" - the T shape. The gun has a tendancy to push in a paticular direction.
+			//
+			//
+			//             		+-------------------------------------------- Scatter Pitch Min
+			//              		|    +--------------------------------------- Scatter Pitch Max
+			//              		|    |       +------------------------------- Scatter Yaw Min
+			//             		|    |       |   +--------------------------- Scatter Yaw Max
+			//             		|    |       |   |     +--------------------- The Recentering speed in fraction per second
+			//              		|    |       |   |     |    +---------------- The Scatter Pattern
+			//              		|    |       |   |     |    |     +---------- The absolute pitch min/max
+			//              		|    |       |   |     |    |     |  +------- The absolute yaw min/max
+			//              		|    |       |   |     |    |     |  | +----- This is the pitch at which you loose all
+			//              		|    |       |   |     |    |     |  | |      control of the weapon and its behavior is
+			//             	 	|    |       |   |     |    |     |  | |      purely random.
+			//				V    V       V   V     V    V     V  V V
+			entry viewkick 	    -1.8 -1.8    -0.2 0.05   3.2  "T"   12 0.2 2.2
+
+//			entry viewkick 	    -2.0 -2.0    -0.2 0.05   2.8  "T"   12 0.2 2.2 (new original setting, use this to revert)
+//			entry viewkick 	    -1.2 -1.2    -0.2  0.2   1   "V"   3.0 1.0 1.6 (Colt .45 Pistol)
+//			entry viewkick 	    -3.0 -3.5    -0.9 0.9 (original setting)
+
+			// muzzle flash
+			entry tagdlight tag_barrel 0.25 0.2 0.15 150 0.11
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model models/fx/muzflash.tik
+				color 1.00 1.00 1.00
+				scale 0.60
+				life 0.05
+				offsetalongaxis -3 0 0 //orig -5 0 0
+				fade
+				randomroll
+			)
+
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model muzsprite.spr
+				alpha 0.70
+				color 1.00 1.00 1.00
+				scale 0.60
+				life 0.05
+				offsetalongaxis 1 0 0 //orig 3 0 0
+				fade
+				randomroll
+			)
+
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model corona_util.spr
+				color 1.00 1.00 1.00
+				scale 0.10
+				life 0.05
+				scalerate 11.00
+				fade
+				randomroll
+			)
+
+			entry commanddelay 0.01 tagspawn tag_eject
+			(
+				//count 1 //orig 2
+				spawnrate 1
+				model vsssource.spr
+				alpha 0.30
+				color 0.50 0.50 0.50
+				spritegridlighting
+				scale 0.10
+				life 0.30 /orig 1.00
+				scalerate 10.00
+				velocity 60.00
+				randvel range 20 -60 crandom -40 range 20 -60
+				friction 5.00
+				fade
+				randomroll
+			)
+
+			entry tagspawn tag_barrel
+			(
+				//count 1 //orig 2
+				spawnrate 1.00
+				model vsssource.spr
+				alpha 0.40
+				color .70 .70 .70
+				spritegridlighting
+				scale 0.45
+				life 0.20 //orig 2.00
+				scalerate 10.00
+				velocity 200.00 //orig 60.00
+				//randvel range 20 -60 crandom -40 range 20 -60
+				offsetalongaxis 10 0 0
+				friction 6.00 //orig 5.00
+				fade
+				randomroll
+			)
+
+			//excessive gun effects removed due to framerate issues
+//			entry tagspawn tag_barrel
+//			(
+//				model models/fx/bh_metal_fastpiece.tik
+//				color 1.00 1.00 1.00
+//				life 0.07
+//				scalerate 1.00
+//				velocity 1000.00
+//				friction 3.00
+//				offsetalongaxis -20 0 0
+//				fade
+//				alignstretch 0.03
+//			)
+
+			// shell eject
+			entry commanddelay 0.1 tagspawn tag_eject
+			(
+				spawnrange 2048
+				count 1
+				model models/ammo/rifleshell.tik
+				scale 1.0
+				velocity 50
+				randvel crandom 10 crandom 10 random 20
+				emitterangles 0 0 0
+				avelocity crandom 90 crandom 90 0
+				accel 0 0 -800
+				physicsrate 20
+				life 2.0
+				fadedelay 1.7
+				collision
+				bouncefactor 0.2
+				bouncesoundonce snd_rifle_shell
+			)
+
+		}
+	}
+}
+
+/*QUAKED addon_playerweapon_german_mp44 (0.0 0.0 1.0) (-8 -8 -8) (8 8 8)
+german submachinegun - mp44
+*/

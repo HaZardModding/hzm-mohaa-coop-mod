@@ -1,0 +1,316 @@
+TIKI
+
+setup
+{
+	scale 0.52			
+	path models/weapons/Vickers
+	skelmodel Uk_W_Vickers.skd
+	surface Material1 shader Uk_W_Vickers
+	surface Material2 shader Uk_W_Vickers
+	surface Material3 shader Uk_W_Vickers
+}
+init
+{
+	server
+	{
+	//========================================//
+	//		WEAPON NAME		  //
+	//========================================//
+
+		classname		Weapon
+		weapontype		mg
+		name			"Vickers-Berthier"
+		rank			430 430
+
+	//========================================//
+	//		WEAPON ACCURACY 	  //
+	//========================================//
+
+		sp bulletrange		4000	 			//the range at which bulletspread is applied
+		sp bulletspread	    	11 11 45 45			//minpitch minyaw maxpitch maxyaw original 
+		sp firespreadmult	0.38 0.61 200 0.6		//add falloff cap maxtime 
+
+		dm bulletrange		4000
+		dm bulletspread		30 30 80 80
+		dm firespreadmult	0.3 0.9 150 0.5		//add(%) falloff(%/sec) cap maxtime 
+
+		// Realism Attributes
+		realism bulletrange	4000
+		realism bulletspread	30 30 80 80			
+		realism firespreadmult	0.3 0.9 150 0.5		//add(%) falloff(%/sec) cap maxtime
+
+	//========================================//
+	//	   DAMAGE / RATE OF FIRE	  //
+	//========================================//
+
+		sp bulletdamage			60
+		dm bulletdamage			38		
+		realism bulletdamage		76	
+
+		sp firedelay			0.12
+		dm firedelay			0.14
+		realism firedelay		0.14
+
+		realism throughwood		26
+		realism throughmetal		8
+
+	//========================================//
+	//		PLAYER MOVEMENT		  //
+	//========================================//
+
+		sp movementspeed		0.9
+		dm movementspeed		0.8 
+		realism movementspeed		0.8
+
+	//========================================//
+	//	RIFLE BUTT / SECONDARY FIRE       //
+	//========================================//
+
+		secondary firetype		melee
+		secondary ammotype		none
+		secondary ammorequired		0
+		secondary meansofdeath		bash
+		secondary bulletknockback	50
+
+		sp secondary bulletrange	64
+		sp secondary bulletdamage	60
+
+		dm secondary bulletrange	96
+		dm secondary bulletdamage	60
+
+		realism secondary bulletrange	96
+		realism secondary bulletdamage	60
+
+	//========================================//
+	//		AMMO			  //
+	//========================================//
+
+		firetype			bullet
+		ammotype			"mg"
+		meansofdeath	        	bullet
+		bulletcount			1
+		clipsize			30
+		ammorequired	        	1
+		bulletlarge			1			
+		sp startammo	        	30
+		dm startammo	        	160
+		sprealism startammo		30
+		dmrealism startammo		100
+
+		// Additional DM loadout
+		dm additionalstartammo "grenade" 		2
+		dm additionalstartammo "smokegrenade" 		1
+		dm startitem "items/binoculars.tik"
+
+		// Additional DM Realism loadout
+		dmrealism additionalstartammo "grenade" 	2
+		dmrealism additionalstartammo "smokegrenade" 	1
+		dmrealism startitem "items/binoculars.tik"
+
+	//========================================//
+	//		CROSSHAIR, ZOOM, TRACERS  //
+	//========================================//
+
+		sp tracerfrequency 	        5 
+		dm tracerfrequency 	        0
+
+		sprealism tracerfrequency 	5
+		dmrealism tracerfrequency 	0
+
+		crosshair			1
+
+	//========================================//
+	//		SOUND, AI, OTHER	  //
+	//========================================//
+
+		pickupsound				Vickers_snd_pickup
+		ammopickupsound	        		Vickers_snd_pickup_ammo
+		noammosound				Vickers_snd_noammo
+
+		// AI animation group info
+		weapongroup				thompson
+		airange					short
+
+		// this is attached to the player during reload
+		cache models/weapons/Uk_W_Vickers_clip.tik
+
+		//[200] Smithy - get handled
+		exec coop_mod/itemhandler.scr "initialiseItem" "mg" "Vickers-Berthier"
+	}
+	client
+	{
+		cache tracer.spr
+		cache muzsprite.spr
+		cache models/ammo/rifleshell.tik
+		cache models/fx/muzflash.tik
+		cache corona_util.spr
+		cache vsssource.spr
+	}
+}
+
+animations
+{
+	idle	Uk_W_Vickers.skc 
+	reload 	A_W_Vickers_reload_W.skc
+	{
+		server
+		{
+			19 surface material3 +nodraw
+			51 surface material3 -nodraw
+			last idle
+		}
+		client
+		{
+			entry sound Vickers_snd_reload
+		}
+
+	}
+	fire     Uk_W_Vickers.skc
+	{
+		server
+		{
+			entry shoot
+		}
+		client
+		{
+			entry stopaliaschannel Vickers_snd_fire
+			entry sound Vickers_snd_fire
+
+			// By now, the server has already fired the weapon, so it's
+			// ok to apply the view kick apon entry to avoid problems
+			// with multiple application on single frame animations.
+
+			////////////////////////////////////////////////////////////////////////////////////////
+			// View Kicking
+			//
+			// View Kicking works based on the assumptions that every weapon has its own tendencies to kick in
+			// a paticular fashion. In MOH we call then scatter patterns. Currently we have 2 scatter patterns which
+			// will be explained.
+			// Scatter Patterns:
+			// "V" - the cone. The longer you shoot the more random your shots will be in the horizontal axis.
+			// "T" - the T shape. The gun has a tendency to push in a paticular direction.
+			//
+			//
+			//             		+-------------------------------------------- Scatter Pitch Min
+			//              	|    +--------------------------------------- Scatter Pitch Max
+			//              	|    |       +------------------------------- Scatter Yaw Min
+			//             		|    |       |   +--------------------------- Scatter Yaw Max
+			//             		|    |       |   |     +--------------------- The Recentering speed in degrees per second
+			//              	|    |       |   |     |    +---------------- The Scatter Pattern
+			//              	|    |       |   |     |    |    +----------- The absolute pitch min/max
+			//              	|    |       |   |     |    |    |   +------- The absolute yaw min/max
+			//              	|    |       |   |     |    |    |   |   +--- This is the pitch at which you loose all
+			//              	|    |       |   |     |    |    |   |   |    control of the weapon and its behavior is
+			//             	 	|    |       |   |     |    |    |   |   |    purely random.
+			//			V    V       V   V     V    V    V   V   V
+			entry viewkick 	       -2   -2     -1.2 1.2   3.2  "V"   10 0.6  12
+
+			//muzzle flash
+			entry tagdlight tag_barrel 0.25 0.2 0.15 150 0.11
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model models/fx/muzflash.tik
+				color .80 .80 1.00
+				scale .70
+				life 0.05
+				offsetalongaxis 0 0 0 //orig -5 0 0
+				fade
+				randomroll
+			)
+
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model muzsprite.spr
+				alpha 0.70
+				color 1.00 1.00 1.00
+				scale 0.60
+				life 0.05
+				offsetalongaxis 4 0 0 //orig 3 0 0
+				fade
+				randomroll
+			)
+
+			entry tagspawnlinked tag_barrel
+			(
+				count 1
+				model corona_util.spr
+				color 1.00 1.00 1.00
+				scale 0.10
+				life 0.05
+				scalerate 11.00
+				offsetalongaxis 4 0 0 //orig 3 0 0
+				fade
+				randomroll
+			)
+
+			entry tagspawn tag_barrel
+			(
+				spawnrate 1.00
+				model vsssource.spr
+				alpha 0.40
+				color .70 .70 .70
+				spritegridlighting
+				scale 0.45
+				life 0.30 //orig 1.0
+				scalerate 10.00
+				velocity 200.00 //orig 60.00
+				//randvel range 20 -60 crandom -40 range 20 -60
+				offsetalongaxis 10 0 0
+				friction 6.00 //orig 7.00
+				fade
+				randomroll
+			)
+			
+			// shell eject
+			entry commanddelay 0.1 tagspawn tag_eject
+			(
+				count 1
+				model models/ammo/rifleshell.tik
+				spawnrange 1024
+				scale .75 //orig 1.0
+				velocity 50
+				randvel crandom 10 crandom 10 random 20
+				emitterangles 0 0 0
+				avelocity crandom 90 crandom 90 0
+				accel 0 0 -800
+				physicsrate 20
+				life 2.0
+				fadedelay 1.7
+				collision
+				bouncefactor 0.2
+				bouncesoundonce snd_rifle_shell
+			)
+	
+			//chamber smoke
+			entry commanddelay 0.01 tagspawn tag_eject
+			(
+				//count 1 //orig 2
+				spawnrate 1
+				model vsssource.spr
+				alpha 0.30
+				color 0.50 0.50 0.50
+				spritegridlighting
+				scale 0.10
+				life 0.30 /orig 1.00
+				scalerate 10.00
+				velocity 60.00
+				randvel range 20 -60 crandom -40 range 20 -60
+				friction 5.00
+				fade
+				randomroll
+			)
+		}
+	}	
+	secondaryfire     Uk_W_Vickers.skc
+	{
+		server
+		{
+			entry shoot secondary
+		}
+	}
+}
+
+/*QUAKED addon_weapon_Vickers (0.0 0.0 0.0) (-65 -40 0) (65 40 120) Vickers
+*/

@@ -1,0 +1,143 @@
+setup
+{
+	scale 0.52			// Set default scale to 16/30.5 since world is in 16 units per foot and model is in cm's
+	path models/weapons/M2FragGrenade
+	skelmodel grenade.skd
+	surface grenade shader M2FragGrenade
+}
+
+init
+{
+	server
+	{
+		classname		Weapon
+		weapontype		grenade
+		name			"Frag Grenade"
+		rank			550 550
+
+		pickupsound		m2frag_snd_pickup
+		ammopickupsound	m2frag_snd_pickup_ammo
+		noammosound		m2frag_snd_noammo
+
+		// Primary fire type info (fast, arcing throw)
+		firetype	projectile
+		ammotype	"grenade"
+		semiauto
+		clipsize	1
+		ammorequired	1
+		firedelay	0.75
+		maxchargetime	5.0
+		minchargetime	0.6
+		cooktime	5.5
+		crosshair	1
+		quiet
+		autoputaway 	1
+		usenoammo	0
+		projectile	models/projectiles/M2FGrenade_primary.tik
+
+		sp startammo	1
+		dm startammo	0
+		sprealism startammo	1
+		dmrealism startammo	0
+
+		movementspeed	1.0
+
+		// Secondary fire type info (more controllable, straight throw)
+		shareclip
+		secondary firetype		projectile
+		secondary ammotype		"grenade"
+		secondary projectile		models/projectiles/M2FGrenade.tik
+		secondary clipsize		1
+		secondary ammorequired		1
+		secondary firedelay		0.75
+		secondary maxchargetime		1.5
+		secondary minchargetime		0.5
+
+		// AI animation group info
+		weapongroup		grenade
+
+		cache models/projectiles/M2FGrenade_primary.tik
+		cache models/projectiles/M2FGrenade.tik
+
+
+		//[200] Smithy - get handled
+		exec coop_mod/itemhandler.scr "initialiseItem" "grenade" "Frag Grenade"
+	}
+}
+
+animations
+{
+	raise grenade.skc
+	{
+		// if we're pulling out grenades, we've definatly got 'em
+		server
+		{
+			enter surface grenade -nodraw
+		}
+	}
+
+	idle grenade.skc
+	{
+		server
+		{
+			enter surface grenade -nodraw
+		}
+	}
+
+	// this should make sure that it doesn't look like there's a grenade in hand when you don't have one
+	idle_empty grenade.skc
+	{
+		server
+		{
+			enter surface grenade +nodraw
+		}
+	}
+
+	charge grenade.skc
+	{
+		client
+		{
+			enter sound m2frag_snd_grenade_pull weapon
+		}
+	}
+	secondarycharge grenade.skc
+	{
+		client
+		{
+			enter sound m2frag_snd_grenade_pull weapon
+		}
+	}
+	
+	fire grenade.skc
+	{
+		server
+		{
+			first shoot
+			first surface grenade +nodraw
+		}
+		client
+		{
+			first sound m2frag_snd_grenade_throw weapon
+		}
+	}
+	secondaryfire grenade.skc
+	{
+		server
+		{
+			first shoot secondary
+			first surface grenade +nodraw
+		}
+		client
+		{
+			first sound m2frag_snd_grenade_throw weapon
+		}
+	}
+
+	reload grenade.skc
+	{
+		server
+		{
+			first surface grenade -nodraw
+		}
+	}
+}

@@ -1,0 +1,433 @@
+TIKI
+
+setup
+{
+	scale 0.52					// Set default scale to 16/30.5 since world is in 16 units per foot and model is in cm's
+	path models/weapons/KAR98grenade
+	skelmodel KAR98grenade.skd
+	surface kar98Gren shader kar98Gren
+	surface kar98Gren2 shader kar98Gren
+	surface kar98Gren_proj shader kar98Gren_proj
+	surface kar98Gren_sight shader kar98Gren_sight
+	surface kar98Gren_cup shader kar98Gren_cup
+	surface material7 shader m1clip
+	surface material8 shader m1clip
+	surface kar98Gren_wrap shader kar98Gren_wrap
+}
+
+init
+{
+	server
+		{
+	//========================================//
+	//		WEAPON NAME		  		//
+	//========================================//
+
+		classname		Weapon
+		weapontype		heavy
+		weaponsubtype		1
+		name			"Gewehrgranate"
+		rank			285 285
+
+	//========================================//
+	//		WEAPON ACCURACY 	  		//
+	//========================================//
+//		Kar98K: Max Eff. Range is 400 yds with a muzzle velocity of 2650 ft/s. (7.92 x 57mm Mauser)
+
+		sp bulletrange		4000	 		//the range at which bulletspread is applied
+		sp bulletspread		8 8 65 65 		//minpitch minyaw maxpitch maxyaw
+
+		dm bulletrange		4000
+		dm bulletspread		2 2 65 65
+
+		realism bulletrange	4000
+		realism bulletspread	2 2 65 65
+
+	//========================================//
+	//		DAMAGE / RATE OF FIRE	  	//
+	//========================================//
+
+		sp bulletdamage		75
+		dm bulletdamage		80 	//had to reduce the damage since it fires about twice as fast as the sniper rifles - was 75 then 110 then 115 then 106
+
+		sprealism bulletdamage	100
+		dmrealism bulletdamage 	100	
+
+		sp firedelay 		1.2	//was 1.45
+		dm firedelay		1.1	//was 1.45
+		realism firedelay		1.1
+
+		realism throughwood	24
+		realism throughmetal	8
+
+	//========================================//
+	//		PLAYER MOVEMENT		  	//
+	//========================================//
+
+		sp movementspeed		1.0
+		dm movementspeed		0.93
+		realism movementspeed		0.93
+
+	//========================================//
+	//		RIFLE BUTT / SECONDARY FIRE	//
+	//========================================//
+
+		secondary projectile		models/projectiles/riflemortar.tik
+		secondary firetype		heavy
+		secondary meansofdeath		grenade
+		secondary firedelay 		1	
+		secondary ammotype		riflegrenade
+		secondary ammorequired		1
+		secondaryammoinhud
+
+		sp secondary startammo		3
+		dm secondary startammo		3
+		sprealism secondary startammo	3
+		dmrealism secondary startammo	3
+
+
+	//========================================//
+	//		AMMO			  		//
+	//========================================//
+
+		firetype		bullet
+		ammotype		"rifle"
+		meansofdeath		bullet
+		semiauto
+		bulletcount		1 
+		clipsize		5
+		ammorequired		1
+		bulletlarge		1
+
+		sp startammo		5
+		dm startammo		80
+		sprealism startammo	5
+		dmrealism startammo	60
+
+		// Additional DM Loadout
+		dm additionalstartammo "smokegrenade" 1
+//		dm startitem "items/binoculars.tik"
+
+		// Additional DM Realism Loadout
+		dmrealism additionalstartammo "smokegrenade" 1
+//		dmrealism startitem "items/binoculars.tik"
+
+	//========================================//
+	//		CROSSHAIR, ZOOM, TRACERS  	//
+	//========================================//
+
+		sp tracerfrequency 		2 //original 0
+		dm tracerfrequency 		0
+		sprealism tracerfrequency 	0 //original 2
+		dmrealism tracerfrequency 	0
+
+		crosshair			1
+
+	//========================================//
+	//		SOUND, AI, OTHER	  		//
+	//========================================//
+
+		pickupsound		kar98_snd_pickup
+		ammopickupsound		kar98_snd_pickup_ammo
+		noammosound		kar98_snd_noammo
+
+		// Holstering info
+//		holstertag		"Bip01 Spine2"
+//		holsteroffset		"8.0 -7.75 6.5"
+//		holsterangles		"0 185 -25"
+//		holsterScale		1.0
+
+		// AI animation group info
+		weapongroup		rifle
+		airange			long
+
+		surface material7 +nodraw
+		surface material8 +nodraw
+		surface kar98Gren_proj +nodraw
+		
+		// this is attached to the player during reload
+		cache models/ammo/kar98_clip_reload.tik
+
+		//[200] Smithy - get handled
+		exec coop_mod/itemhandler.scr "initialiseItem" "rifle" "Gewehrgranate"
+	}
+	client
+	{
+		cache tracer.spr
+		cache muzsprite.spr
+		cache models/fx/snipesmoke.tik
+		cache models/ammo/rifleshell.tik
+	}
+}
+
+animations
+{
+	idle		KAR98grenade.skc
+	{
+		server
+		{
+			entry surface material7 +nodraw
+			entry surface material8 +nodraw
+		}
+	}
+//	reload	reload_KAR98.skc
+	reload	reload_KAR98.skc // this is the start of the reloading sequence
+	{
+		client
+		{
+			entry sound kar98_snd_reload item
+		}
+		server
+		{
+			entry surface material7 +nodraw
+			entry surface material8 +nodraw
+			43 surface material7 -nodraw
+			43 surface material8 -nodraw
+			53 surface material7 +nodraw
+			62 surface material8 +nodraw
+			last surface material7 +nodraw
+			last surface material8 +nodraw
+			last idle
+		}
+	}
+	reload_single KAR98grenade.skc // this is the reload loop that loads in a single shell
+	{
+		client
+		{
+			entry sound kar98_snd_reload_single item
+		}
+	}
+	reload_end KAR98grenade.skc
+	{
+		server
+		{
+			last idle
+		}
+		client
+		{
+			entry sound kar98_snd_reload_end item
+		}
+	}
+	rechamber	rechamber_kar98.skc
+	{
+		client
+		{
+			entry sound kar98_snd_bolt item
+			18 tagspawn tag_eject 1024
+			(
+				spawnrange 2048
+				count 1
+				model models/ammo/rifleshell.tik
+				scale 1.0
+				velocity 70
+				randvel crandom 10 crandom 10 random 20
+				emitterangles 0 0 0
+				avelocity crandom 90 crandom 90 0
+				accel 0 0 -800
+				physicsrate 20
+				life 2.0
+				fadedelay 1.7
+				collision
+				bouncefactor 0.2
+				bouncesoundonce snd_rifle_shell
+			)
+		}
+	}
+	attachgrenade	  KAR98grenade_secondary.skc
+	{
+		server
+		{
+			// jsl->slow them down when grenade is attached
+			entry dm movementspeed 0.83
+			entry realism movementspeed 0.83
+
+			56 surface kar98Gren_proj -nodraw
+		}
+		client
+		{
+			first sound kar98_snd_altreload
+		}
+	}
+
+	secondaryfire     KAR98grenade_secondary.skc
+	{
+		server
+		{
+			// jsl-->speed them back up when grenade is gone.
+			entry dm movementspeed		0.93
+			entry realism movementspeed 0.93
+
+			entry shoot secondary
+		}
+		client
+		{
+
+			first sound kar98_snd_altfire
+
+			// muzzle woosh!
+			first tagdlight tag_barrel 0.25 0.2 0.05 110 0.11
+
+			enter tagspawn tag_barrel
+			(
+				model snowPlume_01.spr
+				count 11
+				alpha 0.3
+				life 0.3
+				scalerate 8
+				randvelaxis range 300 400 crandom 10 crandom 10
+				accel 0 0 500
+				friction 5
+				angles 0 0 range 90 180
+				avelocity 0 0 crandom 20
+				scalemin 0.1
+				scalemax 0.3
+				fade
+			)
+			
+			enter tagspawn tag_barrel
+			(
+				model snowPlume_01.spr
+				count 9
+				alpha 0.3
+				life 0.3
+				scalerate 8
+				randvelaxis range 100 200 crandom 150 crandom 150
+				accel 0 0 -500
+				friction 5
+				angles 0 0 range 90 180
+				avelocity 0 0 crandom 20
+				scalemin 0.2
+				scalemax 0.5
+				fade
+			)
+
+		}
+	}
+	fire		KAR98grenade.skc
+	{
+		server
+		{
+			// jsl-->speed them back up when grenade is gone.
+			entry dm movementspeed		0.93
+			entry realism movementspeed 0.93
+			entry shoot
+			entry surface material7 +nodraw
+			entry surface material8 +nodraw
+		}
+		client
+		{
+			entry stopaliaschannel kar98_snd_fire
+			entry sound kar98_snd_fire
+
+			// By now, the server has already fired the weapon, so it's
+			// ok to apply the view kick apon entry to avoid problems
+			// with multiple application on single frame animations.
+
+			////////////////////////////////////////////////////////////////////////////////////////
+			// View Kicking
+			//
+			// View Kicking works based on the assumptions that every weapon has its own tendencies to kick in
+			// a paticular fashion. In MOH we call then scatter patterns. Currently we have 2 scatter patterns which
+			// will be explained.
+			// Scatter Patterns:
+			// "V" - the cone. The longer you shoot the more random your shots will be in the horizontal axis.
+			// "T" - the T shape. The gun has a tendancy to push in a paticular direction.
+			//
+			//
+			//             		+-------------------------------------------- Scatter Pitch Min
+			//              		|    +--------------------------------------- Scatter Pitch Max
+			//              		|    |       +------------------------------- Scatter Yaw Min
+			//             		|    |       |   +--------------------------- Scatter Yaw Max
+			//             		|    |       |   |     +--------------------- The Recentering speed in fraction per second
+			//              		|    |       |   |     |    +---------------- The Scatter Pattern
+			//              		|    |       |   |     |    |     +---------- The absolute pitch min/max
+			//              		|    |       |   |     |    |     |  +------- The absolute yaw min/max
+			//              		|    |       |   |     |    |     |  | +----- This is the pitch at which you loose all
+			//              		|    |       |   |     |    |     |  | |      control of the weapon and its behavior is
+			//             	 	|    |       |   |     |    |     |  | |      purely random.
+			//				V    V       V   V     V    V     V  V V
+			entry viewkick 	    -3.5 -4.0    -1.0 -1.05 2.5  "T"   5.0 2.0 5
+
+//			entry viewkick 	    -1.2 -1.2    -0.2  0.2   1   "V"   3.0 1.0 1.6 (Colt .45 Pistol)
+
+//			entry viewkick -3.5 -4.0   -1.0 1.0 (old)
+
+			// muzzle flash
+			entry tagdlight tag_barrel 0.25 0.2 0.15 150 0.11
+			entry tagspawnlinked tag_barrel
+			(
+				model muzsprite.spr
+				count 1
+				alpha .5
+				color 1.00 1.00 1.00
+				varycolor
+				scale 0.70
+				life 0.05
+				scalerate 1.00
+				velocity 4.00
+				friction 3.00
+				fade
+				alignstretch 1.00
+				randomroll
+			)
+			entry tagspawnlinked tag_barrel
+			(
+				model muzsprite.spr
+				count 1
+				alpha .5
+				color 1.00 1.00 1.00
+				scale 0.60
+				life 0.05
+				scalerate 0.70
+				velocity 17.00
+				offsetalongaxis 5 0 0
+				fade
+				alignstretch 0.40
+				randomroll
+			)
+
+			entry tagspawnlinked tag_barrel
+			(
+				model muzsprite.spr
+				count 1
+				alpha .5
+				color 1.00 1.00 1.00
+				scale 0.60
+				life 0.05
+				velocity 18.00
+				offsetalongaxis 9 0 0
+				fade
+			)
+
+			// smoke puff used on sniper version of kar98
+			entry commanddelay 0.020 tagspawn tag_barrel
+			(
+				spawnrate 1.00
+				model vsssource.spr
+				//count 1
+				alpha 0.10
+				color 1.00 1.00 1.00
+				spritegridlighting
+				scale 0.09
+				life .9
+				scalerate 23.00
+				velocity 429.00
+				accel 0.00 20.00 30.00
+				friction 2.00
+				fade
+				offsetalongaxis random 4 0 0
+			)
+
+			entry tagspawn tag_barrel
+			(
+				count 1
+				scale .7
+				model models/fx/snipesmoke.tik
+			)
+		}
+	}
+}
+
+/*QUAKED addon_playerweapon_german_kar98_mortar (0.0 0.0 1.0) (-8 -8 -8) (8 8 8)
+German rifle - Mauser KAR98 with Grenade Launcher.
+*/

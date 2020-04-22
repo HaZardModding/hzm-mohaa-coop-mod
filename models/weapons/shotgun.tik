@@ -1,0 +1,341 @@
+TIKI
+
+setup
+{
+	scale 0.52			// Set default scale to 16/30.5 since world is in 16 units per foot and model is in cm's
+	path models/weapons/shotgun
+	skelmodel shotgun.skd
+	surface shotgun shader shotgun
+}
+
+init
+{
+	server
+	{
+
+	//========================================//
+	//		WEAPON NAME		  //
+	//========================================//
+
+		classname		Weapon
+		weapontype		heavy
+		weaponsubtype		2
+		name			"Shotgun"
+		rank			640 640
+
+	//========================================//
+	//		WEAPON ACCURACY 	  //
+	//========================================//
+
+//		Winchester Shotgun: Max Eff. Range is 25 yds with a muzzle velocity of X ft/s. (Double Ought Buckshot)
+
+		sp bulletrange		1000	 		//the range at which bulletspread is applied
+		sp bulletspread		80 80 95 95 	//minpitch minyaw maxpitch maxyaw
+
+		dm bulletrange		1000
+		dm bulletspread		80 80 95 95
+
+		realism bulletrange		1000
+		realism bulletspread		80 80 95 95
+
+	//========================================//
+	//		DAMAGE / RATE OF FIRE	  //
+	//========================================//
+
+		// currently does a total 300 potential damage, but uses more pellets in SP
+		sp bulletcount		30
+		sp bulletdamage		10
+
+		dm bulletcount		20
+		dm bulletdamage		14	//was 15
+
+		realism bulletcount		20
+		realism bulletdamage		17	//was 15
+
+		sp firedelay		0.75
+		dm firedelay		0.75
+		realism firedelay		0.75
+
+	//========================================//
+	//		PLAYER MOVEMENT		  //
+	//========================================//
+
+		sp movementspeed	0.99
+		dm movementspeed 	0.99
+		realism movementspeed 	0.99
+
+	//========================================//
+	//		RIFLE BUTT / SECONDARY FIRE//
+	//========================================//
+
+		secondary firetype		melee
+		secondary ammotype		none
+		secondary ammorequired		0
+		secondary meansofdeath		bash
+		secondary bulletknockback	50
+		secondary quiet
+
+		sp secondary bulletrange	64
+		sp secondary bulletdamage	60
+
+		dm secondary bulletrange	96
+		dm secondary bulletdamage	60
+
+		realism secondary bulletrange	96
+		realism secondary bulletdamage	60
+
+	//========================================//
+	//		AMMO			  //
+	//========================================//
+
+		firetype		bullet
+		ammotype		"shotgun"
+		meansofdeath	shotgun
+		semiauto
+		clipsize		5
+		ammorequired	1
+
+		sp startammo	5
+		dm startammo	60
+		sprealism startammo	5
+		dmrealism startammo	45
+
+		// Additional DM Loadout
+		dm additionalstartammo "grenade" 2
+		dm additionalstartammo "smokegrenade" 1
+//		dm startitem "items/binoculars.tik"
+
+		// Additional DM Realism Loadout
+		dmrealism additionalstartammo "grenade" 2
+		dmrealism additionalstartammo "smokegrenade" 1
+//		dmrealism startitem "items/binoculars.tik"
+
+	//========================================//
+	//		CROSSHAIR, ZOOM, TRACERS  //
+	//========================================//
+
+		tracerfrequency 0
+
+		crosshair		1
+
+	//========================================//
+	//		SOUND, AI, OTHER	  //
+	//========================================//
+
+
+		pickupsound		shotgun_snd_pickup
+		ammopickupsound	shotgun_snd_pickup_ammo
+		noammosound		shotgun_snd_noammo
+
+		// Holstering info
+//		holstertag		"Bip01 Spine2"
+//		holsteroffset	"8.0 -7.75 6.5"
+//		holsterangles	"0 185 -25"
+//		holsterScale	1.0
+
+		// AI animation group info
+		weapongroup		rifle	//TODO: If AI use this weapon, we need a shotgun group.
+		airange			short
+
+		//[200] Smithy - get handled
+		exec coop_mod/itemhandler.scr "initialiseItem" "shotgun" "Shotgun"
+
+	}
+	client
+	{
+		cache tracer.spr
+		cache muzsprite.spr
+		cache models/ammo/shotgunshell.tik
+		cache model models/fx/bh_metal_fastpiece.tik
+	}
+}
+
+animations
+{
+	idle	shotgun.skc
+	reload 	shotgun.skc // this is the start of the reloading sequence
+	{
+		client
+		{
+			entry sound shotgun_snd_reload_start
+		}
+
+	}
+	reload_single shotgun.skc // this is the reload loop that loads in a single shell
+	{
+		client
+		{
+			entry stopaliaschannel shotgun_snd_reload_single
+			entry sound shotgun_snd_reload_single
+		}
+	}
+	reload_end shotgun_fire.skc
+	{
+		server
+		{
+			last idle
+		}
+		client
+		{
+			entry sound shotgun_snd_reload_end
+		}
+	}
+	secondaryfire     shotgun.skc
+	{
+		server
+		{
+			entry shoot secondary
+		}
+	}
+	fire	shotgun_fire.skc
+	{
+		server
+		{
+			entry shoot
+		}
+		client
+		{
+			entry stopaliaschannel shotgun_snd_fire
+			entry sound shotgun_snd_fire
+
+			// this is the sound for the rechambering pump
+			entry stopaliaschannel shotgun_snd_rechamber
+			entry sound shotgun_snd_rechamber
+
+			// By now, the server has already fired the weapon, so it's
+			// ok to apply the view kick apon entry to avoid problems
+			// with multiple application on single frame animations.
+
+			////////////////////////////////////////////////////////////////////////////////////////
+			// View Kicking
+			//
+			// View Kicking works based on the assumptions that every weapon has its own tendencies to kick in
+			// a paticular fashion. In MOH we call then scatter patterns. Currently we have 2 scatter patterns which
+			// will be explained.
+			// Scatter Patterns:
+			// "V" - the cone. The longer you shoot the more random your shots will be in the horizontal axis.
+			// "T" - the T shape. The gun has a tendancy to push in a paticular direction.
+			//
+			//
+			//             		+-------------------------------------------- Scatter Pitch Min
+			//              		|    +--------------------------------------- Scatter Pitch Max
+			//              		|    |       +------------------------------- Scatter Yaw Min
+			//             		|    |       |   +--------------------------- Scatter Yaw Max
+			//             		|    |       |   |     +--------------------- The Recentering speed in fraction per second
+			//              		|    |       |   |     |    +---------------- The Scatter Pattern
+			//              		|    |       |   |     |    |     +---------- The absolute pitch min/max
+			//              		|    |       |   |     |    |     |  +------- The absolute yaw min/max
+			//              		|    |       |   |     |    |     |  | +----- This is the pitch at which you loose all
+			//              		|    |       |   |     |    |     |  | |      control of the weapon and its behavior is
+			//             	 	|    |       |   |     |    |     |  | |      purely random.
+			//				V    V       V   V     V    V     V  V V
+			entry viewkick 	    -20.0 -20.0    0.05 0.05 15.2  "T"   12.0 5.0 10.0
+
+//			entry viewkick 	    -1.2 -1.2    -0.2  0.2   1   "V"   3.0 1.0 1.6 (Colt .45 Pistol)
+
+
+//			entry viewkick -3 -3.5   -0.75 -1.0 (old)
+
+			// muzzle flash
+			entry tagdlight tag_barrel 0.25 0.2 0.15 140 0.11
+			entry tagspawnlinked tag_barrel
+			(
+				scale 0.4
+				offsetalongaxis 1.5 0 0
+				count 1
+				model muzsprite.spr
+				angles 0 0 crandom 25
+				life 0.06
+			)
+
+			entry tagspawn tag_barrel
+			(
+				spawnrate 1.00
+				model models/fx/bh_metal_fastpiece.tik
+				count 2
+				color 1.00 1.00 1.00
+				scale 0.20
+				life 0.30
+				radius 3.00
+				velocity 100.00
+				randvel 100 0 0
+				accel 0.00 0.00 -120.00
+				offsetalongaxis 4 0 0
+				fade
+				align
+			)
+
+			entry tagspawnlinked tag_barrel
+			(
+				spawnrate 1.00
+				model muzsprite.spr
+				color 1.00 1.00 1.00
+				scale 0.60
+				life 0.09
+				scalerate 12.00
+				velocity 33.00
+				offsetalongaxis 4 0 0
+				fade
+				randomroll
+			)
+
+			entry tagspawnlinked tag_barrel
+			(
+				spawnrate 1.00
+				model muzsprite.spr
+				color 1.00 1.00 1.00
+				scale 0.60
+				life 0.10
+				scalerate 3.00
+				velocity 40.00
+				offsetalongaxis 5 0 0
+				randomroll
+			)
+
+			entry commanddelay 0.010 originspawn
+			(
+				model vsssource.spr
+				count 5
+				alpha 0.30
+				color 1.00 1.00 1.00
+				spritegridlighting
+				scale 0.70
+				life 0.50
+				scalerate 6.00
+				cone 6.00 2.00
+				velocity 320.00
+				radialvelocity 11.00 60.00 120.00
+				accel 0.00 0.00 -30.00
+				friction 5.00
+				offset crandom -5 crandom -5 crandom -5
+				offsetalongaxis 30 0 0
+				fade
+				randomroll
+			)
+
+			// shell eject
+			entry commanddelay 0.2 tagspawn tag_eject
+			(
+				count 1
+				model models/ammo/shotgunshell.tik
+				spawnrange 1024
+				scale 1.0
+				velocity 70
+				randvel crandom 10 crandom 10 random 20
+				emitterangles 0 0 0
+				avelocity crandom 90 crandom 90 0
+				accel 0 0 -800
+				physicsrate 20
+				life 2.0
+				fadedelay 1.7
+				collision
+				bouncefactor 0.2
+				bouncesoundonce snd_shotgun_shell
+			)
+		}
+	}
+}
+
+/*QUAKED addon_playerweapon_allied_shotgun (0.0 0.0 1.0) (-8 -8 -8) (8 8 8)
+Weapon - Winchester Model 12 Shotgun
+*/
