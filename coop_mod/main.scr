@@ -149,11 +149,11 @@ main:{
 	waitthread coop_checkMaps													//chrissstrahl - check if mapceck should be done
 
 	level.coop_mainScriptLoaded = game.true 				//[200] Smithy - used by waitForMainScript to check if main has loaded
-	if ($mainScriptLoader){									//[200] Smithy - used by itemhandler and aihandler (+ future scripts) to notify that main has been loaded
-		println "(" local.threadName "): Now loaded. Continuing threads..."
-		trigger $mainScriptLoader
-		waitframe
-		$mainScriptLoader remove
+
+	//[200] Smithy - created funcs for events
+	if (thread isEventActive "mainScriptLoaded"){									
+		println "(" local.threadName "): ***** Loaded *****. Continuing " level.coop_waitingForMainThreads " waiting threads at " level.time "..." //better reporting
+		thread doEvent "mainScriptLoaded" 					//[200] Smithy - used by itemhandler and aihandler (+ future scripts) to notify that main has been loaded
 	}
 }end
 
@@ -2040,28 +2040,74 @@ changeGameTypeDebug local.message:{
 }end
 
 //[200] Smithy
-//used by other scripts to wait until main.scr::main has loaded (e.g. itemhandler + aihandler)
+//used by other scripts to wait until main.scr::main has loaded.
 //uses a waittill event as we cannot be sure how many instances
-//will need this when, say, aihandler or itemhandler is waiting at prespawn.
-//stops us having to add many, many loops for many many items and ai.
+//will need this when, say, aihandler or itemhandler is waiting before prespawn.
+//e.g. stops us having to add many, many loops for many, many BSP items.
+//99% of the time this will only trigger for BSP items.
 //Note: this can be used by any future scripts (use waitthread)
 //=========================================================================
 waitForMainScript:{
 //=========================================================================
 	local.threadName 		= "coop_mod/main.scr::waitForMainScript"
 	local.prevThreadName 	= parm.previousthread.threadName
+	local.prevSelf 			= parm.previousthread.self 	//grab the self object the previous thread is processing for
+	if (local.prevSelf){ 							 	//better reporting
+		local.prevSelf = (" with object " + local.prevSelf.classname)
+	}
 	if (local.prevThreadName == NIL){
 		local.prevThreadName = "UNKNOWN"
 	}
 	if (!level.coop_mainScriptLoaded){
-		if (!level.coop_initiatedScriptLoader){
-			level.coop_initiatedScriptLoader = 1
-			spawn "ScriptSlave" targetname "mainScriptLoader"
+		if (level.coop_waitingForMainThreads == NIL){		
+			level.coop_waitingForMainThreads = 0 		//number of threads waiting for main to load
 		}
-		println "(" local.threadName "): coop_mod/main.scr::main wasn't loaded in time for " local.prevThreadName " to process. Waiting..."
-		$mainScriptLoader waittill trigger
+		level.coop_waitingForMainThreads++
+		println "(" local.threadName "): main.scr wasn't loaded in time for (" local.prevThreadName ") to process" local.prevSelf " at " level.time ". Thread " level.coop_waitingForMainThreads " is waiting..." //better reporting
+		waitthread waitTillEvent "mainScriptLoaded"
 	}
 }end
+
+//[200] Smithy - creates a temp slave entity we can use for waittill trigger events
+//use this if you want your script to wait until an event is triggered 
+//on some other thread. Expl: Used in waitForMainScript above.
+//Always use with waitthread
+//Note: does use an entity per event. But any number of threads can use same event.
+//This is particularly useful when many threads require a single event.
+//=========================================================================
+waitTillEvent local.event:{
+//=========================================================================
+	if (!$(local.event)){
+		spawn ScriptSlave targetname local.event
+	}
+	$(local.event) waittill trigger
+}end
+
+//[200] Smithy - triggers our custom event
+//=========================================================================
+doEvent local.event:{
+//=========================================================================
+	if ($(local.event)){
+		trigger $(local.event)
+		thread clearEvent local.event
+	}
+}end
+
+//[200] Smithy - removes the event entity from the game
+//=========================================================================
+clearEvent local.event:{
+//=========================================================================
+	if ($(local.event)){
+		$(local.event) remove
+	}
+}end
+
+//[200] Smithy - returns whether event is currently active or not
+//=========================================================================
+isEventActive local.event:{
+//=========================================================================
+}end ($(local.event) != NULL)
+
 
 
 
