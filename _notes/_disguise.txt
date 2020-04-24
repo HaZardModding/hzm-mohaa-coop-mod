@@ -1,0 +1,43 @@
+This is the segment from Player::Think method in the game engine. 
+https://github.com/openmoh/openmohaa/blob/54355278307a64d2e62e68f8450aeb3cdf7651b3/code/game/player.cpp#L7200
+
+Player::Think is constantly checked every simulation
+
+
+	if( g_gametype->integer == GT_SINGLE_PLAYER) 	<-*** we need to temporarily init SP gametype to bypass this for ONE think simulation
+	{
+		m_bIsDisguised = false; 				 	<-*** if this was outside the if we would NEVER get it to work. phew..
+
+		if( m_bHasDisguise && !level.m_bAlarm )  	<-*** this is why we need to set has_disguise on player
+		{
+			pWeap = GetActiveWeapon( WEAPON_MAIN ); 
+
+			if( !pWeap || pWeap->IsSubclassOfInventoryItem() ) <-*** this is why we need to make sure players do not have an active weapon
+			{
+				m_bIsDisguised = true; 							<-*** it sets it to true (yay, we're doing well so far)
+																<-*** m_bIsDisguised (is_disguised) is what ACTUALLY makes them disguised
+
+				<-*** but wait...it then checks to see if any enemies are in attack state.
+				<-*** if so, it sets it back to false... This is why we need to temporarily set them to idle
+				for( Sentient *pSent = level.m_HeadSentient[ 0 ]; pSent != NULL; pSent = pSent->m_NextSentient ) 
+				{
+					Actor *act = ( Actor * )pSent;
+
+					if( pSent->m_Enemy == this && act->IsAttacking())
+					{
+						m_bIsDisguised = false;
+						break;
+					}
+				}
+				<-*** ok, we reached here with is_disguise as true... yay
+				<-*** problem is, because we switch back to MP gametype this code won't be run again
+				<-*** thus is_disguise will always be true. thus they just will not attack players no matter what.
+				<-*** so that's where my disguiseHandler comes in...
+			}
+		}
+
+		PathSearch::PlayerCover( this );
+		UpdateEnemies();
+	}
+
+
