@@ -22,15 +22,17 @@ mg42AttackBeach:{
 //=========================================================================
 	level.coop_mg42Fiering = 1
 	while(level.coop_mg42Fiering){
+
 		local.alivePlayers=0	//chrissstrahl - keep track of players being alive
 		local.explosedPlayers=0	//chrissstrahl - keep track of players not in cover
-		
+
 		for(local.pNum = 1;local.pNum<=$player.size;local.pNum++){
 			local.player = $player[local.pNum]
 			local.playerNotIncover = 1
-			
+
 			//chrissstrahl - skip if player is missing or dead or spec
-			if(local.player == NULL || local.player.health <= 0 || ocal.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1){
+			//[200] Smithy - local.player.dmteam condition typo fixed
+			if(local.player == NULL || local.player.health <= 0 || local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1){
 				continue
 			}
 			//-832.00 3648.00 -344.00
@@ -38,10 +40,10 @@ mg42AttackBeach:{
 			if(local.pos[1] > 4000 ){//everything above 4000 make it a little to hard tro reach the captain
 				continue
 			}
-			
+
 			local.alivePlayers++	//chrissstrahl - keep track of players being alive
 			//iprintlnbold_noloc("mg42AttackBeach warning: " + local.pNum)
-			
+
 			// bullet run-up warning
 			for (local.i = 4 ; local.i >= 1 ; local.i --){
 				local.temp_origin = local.player.origin
@@ -51,10 +53,10 @@ mg42AttackBeach:{
 				$player_target.origin = local.temp_origin
 				$mg42_middle1 setaimtarget $player_target
 				$mg42_middle2 setaimtarget $player_target
-				
+
 				wait 0.3 // was 0.2 might needs better adjustment for coop
 			}
-		
+
 			//chrissstrahl - fire at cover or player
 			//chrissstrahl - make it a bit harder for the player if playing alone
 			//chrissstrahl - otherwise it will be to easy, because the damage is multiplied by players
@@ -64,18 +66,18 @@ mg42AttackBeach:{
 				if(local.player == NULL || local.player.health <= 0 ){
 					break
 				}
-			
+
 				// set the aim target to be a the player while hitting
 				local.temp_origin = local.player.origin
 				local.temp_origin[2] += level.target_offset
 
 				$player_target.origin = local.temp_origin
-				
+
 				//chrissstrahl - not in cover
 				if!(waitthread isInCover local.player){
 					thread mg42_damage_player local.player
 					local.explosedPlayers++;
-				}			
+				}
 				else{//chrissstrahl - in cover
 					local.playerNotIncover = 0
 					thread mg42_incover_player local.player.flags["coop_coverTrigger"]
@@ -85,17 +87,17 @@ mg42AttackBeach:{
 			if(local.player != NULL && local.playerNotIncover ){
 				local.player playsound warn_player_cover
 			}
-			
+
 		}
-		
-		
+
+
 		//chrissstrahl - keep timing of singleplayer in mp if there is just 1 player
 		if(local.alivePlayers < 2){
 			wait (randomfloat(0.6) + 0.3)
 		}else{
 			waitframe
 		}
-		
+
 		//chrissstrahl - fire on other targets if there are no players to fire at
 		if( local.explosedPlayers == 0){
 			//iprintlnbold_noloc("mg42AttackBeach fire: normal targets")
@@ -192,13 +194,13 @@ craters_cover local.player:{
 //=========================================================================
 jitter_mg local.player:{
 //=========================================================================
-	
+
 }end
 
 //=========================================================================
 jitter_mg_cover local.trig:{
 //=========================================================================
-	
+
 }end
 
 // mg42 damage player routine
@@ -211,9 +213,9 @@ mg42_damage_player local.player:{
 	if(local.playerCount == NIL){
 		end
 	}
-	
+
 	local.damage = 5
-	
+
 	local.player normal_damage local.damage (0 -1 0)
 	local.player playsound snd_bh_flesh
 	thread jitter_mg local.player
@@ -248,12 +250,12 @@ warningTriggers local.damage:{
 //=========================================================================
 	//make sure we fix what was not done right
 	if(self == NULL || self.flags["warningTriggers"] != NIL){
-		
+
 		iprintlnbold_noloc("DEV: warningTriggers multiple calls prevented!!!")
 		end
 	}
 	self.flags["warningTriggers"] = 1
-	
+
 	while(1){
 		//wait for the trigger to activate (by player)
 		self waittill trigger
@@ -263,9 +265,9 @@ warningTriggers local.damage:{
 			local.player =  $player[local.i]
 			//if existing, touching the trigger and alive
 			if( local.player != NULL && local.player istouching self && local.player.health > 0){
-			
+
 				//extra check for coop only (skip if player invalid)
-				//skip spectators or players in respawn 
+				//skip spectators or players in respawn
 				if( level.gametype != 0 ){
 					if( local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1 ){
 						continue
@@ -273,7 +275,7 @@ warningTriggers local.damage:{
 					//make sure player will not respawn inside killzone
 					exec coop_mod/main.scr::resetSpawn local.player
 				}
-				
+
 				//hurt player
 				local.player exec maps/m3l1a.scr::bhit local.damage
 			}
@@ -281,7 +283,7 @@ warningTriggers local.damage:{
 	}
 }end
 
-//chrissstrahl - 
+//chrissstrahl -
 //=========================================================================
 mg42_attack_closest:{
 //=========================================================================
@@ -305,36 +307,43 @@ sequence_5_medic local.medic local.patient:{
 			local.medic turnto local.player
 			local.medic waittill turndone
 			wait 1
-			
+
+			if (!isAlive local.medic){ end } //[200] Smithy -  NULL/NIL/DEAD medic check
+
 			if(level.m3l1a_sequence == 11){
 				break
 			}
-			
+
 			if (randomint(100) > 50){ local.medic say medic_heal1 }
 			else{ local.medic say medic_heal2 }
-			
+
 			local.inAnim = 1
 			local.medic upperanim pass_canteen_start
 			local.medic waittill upperanimdone
-			
+
 			while (1){
 				wait 0.1
 				if(level.m3l1a_sequence == 11){
 					break
 				}
-				if(local.player == NULL || local.player.health <= 0 || vector_length (local.player.origin - local.medic.origin) < 110){
+				//[200] Smithy -  NULL/NIL/DEAD medic check
+				if(local.player == NULL || local.player.health <= 0 || !isAlive local.medic || vector_length (local.player.origin - local.medic.origin) < 110){
 					break
 				}
 			}
-			
+
+			if (!isAlive local.medic){ end } //[200] Smithy -  NULL/NIL/DEAD medic check
+
 			if(local.player != NULL || local.player.health > 0){
 				local.player heal 1
 			}
-			
+
 			local.medic upperanim pass_canteen_end
 			local.inAnim = 0
 			wait 2
-			
+
+			if (!isAlive local.medic){ end } //[200] Smithy -  NULL/NIL/DEAD medic check
+
 			if(level.m3l1a_sequence == 11){
 				break
 			}
@@ -344,10 +353,11 @@ sequence_5_medic local.medic local.patient:{
 			local.medic.turndoneerror = 10
 			local.medic waittill turndone
 			wait 1
-			
+
 			if(level.m3l1a_sequence == 11){
 				break
-			}			
+			}
+			if (!isAlive local.medic){ end } //[200] Smithy -  NULL/NIL/DEAD medic check
 			local.medic turnto NULL
 		}
 	}
@@ -362,42 +372,50 @@ shingle_medic local.medic:{
 	local.inAnim = 0
 	while(level.m3l1a_sequence != 11){
 		wait 1
+		if (!isAlive local.medic){ end } //[200] Smithy -  NULL/NIL/DEAD medic check
 		local.player = thread medic_closest local.medic
 		if(local.player != NULL){
 			local.medic lookat local.player
 			local.medic turnto local.player
 			local.medic waittill turndone
 			wait 1
-			
+
+			if (!isAlive local.medic){ end } //[200] Smithy -  NULL/NIL/DEAD medic check
+
 			if(level.m3l1a_sequence == 11){
 				break
 			}
-			
+
 			if (randomint(100) > 50){ local.medic say medic_heal1 }
 			else{ local.medic say medic_heal2 }
-			
+
 			local.inAnim = 1
 			local.medic upperanim pass_canteen_start
 			local.medic waittill upperanimdone
-			
+
 			while (1){
 				wait 0.1
 				if(level.m3l1a_sequence == 11){
 					break
 				}
-				if(local.player == NULL || local.player.health <= 0 || vector_length (local.player.origin - local.medic.origin) < 110){
+				//[200] Smithy - NULL/NIL/DEAD medic check
+				if(!isAlive local.medic || local.player == NULL || local.player.health <= 0 || vector_length (local.player.origin - local.medic.origin) < 110){
 					break
 				}
 			}
-			
+
+			if (!isAlive local.medic){ end } //[200] Smithy -  NULL/NIL/DEAD medic check
+
 			if(local.player != NULL || local.player.health > 0){
 				local.player heal 1
 			}
-			
+
 			local.medic upperanim pass_canteen_end
 			local.inAnim = 0
 			wait 2
-			
+
+			if (!isAlive local.medic){ end } //[200] Smithy -  NULL/NIL/DEAD medic check
+
 			if(level.m3l1a_sequence == 11){
 				break
 			}
@@ -408,11 +426,13 @@ shingle_medic local.medic:{
 			local.medic turnto $mg42_middle1
 			local.medic waittill turndone
 			wait 0.5
-			
+
+			if (!isAlive local.medic){ end } //[200] Smithy -  NULL/NIL/DEAD medic check
+
 			if(level.m3l1a_sequence == 11){
 				break
 			}
-			
+
 			local.medic turnto NULL
 			local.medic exec global/prone.scr
 		}
@@ -430,15 +450,15 @@ medic_closest local.object:{
 	local.playerReturn = NULL
 	local.playerOrigin = (0 0 0)
 	local.closestDistance = 999999
-	
+
 	//make array for 8 players
-	
+
 	if( local.object == NULL ){
 		end NULL
 	}else{
 		local.objectOrigin = local.object.origin
 	}
-	
+
 	for (local.i = 1;local.i <= $player.size;local.i++){
 		local.player = $player[local.i]
 		if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 && (local.player.health / local.player.max_health) < 1 ){
@@ -448,10 +468,11 @@ medic_closest local.object:{
 			}
 		}
 	}
-	
+
 	//to far away from medic
 	if( local.closestDistance > 512){
 		end NULL
 	}
 }end local.playerReturn
+
 
