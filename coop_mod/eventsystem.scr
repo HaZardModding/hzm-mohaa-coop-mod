@@ -1,0 +1,113 @@
+//-------------------------------------------------------------------------//
+//[200] Smithy - Custom named events system now has own file.
+//Allows us to pause threads until a custom event is fired from elsewhere.
+//Saves us having to use active loops. 
+//-------------------------------------------------------------------------//
+
+//Uses an 'EventSlave' (ScriptSlave) for waittill trigger events.
+//Use this if you want your script to wait until an event is triggered
+//on some other thread. Always use with waitthread. 
+//It now only uses a single entity for any number of different events. 
+//Example: used in coop_mod/main.scr::waitForMainScript
+//=========================================================================
+waitTillEvent local.event:{
+//=========================================================================
+	waitthread registerEvent local.event
+
+	while ($EventSlave.events[local.event] == "registered"){
+		$EventSlave waittill trigger //pauses thread here until a doEvent call
+	}
+
+	thread clearEvent local.event
+}end
+
+//[200] Smithy - triggers our custom event
+//=========================================================================
+doEvent local.event:{
+//=========================================================================
+	if (thread isEventActive local.event){
+		thread unregisterEvent local.event  //unregister this particular event
+		trigger $EventSlave	 				//fire off the event
+	}
+}end
+
+//[200] Smithy - removes the spent event from the event list
+//=========================================================================
+clearEvent local.event:{
+//=========================================================================
+	if ($EventSlave == NULL || $EventSlave.events[local.event] == NIL || $EventSlave.events[local.event] == "registered"){ end }
+
+	local.newArray[""] 		= NIL
+	local.oldEventList 		= level.coop_eventNameList
+	local.newEventList[1] 	= NIL
+
+	local.j = 1
+	for(local.i = 1; local.i <= local.oldEventList.size; local.i++){
+		local.eventName = local.oldEventList[local.i]
+		if(local.eventName != local.event){
+			local.newEventList[local.j] = local.eventName
+			local.newArray[local.eventName] = "registered"
+			local.j++
+		}
+	}
+
+	if (local.newArray.size > 0){
+		$EventSlave.events = local.newArray
+	}else{
+		$EventSlave.isRemoving = 1
+		$EventSlave remove  					//if no more events are found, remove EventSlave. no use keeping him for nothing...
+	}
+
+	level.coop_eventNameList = local.newEventList
+}end
+
+//[200] Smithy - returns whether event is currently active or not
+//=========================================================================
+isEventActive local.event:{
+//=========================================================================
+}end ($EventSlave != NULL && $EventSlave.events[local.event] != NIL && $EventSlave.events[local.event] == "registered")
+
+//[200] Smithy - registers a specific event
+//=========================================================================
+registerEvent local.event:{
+//=========================================================================
+	if (thread isEventActive local.event){ end }
+
+	while ($EventSlave && $EventSlave.isRemoving){ 	//just in case we got caught before removal has completed
+		waitframe
+	}
+
+	if (!$EventSlave){ 
+		spawn ScriptSlave targetname EventSlave 	//create a new EventSlave
+	}
+
+	$EventSlave.events[local.event] = "registered"
+
+	if (!level.coop_eventNameList){
+		level.coop_eventNameList[1] = local.event
+	}else{
+		if (!thread isEvent local.event){
+			level.coop_eventNameList[level.coop_eventNameList.size + 1] = local.event
+		}
+	}
+}end
+
+//[200] Smithy - registers a specific event
+//=========================================================================
+unregisterEvent local.event:{
+//=========================================================================
+	if (thread isEventActive local.event){
+		$EventSlave.events[local.event] = "unregistered"
+	}
+}end
+
+//[200] Smithy - checks against event name list to see if it exists
+//=========================================================================
+isEvent local.event:{
+//=========================================================================
+	for (local.i = 1; local.i <= level.coop_eventNameList.size; local.i++){
+		if (level.coop_eventNameList[local.i] == local.event){
+			end(1)
+		}
+	}
+}end(0)

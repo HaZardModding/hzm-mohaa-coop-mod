@@ -148,12 +148,12 @@ main:{
 	waitthread mom/mom.scr::setup "coop_mod/mom_actions.scr" 2 "coop_mom"		//chrissstrahl - set coop mod specific mom file
 	waitthread coop_checkMaps													//chrissstrahl - check if mapceck should be done
 
-	level.coop_mainScriptLoaded = game.true 				//[200] Smithy - used by waitForMainScript to check if main has loaded
+	level.coop_mainScriptLoaded = game.true 									//[200] Smithy - used by waitForMainScript to check if main has loaded
 
 	//[200] Smithy - created funcs for events
-	if (thread isEventActive "mainScriptLoaded"){									
+	if (thread coop_mod/eventsystem.scr::isEventActive "mainScriptLoaded"){									
 		println "(" local.threadName "): ***** Loaded *****. Continuing " level.coop_waitingForMainThreads " waiting threads at " level.time "..." //better reporting
-		thread doEvent "mainScriptLoaded" 					//[200] Smithy - used by itemhandler and aihandler (+ future scripts) to notify that main has been loaded
+		thread coop_mod/eventsystem.scr::doEvent "mainScriptLoaded" 			//[200] Smithy - used by itemhandler and aihandler (+ future scripts) to notify that main has been loaded
 	}
 }end
 
@@ -2064,49 +2064,9 @@ waitForMainScript:{
 		}
 		level.coop_waitingForMainThreads++
 		println "(" local.threadName "): main.scr wasn't loaded in time for (" local.prevThreadName ") to process" local.prevSelf " at " level.time ". Thread " level.coop_waitingForMainThreads " is waiting..." //better reporting
-		waitthread waitTillEvent "mainScriptLoaded"
+		waitthread coop_mod/eventsystem.scr::waitTillEvent "mainScriptLoaded"
 	}
 }end
-
-//[200] Smithy - creates a temp slave entity we can use for waittill trigger events
-//use this if you want your script to wait until an event is triggered 
-//on some other thread. Expl: Used in waitForMainScript above.
-//Always use with waitthread
-//Note: does use an entity per event. But any number of threads can use same event.
-//This is particularly useful when many threads require a single event.
-//=========================================================================
-waitTillEvent local.event:{
-//=========================================================================
-	if (!$(local.event)){
-		spawn ScriptSlave targetname local.event
-	}
-	$(local.event) waittill trigger
-}end
-
-//[200] Smithy - triggers our custom event
-//=========================================================================
-doEvent local.event:{
-//=========================================================================
-	if ($(local.event)){
-		trigger $(local.event)
-		thread clearEvent local.event
-	}
-}end
-
-//[200] Smithy - removes the event entity from the game
-//=========================================================================
-clearEvent local.event:{
-//=========================================================================
-	if ($(local.event)){
-		$(local.event) remove
-	}
-}end
-
-//[200] Smithy - returns whether event is currently active or not
-//=========================================================================
-isEventActive local.event:{
-//=========================================================================
-}end ($(local.event) != NULL)
 
 
 
