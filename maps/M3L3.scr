@@ -38,9 +38,11 @@ main:{
 
 	//===STOP THE PANZERSCHRECK SCRIPTMODEL FROM CUTTING OFF THE PATHFINDING
 	$scene0_panzerschreck notsolid
-	$$scene4_panzerschreck notsolid //[200] chrissstrahl - added for coop
-	
+	$scene4_panzerschreck notsolid //[200] chrissstrahl - added for coop //[200] Smithy - removed extra $
+
+	//[200] Smithy - don't need these anymore	
 	//[200] chrissstrahl - remove useless and place panzerschreck near halftrack loc
+	/*
 	if(level.gametype != 0){
 		$scene0_panzerschreck origin ( -3183 3776 -150 )
 		$scene0_panzerschreck notsolid
@@ -54,7 +56,7 @@ main:{
 		waitframe
 		thread coop_spawnBazooka
 	}
-
+	*/
 //-------------------------------------------------------
 	level waittill prespawn
 //-------------------------------------------------------
@@ -317,11 +319,58 @@ main:{
 	waitthread global/objectives.scr::add_objectives 1 2 level.locationchecktext $scene7_nebelwerfer1.origin
 	thread global/objectives.scr::current_objectives 1
 	thread scene0
+
+	//[200] Smithy - OK, make this work properly in coop
+	thread replaceBazookaPickup
 }end
 
 //****************************************************//
 //			     THREADS				//
 //****************************************************//
+
+//[200] Smithy
+//new func to make zooka pickup work like any other weapon by
+//replacing the weapon and ammo with actual weapons and ammo
+//then removing the original script models
+//=========================================================================
+replaceBazookaPickup:{
+//=========================================================================
+	//make the panzerschreck
+	if(level.gametype != 0){
+		local.panzerschreck = spawn ($scene0_panzerschreck.model)
+		local.panzerschreck angles $scene0_panzerschreck.angles
+		local.panzerschreck scale $scene0_panzerschreck.scale
+		local.panzerschreck origin $scene0_panzerschreck.origin
+		local.panzerschreck.flags["coop_itemRespawnTime"] = 5 	//give it its own respawn time, so it appears for other players faster
+
+		local.panzerschreck = spawn ($scene4_panzerschreck.model)
+		local.panzerschreck angles $scene4_panzerschreck.angles
+		local.panzerschreck scale $scene4_panzerschreck.scale
+		local.panzerschreck origin $scene4_panzerschreck.origin
+		local.panzerschreck.flags["coop_itemRespawnTime"] = 10
+
+		//do the shells
+		for (local.i = 1; local.i <= 7; local.i++){
+			local.oldShell = $("scene0_shell" + local.i)
+			local.newShell = spawn local.oldShell.model
+			local.newShell angles local.oldShell.angles
+			local.newShell scale local.oldShell.scale
+			local.newShell origin local.oldShell.origin
+			//local.newShell.flags["coop_itemRespawnTime"] = 5
+		}
+
+		//dont need these anymore
+		$scene0_panzerschreck remove
+		$scene4_panzerschreck remove
+		$scene0_shell1 remove
+		$scene0_shell2 remove
+		$scene0_shell3 remove
+		$scene0_shell4 remove
+		$scene0_shell5 remove
+		$scene0_shell6 remove
+		$scene0_shell7 remove
+	}	
+}end
 
 //==="STARTING TRENCH" ***//
 //=========================================================================
@@ -510,7 +559,7 @@ scene0_panzerschreck_trigger:
 		iprintln "You have the Panzerschreck."
 		
 		//chrissstrahl - this will only happen in coop
-		exec coop_mod/replace.scr::ammo heavy 6 panzerschreck_snd_pickup_ammo
+		//exec coop_mod/replace.scr::ammo heavy 6 panzerschreck_snd_pickup_ammo //[200] Smithy - not needed now... also, this should be outside this if statement anyway (with an 'end' in here)...
 	}	
 end
 
@@ -542,8 +591,11 @@ halftrack_ambush:{
 		$halftrack.mg42 notsolid
 		thread bruteForceMGOrigin $halftrack.mg42 $halftrack_gunnershield
 		local.player = exec coop_mod/replace.scr::player_closestTo $halftrack_gunner //[200] Smithy - get a target right away (just to make gun point in right direction)
+		
+		local.player = NULL
 		$halftrack.mg42 setAimTarget local.player
 		$halftrack_gunner lookat local.player
+		$halftrack_gunner turnto local.player
 
 		//===Set up the gunner
 		//===Start the halftrack moving
@@ -640,6 +692,7 @@ halftrack_mg_targeting:{
 			end
 	}
 	$halftrack_gunner lookat local.player 	//[200] Smithy - make gunner look dynamically	
+	$halftrack_gunner turnto local.player
 	thread setupPlayerHeadPos local.player 	//[200] Smithy - set up the head!
 
 	self startfiring	
@@ -702,7 +755,8 @@ halftrack_mg_targeting:{
 				break 																			//[200] Smithy - OK, still NULL, lets cycle out and wait at top of func for next valid player
 			}
 			$halftrack_gunner lookat local.player 												//[200] Smithy - make gunner look dynamically
-		}
+			$halftrack_gunner turnto local.player
+		}	
 		if !(isAlive $halftrack){ end }
 		
 		if (vector_within local.player $halftrack 1400){ //[200] Smithy - tweaked (original: 2300) so we can get closer and pick up zooka
@@ -759,7 +813,7 @@ setupPlayerHeadPos local.player:{
 	group.head.croid unglue 								//reset any previous binds
 	group.head unbind
 	group.head.player = local.player
-	group.head.croid glue group.head.player					//this centroid position is needed for the head to bind			  
+	group.head.croid duckableglue group.head.player			//this centroid position is needed for the head to bind	(TODO: TRY duckableglue)		  
 	group.head origin (group.head.croid.origin + (0 0 75))  //make the head near...the head, duh :P
 	group.head bind group.head.croid                  		//make the head follow the player
 }end
@@ -2282,13 +2336,13 @@ scene4_panzerschreck_trigger:{
 		//===Add a panzerschreck and some rockets to the player's inventory and play the pickup sounds
 		$player playsound panzerschreck_snd_pickup
 		$player item weapons/panzerschreck.tik
-		$player ammo heavy 1
+		$player ammo heavy 1	
 		end
 	}
 	//[200] chrissstrahl - coop is handled in 
 
 	//chrissstrahl - this will only happen in mp/coop
-	exec coop_mod/replace.scr::ammo heavy 3 panzerschreck_snd_pickup
+	//exec coop_mod/replace.scr::ammo heavy 3 panzerschreck_snd_pickup //[200] Smithy - not needed now
 }end
 
 //============================================================//
