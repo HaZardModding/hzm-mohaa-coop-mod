@@ -790,7 +790,8 @@ playsound local.sound local.dowait:{
 				if(local.dowait == NIL){
 					local.playerWait playsound local.sound
 				}else{
-					local.playerWait playsound local.sound wait
+					//local.playerWait playsound local.sound wait 	 	//[200] Smithy
+					local.playerWait thread playsound_wait local.sound 	//[200] Smithy - fix playsound callbacks on players
 				}
 				//chrissstrahl - fixme debugme finetune
 				//check if we can use $world instead, because it won't disconnect
@@ -813,7 +814,6 @@ playsound local.sound local.dowait:{
 //the hack is done around the playsound command, not the sounddone.
 //which is lucky because waiting for sounddone to finish means
 //gametype will be 0 for too long.
-//It appears waittill saydone DOES work, so this is just for sounddone (not actors).
 //Example of this being used is m3l1b.scr::seq_bunker_middle_radio:
 //	$bunker_radio thread coop_mod/replace.scr::playsound_wait "den_scripted_M3L1_11d"
 //	$bunker_radio waittill sounddone
@@ -831,6 +831,28 @@ playsound_wait local.sound local.volume:{
 		self playsound local.sound wait (float(local.volume))
 	}else{
 		self playsound local.sound wait
+	}
+	waitthread coop_mod/main.scr::changeGameType 2 0
+}end
+
+//[200] Smithy - ok, dialogue also doesn't work without hack... use separate func
+//give local.idle any value if it is an idlesay command
+//e.g. $talker1 thread coop_mod/replace.scr::say_wait "den_m6l1_614r" "idle"
+//only use this if you need a waittill saydone
+//=========================================================================
+say_wait local.dialogue local.idle:{
+//=========================================================================
+	local.threadName = "coop_mod/replace.scr::say_wait"
+	if (!self){
+		println "(" local.threadName "): self was NULL. Fix me!"
+		end
+	}
+	// changeGameType won't run if level.gametype is 0
+	waitthread coop_mod/main.scr::changeGameType 0 0
+	if (!local.idle){
+		self say local.dialogue
+	}else{
+		self idlesay local.dialogue
 	}
 	waitthread coop_mod/main.scr::changeGameType 2 0
 }end
