@@ -1582,6 +1582,9 @@ playerPrimarySwapCancel local.player:{
 //=========================================================================
 playerPrimarySwap local.player local.weaponNew:{
 //=========================================================================
+	iprintlnbold_noloc("main.scr::playerPrimarySwap is defunct. Fix me!") //[200] Smithy
+	end 																  //[200] Smithy - we won't need this now
+
 	if(local.player == NULL || local.player == NIL ){ end }
 	if( local.player.flags["coop_swapedWeaponPrimary"] == NIL && local.weaponNew != NIL){
 		for(local.x=0;local.x<4;local.x++){
@@ -2066,6 +2069,61 @@ waitForMainScript:{
 		println "(" local.threadName "): main.scr wasn't loaded in time for (" local.prevThreadName ") to process" local.prevSelf " at " level.time ". Thread " level.coop_waitingForMainThreads " is waiting..." //better reporting
 		waitthread coop_mod/eventsystem.scr::waitTillEvent "mainScriptLoaded"
 	}
+}end
+
+//[200] Smithy - use this if you want a static localised earthquake
+//will affect all players in the radius
+//e.g. thread coop_mod/main.scr::earthquake_local local.ent.origin 10 .4 256
+//=========================================================================
+earthquake_radius local.origin local.duration local.magnitude local.radius:{
+//=========================================================================
+	if (level.gametype == 0){ end }
+
+	local.decay = local.magnitude / local.duration
+
+	local.earthquake = spawn ViewJitter
+	local.earthquake origin 		local.origin
+	local.earthquake donedeath 		game.true 	//removes after firing
+	local.earthquake edgeeffect 	1.0
+	local.earthquake duration 		local.duration
+	local.earthquake jitteramount 	( local.magnitude local.magnitude (local.magnitude * 1.5) )
+	local.earthquake timedecay 		( local.decay  local.decay  local.decay )
+	local.earthquake radius 		local.radius	
+	local.earthquake triggereffect 	$world 		//do the jitter
+
+}end
+
+//[200] Smithy - use this if you want an earthquake to run for a specific player
+//e.g. local.player thread coop_mod/main.scr::earthquake_player 10 .4
+//=========================================================================
+earthquake_player local.duration local.magnitude:{
+//=========================================================================
+	if (level.gametype == 0 || !self){ end }
+
+	local.player = self
+
+	local.decay = local.magnitude / local.duration
+
+	local.earthquake = spawn ViewJitter
+	local.earthquake donedeath 		game.true 			//removes after firing
+	local.earthquake edgeeffect 	1.0
+	local.earthquake duration 		local.duration
+	local.earthquake jitteramount 	( local.magnitude local.magnitude (local.magnitude * 1.5) )
+	local.earthquake timedecay 		( local.decay  local.decay  ((local.magnitude * 1.5) / local.duration))
+	local.earthquake radius 		96	
+	local.earthquake triggereffect 	local.player 		//do the jitter
+
+	//attach it to player
+	//i won't use glue/bind as the engine has MAX_GLUE_CHILDREN of 8 per ent and it could mess up scripts
+	while (local.earthquake && isAlive local.player && local.player.dmteam != "spectator"){
+		local.earthquake origin local.player.origin
+		waitframe
+	}
+
+	if (local.earthquake){
+		local.earthquake delete
+	}
+
 }end
 
 
