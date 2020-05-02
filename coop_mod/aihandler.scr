@@ -77,6 +77,11 @@ actorHandler:{
 	thread addActorToArray
 
 	self waittill death 				//'death' event is unregistered if an AI is killed or if they are removed
+
+	if (self.flags["coop_turretUnholsterThread"]){  	//terminate unholster thread to avoid any mem leaks
+		self.flags["coop_turretUnholsterThread"] end
+	}
+
 	waitframe 							//[200] Smithy - fixes NULL entities in array and other abnormalities
 
 	thread removeActorFromArray
@@ -574,6 +579,25 @@ setEnemyAttackStates:{
 			local.enemy.no_idle 							= game.false
 			local.enemy.flags["coop_isAttacking"] 			= game.true
 			local.enemy.flags["coop_actorResetThinkstate"] 	= game.false
+		}
+	}
+}end
+
+//Improves unholstering of MG gunners...
+//This will help stop any delays with AI running around weaponless
+//before the attack.scr hack fix kicks in. We'll keep the other fix as a backup,
+//but hopefully this func will execute first, at least most of the time.
+//=========================================================================
+leaveTurretUnholstered:{
+//=========================================================================
+	if (self.flags["coop_turretUnholsterThread"]){ end }
+	self.flags["coop_turretUnholsterThread"] = local
+	self waittill hasenemy
+	if (isAlive self){
+		if (self.flags["coop_mainActorWeapon"]){
+			self use self.flags["coop_mainActorWeapon"]    //this may actually be what we should do for replace.scr unholster stuff...
+			wait game.ms
+			self activatenewweapon "dual"                  //...because these two commands are what the engine does internally on unholster command
 		}
 	}
 }end
