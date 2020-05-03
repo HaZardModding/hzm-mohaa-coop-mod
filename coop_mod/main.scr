@@ -146,7 +146,6 @@ main:{
 	thread managePlayers														//chrissstrahl - handles spawning, respawning spectator, generic stuff each frame
 	waitthread coop_mod/spawnlocations.scr::main								//chrissstrahl - create spawnpoints for coop
 	waitthread mom/mom.scr::setup "coop_mod/mom_actions.scr" 2 "coop_mom"		//chrissstrahl - set coop mod specific mom file
-	waitthread coop_checkMaps													//chrissstrahl - check if mapceck should be done
 
 	level.coop_mainScriptLoaded = game.true 									//[200] Smithy - used by waitForMainScript to check if main has loaded
 
@@ -155,6 +154,8 @@ main:{
 		println "(" local.threadName "): ***** Loaded *****. Continuing " level.coop_waitingForMainThreads " waiting threads at " level.time "..." //better reporting
 		thread coop_mod/eventsystem.scr::doEvent "mainScriptLoaded" 			//[200] Smithy - used by itemhandler and aihandler (+ future scripts) to notify that main has been loaded
 	}
+	
+	waitthread coop_checkMaps													//chrissstrahl - check if map-check should be done //[200] moved here, because of events system
 }end
 
 //[200] chrissstrahl - have a seperate handle for singleplayer
@@ -174,7 +175,7 @@ spWaitForPlayer:{
 //=========================================================================
 coop_checkMaps:{
 //=========================================================================
-	if((int(getcvar("coop_dev")) == 1) && (int(getcvar("coop_check")) == 1)){
+	if((int(getcvar("coop_dev")) == 1) && (int(getcvar("coop_diag")) == 1)){ //[200] chrissstrahl - changed to coop_diag cuz other coop mod also uses same cvar
 		//[200] chrissstrahl - make sure we have at least two clients so it does not wait for player ready in loadingscreen
 		if(int(getcvar("sv_maxclients")) < 2){
 			setcvar "sv_maxclients" 2
@@ -183,7 +184,7 @@ coop_checkMaps:{
 		//[200] chrissstrahl - if we come full circle we can stop
 		if( level.coopNextMap == "briefing/briefing1" ){
 			setcvar "timescale" 1 //[200] chrissstrahl - restore timescale
-			setcvar "coop_check" "0"
+			setcvar "coop_diag" "0"
 			end
 		}
 		setcvar "timescale" 3 //[200] chrissstrahl - speedup testing
