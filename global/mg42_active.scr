@@ -244,25 +244,19 @@ mg42_gunner_start:{
 		//chrissstrahl - allied assault
 		if(level.coop_aaMap){
 			self.setaimtarget = exec coop_mod/replace.scr::player_closestTo self	//chrissstrahl - grab closest player in coop
-			self stopfiring
-			self.isfiring = 0
-			self.target_changed = 1
-		}
-		//chrissstrahl - breaktrough
-		else{
+		}else{ //chrissstrahl - breaktrough
 			if(self.team == "german" ){
-				//chrissstrahl - make this coop compatible
 				self.setaimtarget = exec coop_mod/replace.scr::player_closestTo self	//chrissstrahl - grab closest player in coop
-			}
-			else if(self.team == "american"){//chrissstrahl
+			}else if(self.team == "american"){ //chrissstrahl
 				self.setaimtarget = self findenemy
 			}
-			// the one with findenemy is the smarter way to do this, but whatever, at least the americans will be smart
-		//	self.setaimtarget = self findenemy
-			self stopfiring
-			self.isfiring = 0
-			self.target_changed = 1
+			//the one with findenemy is the smarter way to do this, but whatever, at least the americans will be smart
+			//self.setaimtarget = self findenemy
 		}
+		self stopfiring 			//[200] Smithy - neater when put here
+		self.isfiring = 0
+		self.target_changed = 1
+		self.player_enemy = 0 		//[200] Smithy - reset player_enemy var as we have multiple players now
 	}
 	else if (self.setaimtarget != self.current_target)
 	{
@@ -310,8 +304,8 @@ mg42_gunner_start:{
 		wait .5
 		goto mg42_main_fireloop
 	}else{
-		//[200] Smithy - self.player_enemy stopped it running more than once
-		if (self.current_target.targetname == "player"){	//chrissstrahl - make this coop compatible
+		//[200] Smithy - self.player_enemy reinstated
+		if (!self.player_enemy && self.current_target.targetname == "player"){	//chrissstrahl - make this coop compatible
 			//*** check to see if the player is disguised
 			//[200] Smithy - "coop_isAttacking" condition so MGs behave properly during disguise missions
 			if ((self.current_target.is_disguised == 1 || level.gametype != 0 && level.coop_threatbias == "ignoreme") && !self.gunner.flags["coop_isAttacking"]){ //chrissstrahl - make this coop compatible
@@ -320,11 +314,9 @@ mg42_gunner_start:{
 				wait .5
 				goto mg42_main_fireloop
 			}
-			//println "FIRING LOOP"
-			//self.player_enemy = 1 //[200] Smithy - nope, we want this to run more than once
+			self.player_enemy = 1 //[200] Smithy - self.player_enemy reinstated
 		}
 		if (self.isfiring == 2){
-			//println "MG42: wait time to start firing again: " self.cover_time
 			wait self.cover_time
 			self startfiring
 			self.isfiring = 1
