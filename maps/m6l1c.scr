@@ -10,14 +10,7 @@ main:{
 	level.coop_debugSpawn = 0 			//Pasted by Criminal for coop comp. - enable spawnpoint debug (make visible)
 	waitthread coop_mod/main.scr::main      //Pasted by Criminal for coop comp. - start coop mod extensions
 	
-	//[200] chrissstrahl - force starting weapons
-	level.coop_forcePrimary		= "weapons/ThompsonSMG.tik"		//chrissstrahl - force weapon on spawn
-	level.coop_forceSecondary	= "weapons/silencedpistol.tik"	//chrissstrahl - force weapon on spawn
-	/*
-	//chrissstrahl - prevent ai from crouching and proneing, especially in tower
-	level.aipronechance = 0
-	//level.aicrouchchance = 1 //[200] chrissstrahl - I think we don't need this
-	*/
+	//[200] Smithy - removed force weapon stuff
 	
 	thread global/exploder.scr::main
 	exec global/loadout.scr maps/m6l1c.scr
@@ -37,7 +30,7 @@ main:{
 	exec coop_mod/replace.scr::tmstop 	// Criminal - coop compabitility.
 
 //	level waitTill spawn //chrissstrahl
-	waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl - coop compabitility
+	waitthread coop_mod/replace.scr::waitForPlayer 	//chrissstrahl - coop compabitility
 	
 	//[200] chrissstrahl - debuging for the alarm zones system
 	//thread coop_debug_playerzones
@@ -47,9 +40,13 @@ main:{
 	local.spawnedhealth.origin = ( -2984 1056 -6)
 	level.skillz = getcvar(skill)
 
-	if (gametype==0){//Criminal - Singleplayer.
+	if (level.gametype==0){//Criminal - Singleplayer. //[200] Smithy - tut tut, Criminal
 		$player useweaponclass pistol
-	}else{ //Criminal - Multiplayer.
+	}
+
+	//[200] Smithy - this is no longer needed now we have itemhandler
+	/*
+	else{ //Criminal - Multiplayer.
 		for (local.i=1; local.i <= $player.size; local.i++){
 			local.player = $player[local.i]
 			if (local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0){ //chrissstrahl - dead players ain't no using any weapon
@@ -57,9 +54,9 @@ main:{
 			}
 		}
 	}
-	
+	*/
 	//chrissstrahl - have it on in mp
-	level.snowblow = 1
+	//level.snowblow = 1 //[200] Smithy - doesn't seem to last long...
 	//chrissstrahl - handle right in sp
 	if(level.gametype == 0){
 		level.snowblow = getcvar(snowblow)
@@ -141,14 +138,13 @@ main:{
 
 	thread asistweap1
 	thread asistweap2
-	//wait 5
+	
 	//chrissstrahl - coop test - move to ammonition room
-	//$player kill
-	//local.hackNumber = waitthread coop_mod/main.scr::hackGametypeOn NIL
-	//$player playsound pickup_uniform wait
-	//waitthread coop_mod/main.scr::hackGametypeOff local.hackNumber NIL
-	//$player waittill sounddone
-	//iprintlnbold_noloc("waittill done")
+	//wait 10
+	//$player origin (4859 3111 -550)
+
+	//[200] Smithy - turn off respawns for the STGs
+	thread turnOffSTGRespawns
 }end
 
 //============================================================================
@@ -261,29 +257,51 @@ asistweap2:{
 	thread playeruseifexist $weapon4
 }end
 
+//[200] Smithy - don't allow these to respawn. stops them reappearing
+//after the bomb has detonated
+//============================================================================
+turnOffSTGRespawns:{
+//============================================================================
+	$weapon.flags["coop_itemRespawnTime"] 	= -1 
+	$weapon1.flags["coop_itemRespawnTime"] 	= -1  
+	$weapon2.flags["coop_itemRespawnTime"] 	= -1  
+	$weapon3.flags["coop_itemRespawnTime"] 	= -1 
+    $weapon4.flags["coop_itemRespawnTime"] 	= -1 
+    $weapon5.flags["coop_itemRespawnTime"] 	= -1 
+   	$weapon6.flags["coop_itemRespawnTime"] 	= -1 
+   	$weapon7.flags["coop_itemRespawnTime"] 	= -1 
+    $weapon8.flags["coop_itemRespawnTime"]	= -1 
+}end
+
 //============================================================================
 playeruseifexist local.thing:{
 //============================================================================
 //hack - picks up mp44's
-	if(local.thing != NULL){ end }
-	
-	iprintlnbold_noloc("DEV: playeruseifexist 1")
+	//if(local.thing != NULL){ end } //[200] Smithy - erm... not equal to NULL? Wrong way around. tut tut.
+	if(local.thing == NULL){ end } 	 //[200] Smithy - better. no wonder it wasn't working...
+
+	//iprintlnbold_noloc("DEV: playeruseifexist 1")
 	
 	if(level.gametype==0){ // Criminal - Singleplayer.
 		local.thing douse $player
 	}
+	/* [200] Smithy - dont take a load of them for one player. we can now let players share them.
 	else { // Criminal - Multiplayer.
+
+		
 		local.force = 0 //chrissstrahl
 		for (local.i = 1; local.i <= $player.size; local.i++) {
 			local.player = $player[local.i]
 			if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0){
-//iprintlnbold_noloc("DEV: playeruseifexist 2")
+
 				local.thing douse local.player
 				break //chrissstrahl - we need only one to be valid, object can be used only once, I suppose
 			} // Use only if player does exist, is in whatever team and is alive.
 		}
-//iprintlnbold_noloc("DEV: playeruseifexist 3")
+
+
 		//chrissstrahl - force to all
+		//[200] Smithy - no longer needed
 		for (local.i = 1; local.i <= $player.size; local.i++) {
 			local.player = $player[local.i]
 			if(local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0){
@@ -291,7 +309,9 @@ playeruseifexist local.thing:{
 				exec coop_mod/main.scr::playerForcePrimary local.player "models/weapons/mp44.tik"
 			}
 		}
+
 	}
+	*/
 }end
 
 //============================================================================
@@ -303,10 +323,15 @@ holstergunners:{
 	$hallturret_gunner forceactivate
 	wait 1	
 
-	$frontturret_gunner holster
-    $rearturret_gunner holster
-    $rearturret2_gunner holster
-    $hallturret_gunner holster
+	//[200] Smithy - coop compatible
+	$frontturret_gunner thread coop_mod/replace.scr::holster
+    $rearturret_gunner 	thread coop_mod/replace.scr::holster
+    $rearturret2_gunner thread coop_mod/replace.scr::holster
+    $hallturret_gunner 	thread coop_mod/replace.scr::holster
+	//$frontturret_gunner holster
+    //$rearturret_gunner holster
+    //$rearturret2_gunner holster
+    //$hallturret_gunner holster
 	$rearturret_gunner exec global/disable_ai.scr
 }end
 
@@ -330,9 +355,9 @@ huddrawrefresh:{
 		self waittill trigger
 		if(level.hackresetaiguyoutsid != 1)
 		{
-			level.hackresetaiguyoutsidecontinued = 1
-			$haktoutsideguy1 exec global/disable_ai.scr
-			$haktoutsideguy2 exec global/disable_ai.scr
+			level.hackresetaiguyoutsidecontinued = 1 		
+			$haktoutsideguy1 exec global/disable_ai.scr //[200] Smithy - heh, funny thing is that im doing this 'hack' now to get coop to work with disguises...
+			$haktoutsideguy2 exec global/disable_ai.scr //[200] Smithy - i didn't realise the original devs tried it at some point too...
 			wait 2
 	          $haktoutsideguy1 exec global/enable_ai.scr
 	          $haktoutsideguy2 exec global/enable_ai.scr
@@ -437,7 +462,7 @@ suitpickup:{
 	$suit remove
 	
 	//[200] chrissstrahl - lets see if it works in mp as well
-	exec coop_mod/replace.scr::has_disguise 1
+	//exec coop_mod/replace.scr::has_disguise 1 [200] Smithy - not needed now
 
 	thread soldierwalk1
 	thread soldierwalk2
@@ -572,7 +597,8 @@ soldierchatsequence:{
 soldiersayto local.talker local.listener local.spot local.word:{
 //============================================================================
 	if((isalive local.talker) && local.talker.thinkstate != "attack"){
-		local.talker idlesay local.word
+		//local.talker idlesay local.word 										//[200] Smithy
+		local.talker thread coop_mod/replace.scr::say_wait local.word "idle" 	//[200] Smithy - coop compatible
 		local.talker waittill saydone
 	}
 	if(local.listener){
