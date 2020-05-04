@@ -398,7 +398,8 @@ friendly_message3:
 		end
 	}
 	println "Z:       saying friendly_message3"
-	level.ramsey say dfr_cover_01j_1		// Take cover!
+	//level.ramsey say dfr_cover_01j_1		// Take cover! //[200] Smithy
+	level.ramsey thread coop_mod/replace.scr::say_wait "dfr_cover_01j_1" //[200] Smithy - stops callback spam in log
 	end
 
 friendly_message4:
@@ -562,7 +563,8 @@ level.s1_finished = 1
 		
 	//*** Private Durden screams, everyone stops looking at each other, and Durden and runs for cover and a sniper position looking out front
 
-		level.durden say warn_player_cover	//"GET DOWN!"
+		//level.durden say warn_player_cover	//"GET DOWN!" //[200] Smithy 
+		level.durden thread coop_mod/replace.scr::say_wait "warn_player_cover" //[200] Smithy - stops callback error in log
 		level.durden lookat NULL
 		level.durden turnto NULL
 		level.durden crouchto $scene2_durden_cover_node
@@ -598,9 +600,9 @@ end
 //============================================================//
 
 scene2_locked_sound:
-
-	$scene2_airborne_door playsound m3l2_blocked_door1 wait	//Door is blocked, not necessarily locked, and is not openable at this time
-	$scene2_airborne_door waittill sounddone
+	//[200] Smithy - removed 'wait' after playsound to stop callback message in logs
+	$scene2_airborne_door playsound m3l2_blocked_door1 //wait	//Door is blocked, not necessarily locked, and is not openable at this time
+	//$scene2_airborne_door waittill sounddone //[200] Smithy - this is not needed at all. will stop callback errors and mem leaks in coop
 
 end
 
@@ -1005,7 +1007,8 @@ scene4:
 
 	while (level.playerposition == 0)
 	{
-		level.ramsey say dfr_M3L3_315j_2	//"Powell, help me cover the front!"
+		//level.ramsey say dfr_M3L3_315j_2	//"Powell, help me cover the front!" //[200] Smithy
+		level.ramsey thread coop_mod/replace.scr::say_wait "dfr_M3L3_315j_2" //[200] Smithy - coop compatible
 		level.ramsey waittill saydone
 		wait 30
 	}
@@ -1536,10 +1539,14 @@ scene6:
 			end
 		if (level.got_radio == 1)
 		{
-			local.binoculars = getboundkey1 "toggleitem"
-			local.fire = getboundkey1 "+attackprimary"
-			iprintlnbold_noloc (loc_convert_string "To call in air support switch to the binoculars. ( ") (loc_convert_string local.binoculars) (loc_convert_string " ) Then look at the target and press your Fire key. ( ") (loc_convert_string local.fire) (loc_convert_string " )")
-
+			if (level.gametype == 0){
+				local.binoculars = getboundkey1 "toggleitem"
+				local.fire = getboundkey1 "+attackprimary"
+				iprintlnbold_noloc (loc_convert_string "To call in air support switch to the binoculars. ( ") (loc_convert_string local.binoculars) (loc_convert_string " ) Then look at the target and press your Fire key. ( ") (loc_convert_string local.fire) (loc_convert_string " )")
+			}else{
+				iprintlnbold_noloc ("To call in air support switch to the binoculars. Then look at the target and press your Fire key.")
+			}
+		
 	//		iprintlnbold "To call in air support switch to the binoculars. Then look at the target and press your Fire key."
 		}
 		wait 12
