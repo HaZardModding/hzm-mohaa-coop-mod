@@ -128,7 +128,7 @@ main:{
 
     //list of maps to exclude from custom pain handler
     //disguise maps should be excluded, as when in disguise the engine doesn't call pain.scr
-    level.coop_painHandlerExclusions 		= "m3l1a"::"m2l2a"::"m6l1c"
+    level.coop_painHandlerExclusions 		= "m3l1a"::"m2l2a"::"m2l2b"::"m6l1c"
     															//you can exclude entire games from this by using first char and wildcard *
     															//e.g to exclude all BT maps add "e*" to list
     //[200] Smithy - used in coop_mod/itemhandler.scr
@@ -144,6 +144,7 @@ main:{
 
 	thread setupServer															//chrissstrahl - inizial setup, might be deprecated
 	thread managePlayers														//chrissstrahl - handles spawning, respawning spectator, generic stuff each frame
+	thread coop_mod/itemhandler.scr::playerSpawnEvent 							//[200] Smithy - enable the spawn event thread used for weapon loadouts, disguises etc..
 	waitthread coop_mod/spawnlocations.scr::main								//chrissstrahl - create spawnpoints for coop
 	waitthread mom/mom.scr::setup "coop_mod/mom_actions.scr" 2 "coop_mom"		//chrissstrahl - set coop mod specific mom file
 
@@ -732,10 +733,13 @@ managePlayers:{
 		}
 
 //[200] chrissstrahl - LMS - check if condistions have changed
-		waitthread lmsCheckLifes local.prevPlayerCount local.playerCount
+		waitthread lmsCheckLifes local.prevPlayerCount local.playerCount //[200] Smithy - NOTE: this is where this loop 'waits'
 
 //[200] chrissstrahl - keep track of player count
 		local.prevPlayerCount = local.playerCount
+		//[200] Smithy - a waitframe here would be more readable
+	}	//[200] Smithy - added bracket - i was finding it hard to read without proper brackets! this is for outer while loop
+		//[200] Smithy - i guess the bracket next to 'end' was used in its place...not good
 }end
 
 //[200] chrissstrahl - this is called if the number of player has changed
@@ -1893,34 +1897,34 @@ lmsForceSpectatorHandle local.player:{
 lmsCheckLifes local.prevPlayerCount local.playerCount:{
 //=========================================================================
 //[200] chrissstrahl - LMS - check if new players should be allowed to join
-		local.prevLifes = level.coop_lmsLifes
-		level.coop_lmsLifes = int(getcvar("coop_lmsLifes"))
-		if(level.coop_lmsLifes <= 0 ){
-			level.coop_lmsLifes = 0
-			level.coop_lmsAllowJoin = 1
+	local.prevLifes = level.coop_lmsLifes
+	level.coop_lmsLifes = int(getcvar("coop_lmsLifes"))
+	if(level.coop_lmsLifes <= 0 ){
+		level.coop_lmsLifes = 0
+		level.coop_lmsAllowJoin = 1
 
-			if(local.prevLifes != 0){
-				iprintlnbold_noloc("COOP: LMS inactive - Joining allowed")
-			}
-		}else{
-			//prevent players from reconnecting and starting over
-			//effects also players that connect for the first time (we can't detect that)
-			if(local.prevPlayerCount > local.playerCount){
+		if(local.prevLifes != 0){
+			iprintlnbold_noloc("COOP: LMS inactive - Joining allowed")
+		}
+	}else{
+		//prevent players from reconnecting and starting over
+		//effects also players that connect for the first time (we can't detect that)
+		if(local.prevPlayerCount > local.playerCount){
+			local.timePassed = 0
+			if(level.coop_gameStartedAt != NIL){
+				local.timePassed = (level.time - level.coop_gameStartedAt)
+			}else{
 				local.timePassed = 0
-				if(level.coop_gameStartedAt != NIL){
-					local.timePassed = (level.time - level.coop_gameStartedAt)
-				}else{
-					local.timePassed = 0
-				}
+			}
 
-				if(local.timePassed > 30){
-					iprintlnbold_noloc("COOP: LMS active - No late joining")
-					level.coop_lmsAllowJoin = 0
-				}
+			if(local.timePassed > 30){
+				iprintlnbold_noloc("COOP: LMS active - No late joining")
+				level.coop_lmsAllowJoin = 0
 			}
 		}
-		waitframe
 	}
+	waitframe //[200] Smithy - it would be more readable if this was in managePlayers - it took me a while to find where the wait was
+	//[200] Smithy - removed bracket - i was finding it hard to read with extra brackets lying around
 }end
 
 //[200] Chrissstrahl - turns g_gametype cvar hack on
