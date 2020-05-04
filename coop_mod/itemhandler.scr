@@ -86,7 +86,7 @@ main local.thread local.arg1 local.arg2:{
 		}
 		setcvar "g_healrate" "100000" 			//this didn't seem to work in config. adding it here does
 		setcvar "g_healthdrop" "0"				//we really don't need big health kits dropping in coop
-		thread playerSpawnEvent 				//enable the spawn event thread used for weapon loadouts
+		//thread playerSpawnEvent 				//enable the spawn event thread used for weapon loadouts //now done in main.scr::main
 	}
 
 	//if we don't allow health items, delete them and end here
@@ -648,15 +648,27 @@ managePlayerInventory:{
 	thread deletePreviousInvWeapons
 	group.player takeall
 
-	if (group.player.dmteam == "spectator"){ 	//a player will only 'spawn' as a spectator when joining the game
-		thread resetPlayerAmmo group.player
-		thread resetPlayerWeapons group.player
+
+	//[200] Smithy - check if this is a briefing mission. if so, don't allow weapons.
+	if (level.coop_mapname[0] == "b"){
+		local.mapPrefix 	= "briefing"
+		local.isBriefing 	= game.true
+		for (local.i = 0; local.i <= (local.mapPrefix.size - 1); local.i++){
+			local.isBriefing = local.isBriefing && level.coop_mapname[local.i] == local.mapPrefix[local.i]
+		}
+		//[200] Smithy - end here if it's a briefing mission which means no weapons
+		if (local.isBriefing){ end }
+	}
+
+	//if (group.player.dmteam == "spectator"){ 	//a player will only 'spawn' as a spectator when joining the game
+	//	thread resetPlayerAmmo group.player
+	//	thread resetPlayerWeapons group.player
 		//lets take advantage of having no weapons to give player a disguise if they need one
-		if (level.coop_enableDisguises && !group.player.is_disguised){
+	//	if (level.coop_enableDisguises && !group.player.is_disguised){
 			//iprintlnbold_noloc("GIVING PLAYER THE DISGUISE ON CONNECT")
 			//waitthread giveDisguiseOnConnect
-		}
-	}else{
+	//	}
+	//}else{
 		//lets take advantage of having no weapons to give player a disguise if they need one
 		if (level.coop_enableDisguises && !group.player.is_disguised){
 			//iprintlnbold_noloc("GIVING PLAYER THE DISGUISE ON SPAWN")
@@ -673,7 +685,7 @@ managePlayerInventory:{
 
 		//either give them a default loadout or give them their old one
 		thread giveWeaponLoadout !(level.coop_retainInventory && thread playerHasInventory)
-	}
+	//}
 }end
 
 //=========================================================================
@@ -957,8 +969,19 @@ giveWeaponLoadout local.default:{
 		group.player.flags["coop_startingDisguise"] = game.false
 	}
 
-	if (isAlive group.player){ 	//unholster
+	if (isAlive group.player && !group.player.has_disguise){ 	//unholster
 		group.player useweaponclass level.coop_weaponUse
+	}
+
+	//improve spawning when in disguise mission! 
+	if (group.player.has_disguise){ 
+		if (group.player.flags["coop_activeWeapon"]){  //stop player holding weapon on spawn when in disguise
+			group.player deactivateweapon "dual"
+		}	
+		if (!group.player.flags["coop_holsterHint"]){
+			group.player iprint "Keep your weapon holstered when in disguise." game.true
+		}	
+		thread setIsDisguised group.player game.true //set initial disguise to true
 	}
 }end
 
@@ -1281,7 +1304,7 @@ enableClickablePapers local.guard local.player:{
 
 	if (!local.player.flags["coop_clickPapersHint"]){
 		local.player.flags["coop_clickPapersHint"] = game.true
-		local.player iprint ("When being asked for papers, you can press PRIMARY FIRE to show them.") 1
+		local.player iprint ("When being asked for papers, you can press (PRIMARY FIRE) to show them.") 1
 	}
 
 	local.player.flags["coop_clickablePapersEnabled"] = game.true
