@@ -272,8 +272,15 @@ setupServer:{
 	setcvar "g_gametypestring" "HZM_Coop_Mod"
 
 	//[200] Smithy
-	if (level.gametype != 2){
-		println "(coop_mod/main.scr::setupServer): Warning: Gametype is " level.gametype " on map load!"
+	if (level.coop_dedicated){
+		if (level.gametype != 2){
+			println "(coop_mod/main.scr::setupServer): ERROR: Gametype is " level.gametype " on dedicated server! Restarting..."
+			thread restartMap
+		}
+	}else{
+		if (level.gametype != 2){
+			println "(coop_mod/main.scr::setupServer): Warning: Gametype is " level.gametype " on map load!"
+		}
 	}
 }end
 
@@ -317,14 +324,7 @@ fixServer:{
 	waitframe
 
 	//this is a ugly way to do this, but the best result so far
-	setcvar "nextmap" (level.coop_mapname) //[200] chrissstrahl - fixed useing unfiltred mapname
-	setcvar "g_gametype" 0
-	bsptransition nextmap
-	setcvar "g_gametype" 2
-
-	//local.trigger = spawn trigger_changelevel map (getcvar("mapname"))
-	//waitframe
-	//local.trigger doActivate $world
+	thread loadMap level.coop_mapname game.false
 }end
 
 //forces player into allies team
@@ -2137,11 +2137,42 @@ earthquake_player local.duration local.magnitude:{
 	if (local.earthquake){
 		local.earthquake delete
 	}
-
 }end
 
+//[200] Smithy - restart the current map
+//=========================================================================
+restartMap:{
+//=========================================================================
+	local.mapname = getcvar "mapname"
+	if (local.mapname[local.mapname.size - 1] == "$"){
+		local.mapname = waitthread cleanText local.mapname "$"
+	}else{
+		local.mapname = (local.mapname+"$")
+	}
+	thread loadMap local.mapname game.true
+}end
 
+//[200] Smithy - load a map
+//=========================================================================
+loadMap local.name local.skipFade:{
+//=========================================================================
+	thread disableGameTypeChanges
+	setcvar "nextmap" (local.name)
+	setcvar "g_gametype" 0
+	bsptransition nextmap local.skipFade
+	setcvar "g_gametype" 2
+}end
 
-
+//[200] Smithy - global disabling of changeGameType hacks
+//=========================================================================
+disableGameTypeChanges:{
+//=========================================================================
+	local.threadName = "coop_mod/main.scr::disableGameTypeHacks"
+	level.coop_preventGameTypeChanges = game.true 				//[200] Smithy - stop any further changes via main.scr::changeGameType if there are any
+	if (level.coop_changeGameTypeThread){  						//[200] Smithy - stop the thread if one is running					
+		thread changeGameTypeDebug ("(" + local.threadName + "): Terminating " + level.coop_changeGameTypeThread.threadName + " thread for level change, and stopping any future calls.")
+		level.coop_changeGameTypeThread end
+	}
+}end
 
 
