@@ -2527,6 +2527,7 @@ state KILLED
 
 	entrycommands
 	{
+		exec coop_mod/events.scr "playerdeath" //[200] Smithy - trigger playerdeath event
 		nextpaintime -1 // allow all pain calls to work properly for death anim selection
 	}
 
