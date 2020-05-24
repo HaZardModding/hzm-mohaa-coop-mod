@@ -73,7 +73,6 @@ main local.thread local.arg1 local.arg2:{
 	wait game.ms 							//so entities have properly initialised
 	wait game.ms                            //two, so aihandler executes first if it is needed
 											//(otherwise, when actors spawn, the weapon is handled first)
-
 	if(self == NULL){ end }
 
 	//only init this once
@@ -86,7 +85,6 @@ main local.thread local.arg1 local.arg2:{
 		}
 		setcvar "g_healrate" "100000" 			//this didn't seem to work in config. adding it here does
 		setcvar "g_healthdrop" "0"				//we really don't need big health kits dropping in coop
-		//thread playerSpawnEvent 				//enable the spawn event thread used for weapon loadouts //now done in main.scr::main
 	}
 
 	//if we don't allow health items, delete them and end here
@@ -140,13 +138,14 @@ initialiseItem local.ammotype:{
 
 	//player weapons we spawn in
 	if (group.item.flags["coop_playerNewWeapon"]){
+
 		local.player = group.item.flags["coop_itemOwner"]
-		local.player.flags["coop_inventoryAmmo"][group.ammotype] = game.true
-		//iprintlnbold_noloc("ADDING " + group.model + " TO PLAYER INV")
-		if (!thread playerHasWeapon local.player group.item){ //add the weapon
-			thread addWeaponToInventory local.player group.item.model
-			//local.weaponIndex = (local.player.flags["coop_inventoryWeapon"].size + 1)
-			//local.player.flags["coop_inventoryWeapon"][local.weaponIndex] = group.model
+		if (isAlive local.player){
+			local.player.flags["coop_inventoryAmmo"][group.ammotype] = game.true
+
+			if (!thread playerHasWeapon local.player group.item){ //add the weapon
+				thread addWeaponToInventory local.player group.item.model
+			}
 		}
 		end //we don't fully initialise player weapons as they cannot be dropped
 	}
@@ -162,35 +161,30 @@ initialiseItem local.ammotype:{
 		//even though they are 'separate'.
 		//so no point processing these weapons!
 		//we need to make sure the item spawn time is the same as player spawn time
-		if (group.angles == (0 0 0) && group.item.origin == (0 0 0)){ 									//non-active player weapons retain 0 properties
-			local.offset = 0.001																		//because we wait at least 1ms before giving new weapons
-			local.playerSpawnTime = group.itemOwner.flags["coop_spawnEventTime"]						//store the player's spawn time
-			local.playerNum = group.itemOwner.entnum
-			//as disguising can take time we add this time up
-			while (group.itemOwner && group.itemOwner.flags["coop_startingDisguise"]){
-				if (group.itemOwner.flags["coop_spawnTimeOffset"]){
-					local.offset += group.itemOwner.flags["coop_spawnTimeOffset"]
-					break
+		if (group.angles == (0 0 0) && group.item.origin == (0 0 0)){ 										//non-active player weapons retain 0 properties
+			if (group.itemOwner){
+				local.offset = 0.001																		//because we wait at least 1ms before giving new weapons
+				local.playerSpawnTime = group.itemOwner.flags["coop_spawnEventTime"]						//store the player's spawn time
+				local.playerNum = group.itemOwner.entnum
+				//as disguising can take time we add this time up
+				while (group.itemOwner && group.itemOwner.flags["coop_startingDisguise"]){
+					if (group.itemOwner.flags["coop_spawnTimeOffset"]){
+						local.offset += group.itemOwner.flags["coop_spawnTimeOffset"]
+						break
+					}
+					wait game.ms
 				}
-				wait game.ms
-			}
-			if (group.itemSpawnTime - local.offset == local.playerSpawnTime){ 			//check if this item spawn time shares the parm.other spawn time
-				//println "(" local.threadName "): Default weapon " group.model " for Player " local.playerNum " ignored. This is expected behaviour."
-				end
-			}else{
-				//println "(" local.threadName "): Weapon " group.item " with model " group.model " has (0 0 0) origin. Checking to see if they need to be initialised..."
-				wait 3
-				if (group.item && group.item.angles == (0 0 0) && group.item.origin == (0 0 0)){
-					//println "(" local.threadName "): Weapon " group.item " with model " group.model " does not need initialisation. Stopping all handlers for it."
+				if (group.itemSpawnTime - local.offset == local.playerSpawnTime){ 			//check if this item spawn time shares the parm.other spawn time
 					end
 				}
 			}
+			waitthread uninitialiseTimer //check to see if we should stop init of item
 		}
 		//any weapons that make it here will be those placed in the world via BSP or script
 
 		waitthread setupGrenades //fix any nades laying around the level
 	}else if (group.isActorWeapon && !group.item.flags["coop_initialiseMe"]){
-		//OK, to cut down on threads i'll only handle actor weapon pickups
+		//OK, to cut down on threads i'll only handle actor weapon pickups``
 		//when they are dropped from their owner's hands on death
 		end
 	}
@@ -257,14 +251,12 @@ handleWeaponPickup:{
 						group.item targetname ("player" + local.player.entnum + "Inventory")
 					}
 					thread addWeaponToInventory local.player group.model
-					//local.weaponIndex = (local.player.flags["coop_inventoryWeapon"].size + 1)
-					//local.player.flags["coop_inventoryWeapon"][local.weaponIndex] = group.model
 					break
 				}else{
 					//on the off chance we can't deal with the weapon, print info and stop the handlers
-					println "(itemhandler.scr::handleWeaponPickup) *ERROR*: Weapon " group.item " with model " group.model " cannot be handled. Killing thread!"
-					if (group.pickupEventThread){ group.pickupEventThread end }
-					end
+					println "(itemhandler.scr::handleWeaponPickup) *ERROR*: Weapon " group.item " with model " group.model " cannot be picked up by " local.player.netname
+					//if (group.pickupEventThread){ group.pickupEventThread end }
+					//end //i dont think we should end here as other players may be able to use this even if we cant
 				}
 			}else{
 				//pickup event found straight away. hallelujah.
@@ -329,6 +321,16 @@ waitTillPickupEvent:{
 			if (group.droppedItemLifeThread){ group.droppedItemLifeThread end }
 			end
 		}
+	}
+}end
+
+//if the item is still at default (0 0 0) origin it means it's probably not used
+//=========================================================================
+uninitialiseTimer:{
+//=========================================================================
+	wait 3
+	if ((group.item && group.item.angles == (0 0 0) && group.item.origin == (0 0 0)) || !group.item){
+		parm.previousthread end
 	}
 }end
 
@@ -621,7 +623,8 @@ playerSpawnEvent:{
 
 	while (1){
 		level waittill playerspawn
-		parm.other thread managePlayerInventory //new thread group
+		parm.other thread managePlayerInventory 		//new thread group
+		parm.other.flags["coop_isAlive"] = game.true 	//he's now alive :)
 	}
 }end
 
@@ -633,6 +636,7 @@ managePlayerInventory:{
 //=========================================================================
 
 	group.player = self
+	group.thread["managePlayerInventory"] = local
 
 	//set some default flags for unused weapon offset calcs
 	group.player.flags["coop_spawnEventTime"] 	= level.time
@@ -648,50 +652,50 @@ managePlayerInventory:{
 	thread deletePreviousInvWeapons
 	group.player takeall
 
-
-	//[200] Smithy - check if this is a briefing mission. if so, don't allow weapons.
+	//if no weapons are allowed
+	if (level.coop_noWeapon){ end }	
+	
+	//[200] Smithy - check if this is a briefing mission. if so, don't allow weapons
 	if (level.coop_mapname[0] == "b"){
 		local.mapPrefix 	= "briefing"
 		local.isBriefing 	= game.true
 		for (local.i = 0; local.i <= (local.mapPrefix.size - 1); local.i++){
 			local.isBriefing = local.isBriefing && level.coop_mapname[local.i] == local.mapPrefix[local.i]
 		}
-		//[200] Smithy - end here if it's a briefing mission which means no weapons
 		if (local.isBriefing){ end }
 	}
 
-	//if (group.player.dmteam == "spectator"){ 	//a player will only 'spawn' as a spectator when joining the game
-	//	thread resetPlayerAmmo group.player
-	//	thread resetPlayerWeapons group.player
-		//lets take advantage of having no weapons to give player a disguise if they need one
-	//	if (level.coop_enableDisguises && !group.player.is_disguised){
-			//iprintlnbold_noloc("GIVING PLAYER THE DISGUISE ON CONNECT")
-			//waitthread giveDisguiseOnConnect
-	//	}
-	//}else{
-		//lets take advantage of having no weapons to give player a disguise if they need one
-		if (level.coop_enableDisguises && !group.player.is_disguised){
-			//iprintlnbold_noloc("GIVING PLAYER THE DISGUISE ON SPAWN")
-			waitthread giveDisguiseOnSpawn group.player
-		}
-		//as player models reset on spawn re-give them the uniform if they need one
-		if (level.coop_enableDisguises && level.coop_uniformOnSpawn && group.player.flags["coop_hasDisguise"] && group.player.has_disguise){
-			thread giveUniformToPlayer group.player
-		}
-		//if it's a new player and they do not have the papers flag
-		if (level.coop_itemPapers && !group.player.flags["coop_hasPapers"]){
-			thread givePapersFlag group.player
-		}
+	//lets take advantage of having no weapons to give player a disguise if they need one
+	if (level.coop_enableDisguises && !group.player.is_disguised){
+		waitthread giveDisguiseOnSpawn group.player
+	}
+	//as player models reset on spawn re-give them the uniform if they need one
+	if (level.coop_enableDisguises && level.coop_uniformOnSpawn && group.player.flags["coop_hasDisguise"] && group.player.has_disguise){
+		thread giveUniformToPlayer group.player
+	}else{
+		thread takeUniformFromPlayer group.player
+	}
+	//if it's a new player and they do not have the papers flag
+	if (level.coop_itemPapers && !group.player.flags["coop_hasPapers"]){
+		thread givePapersFlag group.player
+	}
 
-		//either give them a default loadout or give them their old one
-		thread giveWeaponLoadout !(level.coop_retainInventory && thread playerHasInventory)
-	//}
+	//either give them a default loadout or give them their old one
+	thread giveWeaponLoadout !(level.coop_retainInventory && thread playerHasInventory)
+}end
+
+//=========================================================================
+takeUniformFromPlayer local.player:{
+//=========================================================================
+	local.player stufftext "dm_playermodel american_army"
+	local.player.model = "models/player/american_army.tik"
 }end
 
 //=========================================================================
 giveUniformToPlayer local.player:{
 //=========================================================================
-	//end //this needs further testing...
+	//TODO: this needs further testing...
+	local.player stufftext "dm_playermodel german_waffenss_officer"
 	local.player.model = "models/player/german_waffenss_officer.tik"
 }end
 
@@ -739,6 +743,20 @@ giveDisguise local.player:{
 //=========================================================================
 	local.threadName = "coop_mod/itemhandler.scr::giveDisguise"
 
+	//make sure this isn't a concurrent func
+	//may help stop any issues with gametype swap
+	if (level.coop_disguisingInProgress){
+		while (level.coop_disguisingInProgress){
+			wait game.ms
+		}
+		if (!isAlive local.player || local.player.dmteam == "spectator"){
+			group end //stop any outstanding external threads (managePlayerInventory)
+			local end //stop this thread
+		}
+	}
+
+	level.coop_disguisingInProgress = game.true
+
 	//temporarily force enemies into idle thinkstate so engine allows us to disguise properly (criterion 1)
 	if (thread coop_mod/aihandler.scr::anyEnemiesInAttackState){
 		local.resetAttackStates = game.true
@@ -759,6 +777,8 @@ giveDisguise local.player:{
 	if (local.resetAttackStates){
 		thread coop_mod/aihandler.scr::setEnemyAttackStates
 	}
+
+	level.coop_disguisingInProgress = game.false
 }end
 
 //gives all players the diguise
@@ -916,7 +936,6 @@ activatePlayerWeapon:{
 takeAllDisguises:{
 //=========================================================================
 	local.threadName = "coop_mod/itemhandler.scr::takeAllDisguises"
-	//iprintlnbold_noloc("disguises permanently disabled!")
 	level.coop_enableDisguises 	= game.false
 	level.coop_uniformOnSpawn 	= game.false
 
@@ -962,28 +981,31 @@ giveWeaponLoadout local.default:{
 
 	group.player holster
 
-	wait 0.2								//a little wait is nice before unholster (200ms)
-
-	//reset disguise offset stuff
-	if (group.player){
-		group.player.flags["coop_startingDisguise"] = game.false
-	}
-
-	if (isAlive group.player && !group.player.has_disguise){ 	//unholster
-		group.player useweaponclass level.coop_weaponUse
-	}
-
 	//improve spawning when in disguise mission! 
 	if (group.player.has_disguise){ 
-		if (group.player.flags["coop_activeWeapon"]){  		//stop player holding weapon on spawn when in disguise
-			group.player deactivateweapon "dual"
-			group.player.flags["coop_activeWeapon"] = NULL 	//he won't have a weapon
-		}	
+		thread setIsDisguised group.player game.true //set initial disguise to true
 		if (!group.player.flags["coop_holsterHint"]){
 			group.player iprint "Keep your weapon holstered when in disguise." game.true
 			group.player.flags["coop_holsterHint"] = game.true //duh, set it as hinted
 		}	
+		wait 0.3
+		if (group.player){
+			group.player thread deactivatePlayerWeapon
+		}
 		thread setIsDisguised group.player game.true //set initial disguise to true
+	}else{	
+		wait 0.3
+		if (group.player){
+			group.player thread deactivatePlayerWeapon
+		}
+		waitframe
+		if (isAlive group.player && !group.player.has_disguise){ 	//unholster
+			group.player useweaponclass level.coop_weaponUse
+		}
+	}
+	//reset disguise offset stuff
+	if (group.player){
+		group.player.flags["coop_startingDisguise"] = game.false
 	}
 }end
 
