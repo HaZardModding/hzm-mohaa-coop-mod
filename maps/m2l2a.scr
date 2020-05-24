@@ -15,11 +15,12 @@
 main:{
 //=========================================================================
 	level.coop_aaMap = 1				//chrissstrahl - let global scripts know this is a AA level
-	//level.coop_playerHasDisguise = 1	//chrissstrahl - 
 	level.coopPrevMap = "m2l1"			//chrissstrahl - set previouse map (for mom voteing)
 	level.coopNextMap = "m2l2b"			//chrissstrahl - set next map (for mom voteing)
-	level.coop_noWeapon	= 1				//chrissstrahl - players are suppose to have no weapons
 	waitthread coop_mod/main.scr::main 	//chrissstrahl - start coop mod extensions
+
+	level.coop_enableDisguises 	= game.true 	//[200] Smithy - mark this map as disguise enabled on load
+	level.coop_uniformOnSpawn 	= game.false 	//[200] Smithy - players shouldn't have the german uniform to begin with
 	
 	//chrissstrahl - setup stuff that is needed
 	if(level.gametype != 0){
@@ -610,7 +611,7 @@ end
 
 guygo local.spot local.lookspot:
 	self.avoidplayer = 0
-	self exec global/walkto.scr local.spot
+	self exec global/walkto.scr $(local.spot) //[200] Smithy - ok, why did this ever work without brackets? lol //local.spot
 	self waittill movedone
 	self exec global/turnto.scr local.lookspot
 end
@@ -626,11 +627,13 @@ likeynorway:
 	level.guythathatesnorway type_disguise "none"
 	$suit remove
 	$papers1 remove
-	iprintlnbold "Be prepared to show your papers when asked."
-	
+
 	if(level.gametype == 0){//chrissstrahl - made coop compatible
 		local.key = getboundkey1 "toggleitem"
 		iprintlnbold_noloc (loc_convert_string "Press the ( ") (loc_convert_string local.key) (loc_convert_string " ) key to show your papers.")	
+	}else{
+		//[200] Smithy - ok, you need to use 7 to show papers now (can't do click)
+		iprintlnbold_noloc "If you are asked for your papers, press PRIMARY FIRE to show them."
 	}
 	
 	parm.other playsound pickup_papers	//chrissstrahl - made coop compatible
@@ -643,6 +646,8 @@ likeynorway:
 	wait .2
 	$likeynorwaydoor open level.guythathatesnorway
 	wait 1.5
+	level.guythathatesnorway thread waitForEnemy //[200] Smithy - call new func
+	level.guythatlikesnorway thread waitForEnemy //[200] Smithy - call new func
 	level.guythathatesnorway thread guygo guythathatesnorwayspot1 level.guythatlikesnorway
 	level.guythatlikesnorway thread guygo guythatlikesnorwayspot1 level.guythathatesnorway
 	level.peopletalking = 0
@@ -652,21 +657,42 @@ likeynorway:
 	waitthread likeynorwaytalk level.guythatlikesnorway den_m2l2_208r
 	waitthread likeynorwaytalk level.guythathatesnorway den_m2l2_209q
 	waitthread likeynorwaytalk level.guythatlikesnorway den_m2l2_210r
-	level.guythatlikesnorway type_disguise "salute"
-	level.guythathatesnorway type_disguise "salute"
 	level.peopletalking = 0
-	level.guythatlikesnorway exec global/walkto.scr $guard1patrol1
-	level.guythathatesnorway exec global/walkto.scr $guard2patrol2
+	if (level.guythatlikesnorway.thinkstate == "idle" && level.guythathatesnorway.thinkstate == "idle"){ //[200] Smithy - fix stupid behaviour
+		level.guythatlikesnorway type_disguise "salute"
+		level.guythathatesnorway type_disguise "salute"
+		level.guythatlikesnorway exec global/walkto.scr $guard1patrol1
+		level.guythathatesnorway exec global/walkto.scr $guard2patrol2
+	}
 	$suckyfatty hearing 1024
 end
 
 likeynorwaytalk local.talker local.word:
-	if((isalive local.talker) && local.talker.thinkstate != "attack")
+	if(isAlive local.talker && local.talker.thinkstate == "idle") //[200] Smithy - use idle
 	{
-		local.talker say local.word
+		local.talker idlesay local.word //[200] Smithy - use idlesay instead of say
 		local.talker waittill saydone
 	}
 end
+
+//[200] Smithy - new func to stop dumb behavior with start guys
+//=========================================================================
+waitForEnemy:{
+//=========================================================================
+	local.previousThread = parm.previousthread
+	while (isAlive self && (self.thinkstate == "idle" || self.thinkstate == "disguise")){
+		wait .25
+	}
+	if (isAlive self){
+		//iprintlnbold_noloc("stopping previous thread")
+		self turnto NULL
+		self walkto NULL
+		//self exec global/stand.scr
+		self attackplayer
+		self type_disguise "none"
+		if (local.previousThread){ local.previousThread end }
+	}
+}end
 
 forceturn local.turn:
 	self exec global/disable_ai.scr
@@ -814,7 +840,7 @@ sciencetalk:
 	wait 1
 	local.player = exec coop_mod/replace.scr::player_closestTo self	//chrissstrahl - made coop compatible
 	self lookat local.player
-	self thread guygo $whatareyou local.player
+	self thread guygo whatareyou local.player //[200] Smithy - removed '$' so it works with my fix
 	self idlesay den_m2l2_227f
 	self waittill saydone
 	if (level.scienceinterupt == 2)
