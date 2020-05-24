@@ -2,6 +2,8 @@
 //[200] Smithy - Custom named events system now has own file.
 //Allows us to pause threads until a custom event is fired from elsewhere.
 //Saves us having to use active loops. 
+//
+//NOTE: it may be worth using this system instead of level waittill spawn
 //-------------------------------------------------------------------------//
 
 //Uses an 'EventSlave' (ScriptSlave) for waittill trigger events.
@@ -51,12 +53,12 @@ clearEvent local.event:{
 		}
 	}
 
-	if (local.newArray.size > 0){
+	//if (local.newArray.size > 0){
 		$EventSlave.events = local.newArray
-	}else{
-		$EventSlave.isRemoving = 1
-		$EventSlave remove  					//if no more events are found, remove EventSlave. no use keeping him for nothing...
-	}
+	//}else{
+		//$EventSlave.isRemoving = 1
+		//$EventSlave remove  					//if no more events are found, remove EventSlave. no use keeping him for nothing...
+	//}
 
 	level.coop_eventNameList = local.newEventList
 }end
@@ -67,19 +69,17 @@ isEventActive local.event:{
 //=========================================================================
 }end ($EventSlave != NULL && $EventSlave.events[local.event] != NIL && $EventSlave.events[local.event] == "registered")
 
-//[200] Smithy - registers a specific event
+//[200] Smithy - registers a specific event (makes it active)
 //=========================================================================
 registerEvent local.event:{
 //=========================================================================
 	if (thread isEventActive local.event){ end }
 
-	while ($EventSlave && $EventSlave.isRemoving){ 	//just in case we got caught before removal has completed
-		waitframe
-	}
+	//while ($EventSlave && $EventSlave.isRemoving){ 	//just in case we got caught before removal has completed
+	//	waitframe
+	//}
 
-	if (!$EventSlave){ 
-		spawn ScriptSlave targetname EventSlave 	//create a new EventSlave
-	}
+	thread initEventSlave
 
 	$EventSlave.events[local.event] = "registered"
 
@@ -92,7 +92,7 @@ registerEvent local.event:{
 	}
 }end
 
-//[200] Smithy - registers a specific event
+//[200] Smithy - unregisters a specific event (releases waiting threads)
 //=========================================================================
 unregisterEvent local.event:{
 //=========================================================================
@@ -111,3 +111,44 @@ isEvent local.event:{
 		}
 	}
 }end(0)
+
+//[200] Smithy - coop version of 'built-in' events.
+//these will be those commonly needed by hzm modders,
+//e.g. death events for players
+//example: local.player waitthread coop_mod/eventsystem.scr::waittill "playerdeath"
+//=========================================================================
+waittill local.event:{
+//=========================================================================
+	thread initEventSlave
+
+	if (level.coop_eventCount[local.event] == NIL){
+		level.coop_eventCount[local.event] = 1
+	}else{
+		level.coop_eventCount[local.event]++
+	}
+
+	switch (local.event){
+		case "playerdeath":
+			while (self && self.flags["coop_isAlive"]){
+				$EventSlave waittill trigger
+			}
+			break
+
+		//ADD ANY OTHERS HERE 
+
+		default:
+			println "(coop_mod/eventsystem.scr::waittill): Unrecognised event '" local.event "' - consider adding it!"
+	}
+
+	level.coop_eventCount[local.event]--
+}end
+
+//initialises the event slave if it isn't already
+//=========================================================================
+initEventSlave:{
+//=========================================================================
+	if (!$EventSlave){ 
+		spawn ScriptSlave targetname EventSlave 	//create a new EventSlave
+	}
+}end
+
