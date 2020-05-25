@@ -870,8 +870,9 @@ prisonertruck:
 //	local.tempnum = 270
 	local.tempnum = 0
 
-	local.origin = $truck gettagposition "passenger7"
-	local.angles = $truck gettagangles "passenger7"
+	//local.origin = $truck gettagposition "passenger7" //[200] Smithy
+	local.origin = (6608 -3960 32) //[200] Smithy - manually place
+	//local.angles = $truck gettagangles "passenger7" //[200] Smithy - ffs mackey...
 	local.angles = $truck.angles
 	local.angles[1] += local.tempnum
 
@@ -885,14 +886,16 @@ prisonertruck:
 	$("prisoner" + local.num) notsolid
 	$("prisoner" + local.num) gun "none"
 	$("prisoner" + local.num) anim_noclip "prisoner_1"
+	$("prisoner" + local.num).origin = (local.origin - (0 0 14)) //[200] Smithy - stop him floating
 
 	local.prisoner1 = $("prisoner" + local.num)
 
 	level.bombnum++
 	local.num = level.bombnum + 3110
 
-	local.origin = $truck gettagposition "passenger8"
-	local.angles = $truck gettagangles "passenger8"
+	//local.origin = $truck gettagposition "passenger8" //[200] Smithy
+	//local.angles = $truck gettagangles "passenger8" //[200] Smithy
+	local.origin = (6496 -3960 32) //[200] Smithy - manually place
 	local.angles = $truck.angles
 	local.angles[1] += local.tempnum
 
@@ -905,6 +908,7 @@ prisonertruck:
 	$("prisoner" + local.num) notsolid
 	$("prisoner" + local.num) gun "none"
 	$("prisoner" + local.num) anim_noclip "prisoner_2"
+	$("prisoner" + local.num).origin = (local.origin - (0 0 14)) //[200] Smithy - stop him floating
 
 	local.prisoner2 = $("prisoner" + local.num)
 
@@ -915,9 +919,9 @@ prisonertruck:
 
 	level.bombnum++
 	local.num = level.bombnum + 3110
-
-	local.origin = $truck gettagposition "tag_guard_1"
-	local.angles = $truck gettagangles "tag_guard_1"
+	//local.origin = $truck gettagposition "tag_guard_1" //[200] Smithy
+	local.origin = (local.prisoner1.origin + (40 0 0)) //[200] Smithy - manually place
+	//local.angles = $truck gettagangles "tag_guard_1" //[200] Smithy
 	local.angles = $truck.angles
 	local.angles[1] += local.tempnum
 
@@ -937,15 +941,18 @@ prisonertruck:
 	level.bombnum++
 	local.num = level.bombnum + 3110
 
+	/* //[200] Smithy - redundant - ffs mackey..
 	local.origin = $truck gettagposition "tag_guard_1"
 	local.angles = $truck gettagangles "tag_guard_1"
 	local.angles = $truck.angles
 	local.angles[1] += local.tempnum
-
+	*/
 	spawn human/German_afrika_private.tik "targetname" ("guard" + local.num)
+	/* //[200] Smithy - redundant - ffs mackey..
 	$("guard" + local.num) german
 	$("guard" + local.num).origin = local.origin
 	$("guard" + local.num).angles = local.angles
+	*/
 	local.guard2 = $("guard" + local.num) 
 
 	$truck AttachPassengerSlot 6 local.guard2
@@ -960,8 +967,21 @@ prisonertruck:
 //	$("prisoner" + local.num2) waittill animdone
 	wait 6.5
 
-	$truck AttachPassengerSlot 9 local.prisoner1
-	$truck AttachPassengerSlot 10 local.prisoner2
+	//$truck AttachPassengerSlot 9 local.prisoner1  //[200] Smithy - these slots dont exist on BT model
+	//$truck AttachPassengerSlot 10 local.prisoner2 //[200] Smithy 
+
+	//[200] Smithy - BT compatible - manually attach to truck:
+	//-------------------------------------------//
+	local.truckCentroid = spawn ScriptSlave
+	local.truckCentroid origin $truck.origin
+	local.truckCentroid glue $truck
+	waitframe 					
+	local.prisoner1 origin (6448 -3960 76) 		
+	local.prisoner2 origin (6416 -3960 76) 
+	local.prisoner1 bind local.truckCentroid
+	local.prisoner2 bind local.truckCentroid
+	//-------------------------------------------//
+
 
 //	local.prisoner1 thread showorg	
 
@@ -986,6 +1006,8 @@ prisonertruck:
 	local.prisoner1 thread coop_damageMe	//chrissstrahl - made coop compatible - might get killed at the start by a player
 	local.prisoner2 thread coop_damageMe	//chrissstrahl - made coop compatible - might get killed at the start by a player
 	local.guard2 thread coop_damageMe		//chrissstrahl - made coop compatible - might get killed at the start by a player
+
+	local.truckCentroid remove //[200] Smithy - remove extra ent
 	wait 3
 
 	$truck damage $world 1500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
@@ -1741,19 +1763,9 @@ flagthread9:{
 	}
 	
 	if (level.flags[flak] == 0){
-		self say dfr_M1L2_139m_2 // You get that one
-		
-		//[200] chrissstrahl - fix script getting stuck here
-		/*
-		self waittill saydone -> was stuck because of:
-		Couldn't find animation 'dfr_M1L2_139m_2' trying alias sound instead
-		Callbnack of sound 'dfr_M1L2_139m_2' ignored
-		*/
-		if(level.gametype == 0){
-			self waittill saydone
-		}else{
-			wait 1.5
-		}
+		//self say dfr_M1L2_139m_2 // You get that one
+		self thread coop_mod/replace.scr::say_wait "dfr_M1L2_139m_2" //[200] Smithy - coop compatible
+		self waittill saydone
 	}
 
 	while (level.flags[flak] == 0){
@@ -2061,7 +2073,8 @@ flagthread17:{
 	self.chairsound = 0
 	println "chairsound is now 0"
 	if ((level.flags[botch] == 0) && (level.flags[notorture] == 0)){
-		$interchair playsound interrogation wait
+		//$interchair playsound interrogation wait
+		$interchair thread coop_mod/replace.scr::playsound_wait "interrogation" //[200] Smithy - coop compatible
 		$interchair waittill sounddone
 	}
 
@@ -2159,7 +2172,7 @@ flagthread19:{
 	waitframe
 	self.origin = local.o
 	self.angles = local.a // + (0 5 0) // + (0 180 0)
-	self thread locker local.o local.a	//chrissstrahl - added self, because the called fucntion requires this
+	self thread locker local.o local.a	//chrissstrahl - added self, because the called fucntion requires this //[200] Smithy - nope - self is implicit if it is not specified
 	local.thread = parm.previousthread
 	waitframe
 //	println "--------------------"
@@ -3491,7 +3504,8 @@ large_door:
 
 	if (level.time > self.timer){
 		self.timer = level.time + 5
-		self playsound gate_large_locked wait
+		//self playsound gate_large_locked wait
+		self thread coop_mod/replace.scr::playsound_wait "gate_large_locked" //[200] Smithy - coop compatible
 		self waittill sounddone
 		self.timer = level.time - 5
 	}
