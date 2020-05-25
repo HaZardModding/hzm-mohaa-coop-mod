@@ -629,7 +629,7 @@ intro_truck:{
 	if(level.gametype == 0){ //chrissstrahl - sp
 		$player.has_disguise = 1
 	}else{ //chrissstrahl - mp/coop
-		exec coop_mod/replace.scr::threatbias ignoreme	//Criminal
+		exec coop_mod/replace.scr::threatbias ignoreme	//Criminal //[200] Smithy - yep so reset threatbias in 'faketruck_playerexit' func instead of resetting disguise >:D
 	}
 	
 	/*
@@ -679,7 +679,7 @@ intro_truck:{
 	//$player unglue 										// Criminal - coop unglue handles that.
 	exec coop_mod/replace.scr::unglue 						// Criminal - coop compabitility.
 	exec coop_mod/replace.scr::show							// Criminal - added to prevent weapon disapearing issues.
-	exec coop_mod/replace.scr::threatbias 10				// Criminal - coop compabitility.
+	//exec coop_mod/replace.scr::threatbias 10				// Criminal - coop compabitility. //[200] Smithy - not here
 
 	level.intruck = 0
 	//thread player_prep
@@ -860,37 +860,17 @@ intro_truck_dialog:{
 //=========================================================================
 	wait 2
 	//$player playsound dfr_m4l3_add03 wait 					// Criminal.
-	waitexec coop_mod/replace.scr::playsound dfr_m4l3_add03		// Criminal - coop comapbitility.
+	//$player waittill sounddone
+	waitthread coop_mod/replace.scr::playsound dfr_m4l3_add03 "wait"		// Criminal - coop comapbitility. //[200] Smithy - use waitthread instead of waitexec and use a wait
 	
-	 if(level.gametype==0){ // Criminal - do in SP.
-		$player waittill sounddone
- 	}else{ // Criminal - do in MP.
- 		for (local.i = 1; local.i <= $player.size; local.i++) {
- 			local.player = $player[local.i];
- 			if(local.player != NULL && local.player.dmteam != "spectator" && local.player.healt > 0){
- 				local.player waittill sounddone
- 			}
- 		}
- 	}	
-
-	//	wait .3
-	//	$player playsound dfr_m4l3_add04 wait  					//find a set of officers identifications.....
-	//	$player waittill sounddone
+	//wait .3
+	//$player playsound dfr_m4l3_add04 wait  					//find a set of officers identifications.....
+	//$player waittill sounddone
 
 	wait .3
-	// $player playsound dfr_m4l3_add05 wait					// Criminal.
-	waitexec coop_mod/replace.scr::playsound dfr_m4l3_add05		// Criminal - coop compabitility.
- 	
- 	if(level.gametype==0){ // Criminal - do in SP.
-		$player waittill sounddone
- 	}else{ // Criminal - do in MP.
- 		for (local.i = 1; local.i <= $player.size; local.i++) {
- 			local.player = $player[local.i];
- 			if(local.player != NULL && local.player.dmteam != "spectator" && local.player.healt > 0){
- 				local.player waittill sounddone
- 			}
- 		}
- 	}	
+	//$player playsound dfr_m4l3_add05 wait					// Criminal.
+	//$player waittill sounddone 
+	waitthread coop_mod/replace.scr::playsound dfr_m4l3_add05 "wait" // Criminal - coop compabitility. //[200] Smithy - use waitthread instead of waitexec and use a wait
 }end
 
 //  push back the fog
@@ -920,7 +900,11 @@ faketruck_playerexit:{
 	if (level.gametype==0) { //Criminal - do in SP
 		$player.has_disguise = 0
 	}else{ // Criminal - do in MP.
-		exec coop_mod/replace.scr::has_disguise 0
+
+		//[200] Smithy - you use threatbias in 'intro_truck' func above instead of disguise so you need to reset that not reset disguise!
+		//exec coop_mod/replace.scr::has_disguise 0 
+
+		thread coop_mod/replace.scr::threatbias "10" //[200] Smithy - here instead of bottom of 'intro_truck' func
 		
 		//chrissstrahl - let us try to resolve some issues
 		//first player out will be fine, the others will be kicked out, sort of
