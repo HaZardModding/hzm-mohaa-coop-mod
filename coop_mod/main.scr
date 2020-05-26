@@ -144,7 +144,7 @@ main:{
 
 	thread setupServer															//chrissstrahl - inizial setup, might be deprecated
 	thread managePlayers														//chrissstrahl - handles spawning, respawning spectator, generic stuff each frame
-	thread coop_mod/itemhandler.scr::playerSpawnEvent 							//[200] Smithy - enable the spawn event thread used for weapon loadouts, disguises etc..
+	thread playerSpawnEvent 													//[200] Smithy - enable the spawn event thread used for weapon loadouts, disguises etc..
 	waitthread coop_mod/spawnlocations.scr::main								//chrissstrahl - create spawnpoints for coop
 	waitthread mom/mom.scr::setup "coop_mod/mom_actions.scr" 2 "coop_mom"		//chrissstrahl - set coop mod specific mom file
 
@@ -503,7 +503,7 @@ managePlayers:{
 					local.player.flags["coop_joinedGameAt"] = level.time //[200] chrissstrahl - used for variouse checks
 					local.player max_health local.health
 					local.player healthonly local.health
-					thread playerAttachTrigger local.player
+					//thread playerAttachTrigger local.player //[200] Smithy - defunct now we use playerSpawnEvent func below
 					//this is used for friendly orientation see global/friendly::playernode
 					local.player.fnum = -100
 
@@ -742,6 +742,39 @@ managePlayers:{
 		//[200] Smithy - i guess the bracket next to 'end' was used in its place...not good
 }end
 
+//[200] Smithy
+//Moved from itemhandler as it makes more sense as a general func.
+//checks for any player spawns.
+//this specific func should only run once per level,
+//but you can have other spawn checks outside of this if you wish.
+//make sure to create a new thread group for each func call (explicitly specify self object).
+//we can use this to efficiently replace any spawn specific code, 
+//e.g. triggers that check for active players.
+//along with this method + NightFall events we can decommission the main loop.
+//(internal use only)
+//=========================================================================
+playerSpawnEvent:{
+//=========================================================================
+	if (level.coop_playerSpawnEventThread){ end }
+	level.coop_playerSpawnEventThread = local
+
+	while (1){
+		level waittill playerspawn 							//every time a player spawns/respawns this will be triggered and parm.other is cleared/updated
+
+		if (!parm.other.isSpectator){ 						//isSpectator is a built-in BT bool, more efficient than checking for dmteam string
+			parm.other.flags["coop_isAlive"] = game.true  						//he's now alive :)
+			parm.other thread coop_mod/itemhandler.scr::managePlayerInventory 	//handle his inventory (new thread group)
+			parm.other thread playerActive 										//he is now active (new thread group)
+
+			//Add anymore spawn stuff here
+		}else{
+			//the code in this else block will only hit when a player joins a server and spawns as spec for the first time.
+			//this is because players who join are put into spec. subsequent transfers to spec do not respawn their char.
+			//so we know that if this hits, a new player has arrived. so relevant code can go here.
+		}						
+	}
+}end
+
 //[200] chrissstrahl - this is called if the number of player has changed
 //::managePlayers is waiting for this thread
 //=========================================================================
@@ -787,6 +820,14 @@ printInfo local.player local.message local.bold local.strictTime:{
 //=========================================================================
 playerAttachTrigger local.player:{
 //=========================================================================
+	//[200] Smithy - OK, no more 'fucking stupid triggers' and extra loop for active players - it is much nicer now :) *meditation noise*
+	//this is now handled in playerSpawnEvent func above
+	local.threadName = "coop_mod/main.scr::playerAttachTrigger"
+	iprintlnbold_noloc("(" + local.threadName + "): Func is defunct! Fix me!")
+	end
+
+	//CODE IN THIS FUNC BELOW THIS LINE IS NOW DEFUNCT - CONSIDER REMOVING IN FUTURE <<< TODO 
+
 	if(local.player == NULL || local.player == NIL){ end }
 	//iprintlnbold_noloc("playerAttachTrigger")
 
@@ -829,14 +870,17 @@ playerAttachTrigger local.player:{
 //=========================================================================
 playerActive:{
 //=========================================================================
+	/* [200] Smithy - no longer uses a trigger so parm.other is irrelevant
 	if( parm.other == NULL ){
 		waitframe //prevent infinity loop error
 		end
 	}
-	if( parm.other.flags["coop_myActivityTriggerName"] == self.targetname ){
-		parm.other.flags["coop_iAmTruelyActive"] = 1
+	*/
+
+	//if( parm.other.flags["coop_myActivityTriggerName"] == self.targetname ){ //[200] Smithy - just a simple check now
+	self.flags["coop_iAmTruelyActive"] = 1 //[200] Smithy - TODO: clean this func up!
 		//iprintlnbold_noloc("matching player")
-	}//else{
+	//}//else{
 		//iprintlnbold_noloc("not matching player")
 	//}
 }end
