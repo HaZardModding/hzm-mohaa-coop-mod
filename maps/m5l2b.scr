@@ -76,6 +76,17 @@ main:{
 	thread global/barrel.scr::explosive_barrel
 	exec global/ambient.scr m5l2b
 
+	//[200] Smithy - stop small arms destroying buildings
+	//that use exploder triggers as the entry point
+	//and tanks 
+	//----------------------------------------------//
+	//rocket is what the tank uses as MOD. 
+	//this means zookas can destroy them.
+	//maybe that isn't a bad thing.
+	//if it is a bad thing more can be done in future
+	$explodertrigger 	thread coop_immuniseFromBullets
+	//----------------------------------------------//
+
 	//////////////////////////////////
 	level waitTill spawn
 	println "z:        level waittill spawn marker"
@@ -278,6 +289,18 @@ level_end:{
 //============================================================================
 //called by the BSP
 	if (level.missionfailed == 1){end}
+
+	//[200] Smithy - only tanks allowed to end level
+	local.player = parm.other
+	if (!level.coop_playerTank || local.player != level.coop_playerTank){ //thanks chris for this level var ! :D
+		end
+	}else{
+		if (!local.player.flags["coop_tankEndHint"]){
+			local.player.flags["coop_tankEndHint"] = game.true
+			local.player iprint "The tank needs to reach here to win!" 1
+		}
+	}
+
 	waitthread global/objectives.scr::add_objectives 1 3
 	exec global/missioncomplete.scr m5l3
 }end
@@ -516,5 +539,16 @@ coop_teleportMaster:{
 		}
 		waitframe
 	}
+}end
+
+//[200] Smithy - stop this from being killed by small arms
+//============================================================================
+coop_immuniseFromBullets:{
+//============================================================================
+	self immune bullet
+	self immune shotgun
+	self immune bash
+	self immune grenade
+	self immune fast_bullet
 }end
 
