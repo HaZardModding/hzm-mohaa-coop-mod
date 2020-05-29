@@ -330,7 +330,7 @@ uninitialiseTimer:{
 //=========================================================================
 	wait 3
 	if ((group.item && group.item.angles == (0 0 0) && group.item.origin == (0 0 0)) || !group.item){
-		if (parm.previousthread) { parm.previousthread end }
+		group end //we now kill thread group as parm.previousthread, like parm.other, is a global var that can change due to external thread calls
 	}
 }end
 
@@ -731,7 +731,7 @@ giveDisguise local.player:{
 			wait game.ms
 		}
 		if (!isAlive local.player || local.player.dmteam == "spectator"){
-			group end //stop any outstanding external threads (managePlayerInventory)
+			group.thread["managePlayerInventory"] end //stop any outstanding external threads (managePlayerInventory)
 			local end //stop this thread
 		}
 	}
@@ -1314,7 +1314,7 @@ enableClickablePapers local.guard local.player:{
 
 	local.player.flags["coop_clickablePapersEnabled"] = game.true
 	while (isAlive local.player && local.player.flags["coop_clickablePapersEnabled"] && isAlive local.guard){
-		if (local.player.flags["coop_activeWeapon"] == NULL && local.player.primaryfireheld){
+		if (local.player.primaryfireheld && local.player.flags["coop_activeWeapon"] == NULL){
 			local.player use level.coop_itemPapers
 			wait 3
 		}
