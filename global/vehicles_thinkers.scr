@@ -2,6 +2,8 @@
 //*******************************
 players_tank local.trigger:
 	if(level.gametype != 0){//chrissstrahl - coop
+		$playertank_trigger remove //[200] Smithy - the devs probably originally had plans for this trigger but never used it in the end... remove.
+
 		//chrissstrahl - this shitt is here to correct the false offset that is happening in mp after first use or if not client 0
 		level.coop_tankLastDriverTime = -1
 		if($coop_tankOffset == NULL){
@@ -50,29 +52,30 @@ end
 
 //chrissstrahl - check if a player wants to enter the tank
 //self is tank
+//[200] Smithy - some minor optimisations:
+// -removed redundant NULL check on each player
+// -remove redundant team checks
 //============================================================================
 coop_selectDriverForTank:{
 //============================================================================
 	waitframe //wait for entities to be ready/spawned
 	
 	//but make sure the tank is not taken already
-	while( level.coop_playerTank == NULL ){
+	while (level.coop_playerTank == NULL){
 		//make sure that the tank has a cooldown time of a second or two, otherwise it will create bugs
-		if( (level.coop_tankLastDriverTime + 2) < level.time ){
-			for (local.i = 1;local.i <= $player.size;local.i++){
+		if ((level.coop_tankLastDriverTime + 2) < level.time){
+			for (local.i = 1; local.i <= $player.size; local.i++){
 				local.player =  $player[local.i]
-				if( local.player != NULL ){
-					if( local.player.dmteam != "spectator" && local.player.dmteam != "axis" && local.player.health > 0 && local.player.flags["coop_isActive"] == 1){
-						if( local.player.useheld == 1 && vector_length(local.player.origin - $coop_tankOffset.origin) < 300 && level.time > level.coop_tankLastDriverTime ){
-							if( local.player.flags["coop_playerTankExitAt"] != NIL ){
-								if( level.time < int(local.player.flags["coop_playerTankExitAt"]) ){
-									exec coop_mod/main.scr::printInfo local.player "You need to wait before you can drive the tank again!" 1
-									continue
-								}
+				if (local.player.health > 0 && local.player.dmteam == "allies" && local.player.flags["coop_isActive"] == 1){
+					if (local.player.useheld == 1 && vector_length(local.player.origin - $coop_tankOffset.origin) < 300 && level.time > level.coop_tankLastDriverTime){
+						if (local.player.flags["coop_playerTankExitAt"] != NIL){
+							if (level.time < int(local.player.flags["coop_playerTankExitAt"])){
+								exec coop_mod/main.scr::printInfo local.player "You need to wait before you can drive the tank again!" 1
+								continue
 							}
-							self thread coop_setDriverForTank local.player
-							end
 						}
+						self thread coop_setDriverForTank local.player
+						end
 					}
 				}
 			}
@@ -93,50 +96,37 @@ coop_setDriverForTank local.player:{
 	self DetachDriverSlot 0 ( $coop_tankExit.origin + (0 0 150) )
 	wait 0.2
 	
-	if(local.player != NULL && local.player.health > 0 && local.player.flags["coop_isActive"] == 1 && local.player.dmteam != "spectator" && local.player.dmteam != "axis" ){
+	//[200] Smithy - minor optimisations (removed redundant if checks)
+	if (isAlive local.player && local.player.flags["coop_isActive"] == 1 && local.player.dmteam == "allies"){
 		self attachdriverslot 0 local.player
 		local.player glue $coop_tankOffset
 		local.player perferredweapon "88mm Tank Gun"
 		local.player notsolid
 		local.player nodamage
 		local.player hide
-	}
-	//iprintlnbold_noloc("player driver 1")
-	
-	//monitor driver, see if he dies, changes team or just wants to leave tank by pressing use
-	while( local.player != NULL && local.player.health > 0 && local.player.flags["coop_isActive"] == 1 && local.player.dmteam != "spectator" && local.player.dmteam != "axis" ){	
-		//chrissstrahl - player disconnected
-		if(local.player == NULL){
-			//iprintlnbold_noloc("player driver NULL")
-			break
-		}
-		
-		//chrissstrahl - if player wants to exit the tank
-		if(local.player.useheld == 1){
-			if( level.time > level.coop_tankLastDriverTime ){
-				//iprintlnbold_noloc("player exit use")
-				break
+
+		//monitor driver, see if he dies, changes team or just wants to leave tank by pressing use
+		//[200] Smithy - minor optimisations (removed redundant if NULL check and while conditions)
+		//also moved inside if
+		while (isAlive local.player && local.player.flags["coop_isActive"] == 1 && local.player.dmteam == "allies"){	
+			//chrissstrahl - if player wants to exit the tank
+			if(local.player.useheld == 1){
+				if( level.time > level.coop_tankLastDriverTime ){
+					break
+				}else{
+					exec coop_mod/main.scr::printInfo local.player "You need to wait before you can leave the Tank again!" 1
+				}
 			}
-			else{
-				exec coop_mod/main.scr::printInfo local.player "You need to wait before you can leave the Tank again!" 1
-			}
+			waitframe
 		}
-		waitframe
 	}
-	//iprintlnbold_noloc("player exit")
 	
 	if(local.player != NULL){
-		//iprintlnbold_noloc("unglue")
 		local.playerId = (waitexec coop_mod/main.scr::getPlayerId local.player)
 		local.player.flags["coop_playerTankExitAt"] = ( level.time + 10 )
 		local.player nodamage
 		local.player origin ( $coop_tankExit.origin + (0 0 150) )
 		waitframe
-		//local.player quitteam
-		//local.player perferredweapon "Pistol"
-		//local.player show
-		//local.player weaponcommand "dual" "show"
-		//level.flags["coop_spawn"+local.playerId+"origin"] = (  ( $coop_tankExit.origin + (0 0 150) ) )
 		if(local.player != NULL){
 			local.player stufftext "spectator"
 			local.player.flags["coop_playerTankExit"] = 1
@@ -152,7 +142,6 @@ coop_setDriverForTank local.player:{
 	}else{
 		self DetachDriverSlot 0  ( $coop_tankExit.origin + (0 0 150) )
 	}
-	
 	
 	level.coop_tankLastDriverTime = level.time
 	level.coop_playerTank = NULL
@@ -199,9 +188,10 @@ player_tank_health:
 			self.health = 5000
 		}
 	}
-	//chrissstrahl - give lots of health in coop, cuz mp is more dificult
+	//chrissstrahl - give lots of health in coop, cuz mp is more dificult 
+	//[200] Smithy - ^^^^^^^^ really? I thought it would be easier cos players are helping you destroy everything ¯\_(ツ)_/¯
 	else{
-		self.health = 5000
+		self.health = 5000 //[200] Smithy - probably best to have tank health as a cvar in future for the server just like player health
 		//self.health = 1 //chrissstrahl - test
 	}
 
