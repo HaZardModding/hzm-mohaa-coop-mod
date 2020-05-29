@@ -98,6 +98,16 @@ main:{
 	//$player stufftext "tmstartloop sound/music/mus_TigerTank_01a.mp3"			// Criminal.
 	exec coop_mod/replace.scr::tmstartloop "sound/music/mus_TigerTank_01a.mp3" 	// Criminal - coop compabitility.
 
+	//[200] Smithy - ffs, it's a trigger_once but because we have checks for pedestrians we need to make it a multiple
+	//swap them out and point it to the same thread name
+	if (level.gametype != 0){ 
+		local.oldTrig = $level_end
+		local.newTrig = spawn trigger_multiple origin (local.oldTrig.origin + (0 0 -128)) targetname "level_end"
+		local.newTrig setsize ( -512 -512 0) ( 512 512 512 )
+		local.newTrig setthread "level_end"
+		local.oldTrig delete
+	}
+
 	//	waitthread global/objectives.scr::reset_objectives
 	//	waitthread global/objectives.scr::blank_objectives
 	waitthread global/objectives.scr::add_objectives 1 2 "Escape with the King Tiger tank." $level_end.origin
@@ -291,13 +301,14 @@ level_end:{
 	if (level.missionfailed == 1){end}
 
 	//[200] Smithy - only tanks allowed to end level
-	local.player = parm.other
-	if (!level.coop_playerTank || local.player != level.coop_playerTank){ //thanks chris for this level var ! :D
-		end
-	}else{
-		if (!local.player.flags["coop_tankEndHint"]){
-			local.player.flags["coop_tankEndHint"] = game.true
-			local.player iprint "The tank needs to reach here to win!" 1
+	if (level.gametype != 0){ //duh, check gametype...
+		local.player = parm.other
+		if (!level.coop_playerTank || local.player != level.coop_playerTank){ //thanks chris for this level var ! :D
+			if (!local.player.flags["coop_tankEndHint"]){  //damn... i was tired yesterday... it goes here not in an else...
+				local.player.flags["coop_tankEndHint"] = game.true
+				local.player iprint "The tank needs to reach here to win!" 1
+			}
+			end
 		}
 	}
 

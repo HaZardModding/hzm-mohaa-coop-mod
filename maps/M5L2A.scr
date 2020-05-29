@@ -104,6 +104,16 @@ main:{
 	//	waitthread global/objectives.scr::reset_objectives
 	//	waitthread global/objectives.scr::blank_objectives
 
+	//[200] Smithy - ffs, it's a trigger_once but because we have checks for pedestrians we need to make it a multiple
+	//swap them out and point it to the same thread name
+	if (level.gametype != 0){ 
+		local.oldTrig = $level_end
+		local.newTrig = spawn trigger_multiple origin (local.oldTrig.origin + (0 0 -128)) targetname "level_end"
+		local.newTrig setsize ( -1024 -1024 0) ( 1536 1024 512 )
+		local.newTrig setthread "level_end"
+		local.oldTrig delete
+	}
+
 	waitthread global/objectives.scr::add_objectives 1 2 "Escape with the King Tiger tank." $level_end.origin
 	waitthread global/objectives.scr::current_objectives 1
 
@@ -457,13 +467,14 @@ level_end:{
 	if (level.missionfailed == 1)	{end}
 
 	//[200] Smithy - only tanks allowed to end level
-	local.player = parm.other
-	if (!level.coop_playerTank || local.player != level.coop_playerTank){ //thanks chris for this level var ! :D
-		end
-	}else{
-		if (!local.player.flags["coop_tankEndHint"]){
-			local.player.flags["coop_tankEndHint"] = game.true
-			local.player iprint "The tank needs to reach here to win!" 1
+	if (level.gametype != 0){ //duh, check gametype...
+		local.player = parm.other
+		if (!level.coop_playerTank || local.player != level.coop_playerTank){ //thanks chris for this level var ! :D
+			if (!local.player.flags["coop_tankEndHint"]){  //damn... i was tired yesterday... it goes here not in an else...
+				local.player.flags["coop_tankEndHint"] = game.true
+				local.player iprint "The tank needs to reach here to win!" 1
+			}
+			end
 		}
 	}
 
@@ -701,6 +712,8 @@ coop_playerJustDied:{
 //=========================================================================
 coop_validateAttacker local.thread:{
 //=========================================================================
+	if (level.gametype == 0){ end } //duh... i was tired last night and forgot to include this
+
 	local.player = parm.other //the player that has attacked this building
 	if (level.coop_playerTank && local.player == level.coop_playerTank){ //thanks chris for this level var ! :D
 		self remove //take this opportunity to remove useless triggers from the map
