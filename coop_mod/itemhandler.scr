@@ -120,6 +120,7 @@ main local.thread local.arg1 local.arg2:{
 initialiseItem local.ammotype:{
 //=========================================================================
 	local.threadName = "coop_mod/itemhandler.scr::initialiseItem"
+	group.thread["initialiseItem"] = local
 
 	group.item 							= self
 	group.type 							= self.classname
@@ -142,10 +143,7 @@ initialiseItem local.ammotype:{
 		local.player = group.item.flags["coop_itemOwner"]
 		if (isAlive local.player){
 			local.player.flags["coop_inventoryAmmo"][group.ammotype] = game.true
-
-			if (!thread playerHasWeapon local.player group.item){ //add the weapon
-				thread addWeaponToInventory local.player group.item.model
-			}
+			thread addWeaponToInventory local.player group.item.model
 		}
 		end //we don't fully initialise player weapons as they cannot be dropped
 	}
@@ -236,6 +234,10 @@ handleWeaponPickup:{
 					continue
 				}
 
+				if (!thread isWeaponAllowed local.player group.item){ //ok, now check if we are allowed this weapon
+					continue
+				}
+
 				thread getItemWorldProperties 								//grab latest properties
 
 				//ok, it wasn't picked up and he doesn't have full ammo... must be a new weapon. lets hack it in.
@@ -250,7 +252,6 @@ handleWeaponPickup:{
 						group.item.flags["coop_playerNewWeapon"] = game.true
 						group.item targetname ("player" + local.player.entnum + "Inventory")
 					}
-					thread addWeaponToInventory local.player group.model
 					break
 				}else{
 					//on the off chance we can't deal with the weapon, print info and stop the handlers
@@ -267,6 +268,10 @@ handleWeaponPickup:{
 				break
 			}
 		}
+
+		//ok, needs to be here... duh
+		local.player.flags["coop_inventoryAmmo"][group.ammotype] = game.true
+		thread addWeaponToInventory local.player group.model "pickup" group.ammotype //it's a pickup so check for ammo types
 
 		if (group.pickupEventThread){ group.pickupEventThread end }
 
@@ -330,7 +335,7 @@ uninitialiseTimer:{
 //=========================================================================
 	wait 3
 	if ((group.item && group.item.angles == (0 0 0) && group.item.origin == (0 0 0)) || !group.item){
-		group end //we now kill thread group as parm.previousthread, like parm.other, is a global var that can change due to external thread calls
+		group.thread["initialiseItem"] end //we now kill thread via group as parm.previousthread, like parm.other, is a global var that can change due to external thread calls
 	}
 }end
 
@@ -603,11 +608,81 @@ calculateDropVelocity:{
 
 //checks to see if the player is carrying this ammotype.
 //(can be used externally)
+/* defunct - coop_inventoryAmmo is now defunct too...
 //=====================================================================
 isCarryingAmmoType local.player local.aType:{
 //=====================================================================
 	local.aType = local.player.flags["coop_inventoryAmmo"][local.aType]
 }end (local.aType != game.false)
+*/
+
+//check if this weapon is forced on player
+//=====================================================================
+isWeaponAllowed local.player local.item:{
+//=====================================================================
+	if (local.player.flags["coop_PrimaryWeapon"] || local.player.flags["coop_SecondaryWeapon"]){
+		if (local.player.flags["coop_PrimaryWeapon"] == local.item.model){
+			end(game.false)
+		}
+		if (local.player.flags["coop_SecondaryWeapon"] == local.item.model){
+			end(game.false)
+		}
+	}
+}end(game.true)
+
+//force a weapon on all players
+//=====================================================================
+forceWeaponOnAll local.model:{
+//=====================================================================
+	if ($player){
+		for (local.i = 1; local.i <= $player.size; local.i++){
+			thread forceWeaponOnPlayer $player[local.i] local.model
+		}
+	}
+	if (thread coop_mod/main.scr::isPrimaryWeapon local.model){
+		level.coop_playerPrimaryWeapon = local.model
+	}else{
+		level.coop_playerSecondaryWeapon = local.model
+	}
+}end
+
+//force a weapon on player
+//=====================================================================
+forceWeaponOnPlayer local.player local.model:{
+//=====================================================================
+	if (thread coop_mod/main.scr::isPrimaryWeapon local.model){
+		local.player.flags["coop_PrimaryWeapon"] = local.model
+	}else{
+		local.player.flags["coop_SecondaryWeapon"] = local.model
+	}
+}end
+
+//stop forcing weapon of type ('primary' or 'secondary') on all
+//=====================================================================
+stopForceWeaponOnAll local.type:{
+//=====================================================================
+	if ($player){
+		for (local.i = 1; local.i <= $player.size; local.i++){
+			thread stopForceWeaponOnPlayer $player[local.i] local.type
+		}
+	}
+	if (local.type == "primary"){
+		level.coop_playerPrimaryWeapon = NIL
+	}else{
+		level.coop_playerSecondaryWeapon = NIL
+	}
+}end
+
+//stop forcing weapon of type ('primary' or 'secondary') on player
+//=====================================================================
+stopForceWeaponOnPlayer local.player local.type:{
+//=====================================================================
+	if (local.type == "primary"){
+		local.player.flags["coop_PrimaryWeapon"] = NIL
+	}else{
+		local.player.flags["coop_SecondaryWeapon"] = NIL
+	}
+}end
 
 //handles the player spawn and weapon loadout logic
 //also handles player diguises on spawn
@@ -623,11 +698,6 @@ managePlayerInventory:{
 	group.player.flags["coop_spawnEventTime"] 	= level.time
 	group.player.flags["coop_spawnTimeOffset"] 	= 0
 	group.player.flags["coop_startingDisguise"] = game.false
-
-	if (!level.coop_loadoutInit){
-		level.coop_loadoutInit = game.true
-		exec coop_mod/loadout.scr 			//initialises the weapon loadout array for this level
-	}
 
 	//remove any previous inventory weapons from the game for this player if any exist
 	thread deletePreviousInvWeapons
@@ -662,7 +732,7 @@ managePlayerInventory:{
 	}
 
 	//either give them a default loadout or give them their old one
-	thread giveWeaponLoadout !(level.coop_retainInventory && thread playerHasInventory)
+	thread giveWeaponLoadout !(level.coop_retainInventory && thread playerHasInventory group.player)
 }end
 
 //=========================================================================
@@ -960,28 +1030,29 @@ giveWeaponLoadout local.default:{
 	group.weapons notsolid
 	group.weapons nottriggerable
 
-	group.player holster
+	//group.player holster
 
 	//improve spawning when in disguise mission! 
 	if (group.player.has_disguise){ 
+		thread setIsDisguised group.player game.true //set initial disguise to true	
+		wait 0.25
+		if (isAlive group.player){
+			group.player thread deactivatePlayerWeapon
+		}
 		thread setIsDisguised group.player game.true //set initial disguise to true
 		if (!group.player.flags["coop_holsterHint"]){
 			group.player iprint "Keep your weapon holstered when in disguise." game.true
 			group.player.flags["coop_holsterHint"] = game.true //duh, set it as hinted
-		}	
-		wait 0.3
-		if (group.player){
-			group.player thread deactivatePlayerWeapon
 		}
-		thread setIsDisguised group.player game.true //set initial disguise to true
 	}else{	
-		wait 0.3
-		if (group.player){
-			group.player thread deactivatePlayerWeapon
+		wait 0.25
+		if (isAlive group.player){
+			group.player thread deactivatePlayerWeapon 			//this is so we stop the engine doing the weapon use for us when picking primary mp weapon
 		}
-		waitframe
-		if (isAlive group.player && !group.player.has_disguise){ 	//unholster
+		wait game.ms
+		if (isAlive group.player){ 	
 			group.player useweaponclass level.coop_weaponUse
+			group.player activatenewweapon "dual" 				//unholster the right weapon as quickly as possible
 		}
 	}
 	//reset disguise offset stuff
@@ -994,24 +1065,30 @@ giveWeaponLoadout local.default:{
 //=========================================================================
 spawnInventory local.default:{
 //=========================================================================
-	//if only the nades are present that means a loadout couldn't be found - use basic one
-	if (level.coop_weaponLoadout.size == 2){
-			level.coop_weaponLoadout[level.coop_weaponLoadout.size+1] = "weapons/colt45.tik"
-			level.coop_weaponLoadout[level.coop_weaponLoadout.size+1] = "weapons/m1_garand.tik"
-			level.coop_weaponUse = "rifle"
-			level.coop_ammoLoadout[level.coop_ammoType[1]] 	= 0   //smg
-			level.coop_ammoLoadout[level.coop_ammoType[2]] 	= 40  //pistol
-			level.coop_ammoLoadout[level.coop_ammoType[3]] 	= 60  //rifle
-			level.coop_ammoLoadout[level.coop_ammoType[4]] 	= 1   //grenade
-			level.coop_ammoLoadout[level.coop_ammoType[5]] 	= 0   //heavy
-			level.coop_ammoLoadout[level.coop_ammoType[6]] 	= 0   //shotgun
+	if ((!level.coop_weaponLoadout || level.coop_weaponLoadout.size == 0) && !level.coop_playerPrimaryWeapon && !level.coop_playerSecondaryWeapon){
+		println "(coop_mod/itemhandler.scr::spawnInventory): *ERROR* - no weapon loadout found!"
+		end
 	}
 
-	if (local.default){
-		local.weaponArray = level.coop_weaponLoadout 					//the default level loadout
+	local.weaponArray[1] = NIL
+
+	if (level.coop_playerPrimaryWeapon || level.coop_playerSecondaryWeapon){
+		if (level.coop_playerPrimaryWeapon){
+			local.weaponArray[local.weaponArray.size + 1] = level.coop_playerPrimaryWeapon
+			group.player.flags["coop_PrimaryWeapon"] = level.coop_playerPrimaryWeapon
+		}
+		if (level.coop_playerSecondaryWeapon){
+			local.weaponArray[local.weaponArray.size + 1] = level.coop_playerSecondaryWeapon
+			group.player.flags["coop_SecondaryWeapon"] = level.coop_playerSecondaryWeapon
+		}
 	}else{
-		local.weaponArray = group.player.flags["coop_inventoryWeapon"]	//all the weapons the player has ever picked up
+		if (local.default){
+			local.weaponArray = level.coop_weaponLoadout 					//the default level loadout
+		}else{
+			local.weaponArray = group.player.flags["coop_inventoryWeapon"]	//all the weapons the player has ever picked up
+		}	
 	}
+
 	for (local.i = 1; local.i <= local.weaponArray.size; local.i++){ 	//do the spawning
 		local.weapon = spawn local.weaponArray[local.i] targetname group.invTargetname tracerfrequency 0
 		local.weapon.flags["coop_playerNewWeapon"] 	= game.true
@@ -1039,22 +1116,112 @@ giveInventory:{
 
 //checks if a player holds a coop inventory
 //=========================================================================
-playerHasInventory:{
+playerHasInventory local.player:{
 //=========================================================================
-}end (group.player.flags["coop_inventoryWeapon"].size > 0)
+}end (local.player.flags["coop_inventoryWeapon"].size > 0)
+
+//add weapon to everyone's inventory, whether current or future
+//use this if you want the whole server to spawn with this weap
+//=========================================================================
+addWeaponToEveryone local.model:{
+//=========================================================================
+	thread addWeaponToAllInventories local.model
+	thread addWeaponToLoadout local.model
+}end
+
+//remove weapon from everyone's inventory, whether current or future
+//use this if you want to remove this weapon from all spawns
+//=========================================================================
+removeWeaponFromEveryone local.model:{
+//=========================================================================
+	thread removeWeaponFromAllInventories local.model
+	thread removeWeaponFromLoadout local.model
+}end
+
+//add weapon to the inventories of all active players
+//=========================================================================
+addWeaponToAllInventories local.model:{
+//=========================================================================
+	if ($player){
+		for (local.i = 1; local.i <= $player.size; local.i++){
+			if (thread playerHasInventory $player[local.i]){
+				thread addWeaponToInventory $player[local.i] local.model
+			}	
+		}	
+	}
+}end
 
 //adds weapon model to their inventory array
 //=========================================================================
-addWeaponToInventory local.player local.model:{
+addWeaponToInventory local.player local.model local.pickup local.ammo:{
 //=========================================================================
+	if (waitthread playerHasWeapon local.player local.model){
+		end
+	}
+	if (local.pickup && waitthread isCarryingAmmoType local.player local.ammo){
+		end //this stops weapons of same ammo type being removed from our inv if we pick one up in level
+	}
+
+	local.model = waitthread makeWeaponStringValid local.model
+
+	println local.model
+
+	if (thread notStartGrenade local.model){
+		local.ammoType = waitthread getAmmoType local.model
+	}
+	
+	for (local.i = 1; local.i <= local.player.flags["coop_inventoryWeapon"].size; local.i++){
+		local.invWeapon = local.player.flags["coop_inventoryWeapon"][local.i]
+		if (thread notStartGrenade local.invWeapon){		
+			if (local.ammoType == (waitthread getAmmoType local.invWeapon)){ //we can't have two weapons of the same ammo type
+				println "REMOVING " local.invWeapon
+				waitthread removeWeaponFromInventory local.player local.invWeapon
+				break
+			}
+		}
+	}
 	local.weaponIndex = (local.player.flags["coop_inventoryWeapon"].size + 1)
 	local.player.flags["coop_inventoryWeapon"][local.weaponIndex] = local.model
+
+}end
+
+//new, more robust version
+//=========================================================================
+isCarryingAmmoType local.player local.ammoType:{
+//=========================================================================
+	if (thread playerHasInventory local.player){
+		for (local.i = 1; local.i <= local.player.flags["coop_inventoryWeapon"].size; local.i++){
+			local.weap = local.player.flags["coop_inventoryWeapon"][local.i]
+			if (thread notStartGrenade local.weap){
+				if ((waitthread getAmmoType local.weap) == local.ammoType){
+					end(1)
+				}
+			}
+		}
+	}
+}end(0)
+
+//add weapon to the inventories of all active players
+//=========================================================================
+removeWeaponFromAllInventories local.model:{
+//=========================================================================
+	if ($player){
+		for (local.i = 1; local.i <= $player.size; local.i++){
+			thread removeWeaponFromInventory $player[local.i] local.model
+		}	
+	}
 }end
 
 //removes weapon model from their inventory array
 //=========================================================================
 removeWeaponFromInventory local.player local.model:{
 //=========================================================================
+	if (!thread playerHasWeapon local.player local.model){
+		end
+	}
+
+	local.model = waitthread makeWeaponStringValid local.model
+
 	local.oldArray 		= local.player.flags["coop_inventoryWeapon"]
 	local.newArray[1] 	= NIL
 	local.j = 1
@@ -1068,13 +1235,84 @@ removeWeaponFromInventory local.player local.model:{
 	local.player.flags["coop_inventoryWeapon"] = local.newArray
 }end
 
+//removes weapon from the loadout array.
+//this is to change default spawn loadouts for fresh spawns if a map
+//requires this. 
+//=========================================================================
+removeWeaponFromLoadout local.model:{
+//=========================================================================
+	local.model = waitthread makeWeaponStringValid local.model
+
+	local.oldArray 		= level.coop_weaponLoadout
+	local.newArray[1] 	= NIL
+	local.j = 1
+	for(local.i = 1; local.i <= local.oldArray.size; local.i++){
+		local.weaponModel = local.oldArray[local.i]
+		if(local.weaponModel != local.model){
+			local.newArray[local.j] = local.weaponModel
+			local.j++
+		}
+	}
+	level.coop_weaponLoadout = local.newArray
+
+	if (level.coop_weaponLoadout.size == 0){
+		println "(coop_mod/itemhandler.scr::removeWeaponFromLoadout): *ERROR* - there are no weapons in loadout!"
+	}
+}end
+
+//adds weapon to the loadout array.
+//this is to change default spawn loadouts for fresh spawns if a map
+//requires this. 
+//=========================================================================
+addWeaponToLoadout local.model:{
+//=========================================================================
+	local.model = waitthread makeWeaponStringValid local.model
+
+	local.ammoType = waitthread getAmmoType local.model
+
+	for (local.i = 1; local.i <= level.coop_weaponLoadout.size; local.i++){
+		if (level.coop_weaponLoadout[local.i] == local.model){
+			end
+		}
+	}
+	for (local.i = 1; local.i <= level.coop_weaponLoadout.size; local.i++){
+		if (thread notStartGrenade level.coop_weaponLoadout[local.i]){
+			if (local.ammoType == (waitthread getAmmoType level.coop_weaponLoadout[local.i])){
+				waitthread removeWeaponFromLoadout level.coop_weaponLoadout[local.i]		
+				break
+			}		
+		}
+	}
+
+	local.weaponIndex = (level.coop_weaponLoadout.size + 1)
+	level.coop_weaponLoadout[local.weaponIndex] = local.model
+}end
+
+//we need to have these - never remove!
+//=========================================================================
+notStartGrenade local.model:
+//=========================================================================
+end (local.model != "models/weapons/m2frag_grenade_sp_start.tik" && local.model != "models/weapons/steilhandgranate_start.tik")
+
+//make sure the weapon string is the correct format
+//=========================================================================
+makeWeaponStringValid local.model:{
+//=========================================================================
+	local.model = waitthread coop_mod/strings.scr::to_lower local.model //convert it to lowercase
+
+	//make sure the models folder is included in the name
+	if (!waitthread coop_mod/main.scr::containsText local.model "models"){
+		local.model = ("models/" + local.model)
+	}
+}end(local.model)
+
 //checks if a player holds this weapon
 //=========================================================================
-playerHasWeapon local.player local.item:{
+playerHasWeapon local.player local.model:{ 
 //=========================================================================
 	local.weaponArray = local.player.flags["coop_inventoryWeapon"]
 	for (local.i = 1; local.i <= local.weaponArray.size; local.i++){
-		if (local.weaponArray[local.i] == local.item.model){
+		if (local.weaponArray[local.i] == local.model){
 			end(1)
 		}
 	}
@@ -1169,7 +1407,7 @@ setupGrenades:{
 			local.granate.flags["coop_droppedItem"] = game.true
 			local.item hide
 			local.item nottriggerable
-			parm.previousthread end 			//stop the processing of the item even though the item still exists
+			group.thread["initialiseItem"] end 		//stop the processing of the item even though the item still exists
 			waitthread waitTillLanded local.item
 
 		}
@@ -1215,7 +1453,6 @@ setIsDisguised local.player local.bool local.forceState:{
 		local.player.flags["coop_isDisguised"] = local.bool
 	}
 }end
-
 
 //takes a diguise from a player
 //=========================================================================
@@ -1332,8 +1569,19 @@ enableClickablePapers local.guard local.player:{
 takePlayerWeapon local.model:{
 //=========================================================================
 	local.player = self
+
+	local.activeWeapon = thread returnActiveWeapon local.player
+	if (local.activeWeapon){
+		local.activeModel = local.activeWeapon.model
+	}
+	
+	if (local.activeModel && local.activeModel == local.model){
+		local.player.flags["coop_takenActiveWeapon"] = game.true
+	}
+
+	local.player.flags["coop_inventoryAmmo"][(waitthread getAmmoType local.model)] = game.true
+
 	local.player take local.model
-	thread removeWeaponFromInventory local.player local.model
 }end
 
 //used to replace giving weapons to players via scripts (item and give commands)
@@ -1371,9 +1619,51 @@ givePlayerWeapon local.model:{
 //=========================================================================
 usePlayerWeapon local.model local.wait:{
 //=========================================================================
-	if (local.wait){ wait (float(local.wait)) }
 	local.player = self
-	if (isAlive local.player){
+	local.player.flags["coop_takenActiveWeapon"] = game.false
+
+	if (local.wait){ wait (float(local.wait)) }
+	
+	if (isAlive local.player && local.player.dmteam == "allies"){
 		local.player use local.model
 	}
 }end
+
+//Get the weapon type of this weapon
+//=========================================================================
+getAmmoType local.model:{
+//=========================================================================
+	local.model = waitthread makeWeaponStringValid local.model
+
+	switch (local.model){
+		case "models/weapons/colt45.tik":
+		case "models/weapons/p38.tik":
+		case "models/weapons/silencedpistol.tik":
+			end("pistol")
+		case "models/weapons/bazooka.tik":
+		case "models/weapons/panzerschreck.tik":
+			end("heavy")
+		case "models/weapons/mp44.tik":
+		case "models/weapons/bar.tik":
+			end("mg")
+		case "models/weapons/shotgun.tik":
+			end("shotgun")
+		case "models/weapons/springfield.tik":
+		case "models/weapons/kar98.tik":
+		case "models/weapons/kar98sniper.tik":
+		case "models/weapons/m1_garand.tik":
+			end("rifle")
+		case "models/weapons/thompsonsmg.tik":
+		case "models/weapons/mp40.tik":
+			end("smg")
+		case "models/weapons/us_w_minedetector.tik":
+		case "models/weapons/gr_w_minedetector.tik":
+			end("landmine")
+		case "models/weapons/it_w_bomba.tik":
+		case "models/weapons/steilhandgranate.tik":
+			end("grenade")
+		case "models/weapons/m2frag_grenade.tik":
+			end("agrenade")
+	} //TODO: Add more BT MODELS - see isPrimaryWeapon in main.scr!
+	println "(coop_mod/itemhandler.scr::getAmmoType): *WARNING* - " local.model " not on list. Add it!"
+}end("unknown")
