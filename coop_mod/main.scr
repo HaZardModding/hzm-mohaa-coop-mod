@@ -145,6 +145,7 @@ main:{
 	thread setupServer															//chrissstrahl - inizial setup, might be deprecated
 	thread managePlayers														//chrissstrahl - handles spawning, respawning spectator, generic stuff each frame
 	thread playerSpawnEvent 													//[200] Smithy - enable the spawn event thread used for weapon loadouts, disguises etc..
+	exec coop_mod/loadout.scr 													//[200] Smithy - initialises the weapon loadout array for this level - moved from itemhandler.scr
 	waitthread coop_mod/spawnlocations.scr::main								//chrissstrahl - create spawnpoints for coop
 	waitthread mom/mom.scr::setup "coop_mod/mom_actions.scr" 2 "coop_mom"		//chrissstrahl - set coop mod specific mom file
 
@@ -448,10 +449,12 @@ managePlayers:{
 			continue
 		}
 
+		/* [200] Smithy - handled in playerSpawnEvent
 		//chrissstrahl - if a health is specified in a cvar
 		if( int(getCvar("coop_health")) > 100 ){
 			level.coop_health = int(getCvar("coop_health"))
 		}
+		*/
 
 		//chrissstrahl - calculate health factor based on dificulty settings
 		/* Not implemented yet
@@ -463,7 +466,7 @@ managePlayers:{
 		*/
 
 		//chrissstrahl - setup health
-		local.health = level.coop_health
+		//local.health = level.coop_health //[200] Smithy - handled in playerSpawnEvent
 
 //warp player back to the place he was alive last
 		for (local.i = 1;local.i <= $player.size;local.i++){
@@ -472,7 +475,6 @@ managePlayers:{
 				//[200] chrissstrahl - used for LMS to detect when a player leaves
 				local.playerCount++
 
-				//local.weaponTargetName = "playerWeapon" + local.i + ""
 /////////////////////////////////////////SETUP
 				if(	local.player.flags["coop_isActive"] == NIL){
 //[200] chrissstrahl - LMS if not allowed to join, add deaths
@@ -501,8 +503,9 @@ managePlayers:{
 					local.player.flags["coop_team"] = "None"
 					local.player.flags["coop_lastRespawn"] = -1
 					local.player.flags["coop_joinedGameAt"] = level.time //[200] chrissstrahl - used for variouse checks
-					local.player max_health local.health
-					local.player healthonly local.health
+
+					//local.player max_health local.health //[200] Smithy - handled in playerSpawnEvent
+					//local.player healthonly local.health
 					//thread playerAttachTrigger local.player //[200] Smithy - defunct now we use playerSpawnEvent func below
 					//this is used for friendly orientation see global/friendly::playernode
 					local.player.fnum = -100
@@ -521,10 +524,12 @@ managePlayers:{
 
 					thread resetSpawn local.player
 
+					/* //[200] Smithy - disguise stuff done in itemhandler now
 					if( level.coop_playerHasDisguise != NIL ){
 						local.player.has_disguise = level.coop_playerHasDisguise
 						//local.player.is_disguised = level.coop_playerHasDisguise //this is suppose to be read only
 					}
+					*/
 				}
 /////////////////////////////////////////SPECTATOR
 				if( local.player.dmteam == "spectator" ){
@@ -592,29 +597,31 @@ managePlayers:{
 								//- EACH DEATH:		coop_playerJustDied
 								thread startThread ( "maps/"+level.coop_mapname+".scr::coop_playerJustSpawned" ) (local.player)
 							}
-							local.player max_health local.health
-							local.player healthonly local.health
+							//local.player max_health local.health //[200] Smithy - handled in playerSpawnEvent
+							//local.player healthonly local.health
 							//get all items
-							local.player thread itemGetAll
+							//local.player thread itemGetAll //[200] Smithy - defunct
 
 							level.coop_playerReady = 1
 							local.player.flags["coop_isActive"] = 1
-							//local.player notarget 0
 							local.player threatbias level.coop_threatbias
 							local.player solid
 							local.player american
 							local.player.fnum = -1 //this is used for friendly orientation see global/friendly::playernode
-
+/* [200] Smithy - handled in itemhandler now
 							if( level.coop_noWeapons ){
 								thread playerTakeAll local.player
 							}
+*/
 
 //TAKE SMOKE GRANADES AWAY
 							//chrissstrahl - oh gosh how much I hate this stupid useless pice of shitt, useless in coop
+/* [200] Smithy - done in itemhandler
 							local.player take "models/weapons/M18_smoke_grenade.tik"
 							local.player take "models/weapons/RDG-1_Smoke_grenade.tik"
 							local.player take "models/weapons/nebelhandgranate.tik"
-
+*/
+/* //[200] Smithy - no longer needed now we have itemhandler
 //FORCE PRIMARY
 							if(local.player.flags["coop_specialWeaponPrimary"] != NIL){
 								thread playerForcePrimary local.player local.player.flags["coop_specialWeaponPrimary"]
@@ -633,7 +640,7 @@ managePlayers:{
 							}else if(level.coop_forceInventory != NIL){
 								thread playerForceInventory local.player level.coop_forceInventory
 							}
-
+*/
 //HIDE PLAYER
 							if( level.coop_playerHide ){
 								local.player hide
@@ -679,6 +686,7 @@ managePlayers:{
 							}
 						}
 						//ALLOW ONLY ALLIES//////////////////////////////////////////////
+						/* //[200] Smithy - done in playerSpawnEvent now
 						if( local.player.dmteam == "axis" ){
 							if( local.player.flags["coop_forcedLast"] == NIL ){
 								local.player.flags["coop_forcedLast"] = -10
@@ -691,6 +699,7 @@ managePlayers:{
 								local.player kill
 							}
 						}
+						*/
 					}
 /////////////////////////////////////////DEAD
 					else{
@@ -719,27 +728,23 @@ managePlayers:{
 							local.player threatbias ignoreme
 							local.player.fnum = -100 //this is used for friendly orientation see global/friendly::playernode
 						}
-						//remove weapon right away if dropped/////////////////////////////////////////
-						if($(local.weaponTargetName) != NULL){
-							$(local.weaponTargetName) delete
-						}
 					}
 				}
 			}
 		}
-//[200] chrissstrahl - call player changed func if number of players changed
+		//[200] chrissstrahl - call player changed func if number of players changed
 		if(local.prevPlayerCount != local.playerCount){
 			waitthread playerCountChanged local.prevPlayerCount local.playerCount
 		}
 
-//[200] chrissstrahl - LMS - check if condistions have changed
-		waitthread lmsCheckLifes local.prevPlayerCount local.playerCount //[200] Smithy - NOTE: this is where this loop 'waits'
+		//[200] chrissstrahl - LMS - check if condistions have changed
+		waitthread lmsCheckLifes local.prevPlayerCount local.playerCount
 
-//[200] chrissstrahl - keep track of player count
+		//[200] chrissstrahl - keep track of player count
 		local.prevPlayerCount = local.playerCount
-		//[200] Smithy - a waitframe here would be more readable
-	}	//[200] Smithy - added bracket - i was finding it hard to read without proper brackets! this is for outer while loop
-		//[200] Smithy - i guess the bracket next to 'end' was used in its place...not good
+		
+		waitframe //[200] Smithy - put back here (taken out of lmsCheckLifes)
+	} 
 }end
 
 //[200] Smithy
@@ -751,6 +756,7 @@ managePlayers:{
 //we can use this to efficiently replace any spawn specific code, 
 //e.g. triggers that check for active players.
 //along with this method + NightFall events we can decommission the main loop.
+//I will be slowly moving stuff here from main loop...
 //(internal use only)
 //=========================================================================
 playerSpawnEvent:{
@@ -760,11 +766,18 @@ playerSpawnEvent:{
 
 	while (1){
 		level waittill playerspawn 							//every time a player spawns/respawns this will be triggered and parm.other is cleared/updated
+		local.player = parm.other
 
-		if (!parm.other.isSpectator){ 						//isSpectator is a built-in BT bool, more efficient than checking for dmteam string
-			parm.other.flags["coop_isAlive"] = game.true  						//he's now alive :)
-			parm.other thread coop_mod/itemhandler.scr::managePlayerInventory 	//handle his inventory (new thread group)
-			parm.other thread playerActive 										//he is now active (new thread group)
+		if (!local.player.isSpectator){ 						//isSpectator is a built-in BT bool, more efficient than checking for dmteam string
+			//---------------------// func calls here
+			local.player thread coop_mod/itemhandler.scr::managePlayerInventory 	//handle his inventory (new thread group)
+			local.player thread itemGetAll                                        	//give him any inv items (new thread group)
+			local.player thread forceValidTeam 										//force them into allies if they spawned as axis (new thread group)
+			local.player thread playerHealth 										//sort their health out
+			//---------------------// vars here
+			local.player.flags["coop_iAmTruelyActive"] = 1
+			local.player.flags["coop_isAlive"] = game.true  						//he's now alive :)
+			//---------------------//
 
 			//Add anymore spawn stuff here
 		}else{
@@ -774,6 +787,44 @@ playerSpawnEvent:{
 		}						
 	}
 }end
+
+//[200] Smithy
+//=========================================================================
+forceValidTeam:{
+//=========================================================================
+	local.player = self
+
+	while (local.player && local.player.dmteam == "axis"){
+		if (local.player.flags["coop_forcedLast"] == NIL){
+			local.player.flags["coop_forcedLast"] = -10
+		}
+		//don't force if the game won't let us anymore
+		if ((local.player.flags["coop_forcedLast"] + 3) < level.time){
+			thread forceTeam local.player
+			local.player.flags["coop_forcedLast"] = level.time
+		}else{
+			local.player kill
+		}
+		waitframe
+	}
+}end
+
+//[200] Smithy - own func for giving player their health
+//=========================================================================
+playerHealth:
+//=========================================================================
+	local.player = self
+
+	local.coop_cvarHealth = int(getCvar("coop_health"))
+
+	if (local.coop_cvarHealth == 0){
+		level.coop_health = 750
+	}else{
+		level.coop_health = local.coop_cvarHealth
+	}
+
+	local.player health level.coop_health //this does both max_health and healthonly for you
+end				
 
 //[200] chrissstrahl - this is called if the number of player has changed
 //::managePlayers is waiting for this thread
@@ -827,16 +878,14 @@ playerAttachTrigger local.player:{
 	end
 
 	//CODE IN THIS FUNC BELOW THIS LINE IS NOW DEFUNCT - CONSIDER REMOVING IN FUTURE <<< TODO 
-
+/*
 	if(local.player == NULL || local.player == NIL){ end }
 	//iprintlnbold_noloc("playerAttachTrigger")
 
 	if($("coop_plActDetect" + local.player.entnum) == NULL){
-		//iprintlnbold_noloc("trigger spawned")
 		local.trigger = spawn trigger_multiple targetname ("coop_plActDetect" + local.player.entnum) setthread "coop_mod/main.scr::playerActive"
 		waitframe
 		if(local.player == NULL){
-			iprintlnbold_noloc("trigger removed early")
 			$("coop_plActDetect" + local.player.entnum) delete
 			end
 		}
@@ -844,45 +893,15 @@ playerAttachTrigger local.player:{
 		iprintlnbold_noloc("trigger was there")
 	}
 
-	/*
-	while( 1 ){
-		wait 1
-		local.model glue local.trigger
-		local.trigger origin (local.player.origin)
-	}*/
-
-	//iprintlnbold_noloc("trigger glued")
 	local.player.flags["coop_myActivityTriggerName"] = ("coop_plActDetect" + local.player.entnum)
 	local.trigger wait 0.1
 	local.trigger glue local.player
 
-	//$("coop_plActDetect" + local.player.entnum) wait 0.1
-	//$("coop_plActDetect" + local.player.entnum) glue local.player
 	while(local.player != NULL){
 		waitframe
 	}
-	//$("coop_plActDetect" + local.player.entnum) delete
 	local.trigger delete
-	//iprintlnbold_noloc("trigger removed")
-}end
-
-//chrissstrahl - make sure the trigger will only activate for the assigned player
-//=========================================================================
-playerActive:{
-//=========================================================================
-	/* [200] Smithy - no longer uses a trigger so parm.other is irrelevant
-	if( parm.other == NULL ){
-		waitframe //prevent infinity loop error
-		end
-	}
-	*/
-
-	//if( parm.other.flags["coop_myActivityTriggerName"] == self.targetname ){ //[200] Smithy - just a simple check now
-	self.flags["coop_iAmTruelyActive"] = 1 //[200] Smithy - TODO: clean this func up!
-		//iprintlnbold_noloc("matching player")
-	//}//else{
-		//iprintlnbold_noloc("not matching player")
-	//}
+*/
 }end
 
 //chrissstrahl - this fixes the facing not working most of the time, can't tell what the exact cause might be
@@ -895,16 +914,6 @@ playerFace local.direction:{
 			break
 		}
 		self face local.direction
-	}
-}end
-
-//=========================================================================
-playerTakeAll  local.player:{
-//=========================================================================
-	waitframe
-	if(local.player != NULL){
-		local.player takeall
-		//iprintlnbold_noloc ( "take all from: " + local.player.entnum )
 	}
 }end
 
@@ -1170,26 +1179,16 @@ playerMakeSolidAsap local.i:{
 	}
 }end
 
+//gives all items to the player
 //=========================================================================
 itemGetAll:{
 //=========================================================================
-//gives all items to the player
-	if(self == NULL || self.health <= 0 ){
-		end
-	}
-
 	if(level.coop_playerItem1 != NIL ){	self item level.coop_playerItem1 }
 	if(level.coop_playerItem2 != NIL ){	self item level.coop_playerItem2 }
 	if(level.coop_playerItem3 != NIL ){	self item level.coop_playerItem3 }
 	if(level.coop_playerItem4 != NIL ){	self item level.coop_playerItem4 }
 	if(level.coop_playerItem5 != NIL ){	self item level.coop_playerItem5 }
 	if(level.coop_playerItem6 != NIL ){	self item level.coop_playerItem6 }
-}end
-
-//=========================================================================
-giveammo:{
-//=========================================================================
-	iprintlnbold_noloc("DEV: Critical WARNING: main.scr::giveammo used but has no function")
 }end
 
 //=========================================================================
@@ -1415,6 +1414,7 @@ getActiveWeapon_detect:{
 
 //[200] chrissstrahl - using a less resource intense method sugessted by DoubleKill
 //return weapon of given player
+//[200] Smithy - TODO: swap calls to returnActiveWeapon
 //=========================================================================
 getActiveWeapon local.player:{
 //=========================================================================
@@ -1432,44 +1432,6 @@ getActiveWeapon local.player:{
 		}
 	}
 }end "weaponless"
-
-/*
-//return weapon of given player
-//=========================================================================
-getActiveWeapon local.player:{
-//=========================================================================
-	if(local.player != NULL && local.player.health > 0 ){
-		//[200] chrissstrahl - made singleplayer compatible
-		if(level.gametype == 0 || local.player.dmteam != "spectator"){
-			local.playerOrigin1 = local.player gettagposition "tag_weapon_right"
-			local.playerOrigin2 = local.player gettagposition "tag_weapon_left"
-			local.maxentities = int(getcvar("maxentities"))
-
-			for (local.i = 0; local.i < local.maxentities; local.i++) {
-				local.ent = getentbyentnum local.i
-				if ( local.ent != NULL && local.ent.model != NIL){
-					local.entOrigin = local.ent.origin
-					if( vector_length(local.entOrigin - local.playerOrigin1) < 2 || vector_length(local.entOrigin - local.playerOrigin2) < 2 ){
-						if( waitthread isWeaponModel local.ent.model ){
-							//println ("returning: " + local.ent.model)
-							end local.ent.model
-						}
-					}
-				}
-			}
-		}
-	}
-}end "weaponless"
-*/
-
-//check if primary weapon of given player is active
-//=========================================================================
-isPrimaryWeaponActive local.player:{
-//=========================================================================
-	local.weapon = (waitthread getActiveWeapon local.player)
-	local.result = (waitthread isPrimaryWeapon local.weapon)
-	end local.result
-}end 0
 
 //checks if the given model path contains the word weapons
 //=========================================================================
@@ -1497,28 +1459,47 @@ isPrimaryWeapon local.weapon:{
 //=========================================================================
 	if(local.weapon == "" || local.weapon == NIL){ end 0 }
 
-	if(local.weapon == "models/weapons/US_W_MineDetector.tik"){ end 1 }
-	if(local.weapon == "models/weapons/Gr_W_MineDetector.tik"){ end 1 }
-	//recognize all primary aa weapons
-	if(local.weapon == "models/weapons/bar.tik"){ end 1 }
-	if(local.weapon == "models/weapons/bazooka.tik"){ end 1 }
-	if(local.weapon == "models/weapons/kar98.tik"){ end 1 }
-	if(local.weapon == "models/weapons/KAR98sniper.tik"){ end 1 }
-	if(local.weapon == "models/weapons/m1_garand.tik"){ end 1 }
-	if(local.weapon == "models/weapons/mp40.tik"){ end 1 }
-	if(local.weapon == "models/weapons/mp42.tik"){ end 1 }
-	if(local.weapon == "models/weapons/mp44.tik"){ end 1 }//chrissstrahl - added as it is given to player in m6l1c
-	if(local.weapon == "models/weapons/panzerschreck.tik"){ end 1 }
-	if(local.weapon == "models/weapons/shotgun.tik"){ end 1 }
-	if(local.weapon == "models/weapons/springfield.tik"){ end 1 }
-	if(local.weapon == "models/weapons/thompsonsmg.tik"){ end 1 }
-	//iprintlnbold_noloc( local.weapon ) //debug
-}end 0
+	//[200] Smithy - more efficient + looks nicer
+	switch (local.weapon){
+		case "models/weapons/US_W_MineDetector.tik":
+		case "models/weapons/Gr_W_MineDetector.tik":
+		case "models/weapons/bar.tik":
+		case "models/weapons/bazooka.tik":
+		case "models/weapons/kar98.tik":
+		case "models/weapons/KAR98sniper.tik":
+		case "models/weapons/m1_garand.tik":
+		case "models/weapons/mp40.tik":
+		case "models/weapons/mp44.tik":
+		case "models/weapons/panzerschreck.tik":
+		case "models/weapons/shotgun.tik":
+		case "models/weapons/springfield.tik":
+		case "models/weapons/thompsonsmg.tik":
+		case "models/weapons/It_W_Moschetto.tik":
+		case "models/weapons/It_W_Breda.tik":
+		case "models/weapons/Uk_W_L42A1.tik":
+		case "models/weapons/Uk_W_Piat.tik":
+		case "models/weapons/Uk_W_Vickers.tik":
+		case "models/weapons/DeLisle.tik":
+		case "models/weapons/enfield.tik":
+		case "models/weapons/G43.tik":
+		case "models/weapons/Mosin_Nagant_Rifle.tik":
+		case "models/weapons/ppsh_smg.tik":
+		case "models/weapons/sten.tik":
+		case "models/weapons/svt_rifle.tik":
+			end(1)
+	} //TODO: make it part of itemhandler (remove or change calls from AA missions)!
+}end(0)
 
 //used to force a primary weapon on players
 //=========================================================================
 playerForcePrimary local.player local.weapon:{
 //=========================================================================
+	//[200] Smithy - this stuff isn't needed anymore
+	iprintlnbold_noloc("main.scr::playerForcePrimary: func is defunct! Fix me!")
+	end
+
+	//TODO: remove code below this line!
+	/*
 	if(local.player == NULL || local.player == NIL){ end }
 
 	//added for bt
@@ -1564,12 +1545,17 @@ playerForcePrimary local.player local.weapon:{
 		local.player item local.weapon
 		local.player use local.weapon
 	}
+	*/
 }end
 
 //used to force a primary weapon on players
 //=========================================================================
 playerForceInventory local.player local.item:{
 //=========================================================================
+	//[200] Smithy - this stuff isn't needed anymore
+	iprintlnbold_noloc("main.scr::playerForceInventory: func is defunct! Fix me!")
+	end
+	/*
 	if(local.player == NULL || local.player == NIL){ end }
 
 	//take conflicting inventory stuff
@@ -1581,12 +1567,17 @@ playerForceInventory local.player local.item:{
 	if(local.item != NIL){
 		local.player item local.item
 	}
+	*/
 }end
 
 //used to force a primary weapon on players
 //=========================================================================
 playerForceSecondary local.player local.weapon:{
 //=========================================================================
+	//[200] Smithy - this stuff isn't needed anymore
+	iprintlnbold_noloc("main.scr::playerForceSecondary: func is defunct! Fix me!")
+	end
+	/*
 	if(local.player == NULL || local.player == NIL){ end }
 
 	//bt
@@ -1603,12 +1594,17 @@ playerForceSecondary local.player local.weapon:{
 		local.player item local.weapon
 		local.player use local.weapon
 	}
+	*/
 }end
 
 //clears the primary weapon swap remember variable
 //=========================================================================
 playerPrimarySwapCancel local.player:{
 //=========================================================================
+	//[200] Smithy - this stuff isn't needed anymore
+	iprintlnbold_noloc("main.scr::playerPrimarySwapCancel: func is defunct! Fix me!")
+	end
+	/*
 	if(local.player == NULL){
 		end 1
 	}
@@ -1625,6 +1621,7 @@ playerPrimarySwapCancel local.player:{
 			end 1
 		}
 	}
+	*/
 }end 0
 
 //used to swap a primary weapon of a player with a new one, remembers the swapped weapon
@@ -1633,7 +1630,7 @@ playerPrimarySwap local.player local.weaponNew:{
 //=========================================================================
 	iprintlnbold_noloc("main.scr::playerPrimarySwap is defunct. Fix me!") //[200] Smithy
 	end 																  //[200] Smithy - we won't need this now
-
+	/*
 	if(local.player == NULL || local.player == NIL ){ end }
 	if( local.player.flags["coop_swapedWeaponPrimary"] == NIL && local.weaponNew != NIL){
 		for(local.x=0;local.x<4;local.x++){
@@ -1670,6 +1667,7 @@ playerPrimarySwap local.player local.weaponNew:{
 		waitthread playerForcePrimary local.player local.player.flags["coop_swapedWeaponPrimary"]
 		local.player.flags["coop_swapedWeaponPrimary"] = NIL
 	}
+	*/
 }end
 
 //checks if a string contains the given text
@@ -1967,8 +1965,6 @@ lmsCheckLifes local.prevPlayerCount local.playerCount:{
 			}
 		}
 	}
-	waitframe //[200] Smithy - it would be more readable if this was in managePlayers - it took me a while to find where the wait was
-	//[200] Smithy - removed bracket - i was finding it hard to read with extra brackets lying around
 }end
 
 //[200] Chrissstrahl - turns g_gametype cvar hack on
