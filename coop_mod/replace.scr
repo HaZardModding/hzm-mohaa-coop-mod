@@ -2570,6 +2570,9 @@ missionfailed:{
 givePlayerWeapon local.weapon local.playerToUse local.use local.wait:{
 //=========================================================================
 	if (!$player || !local.weapon){ end }
+
+	//local.ammoType = thread coop_mod/itemhandler.scr::getAmmoType local.weapon
+
 	for (local.i = 1; local.i <= $player.size; local.i++){
 		local.player = $player[local.i]
 		if (level.gametype == 0){
@@ -2577,7 +2580,7 @@ givePlayerWeapon local.weapon local.playerToUse local.use local.wait:{
 		}else{
 			local.player thread coop_mod/itemhandler.scr::givePlayerWeapon local.weapon
 		}
-		if (local.use && local.use == "all"){
+		if (local.use && local.use == "all" || !(thread coop_mod/itemhandler.scr::returnActiveWeapon local.player) && local.player.flags["coop_takenActiveWeapon"]){
 			local.player thread coop_mod/itemhandler.scr::usePlayerWeapon local.weapon local.wait //for 'multithreaded' delays
 		}
 	}
@@ -2585,6 +2588,9 @@ givePlayerWeapon local.weapon local.playerToUse local.use local.wait:{
 		if (local.playerToUse && local.playerToUse.classname && local.playerToUse.classname == "Player"){
 			local.playerToUse thread coop_mod/itemhandler.scr::usePlayerWeapon local.weapon local.wait
 		}
+	}
+	if (level.gametype != 0){ //give the weapon to everyone's inventories and default loadout so current and future players will have this
+		thread coop_mod/itemhandler.scr::addWeaponToEveryone local.weapon
 	}
 }end
 
@@ -2600,5 +2606,8 @@ takePlayerWeapon local.weapon:{
 		}else{
 			local.player thread coop_mod/itemhandler.scr::takePlayerWeapon local.weapon
 		}
+	}
+	if (level.gametype != 0){ //take the weapon from everyone's inventories and default loadout so current and future players will not have this
+		thread coop_mod/itemhandler.scr::removeWeaponFromEveryone local.weapon
 	}
 }end
