@@ -222,6 +222,8 @@ handleWeaponPickup:{
 			thread getItemWorldProperties 								//grab latest properties
 			wait game.ms
 
+			println "triggered gun"
+
 			if ((!local.player || local.player.classname != "Player") && group.item){ continue }
 
 			if (!group.pickupEvent){ 										//a pickup event wasn't found. this means this weapon WAS NOT picked up
@@ -230,11 +232,11 @@ handleWeaponPickup:{
 					if (group.droppedItemLifeThread){ group.droppedItemLifeThread end }
 					end
 				}
-				if (thread isCarryingAmmoType local.player group.ammotype){ //ok, no pickup found, check that he doesn't just have full ammo
+				if (waitthread isCarryingAmmoType local.player group.ammotype){ //ok, no pickup found, check that he doesn't just have full ammo
 					continue
 				}
 
-				if (!thread isWeaponAllowed local.player group.item){ //ok, now check if we are allowed this weapon
+				if (!waitthread isWeaponAllowed local.player group.item){ //ok, now check if we are allowed this weapon
 					continue
 				}
 
@@ -1191,17 +1193,18 @@ addWeaponToInventory local.player local.model local.pickup local.ammo:{
 //=========================================================================
 isCarryingAmmoType local.player local.ammoType:{
 //=========================================================================
-	if (thread playerHasInventory local.player){
+	if (waitthread playerHasInventory local.player){
 		for (local.i = 1; local.i <= local.player.flags["coop_inventoryWeapon"].size; local.i++){
 			local.weap = local.player.flags["coop_inventoryWeapon"][local.i]
-			if (thread notStartGrenade local.weap){
+			if (waitthread notStartGrenade local.weap){
 				if ((waitthread getAmmoType local.weap) == local.ammoType){
-					end(1)
+					println local.weap " is weap type of " local.ammoType
+ 					end(game.true)
 				}
 			}
 		}
 	}
-}end(0)
+}end(game.false)
 
 //add weapon to the inventories of all active players
 //=========================================================================
