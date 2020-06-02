@@ -622,13 +622,15 @@ isWeaponAllowed local.player local.item:{
 //=====================================================================
 	if (local.player.flags["coop_PrimaryWeapon"] || local.player.flags["coop_SecondaryWeapon"]){
 		if (local.player.flags["coop_PrimaryWeapon"] == local.item.model){
-			end(game.false)
+			end(game.true)
 		}
 		if (local.player.flags["coop_SecondaryWeapon"] == local.item.model){
-			end(game.false)
+			end(game.true)
 		}
+	}else{
+		end(game.true)
 	}
-}end(game.true)
+}end(game.false)
 
 //force a weapon on all players
 //=====================================================================
@@ -1164,7 +1166,7 @@ addWeaponToInventory local.player local.model local.pickup local.ammo:{
 
 	local.model = waitthread makeWeaponStringValid local.model
 
-	println local.model
+	//println local.model
 
 	if (thread notStartGrenade local.model){
 		local.ammoType = waitthread getAmmoType local.model
@@ -1469,6 +1471,7 @@ takeDisguise local.player:{
 }end
 
 //returns the weapon (if any) that a sentient is currently holding
+//only returns weapons - any other item (e.g. papers) will return NULL
 //=========================================================================
 returnActiveWeapon local.sentient:{
 //=========================================================================
@@ -1480,10 +1483,15 @@ returnActiveWeapon local.sentient:{
 		local.tempName 	= ("actor" + local.entnum + "ActiveItem")
 		local.reset 	= ""
 	}
-	local.sentient weaponcommand "dual" targetname local.tempName
+	local.sentient weaponcommand "dual" targetname local.tempName //as actors can sometimes have weapons in either hand when doing cover behavior
 	local.item = $(local.tempName)
 	if (local.item){
-		local.item targetname local.reset
+		if (local.item.classname == "Weapon"){
+			local.item targetname local.reset
+		}else{
+			local.item targetname ""
+			local.item = NULL
+		}		
 	}else{
 		local.item = NULL
 	}
