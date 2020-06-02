@@ -151,8 +151,6 @@ main:{
 	if (getcvar(tankgo) == "1")
 		$playertank thread dodrive
 		
-	//chrissstrahl - spawn snipers at positions we need em
-	thread coop_spawnSniper
 }end
 
 towerdeath:{
@@ -2162,67 +2160,4 @@ deathrunner:{
 	plungerprepnode
 	bridgeblowprep
 */
-
-//chrissstrahl - spawn bazooka for players to kill tank
-//============================================================================
-coop_spawnSniper:{
-//============================================================================
-	local.trigg1 = spawn trigger_multiple origin ( -1015 1640 664 ) setthread "coop_sniperSwitch" wait 2
-	local.trigg2 = spawn trigger_multiple origin ( 862 1620 900 ) setthread "coop_sniperSwitch" wait 2
-	local.trigg3 = spawn trigger_multiple origin ( 272 1687 928 ) setthread "coop_sniperSwitch" wait 2
-	spawn script_model model "models/weapons/KAR98sniper.tik" targetname "theOneAndOnlyTrueSniper1" origin ( -1015 1640 664 ) notsolid 1 angles (0 0 180)
-	spawn script_model model "models/weapons/KAR98sniper.tik" targetname "theOneAndOnlyTrueSniper2" origin ( 862 1604 928 ) notsolid 1 angles (0 0 180)
-	spawn script_model model "models/weapons/KAR98sniper.tik" targetname "theOneAndOnlyTrueSniper3" origin ( 272 1687 928 ) notsolid 1 angles (0 0 180)
-	waitframe
-	local.trigg1 setsize ( -10 -10 0 ) ( 10 10 50 )
-	local.trigg2 setsize ( -10 -10 0 ) ( 10 10 50 )
-	local.trigg3 setsize ( -10 -10 0 ) ( 10 10 50 )
-	$theOneAndOnlyTrueSniper1 rotateY 100
-	$theOneAndOnlyTrueSniper2 rotateY 100
-	$theOneAndOnlyTrueSniper3 rotateY 100
-}end
-
-//chrissstrahl - allow players to switch their weapons
-//============================================================================
-coop_sniperSwitch:{
-//============================================================================
-	//iprintlnbold_noloc("coop_SniperSwitch")
-	if( parm.other.targetname == "player"){
-		local.player = parm.other
-		if( local.player.flags["coop_SniperSwitch"] == NIL ){	
-			local.isPrimary = 0
-			local.primary = waitexec coop_mod/main.scr::getActiveWeapon local.player
-			for(local.x=0;local.x<4;local.x++){
-				if(local.player == NULL || local.player.health <= 0){	end	}
-				for(local.y=0;local.y<5;local.y++){
-					local.type = "heavy"
-					if(local.y == 0){ local.type = "smg" }
-					else if(local.y == 1){ local.type = "rifle" }
-					else if(local.y == 2){ local.type = "mg" }
-					local.player useweaponclass (local.type)
-					waitframe
-				}
-				local.primary = waitexec coop_mod/main.scr::getActiveWeapon local.player
-				local.isPrimary = waitexec coop_mod/main.scr::isPrimaryWeapon local.primary
-				if(local.isPrimary == 1){
-					local.player.flags["coop_SniperSwitch"] = local.primary
-					break					
-				}
-			}
-			//if no more player
-			if(local.player == NULL || local.player.health <= 0){	end	}
-			
-			//if the player still does not have a primary weapon stop right here
-			if(	local.isPrimary == 0 ){
-				local.player iprint ("You need a Primary Weapon in order to Trade your weapon!") 1
-				end
-			}
-			exec coop_mod/main.scr::playerForcePrimary local.player "models/weapons/KAR98sniper.tik"
-			local.player item rifle
-		}else{
-			exec coop_mod/main.scr::playerForcePrimary local.player local.player.flags["coop_SniperSwitch"]
-			local.player.flags["coop_SniperSwitch"] = NIL
-		}
-	}
-}end
 
