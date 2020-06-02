@@ -92,14 +92,25 @@ main:{
 		}
 	}
 
-	$bazookahit thread bazookahit
+	//$bazookahit thread bazookahit  //[200] Smithy
+
+	//[200] Smithy - spawn new trigger with spawnsflags of 20 ('PROJECTILES' & 'NOT_PLAYERS' flags)
+	local.zookTrig = spawn trigger_multipleall origin $bazookahit.origin spawnflags 20
+	local.zookTrig setsize (0 -100 -70) (10 100 70)
+	local.zookTrig.origin += ( -25 0 0)
+	local.zookTrig setthread bazookahit
+
+	//[200] Smithy - remove old trigger
+	$bazookahit remove
 	
 	//chrissstrahl - move trigger down so it will not trigger if the building is hit instead of the gate
+	/* [200] Smithy - not needed now - this happened because it waited for damage event, including splash damage from nearby explosions
 	if(level.gametype != 0){
 		local.origin = $bazookahit.origin
 		local.origin[2] -= 100
 		$bazookahit origin ( local.origin )
 	}
+	*/
 
 	$leftgate solid
 	$leftgate disconnect_paths
@@ -1469,9 +1480,6 @@ bazookathread:{
 		//println "there was no self parent"
 	//}
 	
-	//chrissstrahl - give player activating the trigger the bazooka and some ammo
-	//thread coop_bazookaSwitch local.player [200] Smithy - dont need this now we have itemhandler
-	
 	//chrissstrahl - don't in mp 
 	//if(level.gametype == 0){ //[200] Smithy - 'leoevl.gametype'??? - changed to level.gametype //ok... we can do this in mp now
 		self delete
@@ -1568,32 +1576,36 @@ ending_spawn_think:{
 }end
 
 //chrissstrahl - modified to work as we need it in sp and mp
+//[200] Smithy - checking active weapon may not be best way, 
+//as it's entirely possible that a player can fire the rocket and switch guns before rocket reaches trigger.
+//Making it respond to the rocket projectiles themselves will be nicer.
+//Will also stop any splash damage from wrong locations triggering it. 
+//Now uses setthread so doesn't need a loop
 //============================================================================
 bazookahit:{
 //============================================================================
 	local.thisTrigger = self
-	while(1){
-		local.thisTrigger waittill damage
-		local.thisTrigger health 1000
-		
-		//heal up trigger if the wrong weapon was used or player was fiering from above (inside the building) or player has not yet found the bazooka (but rather picked it from the menu)
-		if(waitexec coop_mod/main.scr::getActiveWeapon parm.other == "models/weapons/bazooka.tik" && parm.other.origin[2] < 200 && level.flags[gotbazooka] == 1 ){
-			//right weapon used
-			local.thisTrigger delete
-			$leftgate time 1
-			$rightgate time 1.2
-			$leftgate thread rotateup 85
-			$rightgate thread rotatedown 85
-			level.flags[door] = 1
-			thread escape level.friendly1 1
-			thread escape level.friendly2 2
-			thread escape level.friendly3 3
-			thread escape level.friendly4 4
-			thread escape level.friendly5 5
-			end
-		}
-		waitframe
+
+	local.projectile 		= parm.other  //[200] Smithy - this will be the rocket (or grenade)
+	local.projectileOwner 	= parm.owner  //[200] Smithy - this will be the player firing it (or throwing it)
+
+	//[200] Smithy - make sure it's a rocket
+	if (local.projectile.model != "models/projectiles/bazookashell.tik" && local.projectile.model != "models/projectiles/bazookashell_dm.tik"){
+		end
 	}
+
+	//[200] Smithy - don't check for active weapons anymore
+	local.thisTrigger delete
+	$leftgate time .3 	//1 		//[200] Smithy - sped this up... looks less stupid without slow gate swing after explosive shell hitting it
+	$rightgate time .45 //1.2
+	$leftgate thread rotateup 85
+	$rightgate thread rotatedown 85
+	level.flags[door] = 1
+	thread escape level.friendly1 1
+	thread escape level.friendly2 2
+	thread escape level.friendly3 3
+	thread escape level.friendly4 4
+	thread escape level.friendly5 5
 }end
 
 //============================================================================
@@ -1676,53 +1688,6 @@ rotateup local.amount:{
 	Set 50 enemy generator
 
 */
-
-//chrissstrahl - allow players to switch their weapons
-//============================================================================
-coop_bazookaSwitch local.player:{
-//============================================================================
-	end //[200] Smithy - don't need this - TODO: REMOVE FUNC
-	//iprintlnbold_noloc("coop_bazookaSwitch")
-	/*
-	if( local.player.targetname == "player"){
-		if( local.player.flags["coop_BaZookaSwitch"] == NIL ){	
-			local.isPrimary = 0
-			local.primary = waitexec coop_mod/main.scr::getActiveWeapon local.player
-			for(local.x=0;local.x<4;local.x++){
-				for(local.y=0;local.y<4;local.y++){
-					if(local.player == NULL || local.player.health < 1 || local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1){ end }
-					if		(local.y == 0){ local.type = "heavy" }
-					else if	(local.y == 1){ local.type = "smg" }
-					else if	(local.y == 2){ local.type = "rifle" }
-					else if	(local.y == 3){ local.type = "mg" }
-					local.player useweaponclass (local.type)
-					waitframe
-				}
-				local.primary = waitexec coop_mod/main.scr::getActiveWeapon local.player
-				local.isPrimary = waitexec coop_mod/main.scr::isPrimaryWeapon local.primary
-				if(local.isPrimary == 1){
-					local.player.flags["coop_BaZookaSwitch"] = local.primary
-					break					
-				}
-			}
-			//if no more player
-			if(local.player == NULL || local.player.health < 1 || local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1){ end }
-			
-			//if the player still does not have a primary weapon stop right here
-			if(	local.isPrimary == 0 ){
-				local.player iprint ("You need a Primary Weapon in order to Trade your Weapon!") 1
-				end
-			}
-			
-			exec coop_mod/main.scr::playerForcePrimary local.player "weapons/bazooka.tik"
-			local.player item heavy
-		}else{
-			exec coop_mod/main.scr::playerForcePrimary local.player local.player.flags["coop_BaZookaSwitch"]
-			local.player.flags["coop_BaZookaSwitch"] = NIL
-		}
-	}
-	*/
-}end
 
 //chrissstrahl - update spawnlocations on player progress
 //make sure we don't go backwards
