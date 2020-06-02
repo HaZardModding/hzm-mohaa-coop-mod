@@ -304,7 +304,7 @@ main:{
 	thread scene0
 
 	//[200] Smithy - OK, make this work properly in coop
-	thread replaceBazookaPickup
+	thread coop_replaceBazookaPickup
 }end
 
 //****************************************************//
@@ -316,7 +316,7 @@ main:{
 //replacing the weapon and ammo with actual weapons and ammo
 //then removing the original script models
 //=========================================================================
-replaceBazookaPickup:{
+coop_replaceBazookaPickup:{
 //=========================================================================
 	//make the panzerschreck
 	if(level.gametype != 0){
@@ -352,7 +352,11 @@ replaceBazookaPickup:{
 		$scene0_shell5 remove
 		$scene0_shell6 remove
 		$scene0_shell7 remove
-	}	
+	}
+
+	wait 4
+
+	iprintlnbold_noloc("Hint: the bazooka will respawn after a few seconds.")	
 }end
 
 //==="STARTING TRENCH" ***//
@@ -5944,78 +5948,3 @@ quick_farplane_near_extra:
 		wait .1
 	}
 end
-
-
-//chrissstrahl - spawn bazooka for players to kill tank
-//============================================================================
-coop_spawnBazooka:{
-//============================================================================
-	local.trigg1 = spawn trigger_multiple origin ( -3183 3776 -150 ) setthread coop_bazookaSwitch wait 2
-	local.trigg2 = spawn trigger_multiple origin ( 4088 2053 -224 ) setthread coop_bazookaSwitch wait 2
-	//spawn script_model model "models/weapons/bazooka.tik" targetname "theOneAndOnlyTrueBazooka1" origin ( -782 -5153 110 ) notsolid 1
-	//spawn script_model model "models/weapons/bazooka.tik" targetname "theOneAndOnlyTrueBazooka2" origin ( 0 -6227 110 ) notsolid 1
-	waitframe
-	local.trigg1 setsize ( -10 -10 0 ) ( 10 10 30 )
-	local.trigg2 setsize ( -10 -10 0 ) ( 10 10 30 )
-	$scene0_panzerschreck rotateY 100
-	$scene4_panzerschreck gravity 0
-	$scene4_panzerschreck mass 0
-	$scene4_panzerschreck origin ( 4092.62 2046.36 -238.16 )
-	waitframe
-	$scene4_panzerschreck rotateY 100
-}end
-
-//chrissstrahl - allow players to switch their weapons
-//============================================================================
-coop_bazookaSwitch:{
-//============================================================================
-	//iprintlnbold_noloc("coop_bazookaSwitch")
-	if( parm.other.targetname == "player"){
-		local.player = parm.other
-		if( local.player.flags["coop_BaZookaSwitch"] == NIL ){	
-			local.isPrimary = 0
-			local.primary = waitexec coop_mod/main.scr::getActiveWeapon local.player
-			for(local.x=0;local.x<4;local.x++){
-				for(local.y=0;local.y<4;local.y++){
-					if(local.player == NULL || local.player.health < 1 || local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1){ end }
-					if		(local.y == 0){ local.type = "heavy" }
-					else if	(local.y == 1){ local.type = "smg" }
-					else if	(local.y == 2){ local.type = "rifle" }
-					else if	(local.y == 3){ local.type = "mg" }
-					local.player useweaponclass (local.type)
-					waitframe
-				}
-				local.primary = waitexec coop_mod/main.scr::getActiveWeapon local.player
-				local.isPrimary = waitexec coop_mod/main.scr::isPrimaryWeapon local.primary
-				if(local.isPrimary == 1){
-					local.player.flags["coop_BaZookaSwitch"] = local.primary
-					break					
-				}
-			}
-			//if no more player
-			if(local.player == NULL || local.player.health < 1 || local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1){ end }
-			
-			//if the player still does not have a primary weapon stop right here
-			if(	local.isPrimary == 0 ){
-				local.player iprint ("You need a Primary Weapon in order to Trade your Weapon!") 1
-				end
-			}
-			
-			exec coop_mod/main.scr::playerForcePrimary local.player "weapons/panzerschreck.tik"
-			local.player item heavy
-		}else{
-			exec coop_mod/main.scr::playerForcePrimary local.player local.player.flags["coop_BaZookaSwitch"]
-			local.player.flags["coop_BaZookaSwitch"] = NIL
-		}
-	}
-}end
-
-//[200] chrissstrahl - added to reset bazooka status if player dies
-//============================================================================
-coop_playerJustDied:{
-//============================================================================
-	local.player = parm.other
-	if(local.player){
-		local.player.flags["coop_BaZookaSwitch"] = NIL
-	}
-}end
