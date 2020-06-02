@@ -229,23 +229,13 @@ coop_updateSpawn4:{
 		wait 0.5
 		local.player = waitexec coop_mod/replace.scr::player_closestTo NIL local.origin
 	}
-//iprintlnbold_noloc("DEV: coop_updateSpawn4")
-	//chrissstrahl - set sniper as primary weapon for respawn (this is failsafe if no player picked up the sniper)
-	if(level.coop_forcePrimary != "weapons/KAR98sniper.tik"){ //[200] chrissstrahl - no one picked the sniper up in the tent
-		//[200] chrissstrahl - remove sniper from tent now
-		if($sniperrifle != NULL){ $sniperrifle delete }
 	
-		local.model = "models/weapons/KAR98sniper.tik"
-		level.coop_forcePrimary = local.model
-		for (local.i = 1;local.i <= $player.size;local.i++){
-			local.player =  $player[local.i]
-			if(local.player != NULL && local.player.health > 0 ){
-				if( level.gametype == 0 || local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
-					exec coop_mod/main.scr::playerForcePrimary local.player local.model
-					iprintlnbold_noloc("You have acquired KAR98 Sniper Rifle")
-				}
-			}
-		}	
+	//[200] Smithy - add it to the inventory ready for respawn
+	if ($sniperrifle){
+		thread coop_mod/itemhandler.scr::addWeaponToEveryone "models/weapons/KAR98sniper.tik"
+		//this func:
+		//	adds weapon to inventories of current players (ready for respawn)
+		//	adds weapon to default loadout for future players (ready for first spawn)
 	}
 	waitthread coop_mod/spawnlocations.scr::e1l2_update4
 	wait 15 //wait some time here, then start spawning near convoy leading tank
@@ -270,39 +260,5 @@ coop_updateSpawn6:{
 //============================================================
 //iprintlnbold_noloc("DEV: coop_updateSpawn6")
 	waitthread coop_mod/spawnlocations.scr::e1l2_update6
-}end
-
-
-//chrissstrahl - give mine detector when in minefield, and take it when leaving mine field
-//============================================================
-coop_handleMineDetectorForPlayers:{
-//============================================================
-	end //[200] Smithy - defunct TODO: remove this
-	while(level.gametype != 0){
-		local.player = NULL
-		for (local.i = 1;local.i <= $player.size;local.i++){
-			local.player = $player[local.i]
-			if(local.player != NULL && local.player.health > 0 ){
-				if( local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
-					//within minefiled
-					if(vector_length( local.player.origin-( -5160 -7072 744 )) < 550 ){
-						if(local.player.flags["coop_swapedWeaponPrimary"] == NIL){
-							//waitexec coop_mod/main.scr::playerPrimarySwap local.player "models/weapons/Gr_W_MineDetector.tik"
-							waitexec coop_mod/main.scr::playerPrimarySwap local.player "models/weapons/US_W_MineDetector.tik"
-							local.player weaponcommand "dual" "scale" 2
-						}
-					}
-					//outside of minefield
-					else{
-						if(local.player.flags["coop_swapedWeaponPrimary"] != NIL){
-							waitexec coop_mod/main.scr::playerPrimarySwap local.player NIL
-							local.player weaponcommand "dual" "scale" 1
-						}
-					}
-				}
-			}
-		}
-		waitframe
-	}
 }end
 

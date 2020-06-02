@@ -20,6 +20,7 @@ InitArtillery:
 	$artillery3 thread GunOrExplosive $artillery3charge
 
 	$sniperrifle setthread SniperRifle
+	$sniperrifle.flags["coop_itemRespawnTime"] = -1 //[200] Smithy - don't respawn this gun
 	thread artilleryStopOnProximity
 	
 	//initialize the landmines
@@ -279,33 +280,24 @@ minefieldautosave:
 }end
 
 //=========================================================================
-SniperRifle:
+SniperRifle:{
 //=========================================================================
-{
 //iprintlnbold_noloc("DEV: Sniper")
 	//chrissstrahl - coop compatible
 	local.model = self.model
 	if(level.gametype == 0){
 		$player weapon local.model
 	}else{
-		//chrissstrahl - set sniper as primary weapon for respawn
-		level.coop_forcePrimary = local.model
-		for (local.i = 1;local.i <= $player.size;local.i++){
-			local.player =  $player[local.i]
-			if(local.player != NULL && local.player.health > 0 ){
-				if( level.gametype == 0 || local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
-					//[200] chrissstrahl - print message to each player privatly
-					exec coop_mod/main.scr::playerForcePrimary local.player local.model
-					local.player iprint "You have acquired KAR98 Sniper Rifle" 1
-//					local.player weapon local.model
-				}
-			}
-		}
+		//[200] Smithy - new way - gives peeps the sniper
+		thread coop_mod/replace.scr::takePlayerWeapon "models/weapons/m1_garand.tik" 	//take everyone's old gun
+		thread coop_mod/replace.scr::givePlayerWeapon local.model parm.other "one" 0.05 //give everyone a sniper, but only make the appropriator use it
+		iprintlnbold_noloc "You have acquired the KAR98 Sniper Rifle"
 	}
 	self remove
-	waitframe //chrissstrahl - we need to wait a moment in mp for the weapon to be accsessible
-	if(level.gametype == 0){
-		iprintln "You have acquired KAR98 Sniper Rifle"
+	
+	//waitframe //chrissstrahl - we need to wait a moment in mp for the weapon to be accsessible //[200] Smithy - the code below is for sp
+	if(level.gametype == 0){	
+		//iprintln "You have acquired the KAR98 Sniper Rifle"
 		$player use local.model
 	}
 }end
