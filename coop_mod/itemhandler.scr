@@ -142,7 +142,7 @@ initialiseItem local.ammotype:{
 
 		local.player = group.item.flags["coop_itemOwner"]
 		if (isAlive local.player){
-			local.player.flags["coop_inventoryAmmo"][group.ammotype] = game.true
+			//local.player.flags["coop_inventoryAmmo"][group.ammotype] = game.true
 			thread addWeaponToInventory local.player group.item.model
 		}
 		end //we don't fully initialise player weapons as they cannot be dropped
@@ -222,8 +222,6 @@ handleWeaponPickup:{
 			thread getItemWorldProperties 								//grab latest properties
 			wait game.ms
 
-			println "triggered gun"
-
 			if ((!local.player || local.player.classname != "Player") && group.item){ continue }
 
 			if (!group.pickupEvent){ 										//a pickup event wasn't found. this means this weapon WAS NOT picked up
@@ -272,7 +270,7 @@ handleWeaponPickup:{
 		}
 
 		//ok, needs to be here... duh
-		local.player.flags["coop_inventoryAmmo"][group.ammotype] = game.true
+		//local.player.flags["coop_inventoryAmmo"][group.ammotype] = game.true
 		thread addWeaponToInventory local.player group.model "pickup" group.ammotype //it's a pickup so check for ammo types
 
 		if (group.pickupEventThread){ group.pickupEventThread end }
@@ -309,7 +307,7 @@ waitTillPickupEvent:{
 
 		if (group.type == "Weapon"){
 			group.pickupEvent = game.true 											//flag pickup event to check in handleWeaponPickup
-			local.player.flags["coop_inventoryAmmo"][group.ammotype] = game.true 	//flag that the player now has this ammotype in his inventory
+			//local.player.flags["coop_inventoryAmmo"][group.ammotype] = game.true 	//flag that the player now has this ammotype in his inventory
 			if (group.item){
 				group.item notdroppable
 			}
@@ -736,7 +734,7 @@ managePlayerInventory:{
 	}
 
 	//either give them a default loadout or give them their old one
-	thread giveWeaponLoadout !(level.coop_retainInventory && thread playerHasInventory group.player)
+	thread giveWeaponLoadout !(level.coop_retainInventory && waitthread playerHasInventory group.player)
 }end
 
 //=========================================================================
@@ -1012,7 +1010,7 @@ giveWeaponLoadout local.default:{
 	group.invTargetname = ("player" + group.player.entnum + "Inventory") 	//e.g. player0Inventory
 
 	if (local.default){
-		thread resetPlayerAmmo group.player
+		//thread resetPlayerAmmo group.player
 		thread resetPlayerWeapons group.player
 	}
 	//spawn them in first and flag them as playerWeapon
@@ -1129,6 +1127,7 @@ playerHasInventory local.player:{
 //=========================================================================
 addWeaponToEveryone local.model:{
 //=========================================================================
+	if (level.gametype == 0){ end }
 	thread addWeaponToAllInventories local.model
 	thread addWeaponToLoadout local.model
 }end
@@ -1138,6 +1137,7 @@ addWeaponToEveryone local.model:{
 //=========================================================================
 removeWeaponFromEveryone local.model:{
 //=========================================================================
+	if (level.gametype == 0){ end }
 	thread removeWeaponFromAllInventories local.model
 	thread removeWeaponFromLoadout local.model
 }end
@@ -1146,9 +1146,11 @@ removeWeaponFromEveryone local.model:{
 //=========================================================================
 addWeaponToAllInventories local.model:{
 //=========================================================================
+	if (level.gametype == 0){ end }
+
 	if ($player){
 		for (local.i = 1; local.i <= $player.size; local.i++){
-			if (thread playerHasInventory $player[local.i]){
+			if (waitthread playerHasInventory $player[local.i]){
 				thread addWeaponToInventory $player[local.i] local.model
 			}	
 		}	
@@ -1159,6 +1161,8 @@ addWeaponToAllInventories local.model:{
 //=========================================================================
 addWeaponToInventory local.player local.model local.pickup local.ammo:{
 //=========================================================================
+	if (level.gametype == 0){ end }
+
 	if (waitthread playerHasWeapon local.player local.model){
 		end
 	}
@@ -1170,15 +1174,15 @@ addWeaponToInventory local.player local.model local.pickup local.ammo:{
 
 	//println local.model
 
-	if (thread notStartGrenade local.model){
+	if (waitthread notStartGrenade local.model){
 		local.ammoType = waitthread getAmmoType local.model
 	}
 	
 	for (local.i = 1; local.i <= local.player.flags["coop_inventoryWeapon"].size; local.i++){
 		local.invWeapon = local.player.flags["coop_inventoryWeapon"][local.i]
-		if (thread notStartGrenade local.invWeapon){		
+		if (waitthread notStartGrenade local.invWeapon){		
 			if (local.ammoType == (waitthread getAmmoType local.invWeapon)){ //we can't have two weapons of the same ammo type
-				println "REMOVING " local.invWeapon
+				//println "REMOVING " local.invWeapon
 				waitthread removeWeaponFromInventory local.player local.invWeapon
 				break
 			}
@@ -1198,7 +1202,7 @@ isCarryingAmmoType local.player local.ammoType:{
 			local.weap = local.player.flags["coop_inventoryWeapon"][local.i]
 			if (waitthread notStartGrenade local.weap){
 				if ((waitthread getAmmoType local.weap) == local.ammoType){
-					println local.weap " is weap type of " local.ammoType
+					//println local.weap " is weap type of " local.ammoType
  					end(game.true)
 				}
 			}
@@ -1210,6 +1214,8 @@ isCarryingAmmoType local.player local.ammoType:{
 //=========================================================================
 removeWeaponFromAllInventories local.model:{
 //=========================================================================
+	if (level.gametype == 0){ end }
+
 	if ($player){
 		for (local.i = 1; local.i <= $player.size; local.i++){
 			thread removeWeaponFromInventory $player[local.i] local.model
@@ -1221,7 +1227,9 @@ removeWeaponFromAllInventories local.model:{
 //=========================================================================
 removeWeaponFromInventory local.player local.model:{
 //=========================================================================
-	if (!thread playerHasWeapon local.player local.model){
+	if (level.gametype == 0){ end }
+
+	if (!waitthread playerHasWeapon local.player local.model){
 		end
 	}
 
@@ -1246,7 +1254,18 @@ removeWeaponFromInventory local.player local.model:{
 //=========================================================================
 removeWeaponFromLoadout local.model:{
 //=========================================================================
-	local.model = waitthread makeWeaponStringValid local.model
+	if (level.gametype == 0){ end }
+
+	if (waitthread isWeaponClass local.model){
+		local.class = local.model
+		local.model = waitthread returnWeaponClassFromLoadout local.class
+		if (!local.model){
+			println "(coop_mod/itemhandler.scr::removeWeaponFromLoadout): no weapon of class " local.class " in loadout array"
+			end
+		}
+	}else{
+		local.model = waitthread makeWeaponStringValid local.model
+	}
 
 	local.oldArray 		= level.coop_weaponLoadout
 	local.newArray[1] 	= NIL
@@ -1271,6 +1290,8 @@ removeWeaponFromLoadout local.model:{
 //=========================================================================
 addWeaponToLoadout local.model:{
 //=========================================================================
+	if (level.gametype == 0){ end }
+
 	local.model = waitthread makeWeaponStringValid local.model
 
 	local.ammoType = waitthread getAmmoType local.model
@@ -1281,7 +1302,7 @@ addWeaponToLoadout local.model:{
 		}
 	}
 	for (local.i = 1; local.i <= level.coop_weaponLoadout.size; local.i++){
-		if (thread notStartGrenade level.coop_weaponLoadout[local.i]){
+		if (waitthread notStartGrenade level.coop_weaponLoadout[local.i]){
 			if (local.ammoType == (waitthread getAmmoType level.coop_weaponLoadout[local.i])){
 				waitthread removeWeaponFromLoadout level.coop_weaponLoadout[local.i]		
 				break
@@ -1298,6 +1319,19 @@ addWeaponToLoadout local.model:{
 notStartGrenade local.model:
 //=========================================================================
 end (local.model != "models/weapons/m2frag_grenade_sp_start.tik" && local.model != "models/weapons/steilhandgranate_start.tik")
+
+//=========================================================================
+returnWeaponClassFromLoadout local.class:{
+//=========================================================================
+	for (local.i = 1; local.i <= level.coop_weaponLoadout.size; local.i++){
+		local.invWeapon = level.coop_weaponLoadout[local.i]
+		if (waitthread notStartGrenade local.invWeapon){
+			if (waitthread getAmmoType local.invWeapon == local.class){
+				end(local.invWeapon)
+			}
+		}
+	}
+}end(NULL)
 
 //make sure the weapon string is the correct format
 //=========================================================================
@@ -1348,6 +1382,7 @@ resetPlayerWeapons local.player:{
 resetPlayerAmmo local.player:{
 //=========================================================================
 	if (!local.player || local.player.classname != "Player"){ end }
+	/*
 	local.player.flags["coop_inventoryAmmo"]["pistol"] 		= game.false
 	local.player.flags["coop_inventoryAmmo"]["mg"] 			= game.false
 	local.player.flags["coop_inventoryAmmo"]["heavy"] 		= game.false
@@ -1356,6 +1391,7 @@ resetPlayerAmmo local.player:{
 	local.player.flags["coop_inventoryAmmo"]["shotgun"] 	= game.false
 	local.player.flags["coop_inventoryAmmo"]["grenade"] 	= game.false
 	local.player.flags["coop_inventoryAmmo"]["agrenade"] 	= game.false
+	*/
 }end
 
 //makes grenades work when picking them up by turning them into an AmmoEntity.
@@ -1579,7 +1615,18 @@ enableClickablePapers local.guard local.player:{
 //=========================================================================
 takePlayerWeapon local.model:{
 //=========================================================================
+	local.threadName = "coop_mod/itemhandler.scr::takePlayerWeapon"
 	local.player = self
+
+	//ok, we can take weapon of particular class from player now
+	if (waitthread isWeaponClass local.model){
+		local.class = local.model
+		local.model = waitthread getWeaponOfClassFromPlayer local.player local.class
+		if (!local.model){
+			println "(" local.threadName "): " local.player.netname " is not holding a weapon of class " local.class
+			end //this means the player isn't holding a weapon of this class - so it's safe to give him a weapon!
+		}
+	}
 
 	local.activeWeapon = thread returnActiveWeapon local.player
 	if (local.activeWeapon){
@@ -1590,9 +1637,13 @@ takePlayerWeapon local.model:{
 		local.player.flags["coop_takenActiveWeapon"] = game.true
 	}
 
-	local.player.flags["coop_inventoryAmmo"][(waitthread getAmmoType local.model)] = game.true
+	//local.player.flags["coop_inventoryAmmo"][(waitthread getAmmoType local.model)] = game.true
 
 	local.player take local.model
+
+	//take the weapon from everyone's inventories and default loadout so current and future players will not have this
+	//thread removeWeaponFromEveryone local.model
+	thread removeWeaponFromInventory local.player local.model
 }end
 
 //used to replace giving weapons to players via scripts (item and give commands)
@@ -1602,8 +1653,15 @@ takePlayerWeapon local.model:{
 givePlayerWeapon local.model:{
 //=========================================================================
 	local.threadName = "coop_mod/itemhandler.scr::givePlayerWeapon"
-
 	local.player = self
+
+	//check that the player is not already holding a weapon of this class
+	local.class = waitthread getAmmoType local.model
+	if (waitthread isCarryingAmmoType local.player local.class){
+			println "(" local.threadName "): " local.player.netname " is already holding a weapon of class " local.class " - you must take this from him first!"
+			end //we can't have two weapons of the same ammo type in their inventory
+	}
+	
 	local.item 	= spawn local.model targetname ("player" +  local.player.entnum + "Inventory")
 	local.item notsolid
 	local.item nottriggerable
@@ -1623,6 +1681,12 @@ givePlayerWeapon local.model:{
 	waitthread coop_mod/main.scr::changeGameType 0 0
 	local.item triggereffect local.player
 	waitthread coop_mod/main.scr::changeGameType 2 0
+
+	 //give the weapon to everyone's inventories and default loadout so current and future players will have this
+	//thread addWeaponToEveryone local.model
+	if (waitthread playerHasInventory local.player){
+		thread addWeaponToInventory local.player local.model
+	}	
 }end
 
 //makes a player use a weapon with optional delay
@@ -1650,12 +1714,19 @@ getAmmoType local.model:{
 		case "models/weapons/colt45.tik":
 		case "models/weapons/p38.tik":
 		case "models/weapons/silencedpistol.tik":
+		case "models/weapons/webley_revolver.tik":
+		case "models/weapons/it_w_beretta.tik":
+		case "models/weapons/nagant_revolver.tik":
+		case "models/weapons/delisle.tik":
 			end("pistol")
 		case "models/weapons/bazooka.tik":
 		case "models/weapons/panzerschreck.tik":
+		case "models/weapons/uk_w_piat.tik":
 			end("heavy")
 		case "models/weapons/mp44.tik":
 		case "models/weapons/bar.tik":
+		case "models/weapons/uk_w_vickers.tik":
+		case "models/weapons/it_w_breda.tik":
 			end("mg")
 		case "models/weapons/shotgun.tik":
 			end("shotgun")
@@ -1663,9 +1734,18 @@ getAmmoType local.model:{
 		case "models/weapons/kar98.tik":
 		case "models/weapons/kar98sniper.tik":
 		case "models/weapons/m1_garand.tik":
+		case "models/weapons/it_w_carcano.tik":
+		case "models/weapons/svt_rifle.tik":
+		case "models/weapons/mosin_nagant_rifle.tik":
+		case "models/weapons/g43.tik":
+		case "models/weapons/enfield.tik":
+		case "models/weapons/uk_w_l42a1.tik":
 			end("rifle")
 		case "models/weapons/thompsonsmg.tik":
 		case "models/weapons/mp40.tik":
+		case "models/weapons/sten.tik":
+		case "models/weapons/ppsh_smg.tik":
+		case "models/weapons/it_w_moschetto.tik":
 			end("smg")
 		case "models/weapons/us_w_minedetector.tik":
 		case "models/weapons/gr_w_minedetector.tik":
@@ -1675,6 +1755,40 @@ getAmmoType local.model:{
 			end("grenade")
 		case "models/weapons/m2frag_grenade.tik":
 			end("agrenade")
-	} //TODO: Add more BT MODELS - see isPrimaryWeapon in main.scr!
+	}
 	println "(coop_mod/itemhandler.scr::getAmmoType): *WARNING* - " local.model " not on list. Add it!"
 }end("unknown")
+
+//check if the string is a weapon class
+//=========================================================================
+isWeaponClass local.string:{
+//=========================================================================
+	switch (local.string){
+		case "pistol":
+		case "heavy":
+		case "mg":
+		case "shotgun":
+		case "rifle":
+		case "smg":
+		case "landmine":
+		case "grenade":
+		case "agrenade":
+			end(game.true)
+	}
+}end(game.false)
+
+//returns the weapon of class specified from player inventory if he has one
+//=========================================================================
+getWeaponOfClassFromPlayer local.player local.class:{
+//=========================================================================
+	if (waitthread playerHasInventory local.player){
+		for (local.i = 1; local.i <= local.player.flags["coop_inventoryWeapon"].size; local.i++){
+			local.invWeapon = local.player.flags["coop_inventoryWeapon"][local.i]
+			if (waitthread notStartGrenade local.invWeapon){
+				if (waitthread getAmmoType local.invWeapon == local.class){
+					end(local.invWeapon)
+				}
+			}
+		}
+	}
+}end(NULL)
