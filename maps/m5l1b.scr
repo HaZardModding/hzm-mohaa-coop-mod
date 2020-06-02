@@ -10,8 +10,6 @@ main:{
 	waitthread coop_mod/main.scr::main     //Pasted by Criminal for coop comp. - start coop mod extensions
 	
 	thread coop_updatespawns			//chrissstrahl - update spawnpoints
-	
-	thread coop_spawnBazooka			//chrissstrahl - spawn bazooka for players to kill tank -782 -5153 110
 
 	exec global/ai.scr
 	exec global/exploder.scr
@@ -231,7 +229,8 @@ main:{
 		level.friendly3.maxhealth = level.hardhealth
 	}
 
-	level.friendly1 runto $destinationmedic //[200] Smithy - ffs, this should have always had a '$'' in front of the name - for some reason AA forgives this mistake but BT doesn't so it didnt work for us...
+	level.friendly1 runto $destinationmedic //[200] Smithy - ffs, this should have always had a '$' in front of the name - for some reason AA forgives this mistake but BT doesn't so it didnt work for us...
+	level.friendly1.movedoneradius = 24 	//[200] Smithy - make sure he moves closer to his destination to stop him blocking players. BT obviously increases the radius.
 }end
 
 //============================================================================
@@ -1500,76 +1499,6 @@ endfriendlythink local.pal:{
 	local.pal leash 384
 	//local.pal tether $player //chrissstrahl
 	local.pal exec coop_mod/main.scr::tether //chrissstrahl - coop mod compatibility
-}end
-
-//chrissstrahl - spawn bazooka for players to kill tank
-//============================================================================
-coop_spawnBazooka:{
-//============================================================================
-	local.trigg1 = spawn trigger_multiple origin ( -782 -5153 110 ) setthread coop_bazookaSwitch wait 2
-	local.trigg2 = spawn trigger_multiple origin ( 0 -6227 110 ) setthread coop_bazookaSwitch wait 2
-	spawn script_model model "models/weapons/bazooka.tik" targetname "theOneAndOnlyTrueBazooka1" origin ( -782 -5153 110 ) notsolid 1
-	spawn script_model model "models/weapons/bazooka.tik" targetname "theOneAndOnlyTrueBazooka2" origin ( 0 -6227 110 ) notsolid 1
-	waitframe
-	local.trigg1 setsize ( -10 -10 0 ) ( 10 10 30 )
-	local.trigg2 setsize ( -10 -10 0 ) ( 10 10 30 )
-	$theOneAndOnlyTrueBazooka1 rotateY 100
-	$theOneAndOnlyTrueBazooka2 rotateY 100
-}end
-
-//chrissstrahl - allow players to switch their weapons
-//============================================================================
-coop_bazookaSwitch:{
-//============================================================================
-	//iprintlnbold_noloc("coop_bazookaSwitch")
-	if( parm.other.targetname == "player"){
-		local.player = parm.other
-		if( local.player.flags["coop_BaZookaSwitch"] == NIL ){	
-			local.isPrimary = 0
-			local.primary = waitexec coop_mod/main.scr::getActiveWeapon local.player
-			for(local.x=0;local.x<4;local.x++){
-				for(local.y=0;local.y<4;local.y++){
-					if(local.player == NULL || local.player.health < 1 || local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1){ end }
-					if		(local.y == 0){ local.type = "heavy" }
-					else if	(local.y == 1){ local.type = "smg" }
-					else if	(local.y == 2){ local.type = "rifle" }
-					else if	(local.y == 3){ local.type = "mg" }
-					local.player useweaponclass (local.type)
-					waitframe
-				}
-				local.primary = waitexec coop_mod/main.scr::getActiveWeapon local.player
-				local.isPrimary = waitexec coop_mod/main.scr::isPrimaryWeapon local.primary
-				if(local.isPrimary == 1){
-					local.player.flags["coop_BaZookaSwitch"] = local.primary
-					break					
-				}
-			}
-			//if no more player
-			if(local.player == NULL || local.player.health < 1 || local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1){ end }
-			
-			//if the player still does not have a primary weapon stop right here
-			if(	local.isPrimary == 0 ){
-				local.player iprint ("You need a Primary Weapon in order to Trade your Weapon!") 1
-				end
-			}
-			
-			exec coop_mod/main.scr::playerForcePrimary local.player "weapons/bazooka.tik"
-			local.player item heavy
-		}else{
-			exec coop_mod/main.scr::playerForcePrimary local.player local.player.flags["coop_BaZookaSwitch"]
-			local.player.flags["coop_BaZookaSwitch"] = NIL
-		}
-	}
-}end
-
-//[200] chrissstrahl - added to reset bazooka status if player dies
-//============================================================================
-coop_playerJustDied:{
-//============================================================================
-	local.player = parm.other
-	if(local.player){
-		local.player.flags["coop_BaZookaSwitch"] = NIL
-	}
 }end
 
 
