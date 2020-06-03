@@ -1326,8 +1326,6 @@ killplayer:{
 //=========================================================================
 glue local.entity local.angle:{
 //=========================================================================
-	level.coop_playerGlue = 1
-
 	if( level.gametype == 0 ){
 		//$player notsolid
 		//$player hide
@@ -1339,7 +1337,6 @@ glue local.entity local.angle:{
 		}
 		end
 	}
-
 	//handle multiplayer
 	thread glueHandle local.entity local.angle
 }end
@@ -1350,43 +1347,30 @@ glue local.entity local.angle:{
 //maybe glueing only once will stop shaking when glued while object is moving
 //
 //[200] chrissstrahl - rewritten
+//[200] Smithy - re-written again - no loop needed now. no entity flags. etc...
+//and uses entnums instead of array index
 //=========================================================================
 glueHandle local.glueTo local.angle:{
 //=========================================================================
+	level.coop_playerGlue = 1
+
+	level.coop_glueTo = local.glueTo  	//[200] Smithy - save these for new spawns
+	level.coop_glueAngle = local.angle 
+
 	//detect if it is a entity or a string, if it is a string we want each player to have a seperate spot
 	if(local.glueTo.size > 1){
 		level.coop_playerGlueIndividual = 1
 	}else{
 		level.coop_playerGlueIndividual = 0
 	}
-
-	//loop and handle each player while glue is active
-	//while(level.coop_playerGlue == 1){
+	if ($player){ //[200] Smithy - NULL check should be outside loop
 		for (local.i = 1;local.i <= $player.size;local.i++){
 			local.player =  $player[local.i]
-			//if( local.player != NULL ){
-			if (!local.player.flags["coop_glued"]){
-				if(level.coop_playerGlueIndividual == 1){
-					local.entity = $(local.glueTo+local.i)
-				}else{
-					local.entity = local.glueTo
-				}
-				//print error if there is one
-				if(local.entity == NULL){
-					println("ERROR: replace.scr::glueHandle - local.entity was NULL for $player["+local.i+"]")
-					continue
-				}
-				//[200] chrissstrahl - added forcelegsstate to avoid:
-				//ERROR: Stopping due to possible infinite leg state loop //e1l3 entering rowboat at level start
-				//local.player forcelegsstate "STAND"
-				local.player.flags["coop_glueAngle"] = local.angle
-				local.player.flags["coop_glue"] = local.entity
+			if (isAlive local.player && !local.player.isSpectator){
 				thread coop_mod/main.scr::playerGlue local.player
-			}
-			//}
+			}	
 		}
-		//waitframe
-	//}
+	}
 }end
 
 //UNGLUE
@@ -1399,24 +1383,24 @@ unglue local.entity:{
 	level.coop_playerGlue = 0
 	level.coop_playerGlueIndividual = 0
 
+	level.coop_glueTo = NIL  			//[200] Smithy - reset
+	level.coop_glueAngle = NIL 
+
 	//local.entity keept only for compatibility reasons
 	if( level.gametype == 0 ){
 		$player unglue
 		$player show //not sure if that is right
 		end
 	}
-
-	for (local.i = 1;local.i <= $player.size;local.i++){
-		local.player =  $player[local.i]
-		if( local.player != NULL ){
+	if ($player){ //[200] Smithy - NULL check should be outside loop
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player =  $player[local.i]
 			local.player solid
 			local.player unglue
 			local.player physics_on
-			local.player.flags["coop_glue"] = NIL
-			local.player.flags["coop_glued"] = game.false
 			//added in ver 2.00 making sure unglued players don't get stuck in each other if they are at the same pos
 			thread coop_mod/main.scr::playerMakeSolidAsap local.i
-		}
+		}	
 	}
 }end
 
