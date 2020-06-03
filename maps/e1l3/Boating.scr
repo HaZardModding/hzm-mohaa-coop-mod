@@ -416,7 +416,8 @@ RandomMortars:
 		}
 		//chrissstrahl - handle in mp
 		else{
-			$boat1 playsound arty_leadin
+			//$boat1 playsound arty_leadin
+			$boat1 thread coop_mod/replace.scr::playsound_wait "arty_leadin" //[200] Smithy - coop compatible
 			$boat1 waittill sounddone
 		}
 		$BoatMortarEffect[local.index] anim start
@@ -791,15 +792,17 @@ UnloadPlayer:
 	}else{
 		//make sure players spawn on the other side from now on
 		waitthread coop_mod/spawnlocations.scr::e1l3_update2
+
 		//unglue players from boat
 		waitexec coop_mod/replace.scr::unglue
 		
 		for (local.pl = 1;local.pl <= $player.size;local.pl++){
-			local.player =  $player[local.pl]
-			if(local.player == NULL || local.player.dmteam == "spectator"){
-				continue
+			local.player =  $player[local.pl]						
+			if(isAlive local.player && !local.player.isSpectator){ 	//[200] Smithy - better checks
+				thread coop_mod/main.scr::playerPlaceAtSpawn local.pl
+			}else{
+				thread coop_mod/main.scr::resetSpawn local.player 	//[200] Smithy - reset their spawns if they died in water
 			}
-			thread coop_mod/main.scr::playerPlaceAtSpawn local.pl
 		}
 		
 		//remove the glue spots
