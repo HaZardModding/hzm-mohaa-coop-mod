@@ -128,7 +128,8 @@ main:{
 
     //list of maps to exclude from custom pain handler
     //disguise maps should be excluded, as when in disguise the engine doesn't call pain.scr
-    level.coop_painHandlerExclusions 		= "m3l1a"::"m2l2a"::"m2l2b"::"m6l1c"
+    //omaha is excluded because it is heavily scripted with its own pain events for AI
+    level.coop_painHandlerExclusions 		= "m3l1a"::"m2l2a"::"m2l2b"::"m6l1c"::"e1l3"
     															//you can exclude entire games from this by using first char and wildcard *
     															//e.g to exclude all BT maps add "e*" to list
     //[200] Smithy - used in coop_mod/itemhandler.scr
@@ -144,7 +145,7 @@ main:{
 
 	thread setupServer															//chrissstrahl - inizial setup, might be deprecated
 	thread managePlayers														//chrissstrahl - handles spawning, respawning spectator, generic stuff each frame
-	thread playerSpawnEvent 													//[200] Smithy - enable the spawn event thread used for weapon loadouts, disguises etc..
+	thread coop_mod/events.scr::initialiseEvents								//[200] Smithy - initialise all events we need
 	exec coop_mod/loadout.scr 													//[200] Smithy - initialises the weapon loadout array for this level - moved from itemhandler.scr
 	waitthread coop_mod/spawnlocations.scr::main								//chrissstrahl - create spawnpoints for coop
 	waitthread mom/mom.scr::setup "coop_mod/mom_actions.scr" 2 "coop_mom"		//chrissstrahl - set coop mod specific mom file
@@ -649,7 +650,7 @@ managePlayers:{
 //move player to spawn
 							thread playerPlaceAtSpawn local.i
 //[200] chrissstrahl - handle glueing, used to be managed in replace.scr::glueHandle
-							waitthread playerGlue local.player
+							//waitthread playerGlue local.player //[200] Smithy - handled in playerSpawnEvent
 //[200] CHRISSTRAHL /// LMS /// ///////////// check if player should be spectator in LMS
 							thread lmsForceSpectatorHandle local.player
 						}
@@ -748,11 +749,7 @@ managePlayers:{
 }end
 
 //[200] Smithy
-//Moved from itemhandler as it makes more sense as a general func.
-//checks for any player spawns.
-//this specific func should only run once per level,
-//but you can have other spawn checks outside of this if you wish.
-//make sure to create a new thread group for each func call (explicitly specify self object).
+//Is called from events.scr every time a player spawners.
 //we can use this to efficiently replace any spawn specific code, 
 //e.g. triggers that check for active players.
 //along with this method + NightFall events we can decommission the main loop.
@@ -761,31 +758,48 @@ managePlayers:{
 //=========================================================================
 playerSpawnEvent:{
 //=========================================================================
-	if (level.coop_playerSpawnEventThread){ end }
-	level.coop_playerSpawnEventThread = local
+	local.player = self
+	if (!local.player.isSpectator){ 						//isSpectator is a built-in BT bool, more efficient than checking for dmteam string
+		//---------------------// func calls here
+		thread coop_mod/itemhandler.scr::managePlayerInventory 		//handle his inventory
+		thread itemGetAll                                        	//give him any inv items
+		thread forceValidTeam 										//force them into allies if they spawned as axis
+		thread playerHealth 										//sort their health out
+		thread playerGlue local.player "reset"  					//any new players will be glued if it's needed
+		//---------------------// vars here
+		local.player.flags["coop_iAmTruelyActive"] = 1
+		local.player.flags["coop_isAlive"] = game.true  						//he's now alive :)
+		//---------------------//
 
-	while (1){
-		level waittill playerspawn 							//every time a player spawns/respawns this will be triggered and parm.other is cleared/updated
-		local.player = parm.other
+		//Add anymore spawn stuff here
+	}else{
+		//the code in this else block will only hit when a player joins a server and spawns as spec for the first time.
+		//this is because players who join are put into spec. subsequent transfers to spec do not respawn their char.
+		//so we know that if this hits, a new player has arrived. so relevant code can go here.
+	}						
+}end
 
-		if (!local.player.isSpectator){ 						//isSpectator is a built-in BT bool, more efficient than checking for dmteam string
-			//---------------------// func calls here
-			local.player thread coop_mod/itemhandler.scr::managePlayerInventory 	//handle his inventory (new thread group)
-			local.player thread itemGetAll                                        	//give him any inv items (new thread group)
-			local.player thread forceValidTeam 										//force them into allies if they spawned as axis (new thread group)
-			local.player thread playerHealth 										//sort their health out
-			//---------------------// vars here
-			local.player.flags["coop_iAmTruelyActive"] = 1
-			local.player.flags["coop_isAlive"] = game.true  						//he's now alive :)
-			//---------------------//
+//[200] Smithy
+//called every time a player dies. this is called from events.scr,
+//which in turn is called from mike_torso on KILLED state.
+//I added an extra layer and put it here as it is more intuitive and
+//easier to find.
+//When we transition to NightFall events then they will be housed 
+//with events.scr too.
+//=========================================================================
+playerDeathEvent:{
+//=========================================================================
+	local.player = self
+}end
 
-			//Add anymore spawn stuff here
-		}else{
-			//the code in this else block will only hit when a player joins a server and spawns as spec for the first time.
-			//this is because players who join are put into spec. subsequent transfers to spec do not respawn their char.
-			//so we know that if this hits, a new player has arrived. so relevant code can go here.
-		}						
-	}
+//[200] Smithy
+//this is a stub. not called from anywhere yet. Will be called via events.scr
+//when we set up a NightFall event for it. 
+//Status: Waiting for listen server support in NightFall
+//=========================================================================
+playerTeamChangeEvent:{
+//=========================================================================
+	local.player = self
 }end
 
 //[200] Smithy
@@ -1822,25 +1836,31 @@ checkCoopDeveloper local.text:{
 
 //[200] chrissstrahl - (new) glue player to object coop handle
 //=========================================================================
-playerGlue local.player:{
+playerGlue local.player local.reset:{
 //=========================================================================
-	if( level.coop_playerGlue ){
-		if(local.player.flags["coop_glue"] != NIL && local.player.flags["coop_glue"] != NULL){
+	if (level.coop_playerGlue){
+		if (local.reset){
+			local.player.flags["coop_glued"] = game.false //[200] Smithy - he died in the interim and needs regluing
+		}
+		if (!local.player.flags["coop_glued"] && local.player.flags["coop_glue"]){
 			local.entity	= local.player.flags["coop_glue"]
 			local.angle		= local.player.flags["coop_glueAngle"]
 
+			local.player.flags["coop_glued"] = game.true //[200] Smithy - stop the same player being glued more than once
+
 			//[200] chrissstrahl - added forcelegsstate to avoid:
 			//ERROR: Stopping due to possible infinite leg state loop //e1l3 entering rowboat at level start
-			local.player forcelegsstate "STAND"
+			//local.player forcelegsstate "STAND" //[200] Smithy - not needed now we use events to glue players
 
 			if(local.entity == NIL || local.entity == NULL){
 				println("ERROR: main.scr::managePlayers(glueing) - local.entity was NULL/NIL for $player["+local.i+"]")
-			}else{
+			}else{						
 				if(local.angle != NIL){
+					//iprintlnbold_noloc "GLUUEEEEE"
 					local.player glue local.entity local.angle
 				}else{
 					local.player glue local.entity
-				}
+				}		
 
 				if(!level.coop_playerGlueIndividual){
 					local.player notsolid
