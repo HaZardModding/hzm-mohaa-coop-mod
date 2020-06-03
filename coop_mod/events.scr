@@ -7,12 +7,47 @@ main local.event:
 	}
 end
 
+//[200] Smithy 
+//we now have a global init event func where we can place all our future
+//NightFall events etc
+//=========================================================================
+initialiseEvents:{
+//=========================================================================
+	thread playerSpawnEvent //[200] Smithy - enable the spawn event thread
+}end
+
+//[200] Smithy
+//Moved from main as it makes more sense as wrapper func,
+//because it will create the thread group for us
+//checks for any player spawns.
+//this specific func should only run once per level,
+//but you can have other spawn checks outside of this if you wish.
+//creates a new thread group for each spawn event
+//=========================================================================
+playerSpawnEvent:{
+//=========================================================================
+	if (level.coop_threads["events.scr"]["playerSpawnEvent"]){ end }
+	level.coop_threads["events.scr"]["playerSpawnEvent"] = local
+
+	while (1){
+		level waittill playerspawn 	//every time a player spawns/respawns this will be triggered and parm.other is cleared/updated
+		local.player = parm.other
+		local.player thread coop_mod/main.scr::playerSpawnEvent //where our player spawn logic is (new thread group)
+	}
+}end
+
 //called when player dies (from mike_torso file)
+//probably can be changed to NightFall event when we get listen server support
+//TODO: ^^^^^^^^^^^^^^^
 //=========================================================================
 playerdeath:{
 //=========================================================================
 	self.flags["coop_isAlive"] = game.false
+	thread coop_mod/main.scr::playerDeathEvent
 }end
 
 
 //ADD ANY OTHERS HERE 
+
+//NIGHTFALL EVENTS WILL GO IN HERE!
+//TODO: add NightFall change team event to call main.scr func !!! 
