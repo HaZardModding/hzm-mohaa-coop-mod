@@ -541,7 +541,6 @@ managePlayers:{
 						local.player.flags["coop_isActive"] = -1
 						waitthread resetSpawn local.player
 						local.player unglue
-						//local.player notarget 1
 						local.player threatbias ignoreme
 						local.player.fnum = -100 //this is used for friendly orientation see global/friendly::playernode
 					}
@@ -765,7 +764,7 @@ playerSpawnEvent:{
 		thread itemGetAll                                        	//give him any inv items
 		thread forceValidTeam 										//force them into allies if they spawned as axis
 		thread playerHealth 										//sort their health out
-		thread playerGlue local.player "reset"  					//any new players will be glued if it's needed
+		thread playerGlue local.player "spawn"  					//any new players will be glued if it's needed
 		//---------------------// vars here
 		local.player.flags["coop_iAmTruelyActive"] = 1
 		local.player.flags["coop_isAlive"] = game.true  						//he's now alive :)
@@ -808,19 +807,19 @@ forceValidTeam:{
 //=========================================================================
 	local.player = self
 
-	while (local.player && local.player.dmteam == "axis"){
-		if (local.player.flags["coop_forcedLast"] == NIL){
-			local.player.flags["coop_forcedLast"] = -10
-		}
+	//while (local.player && local.player.dmteam == "axis"){
+		//if (local.player.flags["coop_forcedLast"] == NIL){
+		//	local.player.flags["coop_forcedLast"] = -10
+		//}
 		//don't force if the game won't let us anymore
-		if ((local.player.flags["coop_forcedLast"] + 3) < level.time){
+		//if ((local.player.flags["coop_forcedLast"] + 3) < level.time){
 			thread forceTeam local.player
-			local.player.flags["coop_forcedLast"] = level.time
-		}else{
-			local.player kill
-		}
-		waitframe
-	}
+		//	local.player.flags["coop_forcedLast"] = level.time
+		//}else{
+		//	local.player kill
+		//}
+		//waitframe
+	//}
 }end
 
 //[200] Smithy - own func for giving player their health
@@ -1468,8 +1467,8 @@ isPrimaryWeapon local.weapon:{
 
 	//[200] Smithy - more efficient + looks nicer
 	switch (local.weapon){
-		case "models/weapons/us_w_MineDetector.tik":
-		case "models/weapons/gr_w_MineDetector.tik":
+		case "models/weapons/us_w_minedetector.tik":
+		case "models/weapons/gr_w_mineDetector.tik":
 		case "models/weapons/bar.tik":
 		case "models/weapons/bazooka.tik":
 		case "models/weapons/kar98.tik":
@@ -1835,42 +1834,55 @@ checkCoopDeveloper local.text:{
 }end 1
 
 //[200] chrissstrahl - (new) glue player to object coop handle
+//[200] Smithy - uses entnum for glue spots now
 //=========================================================================
-playerGlue local.player local.reset:{
+playerGlue local.player local.spawn:{
 //=========================================================================
 	if (level.coop_playerGlue){
-		if (local.reset){
-			local.player.flags["coop_glued"] = game.false //[200] Smithy - he died in the interim and needs regluing
+		if(!level.coop_playerGlueIndividual){
+			local.entity = level.coop_glueTo
+		}else{
+			local.entity = waitthread getGlueEntity local.player					
 		}
-		if (!local.player.flags["coop_glued"] && local.player.flags["coop_glue"]){
-			local.entity	= local.player.flags["coop_glue"]
-			local.angle		= local.player.flags["coop_glueAngle"]
 
-			local.player.flags["coop_glued"] = game.true //[200] Smithy - stop the same player being glued more than once
+		//[200] chrissstrahl - added forcelegsstate to avoid:
+		//ERROR: Stopping due to possible infinite leg state loop //e1l3 entering rowboat at level start
+		//local.player forcelegsstate "STAND"
+		local.player resetstate //[200] Smithy - nicer than forcing a state, also may stop torso state errors as well as leg state
 
-			//[200] chrissstrahl - added forcelegsstate to avoid:
-			//ERROR: Stopping due to possible infinite leg state loop //e1l3 entering rowboat at level start
-			//local.player forcelegsstate "STAND" //[200] Smithy - not needed now we use events to glue players
+		if(!local.entity){
+			println "(coop_mod/main.scr::playerGlue): *ERROR* - local.entity is " local.entity " for " local.player local.player.entnum
+		}else{					
+			if(level.coop_glueAngle != NIL){
+				local.player glue local.entity level.coop_glueAngle
+			}else{
+				local.player glue local.entity
+			}	
 
-			if(local.entity == NIL || local.entity == NULL){
-				println("ERROR: main.scr::managePlayers(glueing) - local.entity was NULL/NIL for $player["+local.i+"]")
-			}else{						
-				if(local.angle != NIL){
-					//iprintlnbold_noloc "GLUUEEEEE"
-					local.player glue local.entity local.angle
-				}else{
-					local.player glue local.entity
-				}		
-
-				if(!level.coop_playerGlueIndividual){
-					local.player notsolid
-					local.player physics_off
-					local.player hide
-				}
+			if(!level.coop_playerGlueIndividual){
+				local.player notsolid
+				local.player physics_off
+				local.player hide
 			}
 		}
 	}
 }end
+
+//[200] Smithy - grab his glueTo entity
+//as previous spots were numbered for array index, check this and 
+//provide an offset. but also allow entnum number system for any future
+//glue spots. 
+//=========================================================================
+getGlueEntity local.player:{
+//=========================================================================
+	if (!$(level.coop_glueTo + "0")){
+		local.offset = 1 //array index start
+	}else{
+		local.offset = 0 //entnum start
+	}
+	println "GRABBING ENT"
+	println (string(level.coop_glueTo + (local.player.entnum + local.offset)))
+}end($(level.coop_glueTo + (local.player.entnum + local.offset)))
 
 //[200] Chrissstrahl - used to to check if a player should be for into spectator
 //=========================================================================
@@ -2231,5 +2243,4 @@ disableGameTypeChanges:{
 		level.coop_changeGameTypeThread end
 	}
 }end
-
 
