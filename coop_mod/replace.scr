@@ -921,15 +921,22 @@ ammo local.type local.amount local.sound:{
 		end
 	}
 
-	for (local.i = 1;local.i <= $player.size;local.i++){
-		local.player = $player[local.i]
-		if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+	if ($player){ //[200] Smithy - this is a better check
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+			//[200] Smithy - no need for these checks, as engine already has them or they are superflous.
+			//if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
 			local.player ammo local.type local.amount
 			if(local.sound != NIL){
 				local.player playsound local.sound
 			}
+			//}
 		}
 	}
+
+
+	//[200] Smithy - now add it to loadout so everyone spawns with this amount from now on
+	thread coop_mod/itemhandler.scr::addAmmoToLoadout local.type local.amount
 }end
 
 //chrissstrahl - updated function, the function was actually corrupted in logic
@@ -1354,10 +1361,11 @@ glueHandle local.glueTo local.angle:{
 	}
 
 	//loop and handle each player while glue is active
-	while(level.coop_playerGlue == 1){
+	//while(level.coop_playerGlue == 1){
 		for (local.i = 1;local.i <= $player.size;local.i++){
 			local.player =  $player[local.i]
-			if( local.player != NULL ){
+			//if( local.player != NULL ){
+			if (!local.player.flags["coop_glued"]){
 				if(level.coop_playerGlueIndividual == 1){
 					local.entity = $(local.glueTo+local.i)
 				}else{
@@ -1370,14 +1378,15 @@ glueHandle local.glueTo local.angle:{
 				}
 				//[200] chrissstrahl - added forcelegsstate to avoid:
 				//ERROR: Stopping due to possible infinite leg state loop //e1l3 entering rowboat at level start
-				local.player forcelegsstate "STAND"
+				//local.player forcelegsstate "STAND"
 				local.player.flags["coop_glueAngle"] = local.angle
 				local.player.flags["coop_glue"] = local.entity
 				thread coop_mod/main.scr::playerGlue local.player
 			}
+			//}
 		}
-		waitframe
-	}
+		//waitframe
+	//}
 }end
 
 //UNGLUE
@@ -1404,6 +1413,7 @@ unglue local.entity:{
 			local.player unglue
 			local.player physics_on
 			local.player.flags["coop_glue"] = NIL
+			local.player.flags["coop_glued"] = game.false
 			//added in ver 2.00 making sure unglued players don't get stuck in each other if they are at the same pos
 			thread coop_mod/main.scr::playerMakeSolidAsap local.i
 		}
@@ -2579,10 +2589,12 @@ givePlayerWeapon local.weapon local.playerToUse local.use local.wait:{
 	if (!$player || !local.weapon){ end }
 	if (local.use == NIL){ local.use = "none"}
 
-	//local.ammoType = thread coop_mod/itemhandler.scr::getAmmoType local.weapon
-
 	for (local.i = 1; local.i <= $player.size; local.i++){
 		local.player = $player[local.i]
+
+		if (local.player.isSpectator || !isAlive local.player){
+			continue
+		}
 
 		//check if he already has this weapon
 		if (waitthread coop_mod/itemhandler.scr::playerHasWeapon local.player local.weapon){
@@ -2593,7 +2605,7 @@ givePlayerWeapon local.weapon local.playerToUse local.use local.wait:{
 			continue
 		}
 
-		local.addToLoadout = game.true
+		//local.addToLoadout = game.true
 		local.player waitthread coop_mod/itemhandler.scr::givePlayerWeapon local.weapon
 
 		if (local.use == "all" || !(thread coop_mod/itemhandler.scr::returnActiveWeapon local.player) && local.player.flags["coop_takenActiveWeapon"]){
@@ -2601,13 +2613,13 @@ givePlayerWeapon local.weapon local.playerToUse local.use local.wait:{
 		}
 	}
 	if (local.use == "one"){
-		if (local.playerToUse && local.playerToUse.classname && local.playerToUse.classname == "Player"){
+		if (local.playerToUse && local.playerToUse.classname && local.playerToUse.classname == "Player" && !local.playerToUse.isSpectator){
 			local.playerToUse thread coop_mod/itemhandler.scr::usePlayerWeapon local.weapon local.wait
 		}
 	}
-	if (local.addToLoadout){
+	//if (local.addToLoadout){
 		thread coop_mod/itemhandler.scr::addWeaponToLoadout local.weapon
-	}
+	//}
 }end
 
 //[200] Smithy - this should be used specifically for taking *weapons* from players
