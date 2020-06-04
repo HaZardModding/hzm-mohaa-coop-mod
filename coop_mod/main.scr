@@ -160,7 +160,6 @@ main:{
 	
 	waitthread coop_checkMaps													//chrissstrahl - check if map-check should be done //[200] moved here, because of events system
 }end
-
 //[200] chrissstrahl - have a seperate handle for singleplayer
 //=========================================================================
 spWaitForPlayer:{
@@ -338,15 +337,19 @@ forceTeam local.player:{
 	local.player.flags["coop_isActive"] = 0
 	local.player.flags["coop_team"] = local.player.dmteam
 	waitthread resetSpawn local.player
-	local.player stufftext ( "popmenu 0" )
+	//local.player stufftext ( "popmenu 0" )
 
-	if( local.player.dmteam == "axis" ){
+	//if( local.player.dmteam == "axis" ){
 		thread global/throbtext.scr::throbtext "Only allies are allowed in Coop!" 5
 
-		local.player stufftext ( "popmenu 1;popmenu 0" )
-	}
+		//local.player stufftext ( "popmenu 1;popmenu 0" )
+	//}
 
 	local.player join_team ( "allies" )
+	waitframe
+	local.player primarydmweapon "rifle"
+	local.player pickweapon
+	local.player stufftext ( "popmenu 0" )
 }end
 
 //makes player respawn at predefined spawn location, rather than the last pos player was alive
@@ -472,7 +475,7 @@ managePlayers:{
 //warp player back to the place he was alive last
 		for (local.i = 1;local.i <= $player.size;local.i++){
 			local.player = $player[local.i]
-			if( local.player != NULL ){
+			//if( local.player != NULL ){
 				//[200] chrissstrahl - used for LMS to detect when a player leaves
 				local.playerCount++
 
@@ -549,6 +552,8 @@ managePlayers:{
 					if( level.coop_physicsOff != NIL && level.coop_physicsOff == 1){
 						local.player physics_off
 					}
+ 
+					thread skipWeaponSelect local.player //[200] Smithy - check if hes on a weapon menu, then do it for him
 
 /////////////////////////////////////////ALIVE
 					if( local.player.health > 0 ){
@@ -730,7 +735,7 @@ managePlayers:{
 						}
 					}
 				}
-			}
+			//}
 		}
 		//[200] chrissstrahl - call player changed func if number of players changed
 		if(local.prevPlayerCount != local.playerCount){
@@ -771,10 +776,6 @@ playerSpawnEvent:{
 		//---------------------//
 
 		//Add anymore spawn stuff here
-	}else{
-		//the code in this else block will only hit when a player joins a server and spawns as spec for the first time.
-		//this is because players who join are put into spec. subsequent transfers to spec do not respawn their char.
-		//so we know that if this hits, a new player has arrived. so relevant code can go here.
 	}						
 }end
 
@@ -813,13 +814,34 @@ forceValidTeam:{
 		//}
 		//don't force if the game won't let us anymore
 		//if ((local.player.flags["coop_forcedLast"] + 3) < level.time){
+		if (local.player.dmteam == "axis"){
 			thread forceTeam local.player
+		}
 		//	local.player.flags["coop_forcedLast"] = level.time
 		//}else{
 		//	local.player kill
 		//}
 		//waitframe
 	//}
+}end
+
+//[200] Smithy - the magic combination that signals he in weapon select mode :D
+// -isSpectator returns true if he is anything but walking around (e.g. died, waiting for weapons etc)
+//  so he doesn't have to be on spec team for that! Slightly different.
+//
+// -isAlive duh
+//
+// -dmteam he's not in TEAM spectator
+//=========================================================================
+skipWeaponSelect local.player:{
+//=========================================================================
+	//println "************ ATTEMPTING TO SKIP SELECT SCREEN ****************"
+	if (local.player.isSpectator && isAlive local.player && local.player.dmteam != "spectator"){
+		println "OK PICK WEP!"
+		local.player primarydmweapon "rifle" 	//give him a random primary gun
+		local.player pickweapon 				//make him pick it
+		local.player stufftext ( "popmenu 0" )	//close the menu
+	}
 }end
 
 //[200] Smithy - own func for giving player their health
@@ -2243,4 +2265,24 @@ disableGameTypeChanges:{
 		level.coop_changeGameTypeThread end
 	}
 }end
+
+//[200] Smithy - returns the client with this entnum
+//could use getentbyentnum but this is more compatible with SH
+//=========================================================================
+getClient local.num:{
+//=========================================================================
+	if ($player){
+		local.maxClients = level.coop_svmaxclients
+		for (local.i = 0; local.i <= local.maxClients; local.i++){
+			local.index = local.i + 1
+			if (!$player[local.index]){ break }
+			if ($player[local.index].entnum == local.num){
+				end($player[local.index])
+			}
+		}	
+	}
+}end(NULL)
+
+
+
 
