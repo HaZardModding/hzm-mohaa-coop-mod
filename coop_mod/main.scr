@@ -81,6 +81,8 @@ main:{
 	level.coop_musicCommandVol			= NIL
 	level.coop_musicCommand				= NIL
 
+	setcvar "g_statefile" "coop_mod/player" 		//[200] Smithy - use different state files for coop
+
 	if(level.coop_inJeep				== NIL){ level.coop_inJeep					= 0 }		//used to check if player should be in jeep or not
 	if(level.coop_playerGlueIndividual	== NIL){ level.coop_playerGlueIndividual	= 0 }		//used for replacement of $player glue (individual spots)
 	if(level.coop_playerGlue			== NIL){ level.coop_playerGlue				= 0 }		//used for replacement of $player glue (glue is active)
@@ -837,7 +839,6 @@ skipWeaponSelect local.player:{
 //=========================================================================
 	//println "************ ATTEMPTING TO SKIP SELECT SCREEN ****************"
 	if (local.player.isSpectator && isAlive local.player && local.player.dmteam != "spectator"){
-		println "OK PICK WEP!"
 		local.player primarydmweapon "rifle" 	//give him a random primary gun
 		local.player pickweapon 				//make him pick it
 		local.player stufftext ( "popmenu 0" )	//close the menu
@@ -2282,6 +2283,37 @@ getClient local.num:{
 		}	
 	}
 }end(NULL)
+
+//[200] Smithy - check if we are in coop or not...
+//we use this for files that share both SP and MP maps
+//e.g. global/ scripts
+//=========================================================================
+inCoopMode:{
+//=========================================================================
+	if (level.gametype == NIL){ level.gametype = int(getcvar "g_gametype") } //just in case level.gametype isn't a var yet
+
+	local.isCoopMap = waitthread coop_mod/main.scr::isCoopEnabledMap (getcvar "mapname")
+
+}end(local.isCoopMap && level.gametype)
+	
+
+//[200] Smithy - check that the map is one that supports coop mod.
+//We can add custom map support to here later (e.g. 'coop_' prefix)
+//=========================================================================
+isCoopEnabledMap local.map:{
+//=========================================================================
+	//looks for e1, m1, t1, e2, m2, t2, and so on
+	switch (local.map[0]){ //check game prefix
+		case m:
+		case e:
+		case t:
+			end(bool(string(local.map[1])))
+		case b: //check for briefing maps
+			if (local.map[1] == "r"){
+				end(waitthread containsText local.map "iefing") //for extra efficiency we can add optional index pos as an arg
+			}
+	}
+}end(game.false)
 
 
 
