@@ -19,7 +19,12 @@ main local.thread:{
 //=========================================================================
 	local.threadName = "coop_mod/aihandler.scr::main"
 
-	if (level.gametype == 0 || local.thread == NIL){ end }
+	if (!waitthread coop_mod/main.scr::inCoopMode){ end } //dont load this if we aren't in coop mode
+	if (!self){ end }
+	if (local.thread == NIL){ end }
+	if (self.classname != "Actor"){ end }
+
+	//println "loading " self.classname
 
 	//make sure main.scr has loaded
 	waitthread coop_mod/main.scr::waitForMainScript
@@ -27,7 +32,7 @@ main local.thread:{
 
 	//[200] Smithy - adds maps we don't want to use the custom pain handler on
 	if (!level.coop_painHandlerExclusionInit){
-		thread painHandlerMapExclusions
+		waitthread painHandlerMapExclusions
 	}
 
 	//[200] Smithy - handles cover blown logic if this is a disguise map
@@ -36,7 +41,6 @@ main local.thread:{
 	}
 
 	wait game.ms // so entities have properly initialised
-
 	if (self == NULL){ end }
 
 	thread local.thread
@@ -48,9 +52,7 @@ main local.thread:{
 //=========================================================================
 actorHandler:{
 //=========================================================================
-	if(!isAlive self || self.classname != "Actor"){
-		end
-	}
+	if(!isAlive self){ end }	
 
 	group.team = self.team
 
@@ -73,6 +75,7 @@ actorHandler:{
 	}
 	thread restoreSPProperties 			// restore any properties that are SP specific
 	thread updateEnemyDifficulty 		// update this guy's difficulty
+	thread leaveTurretUnholstered 		// make sure if he's a gunner that he leaves it unholstered
 
 	thread addActorToArray
 
@@ -590,14 +593,27 @@ setEnemyAttackStates:{
 //=========================================================================
 leaveTurretUnholstered:{
 //=========================================================================
-	if (self.flags["coop_turretUnholsterThread"]){ end }
-	self.flags["coop_turretUnholsterThread"] = local
-	self waittill hasenemy
-	if (isAlive self){
-		if (self.flags["coop_mainActorWeapon"]){
-			self use self.flags["coop_mainActorWeapon"]    //this may actually be what we should do for replace.scr unholster stuff...
-			wait game.ms
-			self activatenewweapon "dual"                  //...because these two commands are what the engine does internally on unholster command
+	//reclaimed this func to call on any AI that have a turret in their arsenal!
+	wait 2
+	if (isAlive self && waitthread isMachineGunner){
+		while (isAlive self && waitthread isMachineGunner){		
+			wait 1 //wait until they are not a machinegunner. doesn't have to be that fast...
+		}
+		if (isAlive self){
+			self use self.gun
+			self activatenewweapon "dual"			
 		}
 	}
 }end
+
+//checks if this guy is a machinegunner
+//=========================================================================
+isMachineGunner:{
+//=========================================================================
+	local.MG = game.true
+	local.MG = local.MG && self.type_attack 	== "machinegunner"
+	local.MG = local.MG && self.type_idle 		== "machinegunner"
+	local.MG = local.MG && self.type_disguise 	== "machinegunner"
+	local.MG = local.MG && self.type_grenade 	== "machinegunner"
+	local.MG = local.MG && self.turret
+}end(local.MG)
