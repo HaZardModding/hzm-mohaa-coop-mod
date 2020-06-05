@@ -346,26 +346,25 @@ End
 coop_deleteAI_far_frm_player local.name local.dist:{
 //=========================================================================
 	local.count = 0
-	while (local.count < $(local.name).size){
-		
-		/*
-		local.angles = $player.angles
-		if ($player.turret){
-			local.angles = local.angles + $player.turret.angles
-		}
-		else if ($player.vehicle){
-			local.angles = local.angles + $player.vehicle.angles
-		}
-		*/
 
-		for (local.i=1;local.i<=$(local.name).size;local.i++){
+	//[200] Smithy - this causes overflow errors when it can't find local.name ent
+	if (!$(local.name)){ end }
+
+	while (local.count < $(local.name).size){
+
+		if (!$player){ //[200] Smithy - if no players are around, might as well delete em all
+			$(local.name) remove
+			end
+		}
+
+		for (local.i = 1; local.i <=$(local.name).size; local.i++){
 			local.delete = 1
 			
 			local.player = NULL
 			//[200] chrissstrahl - using twiche the same var and overriting it wasnt planned
-			for (local.y = 1;local.y <= $player.size;local.i++){
-				local.player = $player[local.y]
-				if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 ){
+			for (local.j = 1; local.j <= $player.size; local.j++){ //[200] Smithy - j is after i, and local.i++ was wrong
+				local.player = $player[local.j]
+				if(isAlive local.player && local.player.dmteam != "spectator"){
 					
 					//chrissstrahl - grab angle
 					local.angles = local.player.angles
@@ -376,7 +375,7 @@ coop_deleteAI_far_frm_player local.name local.dist:{
 						local.angles = local.angles + local.player.vehicle.angles
 					}
 					//do everything else
-					local.distance = vector_length(local.player.origin-$(local.name)[local.i].origin)
+					local.distance = vector_length(local.player.origin - $(local.name)[local.i].origin)
 					if(local.distance > local.dist){
 						local.vObjDir	= vector_subtract $(local.name)[local.i].origin local.player.origin
 						local.vObjDir	= vector_normalize local.vObjDir
@@ -390,14 +389,13 @@ coop_deleteAI_far_frm_player local.name local.dist:{
 				}
 			}
 			if(local.delete){
-//				iprintlnbold( " Deleting guy ")
 				//[200] chrissstrahl - if delete is used the entity is removed in the same frame, use remove instad to keep array intact
 				$(local.name)[local.i] remove
 				local.count++
 			}
 		}
-	//wait a lil longer in coop
-	wait 2.0
+		//wait a lil longer in coop
+		wait 2.0
 	}
 }end
 
