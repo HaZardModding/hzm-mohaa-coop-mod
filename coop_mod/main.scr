@@ -81,7 +81,8 @@ main:{
 	level.coop_musicCommandVol			= NIL
 	level.coop_musicCommand				= NIL
 
-	setcvar "g_statefile" "coop_mod/player" 		//[200] Smithy - use different state files for coop
+	setcvar "g_statefile" "coop_mod/player" 					//[200] Smithy - use different state files for coop
+	level.coop_cvars["developer"] = int(getcvar "developer") 	//[200] Smithy - nicer to have console variables stored in same place
 
 	if(level.coop_inJeep				== NIL){ level.coop_inJeep					= 0 }		//used to check if player should be in jeep or not
 	if(level.coop_playerGlueIndividual	== NIL){ level.coop_playerGlueIndividual	= 0 }		//used for replacement of $player glue (individual spots)
@@ -131,7 +132,7 @@ main:{
     //list of maps to exclude from custom pain handler
     //disguise maps should be excluded, as when in disguise the engine doesn't call pain.scr
     //omaha is excluded because it is heavily scripted with its own pain events for AI
-    level.coop_painHandlerExclusions 		= "m3l1a"::"m2l2a"::"m2l2b"::"m6l1c"::"e1l3"
+    level.coop_painHandlerExclusions 		= "m3l1a"::"m2l2a"::"m2l2b"::"m6l1c"::"e1l3"::"e1l4"
     															//you can exclude entire games from this by using first char and wildcard *
     															//e.g to exclude all BT maps add "e*" to list
     //[200] Smithy - used in coop_mod/itemhandler.scr
@@ -151,6 +152,7 @@ main:{
 	exec coop_mod/loadout.scr 													//[200] Smithy - initialises the weapon loadout array for this level - moved from itemhandler.scr
 	waitthread coop_mod/spawnlocations.scr::main								//chrissstrahl - create spawnpoints for coop
 	waitthread mom/mom.scr::setup "coop_mod/mom_actions.scr" 2 "coop_mom"		//chrissstrahl - set coop mod specific mom file
+	exec coop_mod/AA_ubersound.scr 												//[200] Smithy - cache AA sounds if it's an AA map
 
 	level.coop_mainScriptLoaded = game.true 									//[200] Smithy - used by waitForMainScript to check if main has loaded
 
@@ -162,6 +164,8 @@ main:{
 	
 	waitthread coop_checkMaps													//chrissstrahl - check if map-check should be done //[200] moved here, because of events system
 }end
+
+
 //[200] chrissstrahl - have a seperate handle for singleplayer
 //=========================================================================
 spWaitForPlayer:{
@@ -2314,6 +2318,26 @@ isCoopEnabledMap local.map:{
 			}
 	}
 }end(game.false)
+
+//[200] Smithy - for changing a player's FOV
+//=========================================================================
+changePlayerFOV local.player local.fov:{
+//=========================================================================
+	local.threadName = "coop_mod/main.scr::changePlayerFOV"
+	if (level.coop_cvars["developer"] == 0){ //developer also needs to be enabled for FOV changes
+		setcvar "developer" "1"
+	}
+	waitthread changeGameType 0 0
+	local.player fov local.fov
+	waitthread changeGameType 2 0
+	if (level.coop_cvars["developer"] == 0){
+		setcvar "developer" "0"
+	}
+}end
+
+
+
+
 
 
 
