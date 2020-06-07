@@ -1,57 +1,14 @@
 //////////////////////////////////////////////
 // created by chrissstrahl on 2018.06.28
+// VERSION 2.00
 //
-// This contains the main functions for my
-// MOHAA Coop Mod
+// This contains the main functions for the HaZardModding Coop Mod for
+// - Allied Assault
+// - Breaktrough
 
 //WARNING these files contain Adult commentary
 //WARNING these files contain Adult commentary
 //WARNING these files contain Adult commentary
-
-//////////////////////////////////////////////
-//NEW CVARS
-// coop_health - sets health players have
-// coop_interval - sets spawn interval
-// coop_lifes - sets respawns players have, default 0 = infinity
-// coop_obj - responsible for toggeling menu
-//
-//MISC
-// level.dmrespawning
-// game.skill
-// self.enemy
-// level.pilot type_attack weaponless
-// anim/gog_killed.scr
-// self removeondeath 0 						//prevent it from vanishing when destroyed
-// safesolid <- can this actually replace coop check routines ? Need to test
-//team - returns 'german' or 'american'
-//"local.player.dmteam", can be 'spectator', 'freeforall', 'allies' or 'axis'
-//self.nosurprise = 1 //telling ai not to be surprised when encountering player
-// if (((self.current_target.origin - self.origin) * self.leftvector) >= 0){ //enemy to the left ?
-//PLAYER SIZE setsize "-16 -16 0" "16 16 92"
-//KILLED local.player killed local.player (local.player.health + 1) local.player (0 0 -1) (local.player.origin) (0 0 0) (100) (0) (1) (-1)
-//notready - makes this player not ready for the round to start
-//ready - makes this player ready for the round to start
-//ready - returns 1 if this player is ready, 0 otherwise
-//local.master = spawn ScriptMaster
-//local.master aliascache racmsg11 sounds/menu/typewriter.wav soundparms 4 0.1 0.9 0.2 320 4000 auto loaded maps "m dm obj"
-
-
-//chrissstrahl - texture problems (maybe this is caused by updated shaders, renaming the textures in the bsp would do the trick)
-//general_industrial/deckgrate_set1
-//general_industrial/verticalbrace
-//general_industrial/strangebrace1b
-//general_industrial/strangebrace1
-//general_industrial/ibeam_vert
-//general_industrial/ibeam_flat2
-//general_industrial/strangebrace1straight
-//general_industrial/jh_holeflr1
-
-/*
-level.aipronechance = 0
-level.aicrouchchance = 0
-level.dontdropweapons = 1
-level.debug_mode = 1
-*/
 
 //=========================================================================
 main:{
@@ -119,7 +76,17 @@ main:{
 		thread spWaitForPlayer
 		end
 	}
+	
 	//MULTIPLAYER//////////////////////////
+	//[200] chrissstrahl - check to load the last map on dedicated server
+	if(level.gametype != 0 ){//&& level.coop_dedicated != 0
+		local.lastmapname = getcvar("ui_startmap")
+		if(local.lastmapname != "" && level.coop_mapname != local.lastmapname){
+			exec global/missioncomplete.scr local.lastmapname
+			end
+		}
+	}
+	
     //[200] Smithy - used in coop_mod/aihandler.scr
     level.coop_actorArray["german"][1]      = NIL
     level.coop_actorArray["american"][1]    = NIL
@@ -162,6 +129,11 @@ main:{
 	}
 	
 	waitthread coop_checkMaps													//chrissstrahl - check if map-check should be done //[200] moved here, because of events system
+	
+	//[200] chrissstrahl - set this map as last active map for dedicated server reboot
+	if(level.coop_dedicated != 0){
+		setcvar "ui_startmap" level.coop_mapname
+	}
 }end
 
 
