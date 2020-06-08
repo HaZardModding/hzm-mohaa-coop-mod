@@ -68,7 +68,8 @@ textures/general_industrial/verticalbrace
 	qer_keyword metal
 	qer_keyword masked
 	surfaceParm metal
-	surfaceparm wood
+	//surfaceparm wood //[200] chrissstrahl - this is misplaced
+	surfaceParm fence //[200] chrissstrahl - added to fix texture overlap issues on aa maps
 	surfaceParm alphashadow
 	surfaceParm playerclip
 	surfaceParm monsterclip
@@ -79,7 +80,7 @@ textures/general_industrial/verticalbrace
 		map textures/general_industrial/crossbrace_vert1.tga
 		alphaFunc GE128
 		depthWrite
-	nextbundle
+		nextbundle
 		map $lightmap
 	}
 } 
@@ -179,7 +180,8 @@ textures/general_industrial/strangebrace1straight
 	qer_keyword rusted
 	qer_keyword metal
 	surfaceParm metal
-	surfaceparm wood
+	//surfaceparm wood //[200] chrissstrahl - this is misplaced
+	surfaceParm fence //[200] chrissstrahl - added to fix texture overlap issues on aa maps
 	surfaceParm alphashadow
 	surfaceParm playerclip
 	surfaceParm monsterclip
@@ -190,7 +192,7 @@ textures/general_industrial/strangebrace1straight
 		map textures/general_industrial/strngbrace_set1f.tga
 		alphaFunc GE128
 		depthWrite
-	nextbundle
+		nextbundle
 		map $lightmap
 	}
 }
@@ -294,7 +296,8 @@ textures/general_industrial/strangebrace1
 	qer_keyword metal
 	qer_keyword masked
 	surfaceParm metal
-	surfaceparm wood
+	//surfaceparm wood //[200] chrissstrahl - this is misplaced
+	surfaceParm fence //[200] chrissstrahl - added to fix texture overlap issues on aa maps
 	surfaceParm alphashadow
 	surfaceParm playerclip
 	surfaceParm monsterclip
@@ -340,7 +343,8 @@ textures/general_industrial/strangebrace1b
 	qer_keyword metal
 	qer_keyword masked
 	surfaceParm metal
-	surfaceparm wood
+	//surfaceparm wood //[200] chrissstrahl - this is misplaced
+	surfaceParm fence //[200] chrissstrahl - added to fix texture overlap issues on aa maps
 	surfaceParm alphashadow
 	surfaceParm playerclip
 	surfaceParm monsterclip
@@ -362,6 +366,7 @@ textures/general_industrial/ibeam_flat2
 	qer_keyword rusted
 	qer_keyword metal
 	surfaceParm metal
+	surfaceParm fence //[200] chrissstrahl - added to fix texture overlap issues on aa maps
 	{
 		map textures/general_industrial/ibeam_flat2.tga
 		rgbGen identity
@@ -520,6 +525,7 @@ textures/general_industrial/ibeam_vert
 	qer_keyword rusted
 	qer_keyword metal
 	surfaceParm metal
+	surfaceParm fence //[200] chrissstrahl - added to fix texture overlap issues on aa maps
 	cull none
 	{
 		map textures/general_industrial/ibeam_vert.tga
@@ -593,7 +599,8 @@ textures/general_industrial/jh_rustpipe1
 
 textures/general_industrial/jh_holeflr1
 {
-	surfaceparm wood
+	surfaceparm metal //[200] chrissstrahl - changed to metal, because there is no woddy here
+	surfaceParm fence //[200] chrissstrahl - added to fix texture overlap issues on aa maps
 	cull none
 	nopicmip
 	qer_editorimage textures/general_industrial/jh_holeflr1.tga
@@ -895,7 +902,8 @@ textures/general_industrial/deckgrate_set1
 	qer_keyword masked
 	qer_keyword rusted
 	qer_keyword metal
-	surfaceparm wood
+	//surfaceparm wood //[200] chrissstrahl - this is misplaced
+	surfaceParm fence //[200] chrissstrahl - added to fix texture overlap issues on aa maps
 	surfaceparm metal
 	surfaceParm nomarks
 	surfaceParm grill
@@ -922,7 +930,7 @@ textures/general_industrial/deckgrate_set1a
 	qer_keyword masked
 	qer_keyword rusted
 	qer_keyword metal
-	surfaceparm wood
+//	surfaceparm wood //[200] chrissstrahl - removed to fix texture overlap issues
 	surfaceparm metal
 	surfaceParm nomarks
 	surfaceParm grill
