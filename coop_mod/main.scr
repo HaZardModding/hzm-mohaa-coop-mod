@@ -38,8 +38,9 @@ main:{
 	level.coop_musicCommandVol			= NIL
 	level.coop_musicCommand				= NIL
 
-	setcvar "g_statefile" "coop_mod/player" 					//[200] Smithy - use different state files for coop
-	level.coop_cvars["developer"] = int(getcvar "developer") 	//[200] Smithy - nicer to have console variables stored in same place
+
+	level.coop_cvars["developer"] = int(getcvar "developer") 					//[200] Smithy - nicer to have console variables stored in same place
+	level.coop_cvars["coop_prevMapList"] = string(getcvar "coop_prevMapList") 	//[200] Smithy - so we can reset the sv_maplist cvar is it's populated
 
 	if(level.coop_inJeep				== NIL){ level.coop_inJeep					= 0 }		//used to check if player should be in jeep or not
 	if(level.coop_playerGlueIndividual	== NIL){ level.coop_playerGlueIndividual	= 0 }		//used for replacement of $player glue (individual spots)
@@ -76,6 +77,11 @@ main:{
 		thread spWaitForPlayer
 		end
 	}
+
+	setcvar "g_statefile" "coop_mod/player" 					//[200] Smithy - use different state files for coop
+	waitthread initMissionNames 								//[200] Smithy - initialise the mission names and their descriptions
+	thread setScoreboard 										//[200] Smithy - setup the scoreboard for this mission
+	thread resetMapList 										//[200] Smithy - reset sv_maplist
 	
 	//MULTIPLAYER//////////////////////////
 	//[200] chrissstrahl - check to load the last map on dedicated server
@@ -2295,17 +2301,88 @@ isCoopEnabledMap local.map:{
 changePlayerFOV local.player local.fov:{
 //=========================================================================
 	local.threadName = "coop_mod/main.scr::changePlayerFOV"
-	if (level.coop_cvars["developer"] == 0){ //developer also needs to be enabled for FOV changes
-		setcvar "developer" "1"
-	}
+	local.prevCvar = getcvar "developer"
+	setcvar "developer" "1"
 	waitthread changeGameType 0 0
 	local.player fov local.fov
 	waitthread changeGameType 2 0
-	if (level.coop_cvars["developer"] == 0){
-		setcvar "developer" "0"
-	}
+	setcvar "developer" local.prevCvar
 }end
 
+//[200] Smithy - stop any previously loaded scoreboard data persisting on coop maps
+//also can be used to show details of current mission
+//=========================================================================
+setScoreboard:{
+//=========================================================================
+	setcvar "g_scoreboardpic" "" //can we put a sp pic in here? 
+	setcvar "g_obj_alliedtext1" ""
+	setcvar "g_obj_alliedtext2" ""
+	setcvar "g_obj_alliedtext3" level.coop_mapDescription[level.coop_mapname] //map description
+	setcvar "g_obj_axistext1" ""
+	setcvar "g_obj_axistext2" ""
+	setcvar "g_obj_axistext3" ""
+}end
+
+//[200] Smithy - used for scoreboard - can be used for other stuff if needed
+//=========================================================================
+initMissionNames:{
+//=========================================================================
+	level.coop_mapDescription["briefing1"] = "Lighting the Torch"
+	level.coop_mapDescription["m1l1"] = "Rangers Lead the Way"
+	level.coop_mapDescription["m1l2a"] = "The Rescue Mission"
+	level.coop_mapDescription["m1l2b"] = "Sabotage the Motorpool"
+	level.coop_mapDescription["m1l3a"] = "Desert Road"
+	level.coop_mapDescription["m1l3b"] = "Grounding the Airfield"
+	level.coop_mapDescription["m1l3c"] = "Lighthouse"
+	level.coop_mapDescription["briefing2"] = "Scuttling the U-529"
+	level.coop_mapDescription["m2l1"] = "Secret Documents of the Kriegsmarine"
+	level.coop_mapDescription["m2l2a"] = "Naxos Prototype"
+	level.coop_mapDescription["m2l2b"] = "Inside the U-529"
+	level.coop_mapDescription["m2l2c"] = "Cover Blown"
+	level.coop_mapDescription["m2l3"] = "Escape from Trondheim"
+	level.coop_mapDescription["briefing3"] = "Operation Overlord"
+	level.coop_mapDescription["m3l1a"] = "Omaha Beach - The Landing"
+	level.coop_mapDescription["m3l1b"] = "Omaha Beach - Inside the Bunker"
+	level.coop_mapDescription["m3l2"] = "Battle in the Bocage"
+	level.coop_mapDescription["m3l3"] = "The Nebelwerfer Hunt"
+	level.coop_mapDescription["briefing4"] = "Behind Enemy Lines"
+	level.coop_mapDescription["m4l1"] = "Rendezvous with the Resistance"
+	level.coop_mapDescription["m4l2"] = "Diverting the Enemy"
+	level.coop_mapDescription["m4l3"] = "The Command Post"
+	level.coop_mapDescription["briefing5"] = "Day of the Tiger"
+	level.coop_mapDescription["m5l1a"] = "Sniper's Last Stand - Outskirts"
+	level.coop_mapDescription["m5l1b"] = "Sniper's Last Stand - City Hall"
+	level.coop_mapDescription["special"] = "Bazooka-Med"
+	level.coop_mapDescription["m5l2a"] = "The Hunt for the King Tiger - Destroyed Village"
+	level.coop_mapDescription["m5l2b"] = "The Hunt for the King Tiger - Country Road"
+	level.coop_mapDescription["m5l3"] = "The Bridge"
+	level.coop_mapDescription["briefing6"] = "The Return to Schmerzen"
+	level.coop_mapDescription["m6l1a"] = "The Siegfried Forest - Flak Guns"
+	level.coop_mapDescription["m6l1b"] = "The Siegfried Forest - Bunker Hill"
+	level.coop_mapDescription["m6l1c"] = "Die Sturmgewehr"
+	level.coop_mapDescription["m6l2a"] = "The Communications Blackout"
+	level.coop_mapDescription["m6l2b"] = "The Schmerzen Express"
+	level.coop_mapDescription["m6l3a"] = "Storming Fort Schmerzen (Train platform)"
+	level.coop_mapDescription["m6l3b"] = "Storming Fort Schmerzen - Inner Facility"
+	level.coop_mapDescription["m6l3c"] = "Storming Fort Schmerzen - Chemical Plant"
+	level.coop_mapDescription["m6l3d"] = "Storming Fort Schmerzen - Final Run"
+	level.coop_mapDescription["m6l3e"] = "Storming Fort Schmerzen - Conclusion"
+//TODO: ADD BT MISSIONS
+}end
+
+//[200] Smithy - restore a maplist if there is one
+//this allows us to clear it on coop mission transition to stop mp maps
+//being loaded by engine
+//=========================================================================
+resetMapList:{
+//=========================================================================
+	if (level.coop_dedicated && level.coop_cvars["coop_prevMapList"]){
+		setcvar "coop_prevMapList" ""
+		setcvar "sv_maplist" level.coop_cvars["coop_prevMapList"]
+	}else if (!level.coop_dedicated){ //[200] Smithy - if it's a listen server, we don't need a maplist
+		setcvar "sv_maplist" "" 
+	}
+}end
 
 
 
