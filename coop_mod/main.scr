@@ -662,6 +662,17 @@ managePlayers:{
 						local.player.flags["coop_iAmTruelyActive"] = 0
 						if(	local.player.flags["coop_isActive"] != -2 ){
 //[200] CHRISSTRAHL /// LMS /// ///////////// check if player should be spectator in LMS
+							//handle death count
+							local.deaths = local.player.flags["coop_deaths"]
+							local.deaths++
+							local.player.flags["coop_deaths"] = local.deaths
+							
+							//print info to player hud
+							local.deaths = (level.coop_lmsLifes - local.deaths)
+							if(local.deaths < 0){local.deaths=0}
+							local.deaths = ( "You have [ " + local.deaths + " ] lifes left - LastManStanding is active!" )
+							local.player iprint local.deaths 0
+							
 							thread lmsForceSpectatorHandle local.player
 
 							local.player.flags["coop_isActive"] = -2
@@ -1866,13 +1877,12 @@ lmsGetRemainingLifes local.player:{
 	local.lifes = level.coop_lmsLifes
 	local.deaths = local.player.flags["coop_deaths"]
 
-	//check values
-	if(local.deaths == NIL){ local.player.flags["coop_deaths"] = 1 }
-	else{
-		local.player.flags["coop_deaths"] = (local.deaths + 1)
-		local.deaths = 1
+	//set new value
+	if(local.deaths == NIL){
+		local.deaths = 0
+		local.player.flags["coop_deaths"] = local.deaths		
 	}
-
+	
 	//check if player is out - if value is 0 we assume LMS if OFF
 	if(local.lifes > 0){
 		if(local.deaths >= local.lifes){
@@ -1902,7 +1912,6 @@ lmsForceSpectatorHandle local.player:{
 					local.player hide
 				}
 				local.player.flags["coop_lmsForcedInSpectator"] = 1
-				local.player iprint "You have no more lifes left - LastManStanding is active!" 0
 				local.player spectator
 
 				//[200] chrissstrahl - fail mission if all players are dead
@@ -1916,7 +1925,9 @@ lmsForceSpectatorHandle local.player:{
 					}
 				}
 				if(local.numActivePlayers == 0){
+					iprintlnbold_noloc("--")
 					iprintlnbold_noloc("LMS failed all players are dead or inactive.")
+					iprintlnbold_noloc("--")
 					thread coop_mod/replace.scr::missionfailed
 				}
 			}
@@ -2185,7 +2196,8 @@ earthquake_player local.duration local.magnitude:{
 restartMap:{
 //=========================================================================
 	local.mapname = getcvar "mapname"
-	if (local.mapname[local.mapname.size - 1] == "$"){
+	//[200] chrissstrahl - i think this way it is better scalable
+	if (waitthread containsText local.mapname "$"){
 		local.mapname = waitthread cleanText local.mapname "$"
 	}else{
 		local.mapname = (local.mapname+"$")
@@ -2411,17 +2423,18 @@ updateServer:{
 //=========================================================================
 checkScoreboard:{
 //=========================================================================
-	//[200] chrissstrahl - add info to score hud
-	if(NIL == level.prevCoopHealth || level.coop_health != level.prevCoopHealth || level.prevCoopHealth != int(getcvar("coop_health"))){
-		local.cvardata = int(getcvar("coop_health"))
+	local.cvardata = int(getcvar("coop_health"))
+	if(NIL == level.prevCoopHealth || level.coop_health != level.prevCoopHealth || local.cvardata > 0 && level.prevCoopHealth != local.cvardata){
 		if(local.cvardata > 0){
 			level.coop_health = local.cvardata
 		}
 		level.prevCoopHealth = level.coop_health
 		setcvar "g_obj_axistext1" ("Health: "+level.prevCoopHealth)
 	}
-	if(NIL == level.prevCoopLmsLifes || level.prevCoopLmsLifes != int(getcvar("coop_lmsLifes"))){
-		level.prevCoopLmsLifes = int(getcvar("coop_lmsLifes"))
+	
+	local.cvardata = int(getcvar("coop_lmsLifes"))
+	if(NIL == level.prevCoopLmsLifes || level.prevCoopLmsLifes != local.cvardata){
+		level.prevCoopLmsLifes = local.cvardata
 		setcvar "g_obj_axistext2" ("LMS-Lifes: "+level.prevCoopLmsLifes)
 	}
 }end
@@ -2442,7 +2455,7 @@ checkForVote:{
 			exec global/missioncomplete.scr level.coopPrevMap
 		}
 		else if(local.cvarValue == "restartmap"){
-			thread reloadmap
+			thread restartMap
 		}
 		
 		/* not working, because dedicated servers does not execute cfg from callvote
@@ -2474,22 +2487,3 @@ checkForVote:{
 		}
 		}*/
 }end
-
-//[200] chrissstrahl - allows to load the same map
-//=========================================================================
-reloadmap:{
-//=========================================================================
-	//the server will not allow us to load the map with the same name, so we have to hack a bit
-	//not sure if the $ hack will give us any troubles, load the map then again if we need to
-	//$ indicates a singleplayer spawn that is attached to the map, if empty it has no consequence to the spawnspot but the mapnames are no longer equal and we can load the same map
-	local.mapname = getcvar "mapname"
-	if(waitthread containsText local.mapname "$"){
-		local.mapname = waitthread cleanText local.mapname "$"
-		iprintlnbold_noloc("cleaned mapname:" + local.mapname)
-	}else{
-		local.mapname = (local.mapname+"$")
-		iprintlnbold_noloc("added to mapname:" + local.mapname)
-	}
-	exec global/missioncomplete.scr local.mapname 1
-}end
-
