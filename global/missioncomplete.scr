@@ -6,7 +6,6 @@ main local.nextlevel local.bsp local.skipFade:{
 
 	//chrissstrahl - make sure this only is done in sp
 	if(	level.gametype == 0 && $player.health <= 0 ){
-		//iprintlnbold_noloc("pause!!!") //chrissstrahl - test
 		pause
 	}
 	
@@ -22,8 +21,8 @@ main local.nextlevel local.bsp local.skipFade:{
 		//[200] chrissstrahl - set next map to be active map for dedicated server reboot
 		if(level.gametype != 0 && level.coop_dedicated != 0){
 			setcvar "ui_startmap" local.nextlevel
-			setcvar "coop_prevMapList" (getcvar sv_maplist) //[200] Smithy - used to reload sv_maplist on next load
-			setcvar "sv_maplist" "" 						//[200] Smithy - so our coop mission transition works
+			//setcvar "coop_prevMapList" (getcvar sv_maplist) //[200] Smithy - used to reload sv_maplist on next load
+			//setcvar "sv_maplist" "" 						//[200] Smithy - so our coop mission transition works
 		}
 	
 		level.coop_preventGameTypeChanges = game.true 				//[200] Smithy - stop any further changes via main.scr::changeGameType if there are any
@@ -40,12 +39,15 @@ main local.nextlevel local.bsp local.skipFade:{
 		
 		if (local.bsp != NIL)
 		{
-			//[200] chrissstrahl - show info - debug
-			//if(	level.gametype != 0 ){
-			//	iprintlnbold_noloc("Loading map [bsp] -> "+local.nextlevel)
-			//}
-			game.loadout = false
+			game.loadout = false		
 			bsptransition local.nextlevel local.skipFade
+			
+			//[200] chrissstrahl - load next map quickly - also avoids sv_maplist issue
+			if(	level.gametype != 0 ){
+				setcvar "g_gametype" local.gametype
+				map  ( local.nextlevel )
+				end
+			}
 		}
 		else
 		{
