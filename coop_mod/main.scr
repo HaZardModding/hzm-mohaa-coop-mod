@@ -81,7 +81,7 @@ main:{
 	setcvar "g_statefile" "coop_mod/player" 					//[200] Smithy - use different state files for coop
 	waitthread initMissionNames 								//[200] Smithy - initialise the mission names and their descriptions
 	thread setScoreboard 										//[200] Smithy - setup the scoreboard for this mission
-	thread resetMapList 										//[200] Smithy - reset sv_maplist
+	//thread resetMapList 										//[200] Smithy - reset sv_maplist
 	
 	//MULTIPLAYER//////////////////////////
 	//[200] chrissstrahl - check to load the last map on dedicated server
@@ -2314,10 +2314,52 @@ changePlayerFOV local.player local.fov:{
 //=========================================================================
 setScoreboard:{
 //=========================================================================
-	setcvar "g_scoreboardpic" "" //can we put a sp pic in here? 
-	setcvar "g_obj_alliedtext1" ""
-	setcvar "g_obj_alliedtext2" ""
-	setcvar "g_obj_alliedtext3" level.coop_mapDescription[level.coop_mapname] //map description
+	setcvar "g_scoreboardpic" ("textures/mohmenu/dmloading/" + level.coop_mapname) //[200] chrissstrahl - added mappic as suggested
+	
+	//[200] chrissstrahl - break string up if it is to big
+	//i wanted to do it in a seperate func, I also wanted to make it so that it detects where there is a space and if the rest fits or not
+	//but my brain is to dead
+	local.mapdescription = level.coop_mapDescription[level.coop_mapname]
+	local.leftover = local.mapdescription.size
+	local.mapdescription1 = ""
+	local.mapdescription2 = ""
+	local.mapdescription3 = ""
+	local.currentIndex = 0
+	local.maxLetters = 20
+
+	//breake the strings up in 3 groups of 20 letters - my brain is to dead to implement word warp now
+	for(local.i=local.currentIndex;local.i<(local.maxLetters * 1);local.i++){
+		local.mapdescription1 += local.mapdescription[local.i]
+		local.currentIndex++
+		local.leftover--
+		if(local.leftover==0){
+			break
+		}
+	}
+	if(local.leftover > 0){
+		for(local.i=local.currentIndex;local.i<(local.maxLetters * 2);local.i++){
+			local.mapdescription2 += local.mapdescription[local.i]
+			local.currentIndex++
+			local.leftover--
+			if(local.leftover==0){
+				break
+			}
+		}
+	}
+	if(local.leftover > 0){
+		for(local.i=local.currentIndex;local.i<(local.maxLetters * 3);local.i++){
+			local.mapdescription3 += local.mapdescription[local.i]
+			local.currentIndex++
+			local.leftover--
+			if(local.leftover==0){
+				break
+			}
+		}
+	}
+	setcvar "g_obj_alliedtext1" local.mapdescription1
+	setcvar "g_obj_alliedtext2" local.mapdescription2
+	setcvar "g_obj_alliedtext3" local.mapdescription3
+	
 	setcvar "g_obj_axistext1" ""
 	setcvar "g_obj_axistext2" ""
 	setcvar "g_obj_axistext3" ""
@@ -2359,7 +2401,7 @@ initMissionNames:{
 	level.coop_mapDescription["briefing6"] = "The Return to Schmerzen"
 	level.coop_mapDescription["m6l1a"] = "The Siegfried Forest - Flak Guns"
 	level.coop_mapDescription["m6l1b"] = "The Siegfried Forest - Bunker Hill"
-	level.coop_mapDescription["m6l1c"] = "Die Sturmgewehr"
+	level.coop_mapDescription["m6l1c"] = "Das Sturmgewehr" //[200] chrissstrahl - Bad Article, it is "Das" not "Die"
 	level.coop_mapDescription["m6l2a"] = "The Communications Blackout"
 	level.coop_mapDescription["m6l2b"] = "The Schmerzen Express"
 	level.coop_mapDescription["m6l3a"] = "Storming Fort Schmerzen (Train platform)"
