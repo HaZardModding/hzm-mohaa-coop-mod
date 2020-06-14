@@ -40,7 +40,7 @@ main:{
 
 
 	level.coop_cvars["developer"] = int(getcvar "developer") 					//[200] Smithy - nicer to have console variables stored in same place
-	level.coop_cvars["coop_prevMapList"] = string(getcvar "coop_prevMapList") 	//[200] Smithy - so we can reset the sv_maplist cvar is it's populated
+	//level.coop_cvars["coop_prevMapList"] = string(getcvar "coop_prevMapList") 	//[200] Smithy - so we can reset the sv_maplist cvar is it's populated
 
 	if(level.coop_inJeep				== NIL){ level.coop_inJeep					= 0 }		//used to check if player should be in jeep or not
 	if(level.coop_playerGlueIndividual	== NIL){ level.coop_playerGlueIndividual	= 0 }		//used for replacement of $player glue (individual spots)
@@ -54,12 +54,6 @@ main:{
 	if(level.coop_aaMap					== NIL){ level.coop_aaMap					= 0 }		//sets a map to be handles like in aa
 	if(level.coop_prespawn				== NIL){ level.coop_prespawn				= 1 }		//used for replace.scr::waitTillPrespawn
 	if(level.coopMedicHealth			== NIL){ level.coopMedicHealth				= 1000 }	//sets medic AI health
-	if(level.coop_health				== NIL){												//sets players health (only multiplayer)
-		level.coop_health				= (int(getcvar("coop_health")))
-		if(level.coop_health == 0){
-			level.coop_health = 1000
-		}
-	}
 
 	//[200] chrissstrahl - make sure to filter what ever is not part of the real filename
 	local.fullMapName = string(getcvar("mapname"));
@@ -133,15 +127,7 @@ main:{
 		println "(" local.threadName "): ***** Loaded *****. Continuing " level.coop_waitingForMainThreads " waiting threads at " level.time "..." //better reporting
 		thread coop_mod/eventsystem.scr::doEvent "mainScriptLoaded" 			//[200] Smithy - used by itemhandler and aihandler (+ future scripts) to notify that main has been loaded
 	}
-	
-	waitthread coop_checkMaps													//chrissstrahl - check if map-check should be done //[200] moved here, because of events system
-	
-	//[200] chrissstrahl - set this map as last active map for dedicated server reboot
-	if(level.coop_dedicated != 0){
-		setcvar "ui_startmap" level.coop_mapname
-	}
 }end
-
 
 //[200] chrissstrahl - have a seperate handle for singleplayer
 //=========================================================================
@@ -225,35 +211,8 @@ setupServer:{
 		level.coop_disableSpawnWarper = TRUE
 	}
 
-	//send this also to each player - this currently sets value only for hosting player
-	//setcvar "ui_team_spawn_interval" 0
-	//check vital server settings
-	/*
-	local.correct = 0
-
-	if( getCvar("ui_team_spawn_interval") != "0" )	{ local.correct = 1 }
-	waitthread setupServerBadSettingInfo local.correct "ui_team_spawn_interval"
-	if( getCvar("sv_team_spawn_interval") != "0" )	{ local.correct = 2 }
-	waitthread setupServerBadSettingInfo local.correct "sv_team_spawn_interval"
-	if( getCvar("g_gametype")	!= "2" )			{ local.correct = 3 }
-	waitthread setupServerBadSettingInfo local.correct "g_gametype"
-	//if( getCvar("maxentities")	!= "2048" )			{ local.correct = 4 }
-	//waitthread setupServerBadSettingInfo local.correct "maxentities"
-	if( getCvar("timelimit")	!= "0" )			{ local.correct = 5 }
-	waitthread setupServerBadSettingInfo local.correct "timelimit"
-	if( getCvar("fraglimit")	!= "0" )			{ local.correct = 6 }
-	waitthread setupServerBadSettingInfo local.correct "fraglimit"
-	if( getCvar("roundlimit")	!= "0")				{ local.correct = 7 }
-	waitthread setupServerBadSettingInfo local.correct "roundlimit"
-
-	if( local.correct != 0 ){
-		thread fixServer
-		end
-	}
-	*/
-
 	//[200] chrissstrahl - just to be sure this works
-	setcvar "g_gametypestring" "HZM_Coop_Mod"
+	setcvar "g_gametypestring" "HZM Coop Mod"
 
 	//[200] Smithy
 	if (level.coop_dedicated){
@@ -266,6 +225,13 @@ setupServer:{
 			println "(coop_mod/main.scr::setupServer): Warning: Gametype is " level.gametype " on map load!"
 		}
 	}
+	
+	//[200] chrissstrahl - check if map-check should be donemoved here, moved here because of events system
+	//[200] chrissstrahl - added updateServer to handle server settings changes
+	//[200] chrissstrahl - added set this map as last active map for dedicated server reboot
+	waitthread coop_checkMaps			
+	thread updateServer
+	if(level.coop_dedicated != 0){ setcvar "ui_startmap" level.coop_mapname }
 }end
 
 //chrissstrahl - this is only for temporary debug
@@ -425,7 +391,7 @@ managePlayers:{
 	//[200] chrissstrahl - wait for a player to join the game
 	level waittill spawn
 
-	//[200] chrissstrahl - used for LMS to detect when a player leaves
+	//[200] chrissstrahl - used to detect when a player leaves/joins
 	local.prevPlayerCount = 0
 
 	while(1){
@@ -435,6 +401,8 @@ managePlayers:{
 			waitframe
 			continue
 		}
+		//[200] chrissstrahl - used  to detect when a player leaves/joins
+		local.playerCount = 0
 
 		/* [200] Smithy - handled in playerSpawnEvent
 		//chrissstrahl - if a health is specified in a cvar
@@ -2325,7 +2293,7 @@ setScoreboard:{
 	local.mapdescription2 = ""
 	local.mapdescription3 = ""
 	local.currentIndex = 0
-	local.maxLetters = 20
+	local.maxLetters = 27
 
 	//breake the strings up in 3 groups of 20 letters - my brain is to dead to implement word warp now
 	for(local.i=local.currentIndex;local.i<(local.maxLetters * 1);local.i++){
@@ -2362,7 +2330,8 @@ setScoreboard:{
 	
 	setcvar "g_obj_axistext1" ""
 	setcvar "g_obj_axistext2" ""
-	setcvar "g_obj_axistext3" ""
+	//[200] chrissstrahl - add info to score hud	
+	setcvar "g_obj_axistext3" "www.hazardmodding.com"
 }end
 
 //[200] Smithy - used for scoreboard - can be used for other stuff if needed
@@ -2427,8 +2396,100 @@ resetMapList:{
 }end
 
 
+//[200] chrissstrahl - checks for changes every second
+//=========================================================================
+updateServer:{
+//=========================================================================
+	while(1){
+		wait 1
+		waitthread checkForVote
+		waitthread checkScoreboard
+	}
+}end
 
+//[200] chrissstrahl - checks if something changed that needs to be shown in the scoreboard
+//=========================================================================
+checkScoreboard:{
+//=========================================================================
+	//[200] chrissstrahl - add info to score hud
+	if(NIL == level.prevCoopHealth || level.coop_health != level.prevCoopHealth || level.prevCoopHealth != int(getcvar("coop_health"))){
+		local.cvardata = int(getcvar("coop_health"))
+		if(local.cvardata > 0){
+			level.coop_health = local.cvardata
+		}
+		level.prevCoopHealth = level.coop_health
+		setcvar "g_obj_axistext1" ("Health: "+level.prevCoopHealth)
+	}
+	if(NIL == level.prevCoopLmsLifes || level.prevCoopLmsLifes != int(getcvar("coop_lmsLifes"))){
+		level.prevCoopLmsLifes = int(getcvar("coop_lmsLifes"))
+		setcvar "g_obj_axistext2" ("LMS-Lifes: "+level.prevCoopLmsLifes)
+	}
+}end
 
+//[200] chrissstrahl - checks if change has been requested via vote
+//=========================================================================
+checkForVote:{
+//=========================================================================
+		local.cvarValue = getCvar("coop_callvote")
+		if(local.cvarValue == ""){ end }
+		
+		setCvar "coop_callvote" ""
+		
+		if(local.cvarValue == "nextmap"){
+			exec global/missioncomplete.scr level.coopNextMap
+		}
+		else if(local.cvarValue == "previousemap"){
+			exec global/missioncomplete.scr level.coopPrevMap
+		}
+		else if(local.cvarValue == "restartmap"){
+			thread reloadmap
+		}
+		
+		/* not working, because dedicated servers does not execute cfg from callvote
+		else if(local.cvarValue == "quit"){
+		//magic happens in coop_mod/cfg/sv_quit.cfg
+		if(level.coop_dedicated == 0){
+		iprintlnbold_noloc("--")
+		iprintlnbold_noloc("Sorry - ONLY DEDICATED SERVERS CAN REBOOT")
+		iprintlnbold_noloc("--")
+		end
+		}
+		iprintlnbold_noloc("--")
+		iprintlnbold_noloc("========WARNING==========")
+		iprintlnbold_noloc("HZM Coop Mod will now quit and reboot the server")
+		iprintlnbold_noloc("--")
+		wait 3
+		iprintlnbold_noloc("--")
+		iprintlnbold_noloc("-- Please Reconnect ! --")
+		iprintlnbold_noloc("--")
+		wait 1
+		if(level.coop_dedicated){
+		for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player = $player[local.i]
+		if( local.player != NULL ){
+		local.player stufftext "exec coop_mod/cfg/reconnect.cfg"
+		}
+		}
+		waitframe
+		}
+		}*/
+}end
 
-
+//[200] chrissstrahl - allows to load the same map
+//=========================================================================
+reloadmap:{
+//=========================================================================
+	//the server will not allow us to load the map with the same name, so we have to hack a bit
+	//not sure if the $ hack will give us any troubles, load the map then again if we need to
+	//$ indicates a singleplayer spawn that is attached to the map, if empty it has no consequence to the spawnspot but the mapnames are no longer equal and we can load the same map
+	local.mapname = getcvar "mapname"
+	if(waitthread containsText local.mapname "$"){
+		local.mapname = waitthread cleanText local.mapname "$"
+		iprintlnbold_noloc("cleaned mapname:" + local.mapname)
+	}else{
+		local.mapname = (local.mapname+"$")
+		iprintlnbold_noloc("added to mapname:" + local.mapname)
+	}
+	exec global/missioncomplete.scr local.mapname 1
+}end
 
