@@ -75,7 +75,7 @@ main:{
 	setcvar "g_statefile" "coop_mod/player" 					//[200] Smithy - use different state files for coop
 	waitthread initMissionNames 								//[200] Smithy - initialise the mission names and their descriptions
 	thread setScoreboard 										//[200] Smithy - setup the scoreboard for this mission
-	//thread resetMapList 										//[200] Smithy - reset sv_maplist
+	thread resetMapList 										//[200] Smithy - reset sv_maplist
 	
 	//MULTIPLAYER//////////////////////////
 	//[200] chrissstrahl - check to load the last map on dedicated server
@@ -827,7 +827,11 @@ end
 //=========================================================================
 playerCountChanged local.prevPlayerCount local.playerCount:{
 //=========================================================================
-	PRINTLN "::playerCountChanged"
+	//[200] chrissstrahl - if no player left on server restart mission
+	if(local.playerCount == 0){
+		wait 1
+		waitthread restartMap
+	}
 
 	//[200] chrissstrahl - call Smithys ai handler to update
 	exec coop_mod/aihandler.scr::updateEnemyTeamDifficulty
@@ -2210,10 +2214,8 @@ restartMap:{
 loadMap local.name local.skipFade:{
 //=========================================================================
 	thread disableGameTypeChanges
-	setcvar "nextmap" (local.name)
-	setcvar "g_gametype" 0
-	bsptransition nextmap local.skipFade
-	setcvar "g_gametype" 2
+	//[200] chrissstrahl - lets use the default way of loading next map
+	exec global/missioncomplete.scr local.lastmapname
 }end
 
 //[200] Smithy - global disabling of changeGameType hacks
@@ -2263,15 +2265,30 @@ inCoopMode:{
 //=========================================================================
 isCoopEnabledMap local.map:{
 //=========================================================================
-	//looks for e1, m1, t1, e2, m2, t2, and so on
-	switch (local.map[0]){ //check game prefix
+	//[200] chrissstrahl - lets upgrade this a bit, make sure to reduce errors
+	if(local.map.size < 4){ end game.false }
+	
+	switch (local.map[0]){
+		//missions pattern m1l,e1l,t1l
 		case m:
 		case e:
 		case t:
-			end(bool(string(local.map[1])))
-		case b: //check for briefing maps
+			switch (local.map[2]){
+				case l:
+				case L:
+					if( int(string(local.map[1])) > 0 ){
+						end game.true						
+					}
+			}
+		//briefings
+		case b:
 			if (local.map[1] == "r"){
 				end(waitthread containsText local.map "iefing") //for extra efficiency we can add optional index pos as an arg
+			}
+		//coop_ maps
+		case c:
+			if(local.map[1] == "0" && local.map[2] == "0"){
+				end(waitthread containsText local.map "coop_")
 			}
 	}
 }end(game.false)
@@ -2390,6 +2407,20 @@ initMissionNames:{
 	level.coop_mapDescription["m6l3c"] = "Storming Fort Schmerzen - Chemical Plant"
 	level.coop_mapDescription["m6l3d"] = "Storming Fort Schmerzen - Final Run"
 	level.coop_mapDescription["m6l3e"] = "Storming Fort Schmerzen - Conclusion"
+	
+	//[200] chrissstrahl - added BT
+	//Should have a maxlength of 81 or it is cut off in scoreboard
+	level.coop_mapDescription["e1l1"] = "Battle of Kasserine Pass - 1"
+	level.coop_mapDescription["e1l2"] = "Battle of Kasserine Pass - 2"
+	level.coop_mapDescription["e1l3"] = "Operation Torch - Bizerte Fort"
+	level.coop_mapDescription["e1l4"] = "Operation Torch - Bizerte Harbor"
+	level.coop_mapDescription["e2l1"] = "Sicily"
+	level.coop_mapDescription["e2l2"] = "Operation Husky - Caltagirone"
+	level.coop_mapDescription["e2l3"] = "Operation Husky - Gela"
+	level.coop_mapDescription["e3l1"] = "Invasion of Monte Cassino - 1"
+	level.coop_mapDescription["e3l2"] = "Invasion of Monte Cassino - 2"
+	level.coop_mapDescription["e2l3"] = "Battle of Anzio"
+	level.coop_mapDescription["e2l4"] = "Battle of Monte Battaglia"
 //TODO: ADD BT MISSIONS
 }end
 
@@ -2408,7 +2439,7 @@ resetMapList:{
 }end
 
 
-//[200] chrissstrahl - checks for changes every second
+//[200] chrissstrahl - checks for changes every secound
 //=========================================================================
 updateServer:{
 //=========================================================================
@@ -2443,47 +2474,47 @@ checkScoreboard:{
 //=========================================================================
 checkForVote:{
 //=========================================================================
-		local.cvarValue = getCvar("coop_callvote")
-		if(local.cvarValue == ""){ end }
-		
-		setCvar "coop_callvote" ""
-		
-		if(local.cvarValue == "nextmap"){
-			exec global/missioncomplete.scr level.coopNextMap
-		}
-		else if(local.cvarValue == "previousemap"){
-			exec global/missioncomplete.scr level.coopPrevMap
-		}
-		else if(local.cvarValue == "restartmap"){
-			thread restartMap
-		}
-		
-		/* not working, because dedicated servers does not execute cfg from callvote
-		else if(local.cvarValue == "quit"){
-		//magic happens in coop_mod/cfg/sv_quit.cfg
-		if(level.coop_dedicated == 0){
-		iprintlnbold_noloc("--")
-		iprintlnbold_noloc("Sorry - ONLY DEDICATED SERVERS CAN REBOOT")
-		iprintlnbold_noloc("--")
-		end
-		}
-		iprintlnbold_noloc("--")
-		iprintlnbold_noloc("========WARNING==========")
-		iprintlnbold_noloc("HZM Coop Mod will now quit and reboot the server")
-		iprintlnbold_noloc("--")
-		wait 3
-		iprintlnbold_noloc("--")
-		iprintlnbold_noloc("-- Please Reconnect ! --")
-		iprintlnbold_noloc("--")
-		wait 1
-		if(level.coop_dedicated){
-		for (local.i = 1;local.i <= $player.size;local.i++){
-		local.player = $player[local.i]
-		if( local.player != NULL ){
-		local.player stufftext "exec coop_mod/cfg/reconnect.cfg"
-		}
-		}
-		waitframe
-		}
-		}*/
+	local.cvarValue = getCvar("coop_callvote")
+	if(local.cvarValue == ""){ end }
+	
+	setCvar "coop_callvote" ""
+	
+	if(local.cvarValue == "nextmap"){
+		exec global/missioncomplete.scr level.coopNextMap 1
+	}
+	else if(local.cvarValue == "previousemap"){
+		exec global/missioncomplete.scr level.coopPrevMap 1
+	}
+	else if(local.cvarValue == "restartmap"){
+		thread restartMap
+	}
+	
+	/* not working, because dedicated servers does not execute cfg from callvote
+	else if(local.cvarValue == "quit"){
+	//magic happens in coop_mod/cfg/sv_quit.cfg
+	if(level.coop_dedicated == 0){
+	iprintlnbold_noloc("--")
+	iprintlnbold_noloc("Sorry - ONLY DEDICATED SERVERS CAN REBOOT")
+	iprintlnbold_noloc("--")
+	end
+	}
+	iprintlnbold_noloc("--")
+	iprintlnbold_noloc("========WARNING==========")
+	iprintlnbold_noloc("HZM Coop Mod will now quit and reboot the server")
+	iprintlnbold_noloc("--")
+	wait 3
+	iprintlnbold_noloc("--")
+	iprintlnbold_noloc("-- Please Reconnect ! --")
+	iprintlnbold_noloc("--")
+	wait 1
+	if(level.coop_dedicated){
+	for (local.i = 1;local.i <= $player.size;local.i++){
+	local.player = $player[local.i]
+	if( local.player != NULL ){
+	local.player stufftext "exec coop_mod/cfg/reconnect.cfg"
+	}
+	}
+	waitframe
+	}
+	}*/
 }end
