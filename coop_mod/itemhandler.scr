@@ -28,7 +28,6 @@
 //dropItemOnDeath
 //local.actor thread dropItem <item model> <angles> <mass>
 //---------------------------------------------------
-//TODO: ADD DISGUISE FUNCS HERE !
 //=========================================================================
 main local.thread local.arg1 local.arg2:{
 //=========================================================================
@@ -37,9 +36,7 @@ main local.thread local.arg1 local.arg2:{
 	if (!waitthread coop_mod/main.scr::inCoopMode){ end } //dont load this if we aren't in coop mode
 	if (!self){ end }
 	if (local.thread == NIL){ end } 
-	if (self.classname != "Health" && self.classname != "AmmoEntity" && self.classname != "Weapon"){ end }
-
-	//println "loading " self.classname	  		
+	if (self.classname != "Health" && self.classname != "AmmoEntity" && self.classname != "Weapon"){ end }	
 
 	//make sure main.scr has loaded
 	waitthread coop_mod/main.scr::waitForMainScript
@@ -746,7 +743,6 @@ takeUniformFromPlayer local.player:{
 //=========================================================================
 giveUniformToPlayer local.player:{
 //=========================================================================
-	//TODO: this needs further testing...
 	local.player stufftext "dm_playermodel german_waffenss_officer"
 	local.player.model = "models/player/german_waffenss_officer.tik"
 }end
@@ -1051,8 +1047,13 @@ giveWeaponLoadout local.default:{
 			group.player thread deactivatePlayerWeapon 			//this is so we stop the engine doing the weapon use for us when picking primary mp weapon
 		}
 		wait game.ms
-		if (isAlive group.player){ 	
-			group.player useweaponclass level.coop_weaponUse
+		if (isAlive group.player){ //[200] Smithy - allow the game to know their last active weapon on respawn (suggested by Chris)  
+			if (group.player.flags["coop_lastWeapon"] && waitthread playerHasWeapon group.player group.player.flags["coop_lastWeapon"]){ 
+				println "USING LAST WEAPON: " group.player.flags["coop_lastWeapon"]
+				group.player use group.player.flags["coop_lastWeapon"]
+			}else{
+				group.player useweaponclass level.coop_weaponUse
+			}		
 			group.player activatenewweapon "dual" 				//unholster the right weapon as quickly as possible			
 		}
 	}
@@ -1060,6 +1061,9 @@ giveWeaponLoadout local.default:{
 	if (group.player){
 		group.player.flags["coop_startingDisguise"] = game.false
 		group.player.flags["coop_activeWeapon"] = waitthread returnActiveWeapon group.player //duh, initialise activeWeapon flag (will return weapon or NULL)
+		if (group.player.flags["coop_activeWeapon"]){
+			group.player.flags["coop_lastWeapon"] = group.player.flags["coop_activeWeapon"].model
+		}	 
 	}
 }end
 
