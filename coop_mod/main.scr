@@ -296,8 +296,8 @@ forceTeam local.player:{
 		setcvar "g_teamswitchdelay" "0"
 		local.player join_team ( "allies" )
 		setcvar "g_teamswitchdelay" local.switchDelay
-		waitframe
-		if (!local.player){ end }
+		//wait game.ms
+		//if (!local.player){ end }
 		local.player primarydmweapon "rifle"
 		local.player pickweapon
 		local.player stufftext ( "popmenu 0" )
@@ -451,7 +451,7 @@ managePlayers:{
 							local.player.flags["coop_isHost"] = 1
 						}
 						else{
-							local.player.flags["coop_isHost"] = 0
+							local.player.flags["0"] = 0
 						}
 					}
 
@@ -482,6 +482,11 @@ managePlayers:{
 
 					thread resetSpawn local.player
 
+					//[200] Smithy - on listen servers spawn the host player and skip selection
+					if (!level.coop_dedicated && local.player.entnum == 0){
+						thread skipTeamAndWeaponSelect local.player
+					}
+
 					/* //[200] Smithy - disguise stuff done in itemhandler now
 					if( level.coop_playerHasDisguise != NIL ){
 						local.player.has_disguise = level.coop_playerHasDisguise
@@ -501,13 +506,19 @@ managePlayers:{
 						local.player threatbias ignoreme
 						local.player.fnum = -100 //this is used for friendly orientation see global/friendly::playernode
 					}
+					//[200] Smithy - now we just check for fire button to auto join them to allies and skip weapon menu
+					if (local.player.primaryfireheld){
+						//[200] Smithy - put here to stop spam that prevents players typing/using menu
+						local.switchDelay = getcvar "g_teamswitchdelay"  //[200] Smithy - stop switch delay intefering 
+						setcvar "g_teamswitchdelay" "0"	
+						thread skipTeamAndWeaponSelect local.player
+						setcvar "g_teamswitchdelay" local.switchDelay
+					}
 				}else{
 					//[200] chrissstrahl - check if physics is off
 					if( level.coop_physicsOff != NIL && level.coop_physicsOff == 1){
 						local.player physics_off
 					}
- 
-					thread skipWeaponSelect local.player //[200] Smithy - check if hes on a weapon menu, then do it for him
 
 /////////////////////////////////////////ALIVE
 					if( local.player.health > 0 ){
@@ -775,40 +786,23 @@ playerTeamChangeEvent:{
 forceValidTeam:{
 //=========================================================================
 	local.player = self
-
-	//while (local.player && local.player.dmteam == "axis"){
-		//if (local.player.flags["coop_forcedLast"] == NIL){
-		//	local.player.flags["coop_forcedLast"] = -10
-		//}
-		//don't force if the game won't let us anymore
-		//if ((local.player.flags["coop_forcedLast"] + 3) < level.time){
-		if (local.player.dmteam == "axis"){
-			thread forceTeam local.player
-		}
-		//	local.player.flags["coop_forcedLast"] = level.time
-		//}else{
-		//	local.player kill
-		//}
-		//waitframe
-	//}
+	if (local.player.dmteam == "axis"){
+		thread forceTeam local.player
+	}
 }end
 
-//[200] Smithy - the magic combination that signals he in weapon select mode :D
-// -isSpectator returns true if he is anything but walking around (e.g. died, waiting for weapons etc)
-//  so he doesn't have to be on spec team for that! Slightly different.
-//
-// -isAlive duh
-//
-// -dmteam he's not in TEAM spectator
+//[200] Smithy - forces a player to join allies and skip selection process
 //=========================================================================
-skipWeaponSelect local.player:{
+skipTeamAndWeaponSelect local.player:{
 //=========================================================================
-	//println "************ ATTEMPTING TO SKIP SELECT SCREEN ****************"
-	if (local.player.isSpectator && isAlive local.player && local.player.dmteam != "spectator"){
-		local.player primarydmweapon "rifle" 	//give him a random primary gun
-		local.player pickweapon 				//make him pick it
-		local.player stufftext ( "popmenu 0" )	//close the menu
-	}
+	local.player join_team "allies"
+	local.player stufftext "popmenu 0"		//close the team menu
+	local.player primarydmweapon "rifle" 	//give him a random primary gun
+	local.player pickweapon 				//make him pick it	
+	local.player stufftext "popmenu 0"		//close the weapons menu
+	local.player stopfire "dual" 			//stop weapon fire bug when clicking several times
+	wait game.ms
+	local.player stopfire "dual"
 }end
 
 //[200] Smithy - own func for giving player their health
