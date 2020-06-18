@@ -1,0 +1,62 @@
+//[200] Chrissstrahl - turns g_gametype cvar hack on
+//=========================================================================
+hackGametypeOn local.delay:{
+//=========================================================================
+	if(level.gametype == 0){ end }	//no need in sp
+
+	//get hacknumber and count up
+	local.hackNumber = int($world.flags["coopHackGametIndex"])
+	$world.flags["coopHackGametIndex"] = (local.hackNumber + 1)
+
+	//if not set, set right away
+	if(int(getCvar("g_gametype")) != 0){
+		setcvar "g_gametype" "0"
+	}
+
+	iprintlnbold_noloc("hackGametypeOn: "+getcvar("g_gametype")+" : "+level.time)
+
+	//flag this as active
+	$world.flags[("coopHackGamet"+local.hackNumber)] = 1
+
+	//turn off automatically if we know it has a delay
+	local.flagTime = local.delayTime
+	if(local.flagTime != NIL){
+		thread 	hackGametypeOff local.hackNumber local.delay
+	}
+}end local.hackNumber
+
+//[200] Chrissstrahl - turns g_gametype cvar hack off
+//=========================================================================
+hackGametypeOff local.hackNumber local.delay:{
+//=========================================================================
+	if(level.gametype == 0){ end }	//no need in sp
+
+	if(local.hackNumber == NIL){
+		error ( "coop_mod/main.scr::hackGametypeOff - parameter 1 was NIL should be <int> returnval of local.hNum = hackGametypeOn" ) 1000
+		end
+	}
+
+	//wait provided delay time
+	if(local.delay != NIL){
+		wait 0.0005
+	}
+
+	//flag this as inactive
+	$world.flags[("coopHackGamet"+local.hackNumber)] = 0
+
+	local.resetGametype	= 1
+	local.index			= int($world.flags["coopHackGametIndex"])
+
+	//lets see if all hacks are done
+	for(local.i=0;local.i<local.index;local.i++){
+		if($world.flags[("coopHackGamet"+local.i)] != 0){
+			println ("coopHackGamet"+local.i+" is 0")
+			local.resetGametype = 0
+		}
+	}
+	//all hacks are done, turn back gametype
+	if(local.resetGametype){
+		setcvar "g_gametype" level.gametype
+	}
+	iprintlnbold_noloc("hackGametypeOff: "+getcvar("g_gametype")+" : "+level.time)
+}end
