@@ -76,15 +76,15 @@ main:{
 	thread setScoreboard 										//[200] Smithy - setup the scoreboard for this mission
 	thread resetMapList 										//[200] Smithy - reset sv_maplist
 	
-	//MULTIPLAYER//////////////////////////
+	//MULTIPLAYER////////////////////////// //[200] Smithy - not working properly anyway, but can cause issues when using restartMap func
 	//[200] chrissstrahl - check to load the last map on dedicated server
-	if(level.gametype != 0 ){//&& level.coop_dedicated != 0
-		local.lastmapname = getcvar("ui_startmap")
-		if(local.lastmapname != "" && level.coop_mapname != local.lastmapname){
-			exec global/missioncomplete.scr local.lastmapname
-			end
-		}
-	}
+	// if(level.gametype != 0 ){//&& level.coop_dedicated != 0
+	// 	local.lastmapname = getcvar("ui_startmap")
+	// 	if(local.lastmapname != "" && level.coop_mapname != local.lastmapname){
+	// 		exec global/missioncomplete.scr local.lastmapname
+	// 		end
+	// 	}
+	// }
 	
     //[200] Smithy - used in coop_mod/aihandler.scr
     level.coop_actorArray["german"][1]      = NIL
@@ -118,6 +118,7 @@ main:{
 	exec coop_mod/loadout.scr 													//[200] Smithy - initialises the weapon loadout array for this level - moved from itemhandler.scr
 	waitthread coop_mod/spawnlocations.scr::main								//chrissstrahl - create spawnpoints for coop
 	waitthread mom/mom.scr::setup "coop_mod/mom_actions.scr" 2 "coop_mom"		//chrissstrahl - set coop mod specific mom file
+	thread coop_mod/itemhandler.scr::disableAllWeaponsOnMenu 		 			//[200] Smithy - disable weapons on select menu
 
 	level.coop_mainScriptLoaded = game.true 									//[200] Smithy - used by waitForMainScript to check if main has loaded
 
@@ -127,6 +128,30 @@ main:{
 		thread coop_mod/eventsystem.scr::doEvent "mainScriptLoaded" 			//[200] Smithy - used by itemhandler and aihandler (+ future scripts) to notify that main has been loaded
 	}
 }end
+
+//[200] Smithy - fresh dedi servers will have a fake player on startup.
+//we don't need it, and it may mess first client up that takes its spot
+//e.g. 'press fire to join game' doesn't show for first client to join
+//server.
+//This fake player may also mess with map restarts (e.g. missionfailed)
+//=========================================================================
+removeFakePlayer:
+	if (level.coop_dedicated){
+		if ($player && $player[1].netname == "*** Blank Name ***" && $player[1].entnum == 0){
+			$player[1] delete
+			waitframe
+		}		
+	}
+end
+
+//[200] Smithy - on listen servers vars can carry over from map to map
+//=========================================================================
+resetPlayers:
+//=========================================================================
+	for (local.i = 1; local.i <= $player.size; local.i++){
+		$player[local.i].flags["coop_isActive"] = NIL
+	}
+end
 
 //[200] chrissstrahl - have a seperate handle for singleplayer
 //=========================================================================
@@ -282,7 +307,7 @@ forceTeam local.player:{
 //=========================================================================
 	if( local.player == NIL || local.player == NULL ){ end }
 
-	local.player.flags["coop_isActive"] = 0
+	//local.player.flags["coop_isActive"] = 0
 	local.player.flags["coop_team"] = local.player.dmteam
 	waitthread resetSpawn local.player
 
@@ -300,6 +325,7 @@ forceTeam local.player:{
 		local.player primarydmweapon "rifle"
 		local.player pickweapon
 		local.player stufftext ( "popmenu 0" )
+		//local.player.flags["coop_isActive"] = 1
 	}
 }end
 
@@ -393,16 +419,21 @@ managePlayers:{
 	//[200] chrissstrahl - wait for a player to join the game
 	level waittill spawn
 
+	waitthread removeFakePlayer	//[200] Smithy - remove any fake player objects
+	waitthread resetPlayers 	//[200] Smithy - reset any vars that may have transferred from previous map
+
 	//[200] chrissstrahl - used to detect when a player leaves/joins
 	local.prevPlayerCount = 0
 
 	while(1){
 		//if no player on server - also needed for dedicated servers
+		
 		if( $player == NULL || $player.size == 0 ){
 			level.coop_playerReady = 0
-			waitframe
-			continue
+			//waitframe //[200] Smithy - dont need this
+			//continue
 		}
+		
 		//[200] chrissstrahl - used  to detect when a player leaves/joins
 		local.playerCount = 0
 
@@ -435,6 +466,8 @@ managePlayers:{
 				local.player.flags["coop_team"] = "None"
 				local.player.flags["coop_lastRespawn"] = -1
 				local.player.flags["coop_joinedGameAt"] = level.time //[200] chrissstrahl - used for variouse checks
+
+				local.player spectator
 
 				//this is used for friendly orientation see global/friendly::playernode
 				local.player.fnum = -100
@@ -483,32 +516,30 @@ managePlayers:{
 /////////////////////////////////////////ALIVE
 				if( local.player.health > 0 ){
 					//CHANGED TEAM/////////////////////////////////////////
-					if( local.player.flags["coop_team"] != local.player.dmteam ){
+					if( local.player.flags["coop_team"] != "allies" ){
 						local.player.flags["coop_team"] = local.player.dmteam
 						local.player.flags["coop_justSpawnedDone"] = NIL
 						local.player.flags["coop_isActive"] = 0
 						waitthread resetSpawn local.player
-
 						//move player to spawn
-						thread playerPlaceAtSpawn local.i
+						thread playerPlaceAtSpawn local.i //[200] Smithy - is this needed so many times?
 					}
 					//NOT ACTIVE YET///////////////////////////////////////
 					if(local.player.flags["coop_isActive"] != 1){
 						//iprintlnbold_noloc("not active")
 						if( local.player.flags["coop_iAmTruelyActive"] != 1 ){
 							//move player to spawn
-							thread playerPlaceAtSpawn local.i
+							thread playerPlaceAtSpawn local.i //[200] Smithy - is this needed so many times?
 							continue
 						}
 						//FIST ACTIVE AFTER INACTIVE - SETUP////////////////////
-
 						//[200] chrissstrahl - keep track of when first player was really actve
 						if(level.coop_gameStartedAt == NIL){
 							level.coop_gameStartedAt = level.time
 						}
 
 						//move player to spawn
-						thread playerPlaceAtSpawn local.i
+						thread playerPlaceAtSpawn local.i  //[200] Smithy - is this needed so many times?
 
 						//see if the level script has a special handling for players that just spawned
 						if( local.player.flags["coop_justSpawnedDone"] == NIL ){
@@ -536,7 +567,7 @@ managePlayers:{
 							local.player hide
 						}
 //move player to spawn
-						thread playerPlaceAtSpawn local.i
+						thread playerPlaceAtSpawn local.i //[200] Smithy - is this needed so many times?
 
 //[200] CHRISSTRAHL /// LMS /// ///////////// check if player should be spectator in LMS
 						thread lmsForceSpectatorHandle local.player
@@ -615,6 +646,7 @@ managePlayers:{
 				}
 			}
 		}
+
 		//[200] chrissstrahl - call player changed func if number of players changed
 		if(local.prevPlayerCount != local.playerCount){
 			waitthread playerCountChanged local.prevPlayerCount local.playerCount
@@ -650,6 +682,7 @@ playerSpawnEvent:{
 		thread playerGlue local.player "spawn"  					//any new players will be glued if it's needed
 		//---------------------// vars here
 		local.player.flags["coop_iAmTruelyActive"] = 1
+		//local.player.flags["coop_isActive"] = 1 								//added here as well for extra safety
 		local.player.flags["coop_isAlive"] = game.true  						//he's now alive :)
 		//---------------------//
 
@@ -699,7 +732,7 @@ skipTeamAndWeaponSelect local.player:{
 	setcvar "g_teamswitchdelay" "0"	
 	local.player join_team "allies"
 	setcvar "g_teamswitchdelay" local.switchDelay
-	
+
 	local.player stufftext "popmenu 0"		//close the team menu
 	local.player primarydmweapon "rifle" 	//give him a random primary gun
 	local.player pickweapon 				//make him pick it	
@@ -731,6 +764,8 @@ end
 //=========================================================================
 playerCountChanged local.prevPlayerCount local.playerCount:{
 //=========================================================================
+	println "PLAYER COUNT CHANGED: " local.playerCount
+
 	//[200] chrissstrahl - if no player left on server restart mission
 	if(local.playerCount == 0){
 		wait 1
