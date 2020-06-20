@@ -87,11 +87,11 @@ coop_selectDriverForTank:{
 //============================================================================
 coop_setDriverForTank local.player:{
 //============================================================================
-	//iprintlnbold_noloc("player driver")
 	level.coop_tankLastDriverTime = (level.time + 10)
 	level.coop_playerTank = local.player
-	local.player.flags["coop_playerTankExitAt"] = ( level.time + 10 )
+	local.player takeall 	//[200] Smithy - stop weapon disappearing on exiting tank (can happen with sniper)
 	self DetachDriverSlot 0 ( $coop_tankExit.origin + (0 0 150) )
+	self lock 				//[200] Smithy - stop players being able to partly detach from tank and fire their weapons
 	wait 0.2
 	
 	//[200] Smithy - minor optimisations (removed redundant if checks)
@@ -112,29 +112,33 @@ coop_setDriverForTank local.player:{
 				if( level.time > level.coop_tankLastDriverTime ){
 					break
 				}else{
-					exec coop_mod/main.scr::printInfo local.player "You need to wait before you can leave the Tank again!" 1
+					exec coop_mod/main.scr::printInfo local.player "You need to wait before you can leave the tank again!" 1
 				}
 			}
 			waitframe
 		}
 	}
 	
-	if(local.player != NULL){
-		local.playerId = (waitexec coop_mod/main.scr::getPlayerId local.player)
+	if(local.player){
 		local.player.flags["coop_playerTankExitAt"] = ( level.time + 10 )
 		local.player nodamage
 		local.player origin ( $coop_tankExit.origin + (0 0 150) )
-		if(local.player != NULL){
+		waitframe
+		if(local.player){
 			local.player spectator //[200] Smithy - better than stufftexting
 			local.player.flags["coop_playerTankExit"] = 1
 		}
 		waitframe
-		if(local.player != NULL){
-			local.player unglue
-			thread coop_mod/main.scr::skipTeamAndWeaponSelect local.player //[200] Smithy - forces player to allies and skips menus
+		if(local.player){
+			local.player unglue			
 			self DetachDriverSlot 0  ( $coop_tankExit.origin + (0 0 150) )
 			local.player tele  ( $coop_tankExit.origin + (0 0 150) )
 			local.player takedamage
+			thread coop_mod/main.scr::skipTeamAndWeaponSelect local.player //[200] Smithy - forces player to allies and skips menus
+			waitframe
+			if(local.player){
+				local.player useweaponclass level.coop_weaponUse //[200] Smithy - stop weapon disappearing on exiting tank (can happen with sniper)
+			}
 		}
 	}else{
 		self DetachDriverSlot 0  ( $coop_tankExit.origin + (0 0 150) )
