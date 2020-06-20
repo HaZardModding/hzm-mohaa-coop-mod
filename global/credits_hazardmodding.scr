@@ -1,0 +1,248 @@
+////////////////////////////////////////////////////////////////////////////////////////
+//
+//  MoH: Allied Assault Script File  
+//  Global function: Ending credits data
+//  Script Written By: Benson 'elmagoo' Russell, Jeff Heath, Brad Allen, Vince Zampella
+//
+////////////////////////////////////////////////////////////////////////////////////////
+credits_start:
+
+//***************************************************************************************************
+//***************************************************************************************************
+//*** documentation on credit script commands
+//***************************************************************************************************
+//***************************************************************************************************
+//	The way the credits work is you pass commands to the script with what you want to display
+//	These are the commands for text:
+//		section	      - this is for passing text for a section header, such as 'CAST'
+//		sub_section   - this is for smaller, sub-section style text, such as 'Filmed in XRAY VISION'
+//		entry	      - this is for passing text for an entry with a header, such as 'Art Director', and a body, such as 'Tadd Whomever'
+//		entry_single  - this is for a single line of entry header style text with no body
+//		image	      - this is for displaying an image on-que at certain points in the credits
+//		image_scroll  - this is to place an image to scroll up with the text
+//		pause	      - this puts a pause in the scrolling text for spacing
+//		done	      - ends the credits and disconnects back to the menu
+//
+//	These are the commands for pictures:
+//		show	  - used to display a graphic on the screen
+//		hide	  - used to take an already displayed graphic off the screen
+//
+//
+//	Syntax for text commands:
+//	All text commands are called with this statement and parameters:
+//
+//	waitthread global/credits.scr::credits_add <command> <header text> <body text>
+//
+//
+//	Here's how you add text to scroll up the screen.  First, pick the command to use.
+//	You have to specify the command in quotes.
+//
+//	"section"  - This is for displaying main headings, such as 'CAST'  You only need to enter
+//		     the <header text> parameter for this command, <body text> is not used.
+//
+//	"sub_section"   - This is the same as section, but used for sub-section style headings such
+//			  as 'Filmed in XRAY VISION'
+//
+//	"entry"    - This is for displaying people and their titles, such as 'Art Director'
+//		     'Tadd Whomever'.  The <header text> is the label, which would be the
+//		     'Art Director' portion.  The <body text> is the accompanying text, which
+//		     would be the 'Tadd Whomever' portion.
+//
+//	"entry_single   - This is like entry text, only it's for a single line of <header text> with
+//			  no <body text>.  So if you wanted to create just a list of persons after
+//			  a section header, you would use this command
+//
+//	"image"	   - This is for passing an image command into the sequence of credits for more
+//		     precise queing of when to display an image.  Following the "image" command
+//		     you enter the following just like you would with a normal image command:
+//
+//		     <image_command> <element number> <image> [time] [ul_x] [ul_y] [br_x] [br_y]
+//
+//		     For a description of all the image parameters, look under the picture commands
+//		     syntax descriptions below.
+//
+//	"image_scroll"  - This is for having a picture scoll in with the text in the credits.  You
+//			- pass these parameters with it:
+//
+//			  <image> [ul_x] [br_x] [br_y]
+//
+//			  <image> first is the reference to the picture.  <ul_x> is the x coordinate
+//			  where you want it to scroll up the screen.  <br_x> <br_y> specifiy the
+//			  bottom right corner of the image (works as the normal image command).
+//			  NOTE: DO NOT use images that are taller than 80 units.  If an image is
+//			  taller than 80 units, then you will see it disappear since it won't be
+//			  completely obscured by the top border.
+//
+//	"pause"    - This is for placing blank spacing between entries.  So say you entered all
+//		     of the 'CAST' entries, and you want some space before you start the next
+//		     section of text.  Pause is used to place that space.
+//
+//	"done"     - This is when the credits are done and you want to return back to the main
+//		     menu.  This will fade out the borders, wait a second, then go back to
+//		     the main menu.  Make sure to fade out everything else and wait a bit for
+//		     whatever remaining text to scroll off the screen, else it will bail out
+//		     in the middle of it scrolling.
+//
+//
+//	Syntax for Picture commands:
+//	All picture commands are called with this statement and parameters:
+//
+//	waitthread global/credits.scr::credits_image <command> <element number> <image> [time] [ul_x] [ul_y] [br_x] [br_y]
+//
+//
+//	Here's how you display a picture up on the screen.  All pictures will display behind the
+//	borders of the screen, so you want to make sure all your pictures are made to be in that area.
+//	The important thing to remember when adding pictures is the <element number> that you use.
+//	You have 100 element numbers you can use, 1 - 100 (the script will error out if you go
+//	outside of this range, or don't enter one at all).  The number determines which pictures get
+//	drawn on top of other pictures.  The higher the number, the more 'on-top' that picture is.
+//	So element 100 is the topmost picture and will draw on top of all other elements, and 1 is the
+//	bottommost element and will draw under all other elements.  Also, you can use the same element
+//	number for multiple pictures, but if you assign a new picture to a used element, that element
+//	will switch to that picture, whether it's shown or not.  So keep track of your <element number>
+//	that you use.  One thing to note is to wait the appropriate amount of time before sending the
+//	next picture.  Else you'll see the transition occur before the pictures fully fade.
+//
+//	Here is the explaination of all the parameters and which ones are optional:
+//
+//	<command> 	- Commands given have to be in quotes as with text commands.  There are only
+//			  two draw commands.  You have to enter this parameter.
+//
+//			  "show" - This will fade the desired picture in on the specified <element number>
+//			  "hide" - This will fade the desired <element number> out
+//
+//	<element number>   This is the element number to display a picture on, numbers 1 - 100.
+//			   You have to enter this parameter.  NO quotes used for this parameter.
+//
+//	<image>		-  This is the graphic to display, entered in quotes.  It can either be a shader name, or a 
+//			   direct reference to the picture.  If it's a direct reference to a picture,
+//			   then you have to enter the path starting with "textures/" (with the rest of the path).
+//			   So for example, this is a reference to a direct picture:
+//
+//			   "textures/mohmenu/credits/bottomborder"
+//
+//			   It is recommended to place all images for the credits screen in the
+//			   "textures/mohmenu/credits/" folder where the borders already are.
+//			   You have to enter this paramter.
+//
+//	[time]		-  This is an optional parameter that's not entered within quotes.  If a time
+//			   is entered, then the displayed picture will automatically fade out in the
+//			   specified time.  So if you enter a time of 5, then after 5 seconds the
+//			   picture will fade without having to give a fade command.  Without the time
+//			   parameter, an image will stay on the screen until it is told to fade.
+//
+// [ul_x] [ul_y] [br_x] [br_y]  -  These last four parameters are used to specify a direct placement
+//				   and size of a picture.  The first two parameters specify the
+//				   upper-left coordinate for the image (hence the ul).  The last two
+//				   parameters specify the bottom-right corner for the image (hence the br).
+//				   All coordinates are based on a 640 x 480 setting, no matter what the
+//				   user's resolution.  To use these parameters, ALL 4 have to be used.
+//				   If you enter only one, and not the rest, bad things can happen and
+//				   borkiness behavior will occur.
+//
+//				   NOTE:  If you want to use these parameters but do NOT wish to use
+//				          the [time] parameter, just enter a value of NIL where the [time]
+//					  parameter is.
+//
+//
+//
+//	I left in my test entries just as an example for you to look at.  MAKE SURE TO REMOVE ALL
+//	THE SAMPLE ENTRIES WHEN YOU ENTER THE FINAL CREDITS!!!!  One techinque you might want to use
+//	is to display the pictures using a seperate thread, so you can control and keep track of the
+//	timing easier, rather than intermixing all the pictures with the text since reading over that
+//	might get confusing.  Come see me if you'd like some help with this.
+//
+//***************************************************************************************************
+//***************************************************************************************************
+
+//*** launch the thread to show the pictures
+thread credits_start_pictures
+
+//*** start the credits
+
+//[200] chrisstrahl - needs refining, right now I need sleep
+
+waitthread global/credits.scr::credits_add "image" "show" 1 "textures/mohmenu/credits/creditbacksky" NIL 0 83 640 400
+
+waitthread global/credits.scr::credits_add "section" "HZM Primary Development"
+waitthread global/credits.scr::credits_add "entry" "Chrissstrahl" "?"
+waitthread global/credits.scr::credits_add "entry" "Criminal" "?"
+waitthread global/credits.scr::credits_add "entry" "Smithy" "?"
+waitthread global/credits.scr::credits_add "pause"
+
+waitthread global/credits.scr::credits_add "section" "HZM additional Development"
+waitthread global/credits.scr::credits_add "entry" "Daggolin" "?"
+waitthread global/credits.scr::credits_add "entry" "DoubleKill" "?"
+waitthread global/credits.scr::credits_add "pause"
+
+waitthread global/credits.scr::credits_add "section" "HZM additional Tester"
+waitthread global/credits.scr::credits_add "entry" "Suxev" "?"
+waitthread global/credits.scr::credits_add "entry" "Steve Craft" "?"
+waitthread global/credits.scr::credits_add "entry" "Jerry Spark" "?"
+waitthread global/credits.scr::credits_add "pause"
+
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "image" "show" 11 "textures/mohmenu/credits/p47-7" .6 0 83 640 320
+//waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "image" "show" 12 "textures/mohmenu/credits/p47-8" .6 0 83 640 320
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "image" "show" 3 "textures/mohmenu/credits/creditbacktrrops2" 25 0 83 640 320
+
+
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "section" "2015 Special Thanks"
+waitthread global/credits.scr::credits_add "entry_single" "The California Historical Group Airborne 101"
+waitthread global/credits.scr::credits_add "entry_single" "Pacific Northwest Historical Group"
+waitthread global/credits.scr::credits_add "entry_single" "Eric Lee"
+waitthread global/credits.scr::credits_add "entry_single" "Our friends at id"
+waitthread global/credits.scr::credits_add "entry_single" "Everyone at Ritual"
+waitthread global/credits.scr::credits_add "entry_single" "All our friends at the Ritz"
+waitthread global/credits.scr::credits_add "entry_single" "Thanks to all of our wives and girlfriends for their patience and support"
+
+waitthread global/credits.scr::credits_add "image" "show" 15 "textures/mohmenu/credits/creditbacktrrops" 42 0 83 640 320
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "image_scroll" "textures/mohmenu/credits/sub" 420 170 80
+waitthread global/credits.scr::credits_add "image" "show" 16 "textures/mohmenu/credits/group" 38 0 83 640 320
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "image_scroll" "textures/mohmenu/credits/lineup" 420 170 80
+
+//*********************************************************
+//*********************************************************
+//*** terminate the credits
+
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "image" "show" 2 "textures/mohmenu/credits/creditbackmoh" 4 192 185 256 128
+
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "image" "show" 20 "textures/mohmenu/credits/dedication" 9 64 179 512 128
+
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "image" "hide" 1
+
+waitthread global/credits.scr::credits_add "pause"
+waitthread global/credits.scr::credits_add "done"
+
+end
+
+
+//*********************************************************
+//*** start the pictures
+//*********************************************************
+credits_start_pictures:
+end
+
