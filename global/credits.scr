@@ -1,0 +1,867 @@
+//[200] chrissstrahl - modified for coop - 2020.06.20
+///////////////////////////////////////////////////////////////////////////////
+//
+//  MoH: Allied Assault Script File  
+//  Global function: Ending credits routines
+//  Script Written By: Benson 'elmagoo' Russell
+//
+///////////////////////////////////////////////////////////////////////////////
+
+//**************************************************************************
+//*** Initializes the credits script
+//*** syntax --------------------------------
+//*** credits_setup
+//**************************************************************************
+credits_setup:
+
+//println "CREDITS: setting up the credits"
+
+//*** catches if the firebutton was pressed and resets the ui_hud command
+thread credits_skip
+
+//*** turn off the player's hud
+$player stufftext "ui_hud 0"
+setcvar "cg_huddraw_force" "1"
+
+//*** fade the screen out
+
+fadeout 3 0 0 0 1
+
+wait 3
+
+//*** draw the letterboxed images
+
+//*** bottom border
+huddraw_virtualsize 253 1
+huddraw_shader 253 "textures/mohmenu/credits/bottomborder"
+huddraw_align 253 left top
+huddraw_rect 253 0 400 640 80
+//huddraw_color 254 0 0 0
+
+//*** top border
+huddraw_virtualsize 254 1
+huddraw_shader 254 "textures/mohmenu/credits/topborder"
+huddraw_align 254 left top
+huddraw_rect 254 0 0 640 80
+//huddraw_color 255 0 0 0
+
+//*** text telling the player how to skip the credits
+huddraw_virtualsize 255 1
+huddraw_string 255 "Press FIRE to skip the credits"
+//huddraw_align 255 left top
+huddraw_align 255 center top
+huddraw_font 255 handle-22
+huddraw_color 255 1 1 1
+//huddraw_rect 255 205 450 0 0
+huddraw_rect 255 75 450 565 0
+
+//*** fade the borders in
+for (local.i = 0 ; local.i <= 1 ; local.i += .03)
+{
+	huddraw_alpha 253 local.i
+	huddraw_alpha 254 local.i
+	huddraw_alpha 255 local.i
+	waitframe
+}
+
+
+//*** initialize the credits index, storage arrays, element counter, position variables
+level.credits_index = 0  //*** where to stuff the next command in the array of credit array's
+level.credits_index_isprocessing = 0  //*** flag for whether or not the stack is being processed
+
+level.credits_command[1] = NIL  //*** stores the command passed [section, entry]
+level.credits_header[1] = NIL   //*** stores the subject header, i.e. Level Designer
+level.credits_body[1] = NIL     //*** stores the value for the header, i.e. Benson Russell
+
+level.credits_current_element = 100  //*** keeps track of what huddraw element to use
+			     	     //*** 100 - 200  for credit entries
+			     	     //*** 0 - 100  for background images
+
+level.section_xpos = 150      //*** section x position
+level.header_xpos = 150       //*** entry header x position
+level.body_xpos = 340         //*** entry body x position
+
+//*** set the default colors for section
+if (level.credits_section_red == NIL)
+{
+	level.credits_section_red = 0
+}
+
+if (level.credits_section_green == NIL)
+{
+	level.credits_section_green = 0
+}
+
+if (level.credits_section_blue == NIL)
+{
+	level.credits_section_blue = 0
+}
+
+//*** set the default colors for sub_section
+if (level.credits_sub_section_red == NIL)
+{
+	level.credits_sub_section_red = 0
+}
+
+if (level.credits_sub_section_green == NIL)
+{
+	level.credits_sub_section_green = 0
+}
+
+if (level.credits_sub_section_blue == NIL)
+{
+	level.credits_sub_section_blue = 0
+}
+
+//*** set the default colors for entry header
+if (level.credits_entry_header_red == NIL)
+{
+	level.credits_entry_header_red = 0
+}
+
+if (level.credits_entry_header_green == NIL)
+{
+	level.credits_entry_header_green = 0
+}
+
+if (level.credits_entry_header_blue == NIL)
+{
+	level.credits_entry_header_blue = 0
+}
+
+//*** set the default colors for entry body
+if (level.credits_entry_body_red == NIL)
+{
+	level.credits_entry_body_red = .2
+}
+
+if (level.credits_entry_body_green == NIL)
+{
+	level.credits_entry_body_green = .2
+}
+
+if (level.credits_entry_body_blue == NIL)
+{
+	level.credits_entry_body_blue = .2
+}
+
+//*** set the default section font
+if (level.credits_section_font == NIL)
+{
+	level.credits_section_font = "handle-23"
+}
+
+//*** set the default section font
+if (level.credits_sub_section_font == NIL)
+{
+	level.credits_sub_section_font = "handle-22"
+}
+
+//*** set the default entry header font
+if (level.credits_entry_header_font == NIL)
+{
+	level.credits_entry_header_font = "handle-18"
+}
+
+//*** set the default entry body font
+if (level.credits_entry_body_font == NIL)
+{
+	level.credits_entry_body_font = "handle-18"
+}
+
+//*** launch the processing thread
+thread credits_processor
+
+end
+
+
+//**************************************************************************
+//*** adds an entry to scroll up the screen
+//*** syntax --------------------------------
+//*** credits_add <command type| "section", "entry", "pause", "done"> <header text> <body text>
+//**************************************************************************
+credits_add local.command local.header_string local.body_string local.var1 local.var2 local.var3 local.var4 local.var5 local.var6:
+
+//*** if the stack is currently processing, wait
+while (level.credits_index_isprocessing == 1)
+{
+	waitframe
+}
+
+//println "CREDITS ADD: comm:" local.command " :header: " local.header_string " :body: " local.body_string
+
+//*** claim the stack
+level.credits_index_isprocessing = 1
+
+switch (local.command)
+{
+	case "section":
+		//println "CREDITS: section was choosen, adding to credits"
+		local.index = level.credits_index
+		local.index ++
+		level.credits_command[local.index] = local.command
+		level.credits_header[local.index] = local.header_string
+		level.credits_index ++
+		break
+
+	case "sub_section":
+		//println "CREDITS: section was choosen, adding to credits"
+		local.index = level.credits_index
+		local.index ++
+		level.credits_command[local.index] = local.command
+		level.credits_header[local.index] = local.header_string
+		level.credits_index ++
+		break
+	
+	case "entry":
+		//println "CREDITS: entry was choosen, adding to credits"
+		local.index = level.credits_index
+		local.index ++
+		level.credits_command[local.index] = local.command
+		level.credits_header[local.index] = local.header_string
+		level.credits_body[local.index] = local.body_string
+		level.credits_index ++
+		break
+
+	case "entry_single":
+		//println "CREDITS: entry was choosen, adding to credits"
+		local.index = level.credits_index
+		local.index ++
+		level.credits_command[local.index] = local.command
+		level.credits_header[local.index] = local.header_string
+		level.credits_index ++
+		break
+
+	case "image":
+		local.index = level.credits_index
+		local.index ++
+		level.credits_command[local.index] = local.command
+		level.credits_draw_command[local.index] = local.header_string
+		level.credits_draw_element_number[local.index] = local.body_string
+		level.credits_draw_image[local.index] = local.var1
+		level.credits_draw_time[local.index] = local.var2
+		level.credits_draw_ul_x[local.index] = local.var3
+		level.credits_draw_ul_y[local.index] = local.var4
+		level.credits_draw_br_x[local.index] = local.var5
+		level.credits_draw_br_y[local.index] = local.var6
+		level.credits_index ++
+		break
+
+	case "image_scroll":
+		local.index = level.credits_index
+		local.index ++
+		level.credits_command[local.index] = local.command
+		level.credits_draw_image[local.index] = local.header_string
+		level.credits_draw_ul_x[local.index] = local.body_string
+		level.credits_draw_br_x[local.index] = local.var1
+		level.credits_draw_br_y[local.index] = local.var2
+		level.credits_index ++
+		break
+	
+	case "pause":
+		local.index = level.credits_index
+		local.index ++
+		level.credits_command[local.index] = local.command
+		level.credits_index ++
+		break
+
+	case "done":
+		local.index = level.credits_index
+		local.index ++
+		level.credits_command[local.index] = local.command
+		level.credits_index ++
+		break
+	
+	default:
+		println "^~^~^ CREDIT SCRIPT ERROR: command passed was not valid!"
+		break
+}
+
+//*** release the stack
+level.credits_index_isprocessing = 0
+
+end
+
+
+//**************************************************************************
+//*** Processes the stack of credits
+//*** syntax --------------------------------
+//*** credits_processor
+//**************************************************************************
+credits_processor:
+
+local.current_index = 1  //*** keeps track of which index to process
+
+credits_processor_loop:
+
+//println "CREDITS PROCESSOR LOOP: starting processing"
+
+//*** while there are no credits, wait
+while (level.credits_index == 0)
+{
+	waitframe
+}
+
+//*** set the scroll time if none has been set
+if (level.credits_scrolltime == NIL || level.credits_scrolltime == 0)
+{
+	//*** if no desired time is set, set it to 10 seconds
+	//println "CREDITS PROCESSOR LOOP: setting scrolltime to 10"
+	level.credits_scrolltime = 17
+}
+
+//*** check if the current element counter is over 200, if so, reset it back to 100
+if (level.credits_current_element > 200)
+{
+	level.credits_current_element = 100
+}
+
+//*** check what command was passed through
+switch (level.credits_command[local.current_index])
+{
+	case "section":
+        	//*** process a section
+        	waitthread credits_process_section local.current_index
+		break
+		
+        case "sub_section":
+        	//*** process a sub_section
+        	waitthread credits_process_sub_section local.current_index
+        	break
+        	
+        case "entry":
+               	//*** process an entry
+        	waitthread credits_process_entry local.current_index
+        	break
+
+        case "entry_single":
+        	//*** process an single line entry
+        	waitthread credits_process_entry_single local.current_index
+        	break
+        	
+        case "image":
+        	//*** display an image
+        	thread credits_image level.credits_draw_command[local.current_index] level.credits_draw_element_number[local.current_index] level.credits_draw_image[local.current_index] level.credits_draw_time[local.current_index] level.credits_draw_ul_x[local.current_index] level.credits_draw_ul_y[local.current_index] level.credits_draw_br_x[local.current_index] level.credits_draw_br_y[local.current_index]
+        	break
+        	
+        case "image_scroll":
+        	//*** display an image that will scroll with the credits
+        	thread credits_process_image_scroll level.credits_draw_image[local.current_index] level.credits_draw_ul_x[local.current_index] level.credits_draw_br_x[local.current_index] level.credits_draw_br_y[local.current_index]
+        	break
+
+	case "pause":
+        	//*** pause the game for a set interval based on scrolltime
+        	local.pause_time = (level.credits_scrolltime / 8.0)
+        	wait local.pause_time
+        	break
+        	
+        case "done":
+        	//*** end the credits routine
+        	thread credits_done
+        	goto credits_processor_done
+        	break
+        	
+        default:
+               	//*** process an entry by default
+        	waitthread credits_process_entry local.current_index
+        	break
+}
+
+//*** increment the current element counter
+level.credits_current_element ++
+
+//*** if the stack is currently processing, wait
+while (level.credits_index_isprocessing == 1)
+{
+	waitframe
+}
+
+//*** claim the stack
+level.credits_index_isprocessing = 1
+
+//*** increment the current index, and check if it exists
+local.current_index ++
+
+//*** if there's nothing on the next index, blank the arrays for starting over
+if (level.credits_command.size < local.current_index)
+{
+	level.credits_command = NIL
+	level.credits_header = NIL
+	level.credits_body = NIL
+	
+	level.credits_command[1] = NIL
+	level.credits_header[1] = NIL
+	level.credits_body[1] = NIL
+	
+	level.credits_index = 0
+	local.current_index = 1
+}
+
+//*** release the stack
+level.credits_index_isprocessing = 0
+
+goto credits_processor_loop
+
+credits_processor_done:
+end
+
+
+//**************************************************************************
+//*** Process a section heading to scroll by
+//*** syntax --------------------------------
+//*** credits_process_section <stack index number>
+//**************************************************************************
+credits_process_section local.stack_index:
+
+//*** format the string, and find out how many lines it takes up
+if (level.credits_header[local.stack_index] != NIL)
+{
+        local.string = waitthread global/string_format.scr::str_format level.credits_header[local.stack_index] 40
+        local.num_lines = level.str_format_num_lines
+        //println "CREDITS SECTION: entry was not NIL!"
+}
+else
+{
+	local.string = " "
+	local.num_lines = 1
+	//println "CREDITS SECTION: entry was NIL!"
+}
+
+
+//*** assign all the huddraw commands
+huddraw_alpha level.credits_current_element 0
+huddraw_string level.credits_current_element local.string
+huddraw_font level.credits_current_element level.credits_section_font
+huddraw_align level.credits_current_element left top
+huddraw_virtualsize level.credits_current_element 1
+huddraw_color level.credits_current_element level.credits_section_red level.credits_section_green level.credits_section_blue
+
+//*** start it scrolling
+thread credits_scroll level.credits_current_element level.section_xpos
+
+//*** pause for a bit to give a space in the text
+local.pause_time = (level.credits_scrolltime / 17.0) + ((level.credits_scrolltime / 15.0) * local.num_lines)
+
+wait local.pause_time
+
+end
+
+
+//**************************************************************************
+//*** Process a sub section heading to scroll by
+//*** syntax --------------------------------
+//*** credits_process_section <stack index number>
+//**************************************************************************
+credits_process_sub_section local.stack_index:
+
+//*** format the string, and find out how many lines it takes up
+if (level.credits_header[local.stack_index] != NIL)
+{
+        local.string = waitthread global/string_format.scr::str_format level.credits_header[local.stack_index] 40
+        local.num_lines = level.str_format_num_lines
+        //println "CREDITS SUB SECTION: entry was not NIL!"
+}
+else
+{
+	local.string = " "
+	local.num_lines = 1
+	//println "CREDITS SUB SECTION: entry was NIL!"
+}
+
+
+//*** assign all the huddraw commands
+huddraw_alpha level.credits_current_element 0
+huddraw_string level.credits_current_element local.string
+huddraw_font level.credits_current_element level.credits_sub_section_font
+huddraw_align level.credits_current_element left top
+huddraw_virtualsize level.credits_current_element 1
+huddraw_color level.credits_current_element level.credits_sub_section_red level.credits_sub_section_green level.credits_sub_section_blue
+
+//*** start it scrolling
+thread credits_scroll level.credits_current_element level.section_xpos
+
+//*** pause for a bit to give a space in the text
+local.pause_time = (level.credits_scrolltime / 21.0) + ((level.credits_scrolltime / 19.0) * local.num_lines)
+
+wait local.pause_time
+
+end
+
+
+//**************************************************************************
+//*** Process a entry with only one value, header with no body
+//*** syntax --------------------------------
+//*** credits_process_entry_single <stack index number>
+//**************************************************************************
+credits_process_entry_single local.stack_index:
+
+//*** format the string, and find out how many lines it takes up
+if (level.credits_header[local.stack_index] != NIL)
+{
+        local.string = waitthread global/string_format.scr::str_format level.credits_header[local.stack_index] 45
+        local.num_lines = level.str_format_num_lines
+        //println "CREDITS ENTRY SINGLE: entry was not NIL!"
+}
+else
+{
+	local.string = " "
+	local.num_lines = 1
+	//println "CREDITS ENTRY SINGLE: entry was NIL!"
+}
+
+//*** assign the header huddraw commands
+huddraw_alpha level.credits_current_element 0
+huddraw_string level.credits_current_element local.string
+huddraw_font level.credits_current_element level.credits_entry_body_font
+huddraw_align level.credits_current_element left top
+huddraw_virtualsize level.credits_current_element 1
+huddraw_color level.credits_current_element level.credits_entry_header_red level.credits_entry_header_green level.credits_entry_header_blue
+
+//*** start it scrolling
+thread credits_scroll level.credits_current_element level.header_xpos
+
+//*** pause for a bit to give a space in the text
+local.pause_time = (level.credits_scrolltime / 30.0) + ((level.credits_scrolltime / 27.0) * local.num_lines)
+
+wait local.pause_time
+
+end
+
+
+//**************************************************************************
+//*** Process a section heading to scroll by
+//*** syntax --------------------------------
+//*** credits_process_entry <stack index number>
+//**************************************************************************
+credits_process_entry local.stack_index:
+
+//*** format the header string, and find out how many lines it takes up
+if (level.credits_header[local.stack_index] != NIL)
+{
+        local.header_string = waitthread global/string_format.scr::str_format level.credits_header[local.stack_index] 20
+        local.header_num_lines = level.str_format_num_lines
+        //println "CREDITS ENTRY HEADER: entry was not NIL!"
+}
+else
+{
+	local.header_string = " "
+	local.header_num_lines = 1
+	//println "CREDITS ENTRY HEADER: entry was NIL!"
+}
+
+
+//println "CREDITS PROCESS ENTRY: header string: " local.header_string
+//println "CREDITS PROCESS ENTRY: header num lines: " local.header_num_lines
+
+//*** format the body string, and find out how many lines it takes up
+if (level.credits_body[local.stack_index] != NIL)
+{
+	local.body_string = waitthread global/string_format.scr::str_format level.credits_body[local.stack_index] 20
+	local.body_num_lines = level.str_format_num_lines
+	//println "CREDITS ENTRY BODY: entry was not NIL!"
+}
+else
+{
+	local.body_string = " "
+	local.body_num_lines = 1
+	//println "CREDITS ENTRY BODY: entry was NIL!"
+}
+
+//println "CREDITS PROCESS ENTRY: body string: " local.body_string
+//println "CREDITS PROCESS ENTRY: body num lines: " local.body_num_lines
+
+//*** find whether the header or body has more lines used
+if (local.header_num_lines >= local.body_num_lines)
+{
+	//*** if the header has more lines, use it's line total
+	local.num_lines = local.header_num_lines
+	//println "CREDITS PROCESS ENTRY: header num lines was more or equal than body"
+}
+else
+{
+	//*** if the body has more lines, use it's line total
+	local.num_lines = local.body_num_lines
+	//println "CREDITS PROCESS ENTRY: body num lines was more than header"
+}
+
+//println "CREDITS PROCESS ENTRY: header string into element: " level.credits_current_element
+
+//*** assign the header huddraw commands
+huddraw_alpha level.credits_current_element 0
+huddraw_string level.credits_current_element local.header_string
+huddraw_font level.credits_current_element level.credits_entry_header_font
+huddraw_align level.credits_current_element left top
+huddraw_virtualsize level.credits_current_element 1
+huddraw_color level.credits_current_element level.credits_entry_header_red level.credits_entry_header_green level.credits_entry_header_blue
+
+local.header_element_counter = level.credits_current_element
+
+//println "CREDITS PROCESS ENTRY: header string into element variable: " local.header_element_counter
+
+level.credits_current_element ++
+if (level.credits_current_element > 200)
+{
+	level.credits_current_element = 100
+}
+
+//println "CREDITS PROCESS ENTRY: body string into element: " level.credits_current_element
+
+//*** assign the body huddraw commands
+huddraw_alpha level.credits_current_element 0
+huddraw_string level.credits_current_element local.body_string
+huddraw_font level.credits_current_element level.credits_entry_body_font
+huddraw_align level.credits_current_element left top
+huddraw_virtualsize level.credits_current_element 1
+huddraw_color level.credits_current_element level.credits_entry_body_red level.credits_entry_body_green level.credits_entry_body_blue
+
+//*** start both scrolling
+thread credits_scroll local.header_element_counter level.header_xpos
+thread credits_scroll level.credits_current_element level.body_xpos
+
+//*** pause for a bit to give a space in the text
+local.pause_time = (level.credits_scrolltime / 33.0) + ((level.credits_scrolltime / 25.0) * local.num_lines)
+
+//println "CREDITS PROCESS ENTRY: pause time: " local.pause_time
+
+wait local.pause_time
+
+end
+
+
+//**************************************************************************
+//*** Process a graphic to scroll up with the credits text
+//*** syntax --------------------------------
+//*** credits_process_image_scroll <image> <ul_x> <br_x> <br_y>
+//**************************************************************************
+credits_process_image_scroll local.image local.ul_x local.br_x local.br_y:
+
+if (local.br_x == NIL)
+{
+	local.br_x = 128
+}
+
+if (local.br_y == NIL)
+{
+	local.br_y = 128
+}
+
+//*** assign the image huddraw commands
+huddraw_alpha level.credits_current_element 0
+huddraw_shader level.credits_current_element local.image
+huddraw_align level.credits_current_element left top
+huddraw_virtualsize level.credits_current_element 1
+huddraw_color level.credits_current_element 1 1 1
+
+//*** start it scrolling
+thread credits_scroll level.credits_current_element local.ul_x local.br_x local.br_y
+
+end
+
+
+//**************************************************************************
+//*** Scrolls the elements up the screen
+//*** syntax --------------------------------
+//*** credits_scroll <huddraw element number> <x position for the element> <bottom right x position for images> <bottom right y position for images>
+//**************************************************************************
+credits_scroll local.element_number local.element_xpos local.element_br_xpos local.element_br_ypos:
+
+//*** default the br positions to zero if NIL
+if (local.element_br_xpos == NIL)
+{
+	local.element_br_xpos = 0
+}
+
+if (local.element_br_ypos == NIL)
+{
+	local.element_br_ypos = 0
+}
+
+//*** set the scroll increment
+local.scroll_increment = (level.credits_scrolltime * 20.0)
+local.scroll_increment = (480.0 / local.scroll_increment)
+
+//*** round the value to make it more even
+local.scroll_increment += .5
+local.scroll_increment = int(local.scroll_increment)
+
+//*** set them scrolling up
+for (local.i = 480 ; local.i >= 0 ; local.i -= local.scroll_increment)
+{
+	//*** turn on the element
+	huddraw_alpha local.element_number 1
+	
+	//*** scroll the element up the screen
+	//println "CREDITS SCROLL: local.i: " local.i
+	huddraw_rect local.element_number local.element_xpos local.i local.element_br_xpos local.element_br_ypos
+	waitframe
+}
+
+//*** turn off the element
+huddraw_alpha local.element_number 0
+
+end
+
+
+//**************************************************************************
+//*** Skips the credits
+//*** syntax --------------------------------
+//*** credits_skip
+//**************************************************************************
+credits_done:
+
+//*** fade the borders out
+for (local.i = 1 ; local.i >= 0 ; local.i -= .01)
+{
+	huddraw_alpha 253 local.i
+	huddraw_alpha 254 local.i
+	huddraw_alpha 255 local.i
+	waitframe
+}
+
+wait 2
+//*** restore the hud and disconnect the player
+$player stufftext "ui_hud 1"
+$player stufftext "disconnect"
+//$player stufftext "pushmenu main"
+
+end
+
+
+//**************************************************************************
+//*** Skips the credits
+//*** syntax --------------------------------
+//*** credits_skip
+//**************************************************************************
+credits_skip:{
+	//[200] chrissstrahl - execute coop skip - do not disconnect players, rather end credits if all clicked
+	if(level.gametype != 0){
+		thread coop_creditsSkip
+		end		
+	}
+	
+	if($player.fireheld){
+		$player stufftext "ui_hud 1"
+		$player stufftext "disconnect"
+		//$player stufftext "pushmenu main"
+	}
+	// check again next server frame
+	waitframe
+	goto credits_skip
+}end
+
+//[200] chrissstrahl - coop skip credits version
+//============================================================================
+coop_creditsSkip:{
+//============================================================================
+	while(level.coop_preventGameTypeChanges == NIL){
+		local.skippingPlayers = 0
+		for (local.i = 1; local.i <= $player.size; local.i++) {
+			local.player = $player[local.i]
+			if ( local.player != NULL && local.player.health > 0 ){
+				if(local.player.fireheld){
+					local.skippingPlayers++
+				}
+			}
+		}
+		
+		if(local.skippingPlayers > ($player.size / 2)){
+			exec global/missioncomplete.scr level.coopNextMap bsp2bsp
+			end
+		}
+		waitframe
+	}
+}end
+
+//**************************************************************************
+//**************************************************************************
+//**************************************************************************
+//***   DRAWING IMAGES
+//**************************************************************************
+//**************************************************************************
+//**************************************************************************
+
+//**************************************************************************
+//*** Tells how to draw an image in the background for the credits
+//*** syntax --------------------------------
+//*** credits_image <command|"show", "hide"> <element number> <image> <time> <ul_x> <ul_y> <br_x> <br_y>
+//**************************************************************************
+credits_image local.command local.element_number local.image local.time local.ul_x local.ul_y local.br_x local.br_y:
+
+//*** check to see if they gave the proper element number, between 0 and 100, and not NIL
+if (local.element_number == NIL || local.element_number > 100 || local.element_number < 0)
+{
+	println "^~^~^ CREDITS PICTURE ERROR: You used an element greater than 100, or less than 0!"
+	goto credits_image_done
+}
+
+switch (local.command)
+{
+	case "show":
+		huddraw_alpha local.element_number 0
+		huddraw_shader local.element_number local.image
+		huddraw_align local.element_number left top
+		huddraw_virtualsize local.element_number 1
+		
+		//*** if they didn't supply coordinates, default them to 640 x 480
+		if (local.ul_x == NIL || local.ul_y == NIL || local.br_x == NIL || local.br_y == NIL)
+		{
+			huddraw_rect local.element_number 0 0 640 480
+		}
+		else
+		{
+			huddraw_rect local.element_number local.ul_x local.ul_y local.br_x local.br_y
+		}
+		
+		//*** launch the show thread to fade it in
+		thread credits_image_show local.element_number local.time
+		
+		break
+	
+	case "hide":
+		huddraw_alpha local.element_number 1
+		
+		for (local.i = 1 ; local.i >= 0 ; local.i -= .02)
+		{
+			huddraw_alpha local.element_number local.i
+			wait .05
+		}
+		
+		break
+	
+	default:
+		println "^~^~^ CREDITS PICTURE ERROR: An unrecognized command was sent!"
+		goto credits_image_done
+		
+		break
+}
+
+credits_image_done:
+end
+
+
+//**************************************************************************
+//*** Fades the image onto the screen
+//*** syntax --------------------------------
+//*** credits_image_show <element number> <time>
+//**************************************************************************
+credits_image_show local.element_number local.time:
+
+//*** fade the image in
+for (local.i = 0 ; local.i <= 1 ; local.i += .02)
+{
+	huddraw_alpha local.element_number local.i
+	wait .05
+}
+
+//*** if the time was set, wait the amount of time then fade the image out
+if (local.time != NIL)
+{
+	wait local.time
+        for (local.i = 1 ; local.i >= 0 ; local.i -= .02)
+        {
+        	huddraw_alpha local.element_number local.i
+        	wait .05
+        }
+}
+
+end
