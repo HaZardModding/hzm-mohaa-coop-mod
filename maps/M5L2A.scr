@@ -111,6 +111,10 @@ main:{
 	//	waitthread global/objectives.scr::reset_objectives
 	//	waitthread global/objectives.scr::blank_objectives
 
+	//[200] chrissstrahl - moved it here to prevent array issue
+	waitthread global/objectives.scr::add_objectives 1 2 "Escape with the King Tiger tank." $level_end.origin
+	waitthread global/objectives.scr::current_objectives 1
+
 	//[200] Smithy - ffs, it's a trigger_once but because we have checks for pedestrians we need to make it a multiple
 	//swap them out and point it to the same thread name
 	if (level.gametype != 0){ 
@@ -120,9 +124,6 @@ main:{
 		local.newTrig setthread "level_end"
 		local.oldTrig delete
 	}
-
-	waitthread global/objectives.scr::add_objectives 1 2 "Escape with the King Tiger tank." $level_end.origin
-	waitthread global/objectives.scr::current_objectives 1
 
 	thread start
 	
@@ -476,10 +477,15 @@ level_end:{
 	//[200] Smithy - only tanks allowed to end level
 	if (level.gametype != 0){ //duh, check gametype...
 		local.player = parm.other
-		if (!level.coop_playerTank || local.player != level.coop_playerTank){ //thanks chris for this level var ! :D
+		if (!level.coop_playerTank || local.player != level.coop_playerTank){ //thanks chriss for this level var ! :D
+			local.message = "The tank needs to reach here to complete Objective!"
+
+			//[200] chrissstrahl - move player away from there, prevents player reaching level end
+			local.player thread coop_teleportBrother ( -4433 5027 600 ) (0 -87 0) local.message
+
 			if (!local.player.flags["coop_tankEndHint"]){  //damn... i was tired yesterday... it goes here not in an else...
 				local.player.flags["coop_tankEndHint"] = game.true
-				local.player iprint "The tank needs to reach here to complete Objective!" 1
+				local.player iprint local.message 1
 			}
 			end
 		}
@@ -587,6 +593,8 @@ coop_teleportBrother local.origin local.angle local.message:{
 		if( local.angle != NIL ){
 			self face ( local.angle )//face your path chosen by your maker
 		}
+		//[200] chrissstrahl - make sure players do not get stuck
+		thread playerMakeSolidAsap self
 	}
 	if(local.message != NIL){	self iprint local.message 1	}
 }end //AMEN Brother!
@@ -607,8 +615,13 @@ coop_teleportMaster:{
 					local.plOrigin = local.player.origin
 					//if(vector_length(local.plOrigin - ()) < 2000){
 					
+
+					//[200] chrissstrahl - under the map
+					if(local.plOrigin[2] < 70){
+						local.player thread coop_teleportBrother ( -1021 934 370) (0 -128 0) local.message
+					}
 					//level start area where the tank is
-					if(local.plOrigin[1] < -4580){
+					else if(local.plOrigin[1] < -4580){
 						local.player thread coop_teleportBrother ( 3426 -3392 300) (0 120 0) local.message
 					}
 					//left side from entrace
@@ -693,6 +706,25 @@ coop_teleportMaster:{
 				}
 			}
 		}
+
+		//[200] chrissstrahl - check ai falling off/being under geometry
+		for(local.i=0;local.i<level.coop_actorArray["german"].size;local.i++){
+			local.actor = level.coop_actorArray["german"][local.i]
+			if(isAlive local.actor){
+				local.actorOrigin = local.actor.origin
+				if(local.actorOrigin[2] < 70){
+					local.actor hide
+					local.actor origin ( -4134 -254 800 )
+					local.actor angle 41
+					local.actor face ( 0 41 0 )
+					local.actor droptofloor
+					//wait some time, because I am to lazzy to create a func that makes sure actors do not get stuck in each other
+					//so have them stack on top of each other
+					waitframe
+					local.actor show
+				}
+			}
+		}
 		waitframe
 	}
 }end
@@ -722,12 +754,17 @@ coop_validateAttacker local.thread:{
 	if (level.gametype == 0){ end } //duh... i was tired last night and forgot to include this
 
 	//the player that has attacked this building
-	//[200] Chrissstrahl - or projectile (stole your m5l1a solution), addad parm.owner check
 	local.eOther 	= parm.other
+	//[200] Chrissstrahl - get active weapon to check if player used bazooka to destroy building
+	local.eWeapon	= thread coop_mod/itemhandler.scr::returnActiveWeapon local.eOther
 
 	if (level.coop_playerTank && local.eOther == level.coop_playerTank || //thanks chriss for this level var ! :D
-	//[200] Chrissstrahl - add ceck for rocket and so
-		local.eOther.model != "models/projectiles/bazookashell.tik" && local.eOther.model != "models/projectiles/bazookashell_dm.tik" )
+	//[200] Chrissstrahl - check if player was using bazooka to fire on building
+	//- other weapons are hitscan
+	//- you can't bash with bazooka (so bashing a building with bazooka in hand is not a issue)
+	//- granades can't be detected if last one is trown, that is why there is no granade detection
+	//- if you trow a granade and then switch to bazooka it will detect a bazooka hit, which is not that bad a bug
+		local.eWeapon != NULL && local.eWeapon.model == "models/weapons/bazooka.tik" )
 	{
 		self remove //take this opportunity to remove useless triggers from the map
 	}else{
