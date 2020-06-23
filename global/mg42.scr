@@ -183,6 +183,13 @@ coop_mg42GetPlayerTarget local.gunner local.target:{
 	while(local.target == NULL){
 		wait 1
 	}
+	
+	//[200] chrissstrahl - make sure the gunner shoots at every player in these maps
+	local.noVisualCheck = 0
+	if(level.coop_mapname == "m5l2a" || level.coop_mapname == "m5l2a"){
+		local.target.targetname = "player"
+		local.noVisualCheck = 1
+	}
 
 	if(local.target.targetname != "player"){
 		self setAimTarget local.target
@@ -191,8 +198,23 @@ coop_mg42GetPlayerTarget local.gunner local.target:{
 	}
 	
 	local.lastTarget = NULL
-	while(isAlive local.gunner){
-		local.player = local.gunner exec coop_mod/replace.scr::canseeGetClosest
+	while(isAlive local.gunner){		
+		//[200] chrissstrahl - make sure the gunner shoots at every player in these maps
+		//- visual check did not work out gunners can't actually see players, so this was changed
+		if(local.noVisualCheck){
+			local.player = local.gunner exec coop_mod/replace.scr::player_closestTo local.gunner NIL
+		}else{
+			local.player = local.gunner exec coop_mod/replace.scr::canseeGetClosest
+		}
+		
+		//[200] chrissstrahl - no target no fire
+		if(local.player == NULL){
+			local.lastTarget = local.player
+			self stopfiring
+			wait 1
+			continue
+		}
+
 		if(local.player != local.lastTarget){
 			self stopfiring
 		}
