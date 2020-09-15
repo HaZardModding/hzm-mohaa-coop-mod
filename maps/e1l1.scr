@@ -19,6 +19,10 @@ main:{
 
 	thread trackPrespawn
 	exec maps/e1l1/hacks.scr
+	if ( int( getcvar( r_usepixo )) != 0 ) //[200] Smithy - original dev change from latest version of file
+	{
+		level.noStorm = 1
+	}
 
 	//chrissstrahl - wtf is that .....?
 	level.largemap = getcvar r_largemap
@@ -39,8 +43,8 @@ main:{
 	//chrissstrahl - fixme
 	//chrissstrahl - fixme
 	thread maps/e1l1/storm.scr::init
-	
-	
+
+
 	exec global/auto.scr
 
 	println "------------------------------------------------------------------------------------"
@@ -85,7 +89,7 @@ main:{
 	//developer warper
 	//developer warper
 	//developer warper
-	
+
 	if (level.warpToFrontLine) {
 		//level waittill spawn
 		//$player.origin = ( -5271 1125 250 )
@@ -137,7 +141,7 @@ main:{
 		//chrissstrahl - make this work in coop
 		waitexec coop_mod/main.scr::waittill_spawn
 		exec coop_mod/main.scr::playersWarpto ( 5377 2777 440 )
-		
+
 		trigger $everythingDoneTrigger
 		level.skipJeepRide = 1
 		level.skipFadeIn = 1
@@ -149,7 +153,7 @@ main:{
 		//chrissstrahl - make this work in coop
 		waitexec coop_mod/main.scr::waittill_spawn
 		exec coop_mod/main.scr::playersWarpto ( 3112 -3352 280 )
-		
+
 		level.skipJeepRide = 1
 		level.skipFadeIn = 1
 	}
@@ -158,7 +162,7 @@ main:{
 		//level waittill spawn
 		//chrissstrahl - make this work in coop
 		waitexec coop_mod/main.scr::waittill_spawn
-		
+
 		//$player.origin = ( -5594 -2142 249 )
 		//$player.origin = ( -1691 -5603 290 )
 		//$player.origin = ( 3249 511 318 )
@@ -173,7 +177,7 @@ main:{
 
 	waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl - coop compatible
 	//level waittill spawn
-	
+
 	waitthread maps/e1l1/scene1.scr::prepJeepRide
 
 	thread doMusic
@@ -202,7 +206,7 @@ main:{
 	// make moving the tank the current objective
 	waitthread maps/e1l1/objectives.scr::transition "commanderGagEnd"
 
-	// wait until the player reaches the bunkers 
+	// wait until the player reaches the bunkers
 	$reachedBunkerTrigger waittill trigger
 	waitthread maps/e1l1/objectives.scr::transition "reachedBunkers"
 	exec global/autosave.scr 4
@@ -280,11 +284,11 @@ InitEnemies:{
 //============================================================
 	//level waittill prespawn //chrissstrahl
 	waitthread coop_mod/replace.scr::waitTillPrespawn //chrissstrahl - coop
-	
+
 	//MG42s
 	if ( $mg42 != NIL ){
 		for (local.i=1;local.i<$mg42.size+1;local.i++){
-			// level.spot_burstmin level.spot_burstmax level.spot_burstdownmin level.spot_burstdownmax	
+			// level.spot_burstmin level.spot_burstmax level.spot_burstdownmin level.spot_burstdownmax
 			$mg42[local.i] burstfiresettings 1 3 1.5 3
 			$mg42[local.i] maxyawoffset 60.0
 			$mg42[local.i] pitchcaps "-20 20 0"
@@ -308,7 +312,7 @@ InitEnemies:{
 //============================================================
 InitPlayer:{
 //============================================================
-	if( level.gametype == 0 ){ //chrissstrahl - singleplayer 
+	if( level.gametype == 0 ){ //chrissstrahl - singleplayer
 		level waittill prespawn
 		println "Initing Player"
 		$player heal 1
@@ -333,7 +337,7 @@ FadeIn:{
 	//chrissstrahl - adjust angles of all players once (sp+mp)
 	for (local.i = 1; local.i <= $player.size; local.i++) {
 		local.player = $player[local.i]
-		local.player.viewangles  = $jeep.angles	
+		local.player.viewangles  = $jeep.angles
 	}
 }end
 
@@ -357,7 +361,7 @@ ArmPlayer:{
 	waitexec global/loadout.scr
 	waitthread global/items.scr::blank_items
 
-	
+
 	if (level.giveAllWeapons) {
 		$player give all
 		$player useweaponclass mg
@@ -380,21 +384,21 @@ InitMineFields:{
 doMineField:{
 //============================================================
 	self waittill trigger
-	
+
 	//chrissstrahl - handle for coop
 	local.player = parm.other
-	
+
 	//chrissstrahl - make sure we don't messed it up
 	if(local.player == NIL || local.player == NULL){
 		iprintlnbold("error doMineField is not working: "+parm.other)
 	}
-	
+
 	//chrissstrahl do not change sp
 	if(level.gametype == 0){
 		local.player = $player
 	}
 
-	local.spawned = spawn script_origin targetname 
+	local.spawned = spawn script_origin targetname
 	local.spawned.origin = local.player.origin //chrissstrahl - made compatible
 	local.spawned.origin += ( 25 25 0)
     local.spawned.damage = 1000 // bump up the damage caused
@@ -415,7 +419,7 @@ doMineField:{
 		while (self.playerInTrigger) {
 			wait 1
 			if ((randomint 100) < 75) {
-				local.spawned = spawn script_origin targetname 
+				local.spawned = spawn script_origin targetname
 				local.spawned.origin = $player.origin
 				local.spawned.origin += ( 25 25 0)
                 local.spawned.damage = 1000 // bump up the damage caused
@@ -424,7 +428,7 @@ doMineField:{
 				wait 0.5
 				local.spawned remove
 			}
-		}			
+		}
 	}
 	*/
 }end
@@ -564,7 +568,7 @@ warpObjectives:{
 //============================================================
 	wait 1
 	if (level.warpToTankRideEnd || level.warpToBunkerEntrance || level.warpToRadioShack	|| level.warpToLevelEnd) {
-		trigger $tankCommanderDoneTalking 
+		trigger $tankCommanderDoneTalking
 		waitframe
 
 		waitthread maps/e1l1/objectives.scr::transition "didIntro"
@@ -575,9 +579,9 @@ warpObjectives:{
 
 		if (level.warpToBunkerEntrance || level.warpToRadioShack	|| level.warpToLevelEnd) {
 			waitthread maps/e1l1/objectives.scr::transition "seizedFlaks"
-				
+
 			if (level.warpToRadioShack || level.warpToLevelEnd) {
-				trigger $reachedBunkerTrigger 
+				trigger $reachedBunkerTrigger
 				waitthread maps/e1l1/objectives.scr::transition "foundBunker"
 				waitthread maps/e1l1/objectives.scr::transition "reachedBunkers"
 				waitthread maps/e1l1/objectives.scr::transition "talkedToSoldier"
@@ -585,7 +589,7 @@ warpObjectives:{
 				if (level.warpToLevelEnd) {
 					waitthread maps/e1l1/objectives.scr::transition "killedRadios"
 					waitthread maps/e1l1/objectives.scr::transition "foundDocs"
-				}				
+				}
 			}
 		}
 	}
@@ -671,12 +675,12 @@ coop_playerJustSpawned:{
 		error ( "e1l2.scr - parameter 1 was NIL, expected integer" ) 1000
 		end
 	}
-	
+
 	//do not hanld storm stuff if there is none
 	if (level.noStorm == 1){
 		end
 	}
-	
+
 	local.player = $player[local.i]
 	if(local.player == NULL){ end }
 	local.playerEntnum = local.player.entnum
@@ -691,18 +695,18 @@ coop_playerJustSpawned:{
 		local.storm = spawn models/emitters/emitters_cube.tik targetname ($storm+local.playerEntnum) notsolid 1
 		waitframe
 	}
-	
+
 	if(local.player == NULL){
 		local.storm delete
 		end
 	}
-	
+
 	//attach storm to the player, not using player numbers as idendificator, because i think they might be unreliable
 	//useing entnum instead.
 	if(local.playerflags["stormAttached"]==NIL){
 		//attach storm now to player
 		local.player.flags["stormAttached",1]
-		
+
 		//attach, manage on death etc
 		thread coop_managePlayerStorm local.player local.storm
 	}
