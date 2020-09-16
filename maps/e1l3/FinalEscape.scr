@@ -11,26 +11,26 @@ init:
 	if (level.warpTo == "finalEscape") {
 		$Claus remove
 		waitframe
-		
+
 		//chrissstrahl - keep for sp
-		if(level.gametype == 0){		
+		if(level.gametype == 0){
 			$player.origin = ( -1834 3287 608 )
 		}
-		
+
 		spawn models/human/sc_al_us_claus.tik targetname Claus
 		$Claus.origin = ( -1633 3226 608 )
 		$Claus weapon beretta
 		$RoofDoor unlock
-		
+
 		level.skipUniformPart = 1
 		if (level.skipUniformPart) {
 			$Claus.origin  = $clausStop_f4.origin
-			
+
 			//chrissstrahl - keep for sp
 			if(level.gametype == 0){
 				$player.origin = $playerChangedPosition.origin
 				$player.angles 		= ( 0 -120 0 )
-				$player.viewangles 	= ( 0 -120 0 )			
+				$player.viewangles 	= ( 0 -120 0 )
 			}
 
 			//$player.origin = ( -1075 3247 150 )
@@ -68,18 +68,18 @@ makeSurePlayerLocksDoor:
 //=========================================================================
 {
 	$uniformRoomTrigger waittill trigger	//chrissstrahl - great there you are, well you are disabled now anyway (will kill claus if coop_save loaded)
-	
+
 	//chrissstrahl - set save token for coop
 	if(level.gametype != 0){
 		setcvar "coop_save" "e1l3_finalEscape"
 	}
-	
+
 	//chrissstrahl - this is not happening normaly because a clip prevents player to go forward if door not locked by player
-	if (level.roofDoorIsLocked == 0){ 
+	if (level.roofDoorIsLocked == 0){
 		$Claus takedamage
 		$Claus damage $world 5000 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
 		iprintlnbold "You failed to protect Klaus"
-		
+
 		//chrissstrahl - keep for sp
 		if(level.gametype == 0){
 			wait 1
@@ -140,7 +140,7 @@ showBar:
 		waitframe
 	}
 }end
-	
+
 //=========================================================================
 lockRoofDoor:
 //=========================================================================
@@ -200,7 +200,7 @@ lockRoofDoor:
 	$RoofDoor playsound e1l3_door_lock_down
 	$bar2.origin += ( 0 96 0 )
 	$PlayerClipA remove
-	
+
 	//chrissstrahl - coop
 	if(level.gametype != 0){
 		//stop checker
@@ -239,13 +239,21 @@ barfix:
 //chrissstrahl - bar is the pice of wood used to lock the roof door of the hotel
 	//chrissstrahl - keep for sp
 	if(level.gametype == 0){
-		wait 0.1
-		while ( $player isinside $bar ){
+		//[200] Smithy - original dev fix from latest file
+		wait 2
+		local.vect = vector_subtract $bar.origin $player.origin
+		local.distance = vector_length local.vect
+		while ( local.distance < 128 )
+		{
+			local.vect = vector_subtract $bar.origin $player.origin
+			local.distance = vector_length local.vect
 			//dprintln "Player is inside the bar"
 			wait 0.1
 		}
+
 		//dprintln "setting bar solid again..."
-		$bar solid		
+
+		$bar solid
 	}
 	//chrissstrahl - we don't care in coop about that
 }end
@@ -308,7 +316,7 @@ clausRuns:
 		self fixedleash 1
 		self exec global/enable_ai.scr
 		$playerLockedDoor waittill trigger
-		
+
 		//chrissstrahl - terminate thread if it is running, or players may get killed
 		if(level.gametype!=0 && level.coop_killThread != NIL){
 			level.coop_killThread = 0
@@ -380,12 +388,12 @@ holsterText:
 	//chrissstrahl - sp/mp
 	if(level.gametype == 0){
 		local.usekey = getboundkey1 "holster"
-		local.msg 	 = (loc_convert_string ("Press " + local.usekey + " to holster your weapon."))	
+		local.msg 	 = (loc_convert_string ("Press " + local.usekey + " to holster your weapon."))
 	}
 	//chrissstrahl - coop
 	else{
 		local.msg 	 = (loc_convert_string ("Holster your weapon."))
-	}	
+	}
 	thread global/throbtext.scr::throbtext local.msg 1000
 	wait 3
 
@@ -409,20 +417,20 @@ clausEscapeRoute:
 	self avoidplayer 0
 
 	$playerFullyDisguised waittill trigger
-	
+
 	/* moved down
 	//chrissstrahl - coop wait for a player if the map was loaded via token
 	if(level.gametype != 0){
 		if(level.warpTo != "finalEscape"){
 			//take all weapons
 			thread coop_mod/replace.scr::takeAll
-		
+
 			//force papers to inventory
 			level.coop_forcePrimary = "models/items/papers.tik"
 			level.coop_forceInventory = "models/items/papers.tik"
 			level.coop_forceSecondary = "models/items/papers.tik"
 			waitframe
-			
+
 			//give papers to all players
 			thread coop_mod/replace.scr::item "models/items/papers.tik" 0
 		}
@@ -430,13 +438,13 @@ clausEscapeRoute:
 		thread coop_mod/replace.scr::threatbias ignoreme
 	}
 	*/
-	
+
 	//chrissstrahl - development time saver
 	if(level.coop_skipThisKlausGino == NIL){
 		self anim A_13_ClausTalk13	// from now on you are Gino
 		self waittill animdone
 	}
-	trigger $clausFullyDisguised 
+	trigger $clausFullyDisguised
 
 	self.has_disguise = 1
 	self threatbias ignoreme
@@ -455,14 +463,14 @@ clausEscapeRoute:
     // This is causing a console error and there are no references
     // to this trigger anywhere in the scripts!?
 	$playerHolsterTrigger waittill trigger
-	
+
 	//chrissstrahl - development time saver
 	if(level.coop_skipThisKlausGino == NIL){
 		self say A_13_ClausTalk14	// you should holster your weapon
 		self thread holsterText
 		self waittill saydone
 	}
-	
+
 	local.gotoNode = $escapeTruckArriveNode
 	self turnto NULL
 	self lookat NULL
@@ -474,9 +482,9 @@ clausEscapeRoute:
 
 	$escapeTruckGuysTalk waittill trigger
 	self turnto $escapeTruckSoldier_1
-	
+
 	//$playerProducedPapers waittill trigge //chrissstrahl - wtf?
-	$playerProducedPapers waittill trigger //chrissstrahl	
+	$playerProducedPapers waittill trigger //chrissstrahl
 
 	self lookat $escapeTruckSoldier_1
 	$Truck1GuyDone waittill trigger
@@ -501,7 +509,7 @@ clausEscapeRoute:
 	self.origin = $getawayTruck gettagposition driver_enter
 	self.angles = $getawayTruck.angles
 	self anim_noclip A_13_driver_getin_opel
-	
+
 	thread truckDoor
 	wait 5.4
 
@@ -544,7 +552,7 @@ driveAway:
 {
 	$playerProducedPapers waittill trigger
 	waitthread playerPressE
-	
+
 	spawn script_object targetname "toGlue"
 	$toGlue attach $getawayTruck passenger 0 ( 0 0 -40 )
 	waitframe //chrissstrahl
@@ -556,7 +564,7 @@ driveAway:
 		$player notsolid
 		$player glue $toGlue
 		$player.angles = $getawayTruck.angles
-		$player.viewangles = $getawayTruck.angles	
+		$player.viewangles = $getawayTruck.angles
 	}else{
 		exec coop_mod/replace.scr::glue $toGlue 60
 	}
@@ -593,7 +601,7 @@ driveAway:
 	$Claus waittill saydone
 
 	$Claus thread global/loopanim.scr::LoopAnim A_13_driver_drive
-	$getawayTruck modifydrive 100 200 200 
+	$getawayTruck modifydrive 100 200 200
 
 	//$getawayTruck drive $getawayTruckPath 100 200 200 200
 	//	$Claus say A_13_ClausTalk17	// We're going to have a hell of a time
@@ -602,7 +610,7 @@ driveAway:
 	$Claus say A_13_ClausTalk17	// We're going to have a hell of a time
 	$Claus waittill saydone
 	wait 3
-	
+
 	//chrissstrahl - handle for coop
 	if(level.gametype != 0){
 		exec global/missioncomplete.scr level.coopNextMap 1
@@ -619,7 +627,7 @@ getUniform:
 		while (level.clausToldAboutUniform == 0) {
 			$uniformUseTrigger waittill trigger
 		}
-		
+
 		//chrissstrahl - keep sp
 		if(level.gametype == 0){
 			$player playsound pickup_papers
@@ -644,42 +652,42 @@ getUniform:
 			level.playerHasUniform = 1
 			exec coop_mod/replace.scr::playsound clothes_on
 		}
-		trigger $playerChangingClothes 
+		trigger $playerChangingClothes
 	}
 	else{
 		//wait 1
 		//$player holster
-		trigger $playerChangingClothes 
+		trigger $playerChangingClothes
 	}
-	
+
 	//chrissstrahl - we don't keep stuff thatis no longer of use
 	$claus_uniform remove
-	
+
 	//chrissstrahl - keep for sp
 	if(level.gametype == 0){
 		$player physics_off
 		$player.origin 		= $playerChangedPosition.origin
 		$player.angles 		= ( 0 -120 0 )
-		$player.viewangles 	= ( 0 -120 0 )	
-		
+		$player.viewangles 	= ( 0 -120 0 )
+
 		$player takeall
 		$player item weapons/silencedpistol.tik
 		$player item weapons/M2Frag_Grenade_sp.tik
 		$player ammo pistol 16
 		$player ammo agrenade 4
-		$player use "Hi-Standard Silenced"		
+		$player use "Hi-Standard Silenced"
 	}
 	//chrissstrahl - coop handle
 	else{
 		//take all weapons
 		thread coop_mod/replace.scr::takeAll
-	
+
 		//force papers to inventory
 		level.coop_forcePrimary = "models/items/papers.tik"
 		level.coop_forceInventory = "models/items/papers.tik"
 		level.coop_forceSecondary = "models/items/papers.tik"
 		waitframe
-			
+
 		//give papers to all players
 		thread coop_mod/replace.scr::item "models/items/papers.tik" 0
 		//chrissstrahl - make ai ignore players, i think this is the only way for stealth
@@ -689,7 +697,7 @@ getUniform:
 	wait 1
 
 	trigger $playerFullyDisguised
-	
+
 	//chrissstrahl - keep for sp
 	if(level.gametype == 0){
 		$player.has_disguise = 1
@@ -698,18 +706,18 @@ getUniform:
 	else{
 		level.playerHasDisguise = 1
 	}
-	
+
 	wait 1
 
 	fadein 1 0 0 0 1
 	waitthread global/items.scr::add_item "papers_level1" noMessage
 	$clausFullyDisguised waittill trigger
-	
+
 	//chrissstrahl - keep for sp
 	if(level.gametype == 0){
 		$player physics_on
 	}
-	
+
 	$PlayerClipB remove
 }end
 
@@ -794,7 +802,7 @@ truckGuard1:
 
 	self sound_awareness 100
 	$escapeTruckGuysTalk waittill trigger
-	
+
 	//chrissstrahl - development time saver
 	if(level.coop_skipThisKlausGino == NIL){
 		// lookat Claus, he'll show us some papers
@@ -807,28 +815,28 @@ truckGuard1:
 		$Claus say A_13_ClausTalk15	// I'm taking Gino for transport
 		$Claus waittill saydone
 	}
-	
+
 	trigger $askPlayerForPapers
-	
+
 	self exec coop_mod/replace.scr::lookat //chrissstrahl
 	thread doClausLook
-	
+
 	$playerProducedPapers waittill trigger
 	wait 1
 	self lookat $Claus
-	
+
 	//[200] chrissstrahl - have actor turn so that he is pointing on the right truck
-	//apperently this confuses players, they run to the pointed truck rather than the 
+	//apperently this confuses players, they run to the pointed truck rather than the
 	//truck claus enters, this then fails the mission
 	if(level.gametype != 0){
 		self angles ( 0 -140 0 )
 		waitframe
 	}
-	
+
 	self say A_13_germdial2			// take this truck...
 	self waittill saydone
 	trigger $Truck1GuyDone
-	
+
 	// step out of the way, look at the truck
 	self lookat NULL
 	self turnto NULL
@@ -851,7 +859,7 @@ papersaccepted:
 //=========================================================================
 {
 	//iprintlnbold "papers accepted"
-	trigger $playerProducedPapers 
+	trigger $playerProducedPapers
 	level.playerProducedPapers = 1
 	//chrissstrahl - do this only in mp
 	if(level.gametype != 0){
@@ -898,11 +906,11 @@ truckGuard2:
 	self type_attack alarm
 	self type_disguise sentry
 	self disguise_accept_thread papersaccepted
-	
+
 	//chrissstrahl - handle in coop
 	if(level.gametype != 0){
 		self waitthread coop_mod/replace.scr::actorWaitForPapers 128  "papersaccepted" "maps/e1l3/FinalEscape.scr"
-		
+
 		/*
 		//attention
 		self lookat self.enemy
@@ -910,29 +918,29 @@ truckGuard2:
 		self setmotionanim (self.weapongroup + "_stand_alert_legs")
 		self setupperanim ("den_actor_alert_" + self.voicetype)
 		self waittill upperanimdone
-		
+
 		//wait for a player to be close
 		//waitthread coop_mod/replace.scr::waitWithinDistance self.origin 200
-		
+
 
 		//ask for papers
-		
+
 		self lookat self.enemy
 		self setmotionanim A_13_germdial4
 		self waittill flaggedanimdone
 		self lookat self.enemy
-		
+
 		//wait until a player is close to the soldier we need to show papers
 		waitthread coop_mod/replace.scr::waitForPapers self 128 NIL NIL
-		
+
 		thread playidleanim
 		self setupperanim ("den_actor_appease_" + self.voicetype)
 		self waittill upperanimdone
 		self lookat NULL
-		
+
 		self thread papersaccepted*/
 	}else{
-		
+
 		$playerProducedPapers waittill trigger
 	}
 	wait 3
@@ -979,7 +987,7 @@ CourtyardWatcher:
 	$escapeTruckSoldier_2	thread veryHealthy
 	$bigGerman				thread veryHealthy
 
-	$cyTalker_2.enableEnemy = 1    
+	$cyTalker_2.enableEnemy = 1
 	$cyTalker_2 sight 	2048
 	$cyTalker_2 hearing 2048
 	$cyTalker_2 exec coop_mod/replace.scr::turnto //chrissstrahl
@@ -998,11 +1006,11 @@ pressEToShow:
 //=========================================================================
 {
 	//chrissstrahl - this seams not to be used
-	
+
 	// wait for the player to show papers
 	local.disguise_range = 300
 	local.textUp = 0
-	
+
 	//chrissstrahl - keep sp
 	if(level.gametype == 0){
 		local.key 	 = getboundkey1 "toggleitem"
@@ -1012,7 +1020,7 @@ pressEToShow:
 		local.player = waitthread coop_mod/replace.scr::player_closestTo self NIL
 		local.msg 	 = ("Show your papers.")
 	}
-	
+
 
 	while (level.playerProducedPapers == 0){
 		//chrissstrahl - keep for sp
@@ -1030,7 +1038,7 @@ pressEToShow:
 					waitthread global/throbtext.scr::throbtext_off
 					local.textUp = 0
 				}
-			}		
+			}
 		}
 		//chrissstrahl - coop
 		if (vector_within local.player.origin self.origin local.disguise_range){
@@ -1055,7 +1063,7 @@ scalePlayerHealth:
 {
 	//chrissstrahl - don't do this in coop
 	if(level.gametype != 0){ end }
-	
+
 	//iprintlnbold "before h=" $player.health " mh=" $player.max_health
 	local.h = ($player.health/$player.max_health)
 	$player healthonly local.h
@@ -1071,19 +1079,19 @@ playerPressE:
 	local.truckOrigin = $getawayTruckTrigger.origin
 	while (1){
 		//if (vector_within $player.origin $getawayTruckTrigger.origin 200){
-		
+
 		local.player = NULL
 		while(local.player == NULL){
 			local.player = waitthread coop_mod/replace.scr::player_closestTo NIL local.truckOrigin
 			waitframe
 		}
-		
+
 		if (vector_within local.player.origin local.truckOrigin 200){
 			if (local.throb_text_on == 0){
 				//chrissstrahl - keep for sp
 				if(level.gametype == 0){
 					local.usekey = getboundkey1 "+use"
-					local.msg 	 = (loc_convert_string ("Press " + local.usekey + " to get in the truck."))				
+					local.msg 	 = (loc_convert_string ("Press " + local.usekey + " to get in the truck."))
 				}else{
 					local.msg 	 = ("Press use to get in the truck.")
 				}
@@ -1100,14 +1108,14 @@ playerPressE:
 				}
 			}
 			//chrissstrahl - coop - check if a player in range is pressing use
-			else{		
+			else{
 				for (local.i = 1;local.i <= $player.size;local.i++){
 					local.player =  $player[local.i]
 					if( local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 && vector_within local.player.origin local.truckOrigin 200 ){
 						if ( local.player.useheld ){
 							thread global/throbtext.scr::throbtext_off
 							local.throb_text_on = 0
-							end					
+							end
 						}
 					}
 				}
