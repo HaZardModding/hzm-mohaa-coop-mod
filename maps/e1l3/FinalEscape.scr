@@ -650,7 +650,7 @@ getUniform:
 		}
 		else{
 			level.playerHasUniform = 1
-			exec coop_mod/replace.scr::playsound clothes_on
+			exec coop_mod/replace.scr::playsound clothes_on			
 		}
 		trigger $playerChangingClothes
 	}
@@ -681,29 +681,36 @@ getUniform:
 	else{
 		//take all weapons
 		thread coop_mod/replace.scr::takeAll
+				
+		//[200] Smithy - give them the weapons
+		waitframe
+		thread coop_mod/replace.scr::givePlayerWeapon "weapons/silencedpistol.tik" NIL "all" 0.5 //[200] Smithy - give current and future players the pistol and use it
+		thread coop_mod/replace.scr::ammo "pistol" 16
 
 		//force papers to inventory
-		level.coop_forcePrimary = "models/items/papers.tik"
-		level.coop_forceInventory = "models/items/papers.tik"
-		level.coop_forceSecondary = "models/items/papers.tik"
-		waitframe
+		//level.coop_forcePrimary = "models/items/papers.tik" //[200] Smithy - not needed now
+		//level.coop_forceInventory = "models/items/papers.tik"
+		//level.coop_forceSecondary = "models/items/papers.tik"
+		//waitframe
 
 		//give papers to all players
 		thread coop_mod/replace.scr::item "models/items/papers.tik" 0
+				
 		//chrissstrahl - make ai ignore players, i think this is the only way for stealth
 		//thread coop_mod/replace.scr::notarget 1
-		thread coop_mod/replace.scr::threatbias ignoreme
+		//thread coop_mod/replace.scr::threatbias ignoreme //[200] Smithy - not needed now
 	}
 	wait 1
-
-	trigger $playerFullyDisguised
-
+	
+	if ($playerFullyDisguised){ trigger $playerFullyDisguised } //[200] Smithy
+	
 	//chrissstrahl - keep for sp
 	if(level.gametype == 0){
 		$player.has_disguise = 1
 	}
 	//chrissstrahl - no idea if we even use the var
 	else{
+		waitthread global/items.scr::add_item "uniform" //[200] Smithy - call the disguise code
 		level.playerHasDisguise = 1
 	}
 
@@ -908,8 +915,9 @@ truckGuard2:
 	self disguise_accept_thread papersaccepted
 
 	//chrissstrahl - handle in coop
-	if(level.gametype != 0){
-		self waitthread coop_mod/replace.scr::actorWaitForPapers 128  "papersaccepted" "maps/e1l3/FinalEscape.scr"
+	//if(level.gametype != 0){ //[200] Smithy
+		//[200] Smithy - it kills me to comment this out as A LOT of work went into this (sorry Chris), but it's not needed anymore as we use normal disguise code now
+		//self waitthread coop_mod/replace.scr::actorWaitForPapers 128  "papersaccepted" "maps/e1l3/FinalEscape.scr" 
 
 		/*
 		//attention
@@ -939,10 +947,10 @@ truckGuard2:
 		self lookat NULL
 
 		self thread papersaccepted*/
-	}else{
+	//}else{
 
-		$playerProducedPapers waittill trigger
-	}
+		$playerProducedPapers waittill trigger //[200] Smithy - we use this whether in mp or sp, as disguise_accept_thread will trigger now we use normal disguise behaviour 
+	//}
 	wait 3
 
 	self.leash = 0
