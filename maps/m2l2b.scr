@@ -333,11 +333,14 @@ blowhshtuffup:
 		$subback remove
 //		$bridge notsolid
 //		$bridge hide
-		$bridgekill volumedamage 2000
+		$bridgekill volumedamage 2000						
 		$bridgebroken show
 		$bridgebroken solid
 		$bridgebroken thread breakbridge
 		thread subkill
+		
+		thread coop_resetPlayerSpawnsIfDead //[200] Smithy - reset spawns if players are dead at this point, stop players respawning in water/boat
+		
 		$bridgeclip solid
      	exec global/earthquake.scr .5 1 0 0
      	$waterplode1 anim start
@@ -363,8 +366,21 @@ blowhshtuffup:
 		//was off to prevent players from respawning on the blowing boat
 		wait 3
 		level.coop_disableSpawnWarper = false
+		
+
 	}
 end
+
+//[200] Smithy - reset player spawns if you die on boat
+coop_resetPlayerSpawnsIfDead:{
+	waitframe
+	for (local.i = 1; local.i <= $player.size; local.i++){
+		local.player =  $player[local.i]						
+		if(!isAlive local.player || local.player.isSpectator){
+			thread coop_mod/main.scr::resetSpawn local.player 	//[200] Smithy - reset their spawns if they died on boat
+		}
+	}
+}end
 
 subkill:
 	while(1)
