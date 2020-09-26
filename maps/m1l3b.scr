@@ -535,9 +535,12 @@ PLAYER_JEEP_Drive local.trigger:
 
 stuka_loop:
 
-	println "z:      $next_path_check2 waittill trigger "  
-$next_path_check2 waittill trigger 
-	println "z:      $next_path_check2 triggered "  
+	//[200] Smithy - are triggers really necessary when it does a waitill drive anyway?	
+	if (!level.gametype){
+		println "z:      $next_path_check2 waittill trigger "  
+		$next_path_check2 waittill trigger 
+		println "z:      $next_path_check2 triggered "  
+	}
 	
 	println "z:   stukas intact: " level.aircraft_intact
 	if (level.aircraft_intact == 0)
@@ -561,10 +564,13 @@ $next_path_check2 waittill trigger
 	self waitTill drive
 	//now it is switching to path4 or path4alt
 
-	println "z:      $next_path_check1 waittill trigger "  
-$next_path_check1 waittill trigger 
-	println "z:      $next_path_check1 triggered "  
-
+	//[200] Smithy - are triggers really necessary when it does a waitill drive anyway?	
+	if (!level.gametype){
+		println "z:      $next_path_check1 waittill trigger "  
+		$next_path_check1 waittill trigger 
+		println "z:      $next_path_check1 triggered "  
+	}
+	
 	println "z:   stukas intact: " level.aircraft_intact
 	if (level.aircraft_intact == 0)
 	{
@@ -977,9 +983,15 @@ end
 coop_setup:{
 //=========================================================================
 	//chrissstrahl - spawn trigger to run a thread each time a player spawns to manager player upon spawn
+	/*
 	spawn trigger_multiple setthread "coop_playerSpawned" targetname "coop_playerSpawn" origin (106 -4466 32)
 	waitframe
 	$coop_playerSpawn setsize ( -50 -50 -100) (50 50 100)
+	*/
+	while (1){ //[200] Smithy - use waittill event instead
+		level waittill playerspawn
+		thread coop_playerSpawned
+	}
 }end
 
 //=========================================================================
@@ -1009,15 +1021,19 @@ coop_playerSpawned:{
 	$playerjeep notsolid
 	$oss_man notsolid
 	//$t209 remove
-
+	
+	if (parm.other == $player[1]){ //[200] Smithy - easier way
+		$player[1].flags["coop_inJeep"] = game.false 
+	}
+	
 	for(local.i=1;local.i <= $player.size;local.i++){
 		local.player = $player[local.i]
-		if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 ){
-			if(local.player isTouching $coop_playerSpawn){
+		if(isAlive local.player && local.player.dmteam != "spectator"){
+			//if(local.player isTouching $coop_playerSpawn){
 				if(local.i == 1){
 					level.coop_inJeep = 1
-					if(local.player.flags["coop_inJeep"] == NIL){
-						local.player.flags["coop_inJeep"] = 1
+					if(!local.player.flags["coop_inJeep"]){
+						local.player.flags["coop_inJeep"] = game.true
 
 						local.player notsolid
 						
@@ -1027,14 +1043,14 @@ coop_playerSpawned:{
 						local.player perferredweapon ".30cal Machine Gun"
 						local.vturretent lock
 						
-						local.player thread coop_monitorPlayer1
+						//local.player thread coop_monitorPlayer1 //[200] Smithy - redundant
 					}
 				}
 				else{
 					//chrissstrahl - they don't need to be monitored, the coop mod does unglue on death
 					//local.player physics_off						//chrissstrahl - this will not work if player shall keep his weapon
 					local.player notsolid							//chrissstrahl - prevent players from stopping bullets of others
-					local.attach = $("playerAttach"+local.i)
+					local.attach = $("playerAttach" + local.i)
 					
 					local.player origin local.attach.origin			//chrissstrahl - this might reduce the shaking
 					//local.player velocity local.attach.velocity		//chrissstrahl - this might reduce the shaking //[200] Smithy
@@ -1042,7 +1058,7 @@ coop_playerSpawned:{
 					local.player forcelegsstate CROUCH_IDLE
 					local.player glue local.attach
 				}
-			}
+			//}
 		}
 	}
 }end
@@ -1051,6 +1067,7 @@ coop_playerSpawned:{
 //=========================================================================
 coop_monitorPlayer1:{
 //=========================================================================
+/* //[200] Smithy - redundant
 	while(self != NULL){
 		if(self.health <= 0 && self.flags["coop_inJeep"] != NIL){
 			self.flags["coop_inJeep"] = NIL
@@ -1058,6 +1075,7 @@ coop_monitorPlayer1:{
 		}
 		waitframe
 	}
+*/
 }end
 
 
