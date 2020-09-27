@@ -458,6 +458,9 @@ coop_setup:{
 	}
 	*/
 	
+	thread coop_fixTriggers //[200] Smithy
+	
+	
 	//chrissstrahl - spawn trigger to run a thread each time a player spawns to manager player upon spawn
 	/*
 	spawn trigger_multiple setthread "coop_playerSpawned" targetname "coop_playerSpawn" origin (3352 -6176 -88)
@@ -467,7 +470,46 @@ coop_setup:{
 	while (1){ //[200] Smithy - use waittill event instead
 		level waittill playerspawn				
 		thread coop_playerSpawned
+	}s
+}end
+
+//[200] Smithy - make sure triggers can be enabled by an empty (just Grillo) jeep. 
+// this prevents spawns and events from being missed when all players are dead.
+//=========================================================================
+coop_fixTriggers:{
+//=========================================================================
+	local.maxEnts = int(getcvar "maxentities") - 1	
+	level.coop_m1Triggers[1] = NIL
+
+	for (local.i = 0; local.i <= local.maxEnts; local.i++){
+		local.ent = getentbyentnum local.i
+		if (!local.ent){ continue }
+		if (local.ent.classname == "Trigger" || local.ent.classname == "TriggerOnce"){	
+			level.coop_m1Triggers[level.coop_m1Triggers.size + 1] = local.ent
+		}
 	}
+	
+	thread coop_enableJeepActivation			
+}end
+
+//[200] Smithy
+//All triggers in the path of the jeep will now be activated by the jeep itself
+//=========================================================================
+coop_enableJeepActivation:{
+//=========================================================================
+	while (1){
+		for (local.i = 1; local.i <= level.coop_m1Triggers.size; local.i++){
+			local.trigger = level.coop_m1Triggers[local.i]
+			if (!local.trigger){ continue }
+			if (local.trigger.activatedByJeep){ continue }
+			
+			if (level.playerjeep isTouching local.trigger){
+				local.trigger.activatedByJeep = game.true
+				trigger local.trigger
+			}
+		}
+		wait .35			
+	}						
 }end
 
 //=========================================================================
@@ -482,7 +524,7 @@ coop_setupAttach:{
 		else if(local.i==5){ local.offset = ( (local.distance + -40) -10 -50) }
 		else if(local.i==6){ local.offset = ( (local.distance + -40) 30 -50) }
 		else if(local.i==7){ local.offset = ( (local.distance + -40) 70 -50) }
-		else{ local.offset = ( (distance + -80) 30 -50) }
+		else{ local.offset = ( (local.distance + -80) 30 -50) }
 	
 		local.ent = spawn script_model "model" "models/fx/dummy.tik" targetname ("playerAttach"+local.i) notsolid 1
 		waitframe
@@ -504,7 +546,7 @@ coop_playerSpawned:{
 
 	for(local.i=1;local.i <= $player.size;local.i++){
 		local.player = $player[local.i]
-		if(isAlive local.player && local.player.dmteam != "spectator"){
+		if(isAlive local.player && !local.player.isSpectator){
 			//if(local.player isTouching $coop_playerSpawn){
 				if(local.i == 1){
 					level.coop_inJeep = 1
