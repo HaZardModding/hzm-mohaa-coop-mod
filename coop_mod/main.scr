@@ -199,7 +199,7 @@ coop_checkMaps:{
 	}
 }end
 
-//[200] chrissstrahl - this outospawns the hosting player
+//[200] chrissstrahl - this autospawns the hosting player
 //this is meant to be used for debugging/testing all maps
 //=========================================================================
 autoSpawnHost:{
@@ -724,6 +724,17 @@ forceValidTeam:{
 //=========================================================================
 skipTeamAndWeaponSelect local.player:{
 //=========================================================================
+	//[201] Tiredsstrahl - Fix player being spawned in LMS when he shouldn't
+	//EXIT on NIL
+	//EXIT on NULL
+	//EXIT if player is flagged as totally dead in LMS
+	//if(local.player == NIL || local.player == NULL || thread lmsGetRemainingLifes local.player < 1){
+	if(local.player == NIL || local.player == NULL || local.player.flags["coop_lmsForcedInSpectator"] = 1){
+		wait game.ms
+		end
+	}
+	//END [201]
+
 	//[200] Smithy - put here to stop spam that prevents players typing/using menu
 	local.switchDelay = getcvar "g_teamswitchdelay"  //[200] Smithy - stop switch delay intefering 
 	setcvar "g_teamswitchdelay" "0"	
@@ -736,7 +747,12 @@ skipTeamAndWeaponSelect local.player:{
 	local.player stufftext "popmenu 0"		//close the weapons menu
 	local.player stopfire "dual" 			//stop weapon fire bug when clicking several times
 	wait game.ms
-	local.player stopfire "dual"
+	
+	//[201] Tiredsstrahl - Make sure player did not disconnect
+	if(local.player != NULL){
+		local.player stopfire "dual"
+	}
+	//END [201]
 }end
 
 //[200] Smithy - own func for giving player their health
