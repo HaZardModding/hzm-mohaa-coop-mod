@@ -18,7 +18,7 @@ Stable: coop.hazardmodding.com:12204
 Development: coop.hazardmodding.com:12203
  
 # Discord
-[![Discord Banner 1](https://discordapp.com/api/guilds/509441602222030848/widget.png?style=banner2)](https://discord.gg/mbU5qAa)
+[![Discord Banner 1](https://discordapp.com/api/guilds/509441602222030848/widget.png?style=banner2)](https://discord.gg/jse9daX)
 
 # Links
 Stable prepacked download: https://www.moddb.com/mods/hazardmodding-mohaa
