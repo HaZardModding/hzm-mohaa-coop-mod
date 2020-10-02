@@ -275,7 +275,7 @@ over_the_wall_spawn local.spawn_point:
 
 	local.guy = spawn human/german_afrika_private.tik
 	local.guy.origin = ((local.spawn_point.origin) + (0 0 -16))
-	local.guy.angles = ((local.spawn_point.angles) + (0 -90 0))
+	local.guy.angles = ((local.spawn_point.angles) + (0 0 0)) //(0 -90 0)) [200] Smithy - fix wall climbers
 		
 	local.guy noticescale 1
 	local.guy mindist 0
@@ -458,10 +458,58 @@ coop_setup:{
 	}
 	*/
 	
+	thread coop_fixTriggers //[200] Smithy
+	
+	
 	//chrissstrahl - spawn trigger to run a thread each time a player spawns to manager player upon spawn
+	/*
 	spawn trigger_multiple setthread "coop_playerSpawned" targetname "coop_playerSpawn" origin (3352 -6176 -88)
 	waitframe
 	$coop_playerSpawn setsize ( -500 -500 -1000) (500 500 1000)
+	*/
+	while (1){ //[200] Smithy - use waittill event instead
+		level waittill playerspawn				
+		thread coop_playerSpawned
+	}
+}end
+
+//[200] Smithy - make sure triggers can be enabled by an empty (just Grillo) jeep. 
+// this prevents spawns and events from being missed when all players are dead.
+//=========================================================================
+coop_fixTriggers:{
+//=========================================================================
+	local.maxEnts = int(getcvar "maxentities") - 1	
+	level.coop_m1Triggers[1] = NIL
+
+	for (local.i = 0; local.i <= local.maxEnts; local.i++){
+		local.ent = getentbyentnum local.i
+		if (!local.ent){ continue }
+		if (local.ent.classname == "Trigger" || local.ent.classname == "TriggerOnce"){	
+			level.coop_m1Triggers[level.coop_m1Triggers.size + 1] = local.ent
+		}
+	}
+	
+	thread coop_enableJeepActivation			
+}end
+
+//[200] Smithy
+//All triggers in the path of the jeep will now be activated by the jeep itself
+//=========================================================================
+coop_enableJeepActivation:{
+//=========================================================================
+	while (1){
+		for (local.i = 1; local.i <= level.coop_m1Triggers.size; local.i++){
+			local.trigger = level.coop_m1Triggers[local.i]
+			if (!local.trigger){ continue }
+			if (local.trigger.activatedByJeep){ continue }
+			
+			if (level.playerjeep isTouching local.trigger){
+				local.trigger.activatedByJeep = game.true
+				trigger local.trigger
+			}
+		}
+		wait .35			
+	}						
 }end
 
 //=========================================================================
@@ -476,7 +524,7 @@ coop_setupAttach:{
 		else if(local.i==5){ local.offset = ( (local.distance + -40) -10 -50) }
 		else if(local.i==6){ local.offset = ( (local.distance + -40) 30 -50) }
 		else if(local.i==7){ local.offset = ( (local.distance + -40) 70 -50) }
-		else{ local.offset = ( (distance + -80) 30 -50) }
+		else{ local.offset = ( (local.distance + -80) 30 -50) }
 	
 		local.ent = spawn script_model "model" "models/fx/dummy.tik" targetname ("playerAttach"+local.i) notsolid 1
 		waitframe
@@ -491,15 +539,19 @@ coop_playerSpawned:{
 	$s1_jeep1 notsolid
 	$oss_man notsolid
 	//$t209 remove
+	
+	if (parm.other == $player[1]){ //[200] Smithy - easier way
+		$player[1].flags["coop_inJeep"] = game.false 
+	}
 
 	for(local.i=1;local.i <= $player.size;local.i++){
 		local.player = $player[local.i]
-		if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 ){
-			if(local.player isTouching $coop_playerSpawn){
+		if(isAlive local.player && !local.player.isSpectator){
+			//if(local.player isTouching $coop_playerSpawn){
 				if(local.i == 1){
 					level.coop_inJeep = 1
-					if(local.player.flags["coop_inJeep"] == NIL){
-						local.player.flags["coop_inJeep"] = 1
+					if(!local.player.flags["coop_inJeep"]){
+						local.player.flags["coop_inJeep"] = game.true
 
 						local.player notsolid
 						
@@ -509,21 +561,22 @@ coop_playerSpawned:{
 						local.player perferredweapon ".30cal Machine Gun"
 						local.vturretent lock
 						
-						local.player thread coop_monitorPlayer1
+						//local.player thread coop_monitorPlayer1 //[200] Smithy - redundant
 					}
 				}
 				else{
 					//chrissstrahl - they don't need to be monitored, the coop mod does unglue on death
 					//local.player physics_off						//chrissstrahl - this will not work if player shall keep his weapon
 					local.player notsolid							//chrissstrahl - prevent players from stopping bullets of others
-					local.attach = $("playerAttach"+local.i)
+					local.attach = $("playerAttach" + local.i)
 					
 					local.player origin local.attach.origin			//chrissstrahl - this might reduce the shaking
-					local.player velocity local.attach.velocity	//chrissstrahl - this might reduce the shaking
-					//local.player forcelegsstate CROUCH_IDLE //chrissstrahl - does not work anyway
+					//local.player velocity local.attach.velocity	//chrissstrahl - this might reduce the shaking
+					local.player.velocity = local.attach.velocity 		//[200] Smithy - sometimes funcs can only be called as properties
+					local.player forcelegsstate CROUCH_IDLE //chrissstrahl - does not work anyway
 					local.player glue local.attach
 				}
-			}
+			//}
 		}
 	}
 }end
@@ -532,6 +585,7 @@ coop_playerSpawned:{
 //=========================================================================
 coop_monitorPlayer1:{
 //=========================================================================
+/* //[200] Smithy - redundant
 	while(self != NULL){
 		if(self.health <= 0 && self.flags["coop_inJeep"] != NIL){
 			self.flags["coop_inJeep"] = NIL
@@ -539,6 +593,7 @@ coop_monitorPlayer1:{
 		}
 		waitframe
 	}
+*/
 }end
 
 //chrissstrahl - gives ammo to the other players
