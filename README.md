@@ -12,7 +12,9 @@ This particular modification is developed on and meant to be run with [Medal of 
 
 # Our servers
 You can connect our servers by pressing ~ key and typing *connect server_of_choice*.
+
 Stable: coop.hazardmodding.com:12204
+
 Development: coop.hazardmodding.com:12203
  
 # Discord
