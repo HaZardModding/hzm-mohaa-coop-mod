@@ -16,4 +16,4 @@ Stable: coop.hazardmodding.com:12204
 Development: coop.hazardmodding.com:12203
  
 # Discord
-https://discord.gg/jse9daX
+![Discord](https://discord.gg/jse9daX)
