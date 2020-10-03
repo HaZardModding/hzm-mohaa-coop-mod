@@ -33,7 +33,7 @@ main:{
 	level.coop_gametypeHackOn			= 0			//[200] chrissstrahl - used to keep track when some script commands are executed that require the gametype to be set to Singleplayer
 	level.coop_gameStartedAt			= NIL		//[200] chrissstrahl - used to keep track when the first player was actually active
 	level.coop_lmsAllowJoin				= 1			//[200] chrissstrahl - allow players who just enter the game to join in in lms (once any player leaves server this will be 0)
-	level.coop_lmsLifes					= 0			//[200] chrissstrahl - number of lifes players have in LMS
+	level.coop_lmsLives					= 0			//[201] chrissstrahl - fixed typo //[200] chrissstrahl - number of lives players have in LMS
 	level.coop_musicCommandVol			= NIL
 	level.coop_musicCommand				= NIL
 
@@ -199,7 +199,7 @@ coop_checkMaps:{
 	}
 }end
 
-//[200] chrissstrahl - this outospawns the hosting player
+//[200] chrissstrahl - this autospawns the hosting player
 //this is meant to be used for debugging/testing all maps
 //=========================================================================
 autoSpawnHost:{
@@ -446,10 +446,10 @@ managePlayers:{
 			if(	local.player.flags["coop_isActive"] == NIL){
 //[200] chrissstrahl - LMS if not allowed to join, add deaths
 				if( level.coop_lmsAllowJoin != 1){
-					local.lmsLifes = level.coop_lmsLifes
+					local.lmsLives = level.coop_lmsLives //[201] chrissstrahl - fixed typo
 					//add only deaths if lms is actually active
-					if(local.lmsLifes > 0){
-						local.player.flags["coop_deaths"] = local.lmsLifes
+					if(local.lmsLives > 0){
+						local.player.flags["coop_deaths"] = local.lmsLives
 					}
 				}
 
@@ -605,17 +605,17 @@ managePlayers:{
 					local.player.flags["coop_iAmTruelyActive"] = 0
 					if(	local.player.flags["coop_isActive"] != -2 ){
 //[200] CHRISSTRAHL /// LMS /// ///////////// check if player should be spectator in LMS
-						if( level.coop_lmsLifes > 0 ){
+						if( level.coop_lmsLives > 0 ){ //[201] chrissstrahl - fixed typo
 							//handle death count
 							local.deaths = local.player.flags["coop_deaths"]
 							local.deaths++
 							local.player.flags["coop_deaths"] = local.deaths
 							
 							//print info to player hud
-							local.deaths = (level.coop_lmsLifes - local.deaths)
+							local.deaths = (level.coop_lmsLives - local.deaths)
 							if(local.deaths < 0){local.deaths=0}
 							
-							local.deaths = ( "You have [ " + local.deaths + " ] lifes left - LastManStanding is active!" )
+							local.deaths = ( "You have [ " + local.deaths + " ] lives left - LastManStanding is active!" ) //[201] chrissstrahl - fixed typo
 							local.player iprint local.deaths 0
 						}
 						
@@ -651,12 +651,12 @@ managePlayers:{
 		}
 
 		//[200] chrissstrahl - LMS - check if condistions have changed
-		waitthread lmsCheckLifes local.prevPlayerCount local.playerCount
+		waitthread lmsCheckLives local.prevPlayerCount local.playerCount
 
 		//[200] chrissstrahl - keep track of player count
 		local.prevPlayerCount = local.playerCount
 		
-		waitframe //[200] Smithy - put back here (taken out of lmsCheckLifes)
+		waitframe //[200] Smithy - put back here (taken out of lmsCheckLives)
 	} 
 }end
 
@@ -724,6 +724,17 @@ forceValidTeam:{
 //=========================================================================
 skipTeamAndWeaponSelect local.player:{
 //=========================================================================
+	//[201] Tiredsstrahl - Fix player being spawned in LMS when he shouldn't
+	//EXIT on NIL
+	//EXIT on NULL
+	//EXIT if player is flagged as totally dead in LMS
+	//if(local.player == NIL || local.player == NULL || thread lmsGetRemainingLives local.player < 1){
+	if(local.player == NIL || local.player == NULL || local.player.flags["coop_lmsForcedInSpectator"] == 1){
+		wait game.ms
+		end
+	}
+	//END [201]
+
 	//[200] Smithy - put here to stop spam that prevents players typing/using menu
 	local.switchDelay = getcvar "g_teamswitchdelay"  //[200] Smithy - stop switch delay intefering 
 	setcvar "g_teamswitchdelay" "0"	
@@ -736,7 +747,12 @@ skipTeamAndWeaponSelect local.player:{
 	local.player stufftext "popmenu 0"		//close the weapons menu
 	local.player stopfire "dual" 			//stop weapon fire bug when clicking several times
 	wait game.ms
-	local.player stopfire "dual"
+	
+	//[201] Tiredsstrahl - Make sure player did not disconnect
+	if(local.player != NULL){
+		local.player stopfire "dual"
+	}
+	//END [201]
 }end
 
 //[200] Smithy - own func for giving player their health
@@ -1184,13 +1200,13 @@ managePlayerToFollow:{
 		//iprintlnbold_noloc ( "find player to follow" ) //chrissstrahl
 		local.grabNewPlayer = 0
 		local.tries = 0
-		waitthread fiendlyFindPlayer
+		waitthread friendlyFindPlayer //[201] chrissstrahl - fix typo
 		waitframe
 	}
 }end
 
 //=========================================================================
-fiendlyFindPlayer:{
+friendlyFindPlayer:{ //[201] chrissstrahl - fix typo
 //=========================================================================
 	//[200] chrissstrahl - make sure this works in sp as well
 	//thanks to DoubleKill for reporting this issue
@@ -1475,14 +1491,15 @@ getGlueEntity local.player:{
 	}
 }end($(level.coop_glueTo + (local.player.entnum + local.offset)))
 
+//[201] chrissstrahl - changed function name to fix typo
 //[200] Chrissstrahl - used to to check if a player should be for into spectator
 //=========================================================================
-lmsGetRemainingLifes local.player:{
+lmsGetRemainingLives local.player:{
 //=========================================================================
 	if(local.player == NULL){ end 0 }
 
 	//grab values
-	local.lifes = level.coop_lmsLifes
+	local.lmsLives = level.coop_lmsLives //[201] chrissstrahl - fixed typo
 	local.deaths = local.player.flags["coop_deaths"]
 
 	//set new value
@@ -1492,9 +1509,9 @@ lmsGetRemainingLifes local.player:{
 	}
 	
 	//check if player is out - if value is 0 we assume LMS if OFF
-	if(local.lifes > 0){
-		if(local.deaths >= local.lifes){
-			local.remaining = (local.lifes - local.deaths)
+	if(local.lmsLives > 0){
+		if(local.deaths >= local.lmsLives){
+			local.remaining = (local.lmsLives - local.deaths)
 			if(local.remaining < 0){
 				local.remaining = 0
 			}
@@ -1511,7 +1528,7 @@ lmsForceSpectatorHandle local.player:{
 
 	while(local.player != NULL){
 		//check if player should be forced in spec
-		if( thread lmsGetRemainingLifes local.player < 1 ){
+		if( thread lmsGetRemainingLives local.player < 1 ){ //[201] chrissstrahl - fixed typo
 			local.player.flags["lmsForceSpectatorHandleActive"] = 1
 
 			//check if player already is in spec, if not force
@@ -1521,6 +1538,15 @@ lmsForceSpectatorHandle local.player:{
 				}
 				local.player.flags["coop_lmsForcedInSpectator"] = 1
 				local.player spectator
+				
+				//[201] chrissstrahl - make sure to clear all flags to prevent ongoing scripts to reinstate player
+				//need probaly to sort out which ones are crucial
+				//i know this stuff is mostly set in the next frame but that is one frame to late, thias is causing strange handling
+				local.player.flags["coop_respawning"] = FALSE //prevent further handling in parent func
+				local.player.flags["coop_iAmTruelyActive"] = 0 //prevent further handling in critical funcs
+				
+				//[201] chrissstrahl - inform player that he is out
+				local.player iprint ( "You have 0 lives left - LastManStanding is active!" ) 1				
 
 				//[200] chrissstrahl - fail mission if all players are dead
 				local.numActivePlayers = 0
@@ -1532,12 +1558,16 @@ lmsForceSpectatorHandle local.player:{
 						}
 					}
 				}
+				
+				//chrissstrahl - disabled for testing
+				/*
 				if(local.numActivePlayers == 0){
 					iprintlnbold_noloc("--")
 					iprintlnbold_noloc("LMS failed all players are dead or inactive.")
 					iprintlnbold_noloc("--")
 					thread coop_mod/replace.scr::missionfailed
 				}
+				*/				
 			}
 		}
 		else{
@@ -1554,18 +1584,19 @@ lmsForceSpectatorHandle local.player:{
 	}
 }end
 
+//[201] chrissstrahl - changed function name to fix typo
 //[200] Chrissstrahl - check if LMS life count has changed
 //=========================================================================
-lmsCheckLifes local.prevPlayerCount local.playerCount:{
+lmsCheckLives local.prevPlayerCount local.playerCount:{
 //=========================================================================
 //[200] chrissstrahl - LMS - check if new players should be allowed to join
-	local.prevLifes = level.coop_lmsLifes
-	level.coop_lmsLifes = int(getcvar("coop_lmsLifes"))
-	if(level.coop_lmsLifes <= 0 ){
-		level.coop_lmsLifes = 0
+	local.prevLmsLives = level.coop_lmsLives //[201] chrissstrahl - fixed typo
+	level.coop_lmsLives = int(getcvar("coop_lmsLives")) //[201] chrissstrahl - cvar from coop_lmsLifes to coop_lmsLives
+	if(level.coop_lmsLives <= 0 ){ //[201] chrissstrahl - fixed typo
+		level.coop_lmsLives = 0
 		level.coop_lmsAllowJoin = 1
 
-		if(local.prevLifes != 0){
+		if(local.prevLmsLives != 0){
 			iprintlnbold_noloc("COOP: LMS inactive - Joining allowed")
 		}
 	}else{
@@ -1985,10 +2016,10 @@ checkScoreboard:{
 		setcvar "g_obj_axistext1" ("Health: "+level.prevCoopHealth)
 	}
 	
-	local.cvardata = int(getcvar("coop_lmsLifes"))
-	if(NIL == level.prevCoopLmsLifes || level.prevCoopLmsLifes != local.cvardata){
-		level.prevCoopLmsLifes = local.cvardata
-		setcvar "g_obj_axistext2" ("LMS-Lifes: "+level.prevCoopLmsLifes)
+	local.cvardata = int(getcvar("coop_lmsLives")) //[201] chrissstrahl - changed cvar from coop_lmsLifes to coop_lmsLives
+	if(NIL == level.prevCoopLmsLives || level.prevCoopLmsLives != local.cvardata){ //[201] chrissstrahl - fixed typo
+		level.prevCoopLmsLives = local.cvardata
+		setcvar "g_obj_axistext2" ("LMS-Lives: "+level.prevCoopLmsLives)
 	}
 }end
 
