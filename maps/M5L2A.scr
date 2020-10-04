@@ -136,6 +136,7 @@ main:{
 	$coop_fixClip0 origin ( 1543 -477 170 )
 	$coop_fixClip0 setsize ( -200 -200 -100 ) ( 200 200 0 )
 	$coop_fixClip0 solid
+	
 }end
 
 //============================================================================
@@ -197,6 +198,8 @@ s3:{
 //============================================================================
 	//called by the BSP
 	//halftrak drives away
+	waitthread coop_validateActivator "s3" //[201] Smithy - validate that it is the tank activating this trigger		
+	
 	$s3_halftrak thread drive_path $s3_halftrakpath level.halftrakspeed remove
 }end
 
@@ -205,6 +208,8 @@ s5:{
 //============================================================================
 	//called by the BSP
 	//first enemy tank comes around the corner and attacks
+	waitthread coop_validateActivator "s5" //[201] Smithy - validate that it is the tank activating this trigger	
+	
 	$s5_tank thread drive_path $s5_tankpath level.enemytankspeed
 }end
 
@@ -213,6 +218,8 @@ s10:{
 //============================================================================
 	//called by the BSP
 	//two enemy tanks come around by the exit and attack
+	waitthread coop_validateActivator "s10" //[201] Smithy - validate that it is the tank activating this trigger	
+	
 	$s10_tank1 thread drive_path $s10_tankpath1 level.enemytankspeed
 	$s10_tank2 thread drive_path $s10_tankpath2 level.enemytankspeed
 }end
@@ -594,7 +601,7 @@ coop_teleportBrother local.origin local.angle local.message:{
 			self face ( local.angle )//face your path chosen by your maker
 		}
 		//[200] chrissstrahl - make sure players do not get stuck
-		thread playerMakeSolidAsap self
+		thread coop_mod/main.scr::playerMakeSolidAsap self //[201] Smithy - added func location 
 	}
 	if(local.message != NIL){	self iprint local.message 1	}
 }end //AMEN Brother!
@@ -781,4 +788,25 @@ coop_immuniseFromBullets:{
 	self immune bash
 	self immune grenade
 	self immune fast_bullet
+}end
+
+//[201] Smithy - validate that the activator is actually the tank.
+//As all the tank triggers in this map are trigger_once, we swap them out
+//for trigger_multiple
+//============================================================================
+coop_validateActivator local.thread:{
+//============================================================================
+	local.player = parm.other
+	local.previousThread = parm.previousthread
+	local.trigger = self
+	if (local.player != level.coop_playerTank){
+		if (local.trigger.targetname != "coop_tankTrigger"){
+			thread coop_mod/replace.scr::cloneTrigger local.trigger "trigger_multiple" "coop_tankTrigger" local.thread
+		}
+		//println "you are not the tank!"		
+		local.previousThread end //[201] Smithy - end the calling thread
+		end
+	}
+	local.trigger delete
+	//println "YOU ARE THE TANK! WOOP"
 }end
