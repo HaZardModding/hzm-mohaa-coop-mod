@@ -2618,15 +2618,44 @@ takePlayerWeapon local.weapon:{
 //[201] Smithy - used to replace triggers with another (or just copy triggers as many times as you want).
 //We can use this if we want to replace a trigger_once with a trigger_multiple
 //to give us control over who activates the trigger (just an example)
+// - reduced var name sizes and added spawnflags arg
 //============================================================================
-cloneTrigger local.oldTrigger local.newTriggerType local.newName local.newThread local.removeOldTrigger:{
+cloneTrigger local.oldTrig local.newTrigType local.newName local.newThread \
+local.removeOldTrig local.spawnFlags:{
 //============================================================================
-	local.newTrigger = spawn local.newTriggerType targetname local.newName
-	local.newTrigger model local.oldTrigger.brushmodel
-	local.newTrigger origin local.oldTrigger.origin
-	local.newTrigger setthread level.script::local.newThread
+	if (local.spawnFlags == NIL){ local.spawnFlags = 0 }
+
+	local.newTrig = spawn local.newTrigType targetname local.newName spawnflags local.spawnFlags //[201] Smithy - trigger spawnflags only work when applied to spawn command
+	local.newTrig model local.oldTrig.brushmodel
+	local.newTrig origin local.oldTrig.origin
+	local.newTrig setthread level.script::local.newThread
 	
-	if (local.removeOldTrigger){
-		local.oldTrigger remove
+	if (local.removeOldTrig){
+		local.oldTrig remove
 	}
+}end
+
+//[201] Smithy - i can see us using this type of method in future. lets make it reusable.
+//Use this if you want to validate the parm.other hitting the trigger. 
+//You don't need to spawn a new trigger.
+//If you just want to only validate (not replace trigger) do:
+//waitthread coop_mod/replace.scr::validateTriggerActivator "threadName" "validEntity"
+//============================================================================
+validateTriggerActivator local.thread local.validActivator local.newTrigType \
+local.newTrigName local.newTrigSpawnFlags local.removeOldTrig:{
+//============================================================================
+	local.activator = parm.other
+	local.previousThread = parm.previousthread
+	local.trigger = self
+	if (local.activator != local.validActivator){
+		if (local.newTrigType && local.newTrigName && local.trigger.targetname != local.newTrigName){
+			thread cloneTrigger local.trigger local.newTrigType local.newTrigName \
+			local.thread local.removeOldTrig local.newTrigSpawnFlags
+		}
+		println "you're NOT the right activator!"	
+		local.previousThread end //[201] Smithy - end the calling thread
+		end
+	}
+	println "you ARE right activator! well done!"
+	local.trigger delete
 }end
