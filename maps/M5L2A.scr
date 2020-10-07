@@ -142,6 +142,10 @@ main:{
 //============================================================================
 speedup:{
 //============================================================================
+	//[201] Smithy - validate it's the tank
+	//[201] Smithy - now use replace method
+	waitthread coop_mod/replace.scr::validateTriggerActivator "speedup" level.coop_playerTank "trigger_multiple" "coop_tankTrigger"
+
 	if (level.currently_fast == 1)	{end}
 	println  "z:        speeding up"
 
@@ -157,6 +161,11 @@ speedup:{
 //============================================================================
 slowdown:{
 //============================================================================
+	//[201] Smithy - validate it's the tank
+	//[201] Smithy - now use replace method
+	waitthread coop_mod/replace.scr::validateTriggerActivator "slowdown" level.coop_playerTank "trigger_multiple" "coop_tankTrigger"
+	
+
 	if (level.currently_fast != 1)	{end}
 	println  "z:        slowing down"
 
@@ -198,7 +207,10 @@ s3:{
 //============================================================================
 	//called by the BSP
 	//halftrak drives away
-	waitthread coop_validateActivator "s3" //[201] Smithy - validate that it is the tank activating this trigger		
+	
+	//[201] Smithy - validate it's the tank
+	//[201] Smithy - now use replace method
+	waitthread coop_mod/replace.scr::validateTriggerActivator "s3" level.coop_playerTank "trigger_multiple" "coop_tankTrigger"
 	
 	$s3_halftrak thread drive_path $s3_halftrakpath level.halftrakspeed remove
 }end
@@ -208,7 +220,10 @@ s5:{
 //============================================================================
 	//called by the BSP
 	//first enemy tank comes around the corner and attacks
-	waitthread coop_validateActivator "s5" //[201] Smithy - validate that it is the tank activating this trigger	
+	
+	//[201] Smithy - validate it's the tank
+	//[201] Smithy - now use replace method
+	waitthread coop_mod/replace.scr::validateTriggerActivator "s5" level.coop_playerTank "trigger_multiple" "coop_tankTrigger"	
 	
 	$s5_tank thread drive_path $s5_tankpath level.enemytankspeed
 }end
@@ -218,7 +233,10 @@ s10:{
 //============================================================================
 	//called by the BSP
 	//two enemy tanks come around by the exit and attack
-	waitthread coop_validateActivator "s10" //[201] Smithy - validate that it is the tank activating this trigger	
+	
+	//[201] Smithy - validate it's the tank
+	//[201] Smithy - now use replace method
+	waitthread coop_mod/replace.scr::validateTriggerActivator "s10" level.coop_playerTank "trigger_multiple" "coop_tankTrigger"
 	
 	$s10_tank1 thread drive_path $s10_tankpath1 level.enemytankspeed
 	$s10_tank2 thread drive_path $s10_tankpath2 level.enemytankspeed
@@ -460,6 +478,9 @@ pole_think:{
 	self notsolid
 	
 	//chrissstrahl - make sure this works in coop, no idea what it does...
+	/* 	//[201] Smithy - due to the way this was coded, local.player was alway $world.
+		//thus the telephone poles don't fall in right direction. The pole triggers are vehicle triggers so can only be activated by the tank.
+		//and if activated by the tank, the player must be in the tank, so no need for these checks (plus we can just use parm.other)
 	local.player = NULL
 	if(level.coop_playerTank == NULL){
 		local.player = exec coop_mod/replace.scr::player_closestTo self
@@ -467,8 +488,11 @@ pole_think:{
 	if(local.player == NULL){
 		local.player = $world
 	}
+	*/
 	
-	local.angles = (vector_toangles (local.player.origin - self.origin)) //chrissstrahl
+	local.activator = parm.other //[201] Smithy - just use whatever activated the trigger. Will always be the player tank but just in case we'll use this.
+	
+	local.angles = (vector_toangles (local.activator.origin - self.origin)) //chrissstrahl //[201] Smithy - use activator
 	self.angles = (0 (local.angles[1]+90) 0)
 	self time 1
 	self rotatezdown 85
@@ -788,25 +812,4 @@ coop_immuniseFromBullets:{
 	self immune bash
 	self immune grenade
 	self immune fast_bullet
-}end
-
-//[201] Smithy - validate that the activator is actually the tank.
-//As all the tank triggers in this map are trigger_once, we swap them out
-//for trigger_multiple
-//============================================================================
-coop_validateActivator local.thread:{
-//============================================================================
-	local.player = parm.other
-	local.previousThread = parm.previousthread
-	local.trigger = self
-	if (local.player != level.coop_playerTank){
-		if (local.trigger.targetname != "coop_tankTrigger"){
-			thread coop_mod/replace.scr::cloneTrigger local.trigger "trigger_multiple" "coop_tankTrigger" local.thread
-		}
-		//println "you are not the tank!"		
-		local.previousThread end //[201] Smithy - end the calling thread
-		end
-	}
-	local.trigger delete
-	//println "YOU ARE THE TANK! WOOP"
 }end
