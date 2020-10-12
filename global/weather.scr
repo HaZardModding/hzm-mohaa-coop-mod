@@ -1,0 +1,537 @@
+main:
+// local.weatherroof local.weatherwindow local.weatherin local.weatherout local.weatherflash local.weathertreewind 
+
+//	if (getcvar(superfps) == "1")
+//		end
+
+level.rain_width = "0.4"
+level.rain_min_dist = 512
+// setcvar "cg_density" "10"
+	level.startedrainsound1 = 1
+	level.startedrainsound2 = 1
+
+	level.farplane = $world.farplane
+	level.farplane_color = $world.farplane_color
+
+	$world farplane level.farplane
+	$world farplane_color level.farplane_color
+
+	level.thunder = 1
+
+
+	if ($weatherF == NULL)
+		level.weatherFs = 0
+		else
+		level.weatherFs = $weatherF.size
+
+	if (level.weatherFs > 0)
+		level.weatherF = exec global/makearray.scr $weatherF
+
+	if ($weatherR == NULL)
+		level.weatherRs = 0
+		else
+		level.weatherRs = $weatherR.size
+
+	if (level.weatherRs > 0)
+	{
+		level.weatherR = exec global/makearray.scr $weatherR
+		level.weatherR model "fx/dummy.tik"
+	}
+
+	if ($weatherI == NULL)
+		level.weatherIs = 0
+		else
+		level.weatherIs = $weatherI.size
+
+	if (level.weatherIs > 0)
+		level.weatherI = exec global/makearray.scr $weatherI
+
+	if ($weatherW == NULL)
+		level.weatherWs = 0
+		else
+		level.weatherWs = $weatherW.size
+
+	if (level.weatherWs > 0)
+	{
+		level.weatherW = exec global/makearray.scr $weatherW
+		level.weatherW model "fx/dummy.tik"
+	}
+
+	if ($wind == NULL)
+		level.winds = 0
+		else
+		level.winds = $wind.size
+
+	if (level.winds > 0)
+		level.wind = exec global/makearray.scr $wind
+
+
+	level waittill spawn
+//end
+
+	level.gametype = int( getcvar( g_gametype ) )
+
+level.rain = 0.0
+
+if( level.gametype == 0 )
+{
+	spawn script_model "targetname" "playersound"
+	$playersound thread playersoundorg
+	$playersound model "fx/dummy.tik"
+	$playersound notsolid
+
+	spawn script_model "targetname" "playersound2"
+	$playersound2 thread playersoundorg
+	$playersound2 model "fx/dummy.tik"
+	$playersound2 notsolid
+
+	spawn script_model "targetname" "playersound3"
+	$playersound3 thread playersoundorg
+	$playersound3 model "fx/dummy.tik"
+	$playersound3 notsolid
+}
+
+thread unflash
+wait 1
+ setcvar "r_fastsky" "0.5"
+$world farplane level.farplane
+
+	if (level.windtime == NIL)
+		level.windtime = 15
+
+	if (level.shuttertime == NIL)
+		level.shuttertime = 0.8
+
+	if (level.rainvolume == NIL)
+		level.rainvolume = -1
+
+	if (level.raindensity == NIL)
+		level.raindensity = -1
+
+	if (level.thundertime == NIL)
+		level.thundertime = 20
+if (level.thundertime != 0) //added by JG--- what if we don't want thunder ?
+{
+thread thunder
+}
+
+if (game.medic != NIL)
+	thread medicchanger
+else
+	thread weatherchanger
+
+thread treemovement
+
+for (local.i=1;local.i<level.interiors+1;local.i++)
+	level.interior[local.i] thread rainin
+
+for (local.i=1;local.i<level.exteriors+1;local.i++)
+	level.exterior[local.i] thread rainout
+
+
+
+level.raindest = 0.0
+
+thread weatherpattern
+	local.raintime = level.time
+	rainvar:
+		
+		if (level.rain < level.raindest)
+		{
+			thread weatherloop
+			level.rain = level.rain + 0.1
+		}
+		else
+		if (level.rain > level.raindest)
+		{
+			thread weatherloop
+			level.rain = level.rain - 0.1
+		}
+		else
+		if (level.time > local.raintime)
+		{
+			thread weatherloop
+			local.raintime = level.time + 2
+		}
+
+	
+		wait 0.1
+
+	goto rainvar
+
+
+end
+
+
+
+
+
+weatherpattern:
+if (level.weatherpattern == 0)
+{
+local.windtime = 15
+local.shuttertime = 0.8
+local.rainvolume = -1
+local.raindensity = -1
+local.thundertime = 20
+}
+else
+if (level.weatherpattern == 1)
+{
+local.windtime = 5
+local.shuttertime = 0.3
+local.rainvolume = 0.2
+local.raindensity = 0.8
+local.thundertime = 8
+}
+else
+if (level.weatherpattern == 2)
+{
+local.windtime = 3
+local.shuttertime = 0.2
+local.rainvolume = 0.4
+local.raindensity = 3
+local.thundertime = 6
+}
+else
+if (level.weatherpattern == 3)
+{
+local.windtime = 1.5
+local.shuttertime = 0.1
+local.rainvolume = 1
+local.raindensity = 10
+local.thundertime = 4
+}
+
+
+// local.trans = 0.15
+local.trans = 0.07
+level.windtime = (local.windtime * local.trans + (level.windtime * (1 - local.trans)))
+level.shuttertime = (local.shuttertime * local.trans + (level.shuttertime * (1 - local.trans)))
+level.raindensity = (local.raindensity * local.trans + (level.raindensity * (1 - local.trans)))
+level.rainvolume = (local.rainvolume * local.trans + (level.rainvolume * (1 - local.trans)))
+level.thundertime = (local.thundertime * local.trans + (level.thundertime * (1 - local.trans)))
+//println ("Current wind:" + level.windtime + " current shutter:" + level.shuttertime + " current raindensity:" + level.raindensity + " current rainvolume:" + level.rainvolume + " current thundertime:" + level.thundertime)
+
+if ((level.raindensity > 0.4) && (level.rainvolume < 0.1))
+level.rainvolume = 0.1
+
+wait 1
+goto weatherpattern
+end
+
+weatherchanger:
+
+level.weatherpattern = 0
+wait 4
+w:
+level.weatherpattern = 1
+wait 10
+level.weatherpattern = 2
+wait 15
+level.weatherpattern = 3
+
+wait 60
+level.weatherpattern = 2
+wait 15
+level.weatherpattern = 1
+wait 60
+// level.weatherpattern = 0
+// wait 60
+goto w
+
+end
+
+// 77
+medicchanger:
+
+level.weatherpattern = 0
+wait 5
+w2:
+level.weatherpattern = 1
+wait 10
+level.weatherpattern = 2
+wait 15
+level.weatherpattern = 3
+
+wait 20
+level.weatherpattern = 2
+wait 5
+level.weatherpattern = 0
+wait 15
+// level.weatherpattern = 0
+// wait 60
+goto w2
+
+end
+
+singlethunder:
+
+	local.num = (randomint (3) + 1)
+	if (local.num == 1)
+	{
+		thread flash
+		wait 0.2
+		thread unflash
+		wait 1
+		thread flash
+		wait 0.1
+		thread unflash
+		wait 0.1
+		thread flash
+		wait 0.1
+		thread unflash
+		wait (1 + (randomfloat(2)))
+	}
+	else
+	if (local.num == 2)
+	{
+		thread flash
+		wait 0.1
+		thread unflash
+		wait 0.1
+		thread flash
+		wait 0.1
+		thread unflash
+		wait 1
+		thread flash
+		wait 0.2
+		thread unflash
+		wait (1 + (randomfloat(2)))
+	}
+	else
+	if (local.num == 3)
+	{
+		thread flash
+		wait 0.1
+		thread unflash
+		wait 0.1
+		thread flash
+		wait 0.2
+		thread unflash
+		wait 0.5
+		thread flash
+		wait 0.1
+		thread unflash
+		wait (1 + (randomfloat(2)))
+	}
+
+	if (game.medic == NIL){
+		//[201] Smithy - stop spam in console if server is empty (playsound will work on an array)
+		if ($player){ 
+			$player playsound thunder 
+		}				
+	}
+
+end
+
+turnonthunder:
+	level.thunder = 1
+End
+turnoffthunder:
+	level.thunder = 0
+End
+
+thunder:
+	wait (level.thundertime + randomint( (level.thundertime * 1.5) ))
+
+	if (level.thunder == 1)
+	{
+		waitthread singlethunder
+	}
+
+	goto thunder 
+end
+
+flash:
+ setcvar "r_fastsky" "1"
+$world farplane_color (0.9 0.9 0.9)
+
+for (local.i=1;local.i<level.weatherFs+1;local.i++)
+level.weatherF[local.i] show
+
+end
+
+unflash:
+ setcvar "r_fastsky" "0"
+$world farplane_color level.farplane_color
+
+for (local.i=1;local.i<level.weatherFs+1;local.i++)
+level.weatherF[local.i] hide
+
+end
+
+
+weatherloop:
+weatherlooper:
+if (level.raindensity < 0)
+level.rain_density = 0
+else
+if (level.raindensity < 1)
+level.rain_density = level.raindensity * 10
+else
+if (level.raindensity < 10)
+level.rain_density = level.raindensity
+else
+level.rain_density = 0.003
+
+level.rain_density = level.raindensity // WTF Mackey? 
+
+if (level.raindensity < 5)
+local.raindensity = 50
+else
+local.raindensity = (50 + ((level.raindensity - 5) * 8))
+
+level.rain_slant = local.raindensity
+
+local.rainvolume = level.rainvolume - 0.3
+local.rainvolume = local.rainvolume - level.rain
+
+/*
+	if (level.startedrainsound1 == 0)
+	{
+		level.startedrainsound1 = 1
+		$playersound thread replaysound
+	}
+
+*/
+if ( level.gametype == 0 )
+{
+	if (local.rainvolume > 0)
+		$playersound loopsound rain_ext (local.rainvolume + 0.2) "levelwide"
+	else
+		$playersound loopsound rain_ext 0
+}
+	
+/*
+	if (level.startedrainsound2 == 0)
+	{
+		level.startedrainsound2 = 1
+		$playersound2 thread replaysound2
+	}
+
+*/
+
+	if (level.rainvolume > 0.4)
+		local.rainvolume = (0.4 - (level.rainvolume - 0.4))
+	else
+		local.rainvolume = level.rainvolume
+	
+	local.rainvolume = local.rainvolume - level.rain
+
+if ( level.gametype == 0 )
+{
+	if (local.rainvolume < 0.0)
+		$playersound2 loopsound rain_puddle 0
+	else
+		$playersound2 loopsound rain_puddle (local.rainvolume + 0.2) "levelwide"
+}
+
+
+	local.rainvolume = level.rainvolume - (1.0 - level.rain)
+
+if ( level.gametype == 0 )
+{
+	if (local.rainvolume < 0.0)
+		$playersound3 loopsound rain_int 0 
+	else
+		$playersound3 loopsound rain_int (local.rainvolume + 0.2) "levelwide"
+}
+
+	for (local.i=1;local.i<level.weatherRs+1;local.i++)
+	{
+		if (level.rainvolume < 0)
+			level.weatherR[local.i] stoploopsound
+		else
+		{
+			level.weatherR[local.i] loopsound rain_roof (level.rainvolume + 0.2) // "levelwide"
+//			println ("rainroof at " + ((level.rainvolume + 0.2) / 2.5))
+		}
+
+	}
+
+	for (local.i=1;local.i<level.weatherWs+1;local.i++)
+	{
+		if (level.rainvolume < 0)
+			level.weatherW[local.i] stoploopsound
+		else
+			level.weatherW[local.i] loopsound rain_window (level.rainvolume + 0.2) // "levelwide"
+	}
+
+	/*
+	for (local.i=1;local.i<level.winds+1;local.i++)
+	{
+		if (level.rainvolume < 0)
+			level.wind[local.i] stoploopsound
+		else
+		if (level.rainvolume > 0.5)
+			level.wind[local.i] loopsound "sound/environment/wind_weak.wav" (level.rainvolume + 0.2) 192
+		else
+			level.wind[local.i] loopsound "sound/environment/wind_strong.wav" level.rainvolume 192
+	}
+	*/
+
+
+end
+
+treemovement:
+	local.num = (level.raindensity + 1.5) / 2.5
+	setcvar "r_static_shadermultiplier1" local.num
+	wait 1
+	goto treemovement
+end
+
+
+playersoundorg:
+self.origin = $player.origin
+// self glue $player
+end
+
+rainin:
+self waittill trigger
+level.raindest = 1.0
+wait 0.1
+goto rainin
+end
+
+rainout:
+self waittill trigger
+level.raindest = 0.0
+wait 0.1
+goto rainout
+end
+
+replaysound:
+	wait 35.5
+
+	$playersound stopsound 5
+
+		local.rainvolume = level.rainvolume - 0.3
+		local.rainvolume = local.rainvolume - level.rain
+
+	if (local.rainvolume > 0)
+		$playersound loopsound rain_ext (local.rainvolume + 0.2) "levelwide"
+	else
+		$playersound loopsound rain_ext 0
+	goto replaysound
+end
+
+replaysound2:
+	wait 14
+
+	$playersound2 stopsound 5
+
+	
+	if (level.rainvolume > 0.4)
+		local.rainvolume = (0.4 - (level.rainvolume - 0.4))
+	else
+		local.rainvolume = level.rainvolume
+	
+	local.rainvolume = local.rainvolume - level.rain
+
+	if (local.rainvolume < 0.0)
+		$playersound2 loopsound rain_puddle 0
+	else
+		$playersound2 loopsound rain_puddle (local.rainvolume + 0.2) "levelwide"
+	goto replaysound2
+end
