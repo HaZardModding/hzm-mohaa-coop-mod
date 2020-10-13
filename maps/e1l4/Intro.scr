@@ -202,7 +202,7 @@ GateGuardDialogue: {
 	$mrinvisible2.shuddup = 1
 	$mrinvisible2 exec global/enable_ai.scr
 	$mrinvisible2 notsolid
-	$mrinvisible2 turnto $player
+	$mrinvisible2 exec coop_mod/replace.scr::turnto //[201] chrissstrahl
 	$mrinvisible2.origin = $spy.origin + (0 0 -50)
 	$mrinvisible2 waitthread askForPapers
 
@@ -251,12 +251,18 @@ KillPlayerIfFailPapers: {
 	if (!$1stgateguard || !(isalive $1stgateguard)) { end }
 	wait 1
 
+	//@smithy
 	if (level.GatePapersAccepted != 1){
 		waitthread global/throbtext.scr::throbtext_off
 		waitframe
-
-		$player takedamage
-		$player damage $world 99999 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
+		
+		//[201] chrissstrahl - coop compatibility
+		exec coop_mod/replace.scr::killplayer
+		
+		//[201] chrissstrahl - fail mission in coop
+		if(level.gametype != 0){
+			exec coop_mod/replace.scr::missionfailed
+		}
 	}
 }end
 
@@ -280,6 +286,7 @@ HACK: {
 	}
 }End
 
+//@smithy
 //============================================================
 askForPapers: {
 //============================================================
@@ -331,6 +338,7 @@ giveDisguise: {
 		setcvar g_playermodel "Sc_AX_Ital_Inf" 
 	}
 	else {
+	//@smithy
 		exec coop_mod/replace.scr::has_disguise  1 //[200] chrissstrahl - give disguise in coop, we might have special features in the future
 		exec coop_mod/replace.scr::playsound "pickup_papers"
 		exec coop_mod/replace.scr::playsound "pickup_uniform"
@@ -387,6 +395,7 @@ driverStopDriving: {
 	level.driverDrivingStraight = 0
 }end
 
+//@smithy
 //============================================================
 handlePlayer: {
 //============================================================
@@ -397,7 +406,7 @@ handlePlayer: {
 	level.opelpassengerseat.origin = local.seatpos
 	level.opelpassengerseat bind $starttruck
 
-	//Crimewavez - coop comp, see replace.scr and SDK in case of guestions.
+	//Crimewavez - coop comp, see replace.scr and SDK in case of questions.
 	if(level.gametype == 0) {
 		$player nodamage
 		$player notsolid
@@ -438,10 +447,14 @@ handleTruckGag:	 {
 	waitframe
 
 	$starttruck moveanim passengerdooropen
-	$player playsound opeltruck_snd_dooropen //sound when player opens door
+	//[201] chrissstrahl - coop compatibility
+	//exec coop_mod/replace.scr::playsound  opeltruck_snd_dooropen //sound when player opens door
+	//$player playsound opeltruck_snd_dooropen //sound when player opens door
+	$starttruck playsound opeltruck_snd_dooropen //sound when player opens door
 	wait 0.5
 	
-	$player playsound opeltruck_snd_doorclose  //sound when player closes door
+	//[201] chrissstrahl - coop compatibility
+	$starttruck playsound opeltruck_snd_doorclose  //sound when player closes door
 	waitthread DeleteGuy1
 	thread PlayerExitVehicle
 	level.RideOver = 1
@@ -465,7 +478,10 @@ handleTruckGag:	 {
 		$starttruck drive $starttruckleavepathA local.speed local.accel local.reached_dest local.look_ahead
 		wait 0.5
 
-		$gate1 open $player
+		//[201] chrissstrahl - coop compatibility
+		//$gate1 open $player
+		$gate1 open $world
+		
 		$starttruck waittill drive
 		$starttruck drive $starttruckleavepathB local.speed local.accel local.reached_dest local.look_ahead
 		wait 1
@@ -489,6 +505,7 @@ startTruckOptions: {	//self refers to $starttruck
 //============================================================
 PlayerExitVehicle: {
 //============================================================
+	//@smithy
 	local.startpos = $player.origin
 	local.exitpos = $starttruck gettagposition "passenger_enter"
 	local.exitpos[2] = local.startpos[2]
@@ -525,7 +542,11 @@ OpenGate1 local.vehicle: {
 		self remove
 
 		$starttruck modifydrive 0 500 156
-		$gate1 open $player
+		
+		//[201] chrissstrahl - coop compatibility
+		//$gate1 open $player
+		$gate1 open $world
+		
 		wait 2.5
 
 		$starttruck modifydrive 500 200 156
