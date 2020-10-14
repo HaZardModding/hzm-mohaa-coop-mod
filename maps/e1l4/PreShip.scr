@@ -83,7 +83,7 @@ naughtyFenceHopping:
 		$NaughtyAccessFreighterTrigger waittill trigger
 
 		if (level.gateguardaccepted != 1)
-			$player.has_disguise = 0
+			$player.has_disguise = 0 //@smithy
 
 		if (level.playerBoardedShip != 1) {
 			// if we haven't gotten the papers yet, then don't bother, they are useless at this point
@@ -146,9 +146,7 @@ clerkGag:
 	$clerk thread IfHurtAttack
 	wait 1
 
-	$clerk turnto $player
-	$clerk waittill turndone
-	$clerk lookat $player
+	$clerk waitthread coop_mod/replace.scr::turntolookat  //[202] chrissstrahl
 
 	// DO NOT UNHOLSTER NOW, I AM DOING THIS IN THE disguise_papers script
 	//$clerk unholster
@@ -196,8 +194,8 @@ invisibleMan:
 	$mrinvisible notsolid
 	$mrinvisible holster
 	$mrinvisible.origin = ( -5199 4979 233 )
-	$mrinvisible turnto $player
-	$mrinvisible lookat $player
+	$mrinvisible exec coop_mod/replace.scr::turnto //[202] chrissstrahl
+	$mrinvisible exec coop_mod/replace.scr::lookat //[202] chrissstrahl
 
 	$mrinvisible.sight =  4096
 	$mrinvisible.hearing =  4096
@@ -346,9 +344,7 @@ clerkWaitForPapers:
 
 	//when good clerks go bad
 	//$clerk unholster
-	$clerk turnto $player
-	$clerk waittill turndone
-	$clerk lookat $player
+	$clerk  waitthread coop_mod/replace.scr::turntolookat  //[202] chrissstrahl
 	//$clerk aimat $player
 	$clerk anim A_14_HMTalk3     //do not move worm!
 	$clerk waittill animdone
@@ -409,17 +405,22 @@ End
 getPapers:
 	$goodpaperspickup waittill trigger
 	trigger $waitingToGetPapers
-	$player playsound pickup_papers
-	$goodpapers remove
+	$goodpapers playsound pickup_papers //[200] chrissstrahl
+	$goodpapers hide //[200] chrissstrahl
 	waitthread global/items.scr::remove_item "papers_level1"
 	waitthread global/items.scr::add_item "papers_level2"
-	$player.hasPapers = 2
+	$player.hasPapers = 2 //@smithy
 	$clerk.obtainPapersThread delete
+	
+	//[200] chrissstrahl - used to play sound
+	wait 3
+	$goodpapers remove 
 end
 
 //----------------------------------------------------------------------
 
 failedPapers:
+	//@smithy
 	$player.hasPapers = 0
 	$player.hasDisguise = 0
 	level.alarm = 1
@@ -435,7 +436,7 @@ end
 clerkdoortrigger:
 	$clerkdoor unlock
 	waitframe
-	$clerkdoor open $player
+	$clerkdoor open $world //[202] chrissstrahl - made coop compatible
 	$clerkdoortrigger remove
 
 	if ($clerk && (isalive $clerk)) {
@@ -493,8 +494,11 @@ doOpen:
 	wait 2
 	self unlock
 	while (!self.isOpen && self.stopOpening != 1) {
+		//[202] chrissstrahl - make compatible to coop
+		local.player = exec coop_mod/replace.scr::player_closestTo self
+		if!(local.player){local.player = $world}
+		self open $world
 		
-		self open $player
 		wait 3
 	}
 end
