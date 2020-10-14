@@ -1,0 +1,1019 @@
+//==========================================================================================================//
+// LEVEL: 		training.bsp												//
+// CAMPAIGN: 		n/a														//			
+// TITLE:		Viewmodel/viewkick/weapon accuracy modeling small arms Testing Range			//
+// GEOMETRY/DESIGN: 	Steve 'Decapitator' Fukuda, Todd									//	
+// SCRIPTING:		Mackey, Z								//		
+//==========================================================================================================//
+	level.script = "maps/training.scr"
+	level.between_lines = .2
+
+level waittill prespawn
+
+	exec global/bomber.scr
+
+	//*** INITIALIZE THE BUTTONS, BOARDS, AND MARKERS (use arrays)
+	
+	//waitthread targetrange_button_init
+	//waitthread targetrange_board_init
+	//waitthread targetrange_marker_init
+
+	exec global/door_locked.scr
+	thread global/barrel.scr::explosive_barrel
+	exec global/ambient.scr training
+
+//	$tank_turret notsolid
+	$tank notsolid
+	$explosive_on hide
+	$explosive_off hide
+
+level waittill spawn
+
+	thread tank_sound
+	
+//	local.soundorigin = spawn script_model model "fx/dummy.tik"
+//	local.soundorigin.origin = local.origin
+//	local.soundorigin loopsound local.sound
+//	local.soundorigin notsolid
+
+//	$player stufftext "tmstop"
+//	$player stufftext "tmstartloop sound/music/mus_06a_mystery.mp3"
+	
+	waitthread global/items.scr::add_item "radio"
+
+	$door_2 lock
+	// the 1st left door 
+	$door_3 lock
+	// the 1st right door
+
+	$door_4a lock
+	$door_5a lock
+	$door_6a lock
+	$door_7a lock
+	$door_8a lock
+	$exit_door lock
+		
+	level.grenade_target = 0
+	$grenade_target1 thread grenade_target
+	$grenade_target2 thread grenade_target
+	$grenade_target3 thread grenade_target
+	
+	$pistol_ammo thread ammo_spawners pistol
+	$rifle_ammo thread ammo_spawners rifle
+	$smg_ammo thread ammo_spawners smg
+	$ammo_grenade thread ammo_spawners grenade
+	
+	$mg42 maxYawOffset 45
+	$mg42 pitchCaps ( -15 15 0)
+
+//	level.dialogue = 0
+	exec global/autosave.scr -5
+
+	// Always give the player the empty grenade weapons
+	// so taht he can use grenade ammo if he gets it.
+	// Note that in single player, "grenade" ammo is
+	// only steilhandgranate ammo, and "agrenade" ammo
+	// is american Frag Grenade ammo.
+	$player item weapons/M2frag_grenade_sp_start.tik
+	$player item weapons/steilhandgranate_start.tik
+	
+	$player stufftext "cg_marks_add 1"
+	
+	thread start
+	thread ladder
+	thread explosives
+//	thread doors
+	thread pistol
+	thread smg
+	thread rifle
+	thread grenade
+	thread mg42
+end
+
+tank_sound:
+	level.tank_idle_entity = spawn script_model model "fx/dummy.tik"
+	level.tank_idle_entity.origin = ($tank.origin + ( 0 0 200))
+	level.tank_idle_entity notsolid
+	println "z:   level.tank_idle_entity: " level.tank_idle_entity.origin
+	
+	level.tank_idle_entity loopsound tank_idle_training
+//	$tank loopsound tank_idle_training
+end
+
+start:			
+	waitthread dialog_start
+	thread p47flyby
+	wait 4
+	waitthread dialog_mouse
+	waitthread global/objectives.scr::add_objectives 1 2 ("Look at all four towers [4 remaining].")
+	
+	for (local.i=1;local.i<$lookat.size+1;local.i++)
+	{
+		$lookat[local.i].seen = 0
+		$lookat[local.i] thread seencheck
+	}
+	
+	local.break = 0
+	local.counter = 0
+	while (local.break == 0)
+	{
+		local.count = 0
+		for (local.i=1;local.i<$lookat.size+1;local.i++)
+			if ($lookat[local.i].seen == 1)
+				local.count++
+
+		if (local.counter != local.count)
+		{
+			local.counter = local.count
+			waitthread global/objectives.scr::add_objectives 1 2 ("Look at all four towers [" + (4 - local.count) + " remaining].")
+			waitthread global/objectives.scr::current_objectives 1
+		//	clear_objective_pos
+		}
+
+		if (local.count > 3)
+			local.break = 1		
+		waitframe
+		//println local.count
+	}
+	waitthread global/objectives.scr::add_objectives 1 3
+	
+	wait 2
+	
+	waitthread dialog_movement
+	
+	wait 2
+	waitthread global/objectives.scr::add_objectives 2 2 "Approach the tower indicated by the arrow on the compass." $tower_trigger	
+	waitthread global/objectives.scr::current_objectives 2
+	waitthread dialog_objectives
+
+//=======================
+	
+	$tower_trigger waittill trigger
+	
+	waitthread global/objectives.scr::add_objectives 2 3
+	waitthread global/objectives.scr::add_objectives 3 2 "Get over the wall to the north." $obj2.origin
+	waitthread global/objectives.scr::current_objectives 3	
+	waitthread dialog_objective_complete
+	
+	$clip_2 delete
+	$door_mid time 2
+	$door_mid rotatexup 175
+	$door_mid waitmove
+		
+	$obj1b waittill trigger
+	
+	thread dialog_jump
+	
+	$obj2 waittill trigger
+
+//=======================
+	
+	waitthread global/objectives.scr::add_objectives 3 3
+	waitthread global/objectives.scr::add_objectives 4 2 "Find the explosives." $explosive.origin
+	waitthread global/objectives.scr::current_objectives 4
+	thread dialog_duck
+	
+	$stand_up waittill trigger
+	
+	thread dialog_duck_complete
+end
+//=======================
+ladder:
+	$obj3 waittill trigger
+	
+	waitthread dialog_ladder
+	
+	$ladder_top waittill trigger
+	
+	thread dialog_down_ladder
+end
+//=======================
+explosives:
+	$explosives_trigger waittill trigger
+	
+	waitthread dialog_explosives
+	
+	while (level.flags[explosive] != 1)
+		wait 1
+		
+	waitthread global/objectives.scr::add_objectives 4 3
+	
+	waitthread dialog_inventory
+	level.bomb_appeared = 1
+	
+	$explosive_off show
+	exec global/autosave.scr 1
+	
+	waitthread global/objectives.scr::add_objectives 5 2 "Plant the explosives on the tank." $explosive_on.origin
+	waitthread global/objectives.scr::current_objectives 5
+	
+	waitthread dialog_plant_explosives
+		
+	while (level.bomb_set != 1)
+		wait 1
+		
+	waitthread global/objectives.scr::add_objectives 5 3
+
+	waitthread dialog_moveaway_explosives
+
+	
+	while (level.flags[tank] != 1)
+		wait 1
+//=======================
+
+	waitthread global/objectives.scr::add_objectives 6 2 "Complete the rest of training." $final_door.origin
+	waitthread global/objectives.scr::current_objectives 6
+
+	$doors_dialog_trigger waittill trigger
+	
+	thread dialog_doors
+	
+	$door_2_triggeruse thread door_wait $door_3
+	$door_3_triggeruse thread door_wait $door_2
+end
+//=======================
+pistol:
+	$trigger_health waittill trigger
+	
+	exec global/autosave.scr 2
+	waitthread dialog_health
+
+	if ($pistol)
+	{	
+		local.key = getboundkey1 "+use"
+		iprintlnbold_noloc (loc_convert_string "Pick up the pistol (press ") (loc_convert_string local.key) (loc_convert_string " ).")
+
+		while ($pistol)
+		{
+			wait 1
+		}
+	}
+	
+	waitthread dialog_pistol
+	
+	$pistol_target waittill trigger
+	waitframe
+	
+	$pistol_target waittill trigger
+	waitframe
+	
+	$pistol_target waittill trigger
+	waitframe
+	
+	thread feedback_delay
+
+	println "z:        unlocking $door_4a"
+	$door_4a unlock
+	$door_4a open $doors_dialog_trigger
+
+	local.key = getboundkey1 "+use"
+	iprintlnbold_noloc (loc_convert_string "Go to the next room and pick up the Thompson (press ") (loc_convert_string local.key) (loc_convert_string " ).")
+end	
+//=======================
+smg:
+	while ($thompson)
+		wait 1
+	
+	waitthread dialog_thompson
+	
+	local.count = 0
+	while (local.count < 20)
+	{
+		$thompson_target waittill trigger
+		local.count++
+		waitframe
+	}	
+	thread feedback_delay
+
+	println "z:        unlocking $door_5a"
+	$door_5a unlock
+	$door_5a open $doors_dialog_trigger
+
+	local.key = getboundkey1 "+use"
+	iprintlnbold_noloc (loc_convert_string "Go to the next room and pick up the sniper rifle (press ") (loc_convert_string local.key) (loc_convert_string " ).")
+
+end	
+//=======================
+rifle:
+	while ($sniper)
+		wait 1
+	
+	waitthread dialog_springfield
+	
+
+	$sniper_target waittill trigger
+	thread feedback_delay
+	waitframe
+	$sniper_target waittill trigger
+	thread feedback_delay
+	waitframe
+	$sniper_target waittill trigger
+	thread feedback_delay
+	waitframe
+
+	println "z:        unlocking $door_6a"	
+	$door_6a unlock
+	$door_6a open $doors_dialog_trigger
+	
+	local.key = getboundkey1 "+use"
+	iprintlnbold_noloc (loc_convert_string "Go to the next room and pick up some grenades (press ") (loc_convert_string local.key) (loc_convert_string " ).")
+end
+
+//=======================
+grenade:
+
+//	$grenade_trigger waittill trigger
+	while (level.got_grenade != 1)
+		wait 1
+	
+	thread dialog_grenade
+	
+	
+	while ( level.grenade_target < 3 )
+		wait 1
+
+	println "z:        unlocking $door_7a"
+	$door_7a unlock
+	$door_7a open $doors_dialog_trigger
+	
+	local.key = getboundkey1 "+use"
+	iprintlnbold_noloc (loc_convert_string "Go to the next room and use the machine gun (press ") (loc_convert_string local.key) (loc_convert_string " ).")
+
+end
+//=======================
+mg42:
+
+	$mg42_trigger waittill trigger
+		
+	thread dialog_mg42
+	
+	for (local.i = 1; local.i <= $mg42_target.size; local.i++)
+	{
+		if (IsAlive $mg42_target[local.i])
+			$mg42_target[local.i] waittill death
+	}
+	wait 1
+	thread feedback_delay
+
+	println "z:        unlocking $door_8a"
+	$door_8a unlock
+	$door_8a open $doors_dialog_trigger
+
+//=======================
+
+	wait 2
+	thread dialog_end_warning
+
+	$final_door waittill trigger
+
+	waitthread dialog_end
+	
+	$exit_door unlock
+	$exit_door open $doors_dialog_trigger
+	
+	$exit_trigger waittill trigger
+	
+	waitthread global/objectives.scr::add_objectives 6 3
+	$player stufftext "disconnect; pushmenu briefingroom"
+end
+
+/////----------------------------
+
+feedback_delay:
+wait .5
+	$player playsound training_positive_feedback
+end
+
+grenade_target:
+	self waittill death
+	level.grenade_target++
+	println "z:     grenade_targets: " level.grenade_target
+	thread feedback_delay
+	end
+
+
+ammo_spawners local.type:
+	local.ammo_origin = self.origin
+	local.ammo_angles = self.angles
+	
+	while (1)
+	{	
+		if (local.type == "pistol")
+			local.item = spawn models/items/item_pistol_ammobox.tik
+		if (local.type == "smg")
+			local.item = spawn models/items/item_smg_ammobox.tik
+		if (local.type == "rifle")
+			local.item = spawn models/items/item_rifle_ammobox.tik	
+		if (local.type == "grenade")
+			local.item = spawn models/weapons/m2frag_grenade_sp.tik
+		
+		local.item.origin = local.ammo_origin
+		local.item.angles = local.ammo_angles
+		
+		while (local.item)
+			wait 1
+		println "z:       " self " is gone. respawning"
+		if (self.targetname == "ammo_grenade")
+			level.got_grenade = 1
+		wait 5
+		
+		while ($player cansee self 100)
+		{
+			println "z:    player cansee: " self
+			println "z:    waitting on spawn"
+			wait 1
+		}
+	}
+end	
+	
+
+seencheck:
+	while (self.seen == 0)
+	{
+		if ($player cansee self 25)
+		{
+			println "z:     looked at tower: " self
+			$player playsound training_positive_feedback
+			self.seen = 1
+		}	
+
+		waitframe
+	}
+end
+
+obj6:
+	//CALLED BY BSP WHEN EXPLOSIVES ARE PICKED UP
+	waitthread global/items.scr::add_item "explosives"
+	$explosive hide
+	level.flags[explosive] = 1
+end
+
+obj6b:
+	//CALLED BY BSP WHEN BOMB IS PLANTED
+	if (level.bomb_appeared == 1)
+	{
+		if (level.bomb_set == 1)
+			end
+		level.bomb_set = 1
+
+		$explosive_off hide
+		$explosive_on show
+		$explosive_on playsound plantbomb
+		$explosive_on loopsound bombtick
+		
+		waitthread global/items.scr::remove_item "explosives"
+		$player stopwatch 15
+		wait 15
+		
+		$explosive_on stoploopsound bombtick
+		$explosive_on hide
+		level.tank_idle_entity stoploopsound
+	//	$tank stoploopsound
+		$tank playsound explode_tank
+		exec global/model.scr $explosive_on.origin "models/emitters/explosion_mine.tik"
+		wait 0.3
+		exec global/model.scr $tank.origin "models/emitters/mortar_higgins.tik"
+
+		$tank.gun = $tank QueryTurretSlotEntity 0
+		$tank.gun2 = $tank QueryTurretSlotEntity 1
+		if ($tank.gun)
+		{
+			$tank DetachTurretSlot 0
+			$tank.gun remove
+		}
+		if ($tank.gun2)
+		{
+			$tank DetachTurretSlot 1
+			$tank.gun2 remove
+		}
+
+		local.ent = spawn script_model
+		local.ent model "vehicles/tigertank_d.tik"	
+		local.ent.origin = $tank.origin
+		local.ent.angles = $tank.angles
+		
+		$tank remove
+		
+		level.flags[tank] = 1
+		
+		//radiusdamage self.origin level.bomb_damage level.bomb_explosion_radius
+		radiusdamage $explosive_on.origin 1000 600
+	}
+end
+
+door_wait local.other_door:
+	self waittill trigger
+	
+	if (level.door_training != 1)
+	{
+		local.other_door unlock
+		println "z:    unlocking: " local.other_door
+		level.door_training = 1
+		thread dialog_locked_doors
+	}
+end
+
+theplane:
+	if (level.theplane != 1)
+	{
+		level.theplane = 1
+		wait 1
+		thread global/bomber.scr::bomb 1 1
+		thread global/bomber.scr::bomb 2 1
+		thread global/bomber.scr::bomb 3 1
+		thread global/bomber.scr::bomb 7 1
+	}
+end
+
+rotatedown local.amount:
+	self rotateydown local.amount
+	self waitmove
+end
+
+rotateup local.amount:
+	self rotateyup local.amount
+	self waitmove
+end
+
+p47flyby:
+
+	//***flyby of p47 as player enters level
+//	wait 0.75
+	thread global/bomber.scr::bomb 4
+	thread global/bomber.scr::bomb 5
+		
+end
+
+easter_egg:
+	thread global/bomber.scr::bomb 6
+end
+
+/////----------------------------
+
+dialog_start:
+	//Lieutenant Powell, it's time to commence field training. 
+//	iprintlnbold "Lieutenant Powell, it's time to commence field training."
+	$player playsound training_01 wait
+	$player waittill sounddone
+	wait level.between_lines
+
+	//Pay attention and you might even stand a chance on the battlefield.
+//	iprintlnbold "Pay attention and you might even stand a chance on the battlefield."
+	$player playsound training_02 wait
+	$player waittill sounddone
+	wait level.between_lines
+end
+
+dialog_mouse:
+	//First I want you to use your mouse to look at each of the four guard towers.
+//	iprintlnbold "First I want you to use your mouse to look at each of the four guard towers."
+	$player playsound training_03 wait
+	$player waittill sounddone
+	iprintlnbold "Use your mouse to look at each of the four guard towers."
+	wait level.between_lines
+end
+
+dialog_movement:
+	//Good. Press now press your FORWARDS key to move in the direction you are facing.
+	local.key = getboundkey1 "+forward"
+//	iprintlnbold_noloc (loc_convert_string "Good. Press now press your FORWARDS key ( ") (loc_convert_string local.key) (loc_convert_string " ) to move in the direction you are facing.")
+	$player playsound training_04 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key) (loc_convert_string " to move forwards.")
+	wait level.between_lines
+
+	//Press your BACKWARDS key to move back. 
+	local.key = getboundkey1 "+back"
+//	iprintlnbold_noloc (loc_convert_string "Press your BACKWARDS key ( ") (loc_convert_string local.key) (loc_convert_string " ) to move back.")
+	$player playsound training_05 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key) (loc_convert_string " to move backwards.")
+	wait level.between_lines
+
+	//Press STRAFE LEFT to move left and STRAFE RIGHT to move right.
+	local.key1 = getboundkey1 "+moveleft"
+	local.key2 = getboundkey1 "+moveright"
+//	iprintlnbold_noloc (loc_convert_string "Press STRAFE LEFT ( ") local.key1 (loc_convert_string " ) to move left and STRAFE RIGHT ( ") local.key2 (loc_convert_string " ) to move right.")
+	$player playsound training_06 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key1) (loc_convert_string " to move left and ") (loc_convert_string local.key2) (loc_convert_string " to move right.")
+	wait level.between_lines
+	
+	//Using these four keys together with the mouse is critical to your success against the enemy.
+//	iprintlnbold "Using these four keys together with the mouse is critical to your success against the enemy."
+	$player playsound training_07 wait
+	$player waittill sounddone
+	wait level.between_lines
+end
+
+dialog_objectives:
+	//Press your OBJECTIVES key to see your list of current objectives. 
+	local.key = getboundkey1 "+scores"
+//	iprintlnbold_noloc (loc_convert_string "Press your OBJECTIVES key ( ") (loc_convert_string local.key) (loc_convert_string " ) to see your list of current objectives.")
+	$player playsound training_08 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key) (loc_convert_string " to see your list of objectives.")
+	wait level.between_lines
+
+	//When you complete an objective it is checked off on this list.
+//	iprintlnbold "When you complete an objective it is checked off on this list."
+	$player playsound training_09 wait
+	$player waittill sounddone
+	wait level.between_lines
+	
+	//Your current objective is highlighted in yellow. 
+//	iprintlnbold "Your current objective is highlighted in yellow."
+	$player playsound training_10 wait
+	$player waittill sounddone
+	wait level.between_lines
+
+	//The arrow points to your current objective.
+//	iprintlnbold "The arrow points to your current objective."
+	$player playsound training_11 wait
+	$player waittill sounddone
+	wait level.between_lines
+
+	//"As you near your objective, the ball-bearings on the compass will get closer together."
+//	iprintlnbold "As you near your objective, the ball bearings on the compass will get closer together."
+	$player playsound training_12 wait
+	$player waittill sounddone
+	wait level.between_lines
+	
+	//Now notice that the arrow on your compass is pointing at one of the towers.
+//	iprintlnbold "Now notice that the arrow on your compass is pointing at one of the towers."
+	$player playsound training_13 wait
+	$player waittill sounddone
+	wait level.between_lines	
+	
+	//"Approach the tower indicated by the arrow."
+//	iprintlnbold "Approach the tower indicated by the arrow."
+	$player playsound training_14 wait
+	$player waittill sounddone
+	wait level.between_lines
+end
+
+dialog_objective_complete:	
+	//"Good. Now press your OBJECTIVES key again."
+	local.key = getboundkey1 "+scores"
+//	iprintlnbold_noloc (loc_convert_string "Good. Now press your OBJECTIVES key ( ") (loc_convert_string local.key) (loc_convert_string " ) again.")
+	$player playsound training_15 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key) (loc_convert_string " to see your new objective.")
+	wait level.between_lines
+	
+	//"You have a new objective. Complete this objective."
+//	iprintlnbold "You have a new objective. Complete this objective."
+	$player playsound training_16 wait
+	$player waittill sounddone
+	wait level.between_lines
+end
+
+dialog_jump:
+	//"Press the JUMP and FORWARD keys to jump up this pile of crates."
+	local.key1 = getboundkey1 "+moveup"
+	local.key2 = getboundkey1 "+forward"
+//	iprintlnbold_noloc (loc_convert_string "Press the JUMP ( ") (loc_convert_string local.key1) (loc_convert_string " ) and FORWARD ( ") (loc_convert_string local.key2) (loc_convert_string " ) keys to jump up this pile of crates.")
+	$player playsound training_17 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key1) (loc_convert_string " to jump.")
+	wait level.between_lines
+end
+
+dialog_duck:
+	//"Press the DUCK key and then move FORWARD to pass under the barbed wire."
+	local.key1 = getboundkey1 "+movedown"
+	local.key2 = getboundkey1 "+forward"
+//	iprintlnbold_noloc (loc_convert_string "Press the DUCK key ( ") local.key1 (loc_convert_string " ) and then move FORWARD ( ") local.key2 (loc_convert_string " ) to pass under the barbed wire.")
+	$player playsound training_18 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key1) (loc_convert_string " to duck.")
+	wait level.between_lines
+end
+
+dialog_duck_complete:
+	//"Press the DUCK key again to stand up."
+	local.key = getboundkey1 "+movedown"
+//	iprintlnbold_noloc (loc_convert_string "Press the DUCK key ( ") (loc_convert_string local.key) (loc_convert_string " ) again to stand up.")
+	$player playsound training_19 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key) (loc_convert_string " to stand up.")
+	wait level.between_lines
+end
+
+dialog_ladder:
+	//"Press the FORWARD key and look up and you will climb up the ladder." 
+	local.key = getboundkey1 "+forward"
+//	iprintlnbold_noloc (loc_convert_string "Press the FORWARD key ( ") (loc_convert_string local.key) (loc_convert_string " ) and look up and you will climb up the ladder.")
+	$player playsound training_20 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key) (loc_convert_string " and look up to climb up the ladder.")
+	wait level.between_lines
+
+	//"Press the USE key to grab a ladder from above or below."
+	local.key = getboundkey1 "+use"
+//	iprintlnbold_noloc (loc_convert_string "Press the USE key ( ") (loc_convert_string local.key) (loc_convert_string " ) to grab a ladder from above or below.")
+	$player playsound training_21 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key) (loc_convert_string " to grab a ladder.")
+	wait level.between_lines
+end
+
+dialog_down_ladder:
+	//"Look down and Press the FORWARD key and you will descend the ladder."
+	local.key = getboundkey1 "+forward"
+//	iprintlnbold_noloc (loc_convert_string "Look down and Press the FORWARD key ( ") (loc_convert_string local.key) (loc_convert_string " ) and you will descend the ladder.")
+	$player playsound training_22 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Look down and press ") (loc_convert_string local.key) (loc_convert_string " to descend the ladder.")
+	wait level.between_lines
+end
+
+dialog_explosives:
+	//"Approach the explosives and press the USE key to pick them up."
+	local.key = getboundkey1 "+use"
+//	iprintlnbold_noloc (loc_convert_string "Approach the explosives and press the USE key ( ") (loc_convert_string local.key) (loc_convert_string " ) to pick them up.")
+	$player playsound training_23 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key) (loc_convert_string " to get the explosives.")
+	wait level.between_lines
+end
+
+dialog_inventory:
+	//"Notice that an image of the explosives has appeared in the upper right corner of your hud."
+//	iprintlnbold "Notice that an image of the explosives has appeared in the upper right corner of your hud."
+	$player playsound training_24 wait
+	$player waittill sounddone
+	wait level.between_lines
+	
+	//"This is how you know what items you have in your inventory."
+//	iprintlnbold "This is how you know what items you have in your inventory."
+	$player playsound training_25 wait
+	$player waittill sounddone
+	wait level.between_lines
+	
+	//"The other image is of the radio which I am using to communicate with you."
+//	iprintlnbold "The other image is of the radio which I am using to communicate with you."
+	$player playsound training_26 wait
+	$player waittill sounddone
+	wait level.between_lines
+end
+
+dialog_plant_explosives:
+	//"A red transparent image of the explosives has appeared on the tank."
+//	iprintlnbold "A red transparent image of the explosives has appeared on the tank."
+	$player playsound training_27 wait
+	$player waittill sounddone
+	wait level.between_lines
+
+	//"Press the USE key while near the image to plant explosives on the tank."
+	local.key = getboundkey1 "+use"
+//	iprintlnbold_noloc (loc_convert_string "Press the USE key ( ") (loc_convert_string local.key) (loc_convert_string " ) while near the image to plant explosives on the tank.")
+	$player playsound training_28 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key) (loc_convert_string " to plant the bomb on the tank.")
+	wait level.between_lines
+	
+	//"Keep in mind that items you need to USE or destroy to complete your mission will also pulse red."
+	local.key = getboundkey1 "+use"
+//	iprintlnbold_noloc (loc_convert_string "Keep in mind that items you need to USE ( ") (loc_convert_string local.key) (loc_convert_string " ) or destroy to complete your mission will also pulse red.")
+	$player playsound training_29 wait
+	$player waittill sounddone
+	wait level.between_lines
+end
+
+dialog_moveaway_explosives:
+	//"Move away from the tank to avoid being injured."
+//	iprintlnbold "Move away from the tank to avoid being injured."
+	$player playsound training_30 wait
+	$player waittill sounddone
+	wait level.between_lines
+end
+
+dialog_doors:
+	//"Press the USE key to open doors."
+	local.key = getboundkey1 "+use"
+//	iprintlnbold_noloc (loc_convert_string "Press the USE key ( ") (loc_convert_string local.key) (loc_convert_string " ) to open doors.")
+	$player playsound training_31 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key) (loc_convert_string " to open doors.")
+	wait level.between_lines
+end
+
+dialog_locked_doors:
+	//"Some doors might be locked. The sound will clue you in."
+//	iprintlnbold "Some doors might be locked. The sound will clue you in."
+	$player playsound training_32 wait
+	$player waittill sounddone
+	wait level.between_lines
+end
+
+dialog_health:
+	//"You will automatically pick up first-aid supplies when your health is below 100%."
+//	iprintlnbold "You will automatically pick up first-aid supplies when your health is below 100%."
+	$player playsound training_33 wait
+	$player waittill sounddone
+	wait level.between_lines
+	
+	//"Same for ammunition and weapons--but remember that each weapon has a maximum amount of ammo you can carry."
+//	iprintlnbold "Same for ammunition and weapons--but remember that each weapon has a maximum amount of ammo you can carry."
+	$player playsound training_34 wait
+	$player waittill sounddone
+	wait level.between_lines
+	
+	//"Sometimes items are too far to be automatically picked up. Press the USE key to grab these items."
+	local.key = getboundkey1 "+use"
+//	iprintlnbold_noloc (loc_convert_string "Sometimes items are too far to be automatically picked up. Press the USE key ( ") (loc_convert_string local.key) (loc_convert_string " ) to grab these items.")
+	$player playsound training_35 wait
+	$player waittill sounddone
+	wait level.between_lines
+end
+
+dialog_pistol:
+	//"Select the Colt 45 by pressing the PISTOL key."
+	local.key = getboundkey1 "useweaponclass pistol"
+//	iprintlnbold_noloc (loc_convert_string "Select the Colt 45 by pressing the PISTOL key. ( ") (loc_convert_string local.key) (loc_convert_string " )")
+	$player playsound training_36 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key) (loc_convert_string " to switch to a pistol.")
+	wait level.between_lines
+
+	//"To neutralize an enemy without drawing undue attention, press the SECONDARY ATTACK key to activate the pistol whip."
+	local.secondary = getboundkey1 "+attacksecondary"
+//	iprintlnbold_noloc (loc_convert_string "To neutralize an enemy without drawing undue attention, press the SECONDARY ATTACK key ( ") (loc_convert_string local.secondary) (loc_convert_string " ) to activate the pistol whip.")
+	$player playsound training_37 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.secondary) (loc_convert_string " to pistol whip.")
+	wait level.between_lines
+	
+	//"Press the PRIMARY ATTACK key to fire any of your weapons."
+	local.primary = getboundkey1 "+attackprimary"
+//	iprintlnbold_noloc (loc_convert_string "Press the PRIMARY ATTACK key ( ") local.primary (loc_convert_string " ) to fire any of your weapons.")
+	$player playsound training_38 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.primary) (loc_convert_string " to fire.")
+	wait level.between_lines	
+	
+	//"Note that you are more accurate with all weapons when firing in short bursts and while not moving."
+//	iprintlnbold "Note that you are more accurate with all weapons when firing in short bursts and while not moving."
+	$player playsound training_39 wait
+	$player waittill sounddone
+	wait level.between_lines
+
+	//"Shoot the target a couple of times with the pistol."
+//	iprintlnbold "Shoot the target a couple of times with the pistol."
+	$player playsound training_40 wait
+	$player waittill sounddone
+	iprintlnbold "Shoot the target three times."
+	wait level.between_lines
+end
+
+dialog_thompson:
+	//"Switch to the Thompson by pressing the SMG key."
+	local.key = getboundkey1 "useweaponclass smg"
+//	iprintlnbold_noloc (loc_convert_string "Switch to the Thompson by pressing the SMG key. ( ") (loc_convert_string local.key) (loc_convert_string " )")
+	$player playsound training_41 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key) (loc_convert_string " to switch to a submachine gun.")
+	wait level.between_lines
+
+	//"You may reload any of your weapons at any time by pressing the RELOAD key."
+	local.key = getboundkey1 "reload"
+//	iprintlnbold_noloc (loc_convert_string "You may reload any of your weapons at any time by pressing the RELOAD key. ( ") (loc_convert_string local.key) (loc_convert_string " )")
+	$player playsound training_42 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key) (loc_convert_string " to reload.")
+	wait level.between_lines
+
+	//"You should always reload all of your weapons before going into combat."
+//	iprintlnbold "You should always reload all of your weapons before going into combat."
+	$player playsound training_43 wait
+	$player waittill sounddone
+	wait level.between_lines
+
+	//"Shoot the target twenty times with the Thompson."
+//	iprintlnbold "Shoot the target twenty times with the Thompson."
+	$player playsound training_44 wait
+	$player waittill sounddone
+	iprintlnbold "Shoot the target twenty times."
+	wait level.between_lines
+end
+	
+dialog_springfield:
+	//"Switch to the Springfield '03 Sniper Rifle by pressing the RIFLE key."
+	local.key = getboundkey1 "useweaponclass rifle"
+//	iprintlnbold_noloc (loc_convert_string "Switch to the Springfield '03 Sniper Rifle by pressing the RIFLE key. ( ") (loc_convert_string local.key) (loc_convert_string " )")
+	$player playsound training_45 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key) (loc_convert_string " to switch to a rifle.")
+	wait level.between_lines
+
+	//"Press the SECONDARY ATTACK key to toggle the sniper scope on and off."
+	local.key = getboundkey1 "+attacksecondary"
+//	iprintlnbold_noloc (loc_convert_string "Press the SECONDARY ATTACK key ( ") (loc_convert_string local.key) (loc_convert_string " ) to toggle the sniper scope on and off.")
+	$player playsound training_46 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key) (loc_convert_string " to use the scope.")
+	wait level.between_lines
+	
+	//"Use the scope and hit the farthest target on the red dot three times."
+//	iprintlnbold "Use the scope and hit the farthest target on the red dot three times."
+	$player playsound training_47 wait
+	$player waittill sounddone
+	iprintlnbold "Hit the farthest bulls eye three times."
+	wait level.between_lines
+end
+
+dialog_grenade:
+	//"Select the Frag Grenades by pressing the GRENADE key."
+	local.key = getboundkey1 "useweaponclass grenade"
+//	iprintlnbold_noloc (loc_convert_string "Select the Frag Grenades by pressing the GRENADE key. ( ") (loc_convert_string local.key) (loc_convert_string " )")
+	$player playsound training_48 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key) (loc_convert_string " to select a grenade.")
+	wait level.between_lines
+
+	//"The PRIMARY ATTACK for the grenades is a long throw."
+	local.key = getboundkey1 "+attackprimary"
+//	iprintlnbold_noloc (loc_convert_string "The PRIMARY ATTACK ( ") (loc_convert_string local.key) (loc_convert_string " ) for the grenades is a long throw.")
+	$player playsound training_49 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key) (loc_convert_string " for a long throw.")
+	wait level.between_lines
+
+	//"Use the SECONDARY ATTACK for shorter tosses."
+	local.key = getboundkey1 "+attacksecondary"
+//	iprintlnbold_noloc (loc_convert_string "Use the SECONDARY ATTACK ( ") (loc_convert_string local.key) (loc_convert_string " ) for shorter tosses.")
+	$player playsound training_50 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key) (loc_convert_string " for a short throw.")
+	wait level.between_lines	
+	
+	//"How long you hold the SECONDARY ATTACK key down affects how far you throw."
+	local.key = getboundkey1 "+attacksecondary"
+//	iprintlnbold_noloc (loc_convert_string "How long you hold the SECONDARY ATTACK key ( ") (loc_convert_string local.key) (loc_convert_string " ) down affects how far you throw.")
+	$player playsound training_51 wait
+	$player waittill sounddone
+	wait level.between_lines
+	
+	//"Use bank shots with the grenades to clear rooms where the enemy might be hiding."
+//	iprintlnbold "Use bank shots with the grenades to clear rooms where the enemy might be hiding."
+	$player playsound training_52 wait
+	$player waittill sounddone
+	wait level.between_lines
+		
+	//"Throw a grenade into each of the concrete boxes."
+//	iprintlnbold "Throw a grenade into each of the concrete boxes."
+	$player playsound training_53 wait
+	$player waittill sounddone
+	iprintlnbold "Throw a grenade into each of the concrete boxes."
+	wait level.between_lines
+end
+
+dialog_mg42:
+	//"Approach the MG42 stationary machine gun and press the USE key to activate it."
+	local.key = getboundkey1 "+use"
+//	iprintlnbold_noloc (loc_convert_string "Approach the MG42 stationary machine gun and press the USE key ( ") (loc_convert_string local.key) (loc_convert_string " ) to activate it.")
+	$player playsound training_54 wait
+	$player waittill sounddone
+//	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key) (loc_convert_string " to use the machine gun.")
+	wait level.between_lines	
+
+	//"Destroy the target with the machine gun."
+//	iprintlnbold "Destroy the target with the machine gun."
+	$player playsound training_55 wait
+	$player waittill sounddone
+	iprintlnbold "Destroy the target."
+	wait level.between_lines
+end
+
+dialog_end_warning:
+	//"Press the USE key on the red door at the end of the range to exit the firing range whenever you are ready.."
+	local.key = getboundkey1 "+use"
+//	iprintlnbold_noloc (loc_convert_string "Press the USE key ( ") (loc_convert_string local.key) (loc_convert_string " ) on the red door at the end of the range to exit the firing range whenever you are ready..")
+	$player playsound training_56 wait
+	$player waittill sounddone
+	iprintlnbold_noloc (loc_convert_string "Press ") (loc_convert_string local.key) (loc_convert_string " on the red door to exit the firing range.")
+	wait level.between_lines
+end
+
+dialog_end:
+	//"This training should help you keep your head under fire."
+//	iprintlnbold "This training should help you keep your head under fire."
+	$player playsound training_57 wait
+	$player waittill sounddone
+	wait level.between_lines
+	
+	//"You're dismissed, Lieutenant Powell. Good luck."
+//	iprintlnbold "You're dismissed, Lieutenant Powell. Good luck."
+	$player playsound training_58 wait
+	$player waittill sounddone
+	wait level.between_lines
+end
+
+
+
+
+
+
+
+
