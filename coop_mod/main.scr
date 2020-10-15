@@ -19,55 +19,18 @@
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+//ALL THIS CODE HAS TO BE STARTED IN A SINGLE FRAME, NO DELAYS
 //=========================================================================
 main:{
 //=========================================================================
-	local.threadName = "coop_mod/main.scr::main" //[200] Smithy - used for script load checks, also can be used in future scripts
+	//[200] Smithy - used for script load checks, also can be used in future scripts
+	local.threadName = "coop_mod/main.scr::main" 
 
-	game.ms 	= 0.0005 			//[200] Smithy - the shortest wait the game will allow (translates to 1ms)
-	game.true 	= bool 1 			//[200] Smithy - nice boolean handling. will be better for engine and me.
-	game.false 	= !game.true
-
-	//[200] chrissstrahl - restore default speed
-	if( int(getcvar("coop_dev")) == 1 || int(getcvar("developer")) > 0 ){ setcvar "timescale" 1 }
-
-	level.gametype						= int(getCvar("g_gametype"))		//[200] chrissstrahl - have the coop mod set it just to have it work always
-	level.coop_dedicated				= int(getcvar("dedicated"))		//[200] chrissstrahl - have this in a var, as we will need this more often in the future
-	level.coop_svmaxclients				= int(getcvar("sv_maxclients"))
-	level.coop_debugSpawn				= 0									//show (1) spawnlocations or not (0)
-	level.coop_playerReady				= 0									//player(s) are not ready/not joined
-	level.coop_disableSpawnWarper 		= FALSE								//[200] chrissstrahl - moved here for inizialisation
-
-	level.coop_gametypeHackOn			= 0			//[200] chrissstrahl - used to keep track when some script commands are executed that require the gametype to be set to Singleplayer
-	level.coop_gameStartedAt			= NIL		//[200] chrissstrahl - used to keep track when the first player was actually active
-	level.coop_lmsAllowJoin				= 1			//[200] chrissstrahl - allow players who just enter the game to join in in lms (once any player leaves server this will be 0)
-	level.coop_lmsLives					= 0			//[201] chrissstrahl - fixed typo //[200] chrissstrahl - number of lives players have in LMS
-	level.coop_musicCommandVol			= NIL
-	level.coop_musicCommand				= NIL
+	//[202] chrissstrahl - Inizialize required game and level variable for the coop mod
+	waitthread coop_mod/variables.scr::main
 	
-	level.coop_cvars["developer"] = int(getcvar "developer") 					//[200] Smithy - nicer to have console variables stored in same place
-	level.coop_cvars["coop_prevMapList"] = string(getcvar "coop_prevMapList") 	//[200] Smithy - so we can reset the sv_maplist cvar is it's populated
-
-	if(level.coop_inJeep				== NIL){ level.coop_inJeep					= 0 }		//used to check if player should be in jeep or not
-	if(level.coop_playerGlueIndividual	== NIL){ level.coop_playerGlueIndividual	= 0 }		//used for replacement of $player glue (individual spots)
-	if(level.coop_playerGlue			== NIL){ level.coop_playerGlue				= 0 }		//used for replacement of $player glue (glue is active)
-	if(level.coop_playerHide			== NIL){ level.coop_playerHide				= 0 }		//used for replacement of $player hide
-	if(level.coop_player				== NIL){ level.coop_player					= NULL }	//follow player for gloabal/fiendly.scr
-	if(level.coop_playerTank			== NIL){ level.coop_playerTank				= NULL }	//tank driving player for gloabal/vehicles_thinkers.scr
-	if(level.enemyhealthscalar			== NIL){ level.enemyhealthscalar			= 1 }		//health scaler - used in global/spawner.scr
-	if(level.coop_noWeapon				== NIL){ level.coop_noWeapon				= 0 }		//specifies if players should have no weapons
-	if(level.coop_threatbias			== NIL){ level.coop_threatbias				= 10 }		//specifies how badly the enemy considers the player a problem
-	if(level.coop_aaMap					== NIL){ level.coop_aaMap					= 0 }		//sets a map to be handles like in aa
-	if(level.coop_prespawn				== NIL){ level.coop_prespawn				= 1 }		//used for replace.scr::waitTillPrespawn
-	if(level.coopMedicHealth			== NIL){ level.coopMedicHealth				= 1000 }	//sets medic AI health
-
-	//[200] chrissstrahl - make sure to filter what ever is not part of the real filename
-	local.fullMapName = string(getcvar("mapname"));
-	level.coop_mapname = ""
-	for(local.current = 0; local.current < local.fullMapName.size;local.current++){
-		if(local.fullMapName[local.current] == "$"){ break }
-		level.coop_mapname += local.fullMapName[local.current]
-	}
+	//[200] chrissstrahl - restore default speed after automatic speed mapcheck
+	if( int(getcvar("coop_dev")) == 1 || int(getcvar("developer")) > 0 ){ setcvar "timescale" 1 }
 
 	//[200] chrissstrahl - moved here to get the real mapname - fixed it now
 	if(level.script	== NIL){ level.script	= "maps/"+level.coop_mapname+".scr" }
@@ -78,17 +41,24 @@ main:{
 		end
 	}
 	
-	//[201] chrissstrahl - reset last saved status if the map has changed
-	if( level.coop_mapname != getCvar("coop_prevMap")){
-		setcvar coop_save ""
-	}
-	setcvar coop_prevMap level.coop_mapname
-
-	setcvar "g_statefile" "coop_mod/player" 					//[200] Smithy - use different state files for coop
-	waitthread initMissionNames 								//[200] Smithy - initialise the mission names and their descriptions
-	thread setScoreboard 										//[200] Smithy - setup the scoreboard for this mission
-	thread resetMapList 										//[200] Smithy - reset sv_maplist
-	waitthread coop_mod/maplist.scr::main 						//[201] Smithy - populates the mapList array
+	//[202] chrissstrahl - once coop_mod/variables.scr::main is iniziallized set up the server
+	thread coop_mod/server.scr::main
+	
+	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
+	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
+	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
+	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
+	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
+	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
+	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
+	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
+	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
+	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
+	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
+	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
+	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
+	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
+	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
 	
 	//MULTIPLAYER////////////////////////// //[200] Smithy - not working properly anyway, but can cause issues when using restartMap func
 	//[200] chrissstrahl - check to load the last map on dedicated server
@@ -1891,128 +1861,6 @@ changePlayerFOV local.player local.fov:{
 	setcvar "developer" local.prevCvar
 }end
 
-//[200] Smithy - stop any previously loaded scoreboard data persisting on coop maps
-//also can be used to show details of current mission
-//=========================================================================
-setScoreboard:{
-//=========================================================================
-	setcvar "g_scoreboardpic" ("textures/mohmenu/dmloading/" + level.coop_mapname) //[200] chrissstrahl - added mappic as suggested
-	
-	//[200] chrissstrahl - break string up if it is to big
-	//i wanted to do it in a seperate func, I also wanted to make it so that it detects where there is a space and if the rest fits or not
-	//but my brain is to dead
-
-	//[200] Smithy - moves sub-name onto new line, uses one loop
-	local.mapDesc 	= level.coop_mapDescription[level.coop_mapname]	
-	local.maxChars 	= 24
-	local.descSize 	= local.mapDesc.size
-	local.line 		= 0
-	local.j 		= 0
-	local.subspace 	= 0
-
-	local.desc[0] = ""; local.desc[1] = ""; local.desc[2] = ""
-
-	for (local.i = 0; local.i <= (local.descSize - 1); local.i++){
-		if (local.mapDesc[local.j] == " " && local.mapDesc[local.j + 1] == "-"){ //put sub-name on new line
-			local.i = 0; local.j += 3; local.line++; local.subspace += 3			
-		}
-		local.desc[local.line] += local.mapDesc[local.j]
-		local.j++
-		if (local.descSize == ((local.desc[0] + local.desc[1] + local.desc[2]).size + local.subspace)){
-			break 
-		}	
-		if (local.i == local.maxChars){
-			local.i = 0
-			local.line++
-		}	
-	}	
-
-	setcvar "g_obj_alliedtext1" local.desc[0]
-	setcvar "g_obj_alliedtext2" local.desc[1]
-	setcvar "g_obj_alliedtext3" local.desc[2]
-	setcvar "g_obj_axistext1" ""
-	setcvar "g_obj_axistext2" ""
-	//[200] chrissstrahl - add info to score hud	
-	setcvar "g_obj_axistext3" "www.hazardmodding.com"
-}end
-
-//[200] Smithy - used for scoreboard - can be used for other stuff if needed
-// - added briefing dir to relevant map names
-//=========================================================================
-initMissionNames:{
-//=========================================================================
-	level.coop_mapDescription["briefing/briefing1"] = "Lighting the Torch"
-	level.coop_mapDescription["m1l1"] 				= "Rangers Lead the Way"
-	level.coop_mapDescription["m1l2a"] 				= "The Rescue Mission"
-	level.coop_mapDescription["m1l2b"] 				= "Sabotage the Motorpool"
-	level.coop_mapDescription["m1l3a"] 				= "Desert Road"
-	level.coop_mapDescription["m1l3b"] 				= "Grounding the Airfield"
-	level.coop_mapDescription["m1l3c"] 				= "Lighthouse"
-	level.coop_mapDescription["briefing/briefing2"] = "Scuttling the U-529"
-	level.coop_mapDescription["m2l1"] 				= "Secret Documents of the Kriegsmarine"
-	level.coop_mapDescription["m2l2a"] 				= "Naxos Prototype"
-	level.coop_mapDescription["m2l2b"] 				= "Inside the U-529"
-	level.coop_mapDescription["m2l2c"] 				= "Cover Blown"
-	level.coop_mapDescription["m2l3"] 				= "Escape from Trondheim"
-	level.coop_mapDescription["briefing/briefing3"] = "Operation Overlord"
-	level.coop_mapDescription["m3l1a"] 				= "Omaha Beach - The Landing"
-	level.coop_mapDescription["m3l1b"] 				= "Omaha Beach - Inside the Bunker"
-	level.coop_mapDescription["m3l2"] 				= "Battle in the Bocage"
-	level.coop_mapDescription["m3l3"] 				= "The Nebelwerfer Hunt"
-	level.coop_mapDescription["briefing/briefing4"] = "Behind Enemy Lines"
-	level.coop_mapDescription["m4l1"] 				= "Rendezvous with the Resistance"
-	level.coop_mapDescription["m4l2"] 				= "Diverting the Enemy"
-	level.coop_mapDescription["m4l3"] 				= "The Command Post"
-	level.coop_mapDescription["briefing/briefing5"] = "Day of the Tiger"
-	level.coop_mapDescription["m5l1a"] 				= "Sniper's Last Stand - Outskirts"
-	level.coop_mapDescription["m5l1b"] 				= "Sniper's Last Stand - City Hall"
-	level.coop_mapDescription["special"] 			= "Bazooka-Med"
-	level.coop_mapDescription["m5l2a"] 				= "The Hunt for the King Tiger - Destroyed Village"
-	level.coop_mapDescription["m5l2b"] 				= "The Hunt for the King Tiger - Country Road"
-	level.coop_mapDescription["m5l3"] 				= "The Bridge"
-	level.coop_mapDescription["briefing/briefing6"] = "The Return to Schmerzen"
-	level.coop_mapDescription["m6l1a"] 				= "The Siegfried Forest - Flak Guns"
-	level.coop_mapDescription["m6l1b"] 				= "The Siegfried Forest - Bunker Hill"
-	level.coop_mapDescription["m6l1c"] 				= "Das Sturmgewehr" //[200] chrissstrahl - Bad Article, it is "Das" not "Die"
-	level.coop_mapDescription["m6l2a"] 				= "The Communications Blackout"
-	level.coop_mapDescription["m6l2b"] 				= "The Schmerzen Express"
-	level.coop_mapDescription["m6l3a"] 				= "Storming Fort Schmerzen - Train Platform" //[200] Smithy - removed brackets for consistency
-	level.coop_mapDescription["m6l3b"] 				= "Storming Fort Schmerzen - Inner Facility"
-	level.coop_mapDescription["m6l3c"] 				= "Storming Fort Schmerzen - Chemical Plant"
-	level.coop_mapDescription["m6l3d"] 				= "Storming Fort Schmerzen - Final Run"
-	level.coop_mapDescription["m6l3e"] 				= "Storming Fort Schmerzen - Conclusion"
-	
-	//[200] chrissstrahl - added BT
-	//Should have a maxlength of 81 or it is cut off in scoreboard
-	//[200] Smithy - added 'Part' as it will look better on scoreboard
-	level.coop_mapDescription["e1l1"] = "Battle of Kasserine Pass - Part 1" 
-	level.coop_mapDescription["e1l2"] = "Battle of Kasserine Pass - Part 2"
-	level.coop_mapDescription["e1l3"] = "Operation Torch - Bizerte Fort"
-	level.coop_mapDescription["e1l4"] = "Operation Torch - Bizerte Harbor"
-	level.coop_mapDescription["e2l1"] = "Sicily"
-	level.coop_mapDescription["e2l2"] = "Operation Husky - Caltagirone"
-	level.coop_mapDescription["e2l3"] = "Operation Husky - Gela"
-	level.coop_mapDescription["e3l1"] = "Invasion of Monte Cassino - Part 1"
-	level.coop_mapDescription["e3l2"] = "Invasion of Monte Cassino - Part 2"
-	level.coop_mapDescription["e2l3"] = "Battle of Anzio"
-	level.coop_mapDescription["e2l4"] = "Battle of Monte Battaglia"
-}end
-
-//[200] Smithy - restore a maplist if there is one
-//this allows us to clear it on coop mission transition to stop mp maps
-//being loaded by engine
-//=========================================================================
-resetMapList:{
-//=========================================================================
-	if (level.coop_dedicated && level.coop_cvars["coop_prevMapList"]){
-		setcvar "coop_prevMapList" ""
-		setcvar "sv_maplist" level.coop_cvars["coop_prevMapList"]
-	}else if (!level.coop_dedicated){ //[200] Smithy - if it's a listen server, we don't need a maplist
-		setcvar "sv_maplist" "" 
-	}
-}end
-
-
 //[200] chrissstrahl - checks for changes every secound
 //=========================================================================
 updateServer:{
@@ -2064,33 +1912,17 @@ checkForVote:{
 	else if(local.cvarValue == "restartmap"){
 		thread restartMap
 	}
-	
-	/* not working, because dedicated servers does not execute cfg from callvote
-	else if(local.cvarValue == "quit"){
-	//magic happens in coop_mod/cfg/sv_quit.cfg
-	if(level.coop_dedicated == 0){
-	iprintlnbold_noloc("--")
-	iprintlnbold_noloc("Sorry - ONLY DEDICATED SERVERS CAN REBOOT")
-	iprintlnbold_noloc("--")
-	end
-	}
-	iprintlnbold_noloc("--")
-	iprintlnbold_noloc("========WARNING==========")
-	iprintlnbold_noloc("HZM Coop Mod will now quit and reboot the server")
-	iprintlnbold_noloc("--")
-	wait 3
-	iprintlnbold_noloc("--")
-	iprintlnbold_noloc("-- Please Reconnect ! --")
-	iprintlnbold_noloc("--")
-	wait 1
-	if(level.coop_dedicated){
-	for (local.i = 1;local.i <= $player.size;local.i++){
-	local.player = $player[local.i]
-	if( local.player != NULL ){
-	local.player stufftext "exec coop_mod/cfg/reconnect.cfg"
-	}
-	}
-	waitframe
-	}
-	}*/
 }end
+
+//[202] chrissstrahl - cleans the mapname of savepoints ($...) and returns it
+//=========================================================================
+getCleanMapname local.dirtyName:{
+//=========================================================================
+	local.fullMapName = string(local.dirtyName);
+	local.cleanName = ""
+	for(local.current = 0; local.current < local.fullMapName.size;local.current++){
+		if(local.fullMapName[local.current] == "$"){ break }
+		local.cleanName += local.fullMapName[local.current]
+	}
+}end local.cleanName
+
