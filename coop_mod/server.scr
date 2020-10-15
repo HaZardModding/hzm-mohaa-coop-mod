@@ -1,0 +1,90 @@
+//////////////////////////////////////////////
+// started by chrissstrahl on 2020.10.16 ([202])
+// 
+// Contains server related functions
+//
+//////////////////////////////////////////////
+
+//			NEEDS TO HAVE variables.scr ALREADY EXECUTED
+
+//This is executed at the erliest stage from main.scr::main
+//does set up the srever for coop usage
+//=========================================================================
+main:{
+//=========================================================================
+	//[201] chrissstrahl - reset last saved status if the map has changed
+	if( level.coop_mapname != getCvar("coop_prevMap")){ setcvar coop_save "" }
+	
+	//[201] chrissstrahl - set this map as previouse loadad
+	setcvar coop_prevMap level.coop_mapname
+	
+	//[200] Smithy - use different state files for coop
+	setcvar "g_statefile" "coop_mod/player"
+	
+	//[200] Smithy - setup the scoreboard for this mission
+	thread setScoreboard
+	
+	//[200] Smithy - reset sv_maplist	
+	thread resetMapList							
+}end
+
+//[200] Smithy - stop any previously loaded scoreboard data persisting on coop maps
+// Used to show details of current mission
+//=========================================================================
+setScoreboard:{
+//=========================================================================
+	setcvar "g_scoreboardpic" ("textures/mohmenu/dmloading/" + level.coop_mapname) //[200] chrissstrahl - added mappic as suggested
+	
+	//[200] chrissstrahl - break string up if it is to big
+	//i wanted to do it in a seperate func, I also wanted to make it so that it detects where there is a space and if the rest fits or not
+	//but my brain is to dead
+
+	//[200] Smithy - moves sub-name onto new line, uses one loop
+	local.mapDesc 	= level.coop_mapDescription[level.coop_mapname]	
+	local.maxChars 	= 24
+	local.descSize 	= local.mapDesc.size
+	local.line 		= 0
+	local.j 		= 0
+	local.subspace 	= 0
+
+	local.desc[0] = ""; local.desc[1] = ""; local.desc[2] = ""
+
+	for (local.i = 0; local.i <= (local.descSize - 1); local.i++){
+		if (local.mapDesc[local.j] == " " && local.mapDesc[local.j + 1] == "-"){ //put sub-name on new line
+			local.i = 0; local.j += 3; local.line++; local.subspace += 3			
+		}
+		local.desc[local.line] += local.mapDesc[local.j]
+		local.j++
+		if (local.descSize == ((local.desc[0] + local.desc[1] + local.desc[2]).size + local.subspace)){
+			break 
+		}	
+		if (local.i == local.maxChars){
+			local.i = 0
+			local.line++
+		}	
+	}	
+
+	setcvar "g_obj_alliedtext1" local.desc[0]
+	setcvar "g_obj_alliedtext2" local.desc[1]
+	setcvar "g_obj_alliedtext3" local.desc[2]
+	setcvar "g_obj_axistext1" ""
+	setcvar "g_obj_axistext2" ""
+	//[200] chrissstrahl - add info to score hud	
+	setcvar "g_obj_axistext3" "www.hazardmodding.com"
+}end
+
+
+//[200] Smithy - restore a maplist if there is one
+//this allows us to clear it on coop mission transition to stop mp maps
+//being loaded by engine
+//=========================================================================
+resetMapList:{
+//=========================================================================
+	if (level.coop_dedicated && level.coop_cvars["coop_prevMapList"]){
+		setcvar "coop_prevMapList" ""
+		setcvar "sv_maplist" level.coop_cvars["coop_prevMapList"]
+	}else if (!level.coop_dedicated){ //[200] Smithy - if it's a listen server, we don't need a maplist
+		setcvar "sv_maplist" "" 
+	}
+}end
+
