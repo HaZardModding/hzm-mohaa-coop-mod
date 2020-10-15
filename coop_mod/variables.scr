@@ -25,7 +25,9 @@ main:{
 	level.coop_lmsLives					= 0			//[201] chrissstrahl - fixed typo //[200] chrissstrahl - number of lives players have in LMS
 	level.coop_musicCommandVol			= NIL
 	level.coop_musicCommand				= NIL
-
+	level.coop_mapname					= thread coop_mod/main.scr::getCleanMapname (getcvar("mapname")) //[202] chrissstrahl - get current mapname from cvar have it cleaned and available
+	
+	if(level.script						== NIL){ level.script	= "maps/"+level.coop_mapname+".scr" } //used to set current map script (used frequently)
 	if(level.coop_inJeep				== NIL){ level.coop_inJeep					= 0 }		//used to check if player should be in jeep or not
 	if(level.coop_playerGlueIndividual	== NIL){ level.coop_playerGlueIndividual	= 0 }		//used for replacement of $player glue (individual spots)
 	if(level.coop_playerGlue			== NIL){ level.coop_playerGlue				= 0 }		//used for replacement of $player glue (glue is active)
@@ -39,10 +41,79 @@ main:{
 	if(level.coop_prespawn				== NIL){ level.coop_prespawn				= 1 }		//used for replace.scr::waitTillPrespawn
 	if(level.coopMedicHealth			== NIL){ level.coopMedicHealth				= 1000 }	//sets medic AI health
 	
-	//[202] chrissstrahl - get current mapname from cvar have it cleaned and available
-	level.coop_mapname = thread coop_mod/main.scr::getCleanMapname (getcvar("mapname"))
+	//[202] chrissstrahl - don't populate these vars in singleplayer
+	//pretty sure there are more vars that should go below this line but we haven't got the time to sort them out
+	if(level.gametype == 0){ end }
+	
+	//[202] chrissstrahl - made to thread, not time critical
+	thread coop_mod/maplist.scr::main			//[201] Smithy - populates the mapList array
+	thread initMissionNames						//[200] Smithy - initialise the mission names and their descriptions
 	
 	//[200] Smithy - nicer to have console variables stored in same place 	
 	level.coop_cvars["developer"] = int(getcvar "developer") 		
-	level.coop_cvars["coop_prevMapList"] = string(getcvar "coop_prevMapList")	//[200] Smithy - so we can reset the sv_maplist cvar is it's populated	
+	level.coop_cvars["coop_prevMapList"] = string(getcvar "coop_prevMapList")	//[200] Smithy - so we can reset the sv_maplist cvar is it's populated
 }end
+
+
+//[200] Smithy - used for scoreboard - can be used for other stuff if needed
+// - added briefing dir to relevant map names
+//=========================================================================
+initMissionNames:{
+//=========================================================================
+	level.coop_mapDescription["briefing/briefing1"] = "Lighting the Torch"
+	level.coop_mapDescription["m1l1"] 				= "Rangers Lead the Way"
+	level.coop_mapDescription["m1l2a"] 				= "The Rescue Mission"
+	level.coop_mapDescription["m1l2b"] 				= "Sabotage the Motorpool"
+	level.coop_mapDescription["m1l3a"] 				= "Desert Road"
+	level.coop_mapDescription["m1l3b"] 				= "Grounding the Airfield"
+	level.coop_mapDescription["m1l3c"] 				= "Lighthouse"
+	level.coop_mapDescription["briefing/briefing2"] = "Scuttling the U-529"
+	level.coop_mapDescription["m2l1"] 				= "Secret Documents of the Kriegsmarine"
+	level.coop_mapDescription["m2l2a"] 				= "Naxos Prototype"
+	level.coop_mapDescription["m2l2b"] 				= "Inside the U-529"
+	level.coop_mapDescription["m2l2c"] 				= "Cover Blown"
+	level.coop_mapDescription["m2l3"] 				= "Escape from Trondheim"
+	level.coop_mapDescription["briefing/briefing3"] = "Operation Overlord"
+	level.coop_mapDescription["m3l1a"] 				= "Omaha Beach - The Landing"
+	level.coop_mapDescription["m3l1b"] 				= "Omaha Beach - Inside the Bunker"
+	level.coop_mapDescription["m3l2"] 				= "Battle in the Bocage"
+	level.coop_mapDescription["m3l3"] 				= "The Nebelwerfer Hunt"
+	level.coop_mapDescription["briefing/briefing4"] = "Behind Enemy Lines"
+	level.coop_mapDescription["m4l1"] 				= "Rendezvous with the Resistance"
+	level.coop_mapDescription["m4l2"] 				= "Diverting the Enemy"
+	level.coop_mapDescription["m4l3"] 				= "The Command Post"
+	level.coop_mapDescription["briefing/briefing5"] = "Day of the Tiger"
+	level.coop_mapDescription["m5l1a"] 				= "Sniper's Last Stand - Outskirts"
+	level.coop_mapDescription["m5l1b"] 				= "Sniper's Last Stand - City Hall"
+	level.coop_mapDescription["special"] 			= "Bazooka-Med"
+	level.coop_mapDescription["m5l2a"] 				= "The Hunt for the King Tiger - Destroyed Village"
+	level.coop_mapDescription["m5l2b"] 				= "The Hunt for the King Tiger - Country Road"
+	level.coop_mapDescription["m5l3"] 				= "The Bridge"
+	level.coop_mapDescription["briefing/briefing6"] = "The Return to Schmerzen"
+	level.coop_mapDescription["m6l1a"] 				= "The Siegfried Forest - Flak Guns"
+	level.coop_mapDescription["m6l1b"] 				= "The Siegfried Forest - Bunker Hill"
+	level.coop_mapDescription["m6l1c"] 				= "Das Sturmgewehr" //[200] chrissstrahl - Bad Article, it is "Das" not "Die"
+	level.coop_mapDescription["m6l2a"] 				= "The Communications Blackout"
+	level.coop_mapDescription["m6l2b"] 				= "The Schmerzen Express"
+	level.coop_mapDescription["m6l3a"] 				= "Storming Fort Schmerzen - Train Platform" //[200] Smithy - removed brackets for consistency
+	level.coop_mapDescription["m6l3b"] 				= "Storming Fort Schmerzen - Inner Facility"
+	level.coop_mapDescription["m6l3c"] 				= "Storming Fort Schmerzen - Chemical Plant"
+	level.coop_mapDescription["m6l3d"] 				= "Storming Fort Schmerzen - Final Run"
+	level.coop_mapDescription["m6l3e"] 				= "Storming Fort Schmerzen - Conclusion"
+	
+	//[200] chrissstrahl - added BT
+	//Should have a maxlength of 81 or it is cut off in scoreboard
+	//[200] Smithy - added 'Part' as it will look better on scoreboard
+	level.coop_mapDescription["e1l1"] = "Battle of Kasserine Pass - Part 1" 
+	level.coop_mapDescription["e1l2"] = "Battle of Kasserine Pass - Part 2"
+	level.coop_mapDescription["e1l3"] = "Operation Torch - Bizerte Fort"
+	level.coop_mapDescription["e1l4"] = "Operation Torch - Bizerte Harbor"
+	level.coop_mapDescription["e2l1"] = "Sicily"
+	level.coop_mapDescription["e2l2"] = "Operation Husky - Caltagirone"
+	level.coop_mapDescription["e2l3"] = "Operation Husky - Gela"
+	level.coop_mapDescription["e3l1"] = "Invasion of Monte Cassino - Part 1"
+	level.coop_mapDescription["e3l2"] = "Invasion of Monte Cassino - Part 2"
+	level.coop_mapDescription["e2l3"] = "Battle of Anzio"
+	level.coop_mapDescription["e2l4"] = "Battle of Monte Battaglia"
+}end
+
