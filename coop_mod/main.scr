@@ -1,14 +1,23 @@
 //////////////////////////////////////////////
-// created by chrissstrahl on 2018.06.28
-// VERSION 2.00
+// VERSION 1.0 started by chrissstrahl on 2018.06.28
+// CURRENT VERSION 2.02
 //
 // This contains the main functions for the HaZardModding Coop Mod for
 // - Allied Assault
 // - Breaktrough
 
 //WARNING these files contain Adult commentary
-//WARNING these files contain Adult commentary
-//WARNING these files contain Adult commentary
+
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//					THIS IS VERY IMPORTANT - READ THIS
+// - there are a few functions that need to be timed just right for the Mod to work
+// - do not introduce any delay like wait or waitframe, in or before these functions are called
+// - delay will make these functions no longer reliable
+// - main, manageplayers
+// - please consult chrissstrahl or smithy for followup questions
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 //=========================================================================
 main:{
@@ -36,8 +45,7 @@ main:{
 	level.coop_lmsLives					= 0			//[201] chrissstrahl - fixed typo //[200] chrissstrahl - number of lives players have in LMS
 	level.coop_musicCommandVol			= NIL
 	level.coop_musicCommand				= NIL
-
-
+	
 	level.coop_cvars["developer"] = int(getcvar "developer") 					//[200] Smithy - nicer to have console variables stored in same place
 	level.coop_cvars["coop_prevMapList"] = string(getcvar "coop_prevMapList") 	//[200] Smithy - so we can reset the sv_maplist cvar is it's populated
 
@@ -146,7 +154,7 @@ removeFakePlayer:
 	if (level.coop_dedicated){
 		if ($player && $player[1].netname == "*** Blank Name ***" && $player[1].entnum == 0){
 			$player[1] delete
-			waitframe
+			//waitframe //[202] chrissstrahl - this was causing unhealthy delay in main.scr::manageplayers
 		}		
 	}
 end
@@ -529,7 +537,11 @@ managePlayers:{
 						//move player to spawn
 						thread playerPlaceAtSpawn local.i //[200] Smithy - is this needed so many times?
 					}
+					
+					//[202] chrissstrahl - code was moded to event based thread
+					//main.scr::playerSpawnEvent
 					//NOT ACTIVE YET///////////////////////////////////////
+/*
 					if(local.player.flags["coop_isActive"] != 1){
 						//iprintlnbold_noloc("not active")
 						if( local.player.flags["coop_iAmTruelyActive"] != 1 ){
@@ -580,6 +592,7 @@ managePlayers:{
 //[200] CHRISSTRAHL /// LMS /// ///////////// check if player should be spectator in LMS
 						thread lmsForceSpectatorHandle local.player
 					}
+*/
 // RESPAWNING & RESTORE /////////////////////////////////////////
 					if(local.player.flags["coop_respawning"] == TRUE){
 						if( level.coop_disableSpawnWarper != TRUE && vector_length( local.player.flags["coop_respawnOrigin"] ) > 10){
@@ -681,7 +694,7 @@ managePlayers:{
 playerSpawnEvent:{
 //=========================================================================
 	local.player = self
-	if (!local.player.isSpectator){ 						//isSpectator is a built-in BT bool, more efficient than checking for dmteam string
+	if (!local.player.isSpectator){ //isSpectator is a built-in BT bool, more efficient than checking for dmteam string
 		//---------------------// func calls here
 		thread coop_mod/itemhandler.scr::managePlayerInventory 		//handle his inventory
 		thread itemGetAll                                        	//give him any inv items
@@ -694,6 +707,11 @@ playerSpawnEvent:{
 		//---------------------//
 
 		//Add anymore spawn stuff here
+		
+		//@chrissstrahl
+		//place at spawn
+		//SET READY VAR
+		//check what else needs to be ported from original hanlde
 	}						
 }end
 
