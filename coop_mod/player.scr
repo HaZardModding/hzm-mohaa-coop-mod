@@ -1,0 +1,354 @@
+//////////////////////////////////////////////
+// started by chrissstrahl on 2020.10.16 ([202])
+// 
+// Contains player related functions
+//
+//////////////////////////////////////////////
+
+//this gets everything ready to manage players
+//=========================================================================
+main:{
+//=========================================================================
+	//start manager for players
+	thread manage
+}end
+
+//this manages players previously done by: main.scr::managePlayers
+//=========================================================================
+manage:{
+//=========================================================================
+	//wait for any player to join server
+	level waittill spawn
+	
+	//remove placeholder player - relict from singleplayer
+	waitthread removeFakePlayer
+	
+	//[200] Smithy - reset any vars that may have transferred from previous map
+	waitthread resetPlayers
+	
+	//[202] chrissstrahl - handle players
+	while(1){
+		//[200] chrissstrahl - used to detect when a player leaves/joins
+		local.prevPlayerCount = 0
+		
+		//[202] chrissstrahl - if server is empty wait
+		if( $player == NULL || $player.size == 0 ){
+			waitframe
+			continue
+		}
+		
+		//[202] chrissstrahl - handle all players
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+			
+			//[200] chrissstrahl - used for LMS to detect when a player leaves
+			local.playerCount++
+			
+/////////////////////////////////////////SETUP
+			if(	local.player.flags["coop_isActive"] == NIL){
+				waitthread manageSetup local.player
+			}
+/////////////////////////////////////////SPECTATOR
+			if( local.player.isSpectator ){
+				waitthread manageSpectator local.player
+			}
+////////////////////////////////////////NO SPECTATOR
+			else{
+				waitthread manageNoSpectator local.player
+/////////////////////////////////////////ALIVE
+				if( local.player.health > 0 ){
+					//spawning is event based handled in: main.scr::playerSpawnEvent
+					
+					waitthread manageAlive local.player local.i
+				}
+/////////////////////////////////////////DEAD
+				//death is event based handled in: main.scr::playerDeathEvent
+			}
+		}
+		
+		//[200] chrissstrahl - call player changed func if number of players changed
+		if(local.prevPlayerCount != local.playerCount){
+			waitthread coop_mod/main.scr::playerCountChanged local.prevPlayerCount local.playerCount
+		}
+
+		//[200] chrissstrahl - LMS - check if condistions have changed
+		waitthread coop_mod/main.scr::lmsCheckLives local.prevPlayerCount local.playerCount
+
+		//[200] chrissstrahl - keep track of player count
+		local.prevPlayerCount = local.playerCount
+	
+		//[202] chrissstrahl - all this needs to be done only once per server frame (sv_fps)
+		waitframe
+	}
+}end
+
+//does first time setup on a player
+//called from ::manage if local.player.flags["coop_isActive"] == NIL
+//=========================================================================
+manageSetup local.player:{
+//=========================================================================
+//Host detection
+	if(!level.coop_dedicated){
+		//[200] Smithy - as this is a bool, just do it in one line
+		local.player.flags["coop_isHost"] = local.player.entnum == 0
+	}
+
+//LMS reconnect protection
+	//During LMS add deaths to prevent player from playing if he is not allowed to
+	//New players are not allowed in if one player left before on the current map
+	//this prevents players from just reconnecting when dead
+	if( level.coop_lmsAllowJoin != 1){
+		local.lmsLives = level.coop_lmsLives
+		if(local.lmsLives > 0){
+			local.player.flags["coop_deaths"] = local.lmsLives
+		}
+	}
+	
+//SPECTATOR forceing
+	//force player in spec to prevent any issues
+	//WARNING:	WARNING:	WARNING:	WARNING:
+	//the code depends on vars set and code executed
+	//the same stuff is done when entering spectator
+	//so the following code was disabled but keept for reference:
+	//	local.player.fnum = -100
+	//	local.player.flags["coop_iAmTruelyActive"] = 0
+	//	local.player.flags["coop_isActive"] = -1
+	//	local.player.flags["coop_justSpawnedDone"] = NIL
+	//	waitthread coop_mod/main.scr::resetSpawn local.player
+	local.player spectator
+	
+//VARIABLES initialization 
+	local.player.flags["coop_lastRespawn"] = -1
+	local.player.flags["coop_joinedGameAt"] = level.time
+}end
+
+//spectator handle
+//called from ::manage if player is spectator
+//=========================================================================
+manageSpectator local.player:{
+//=========================================================================
+//SETUP when entering spectator
+	//run only once per spectator join
+	if(	local.player.flags["coop_isActive"] != -1 ){
+		//Notify scripts instantly this player is no longer valid
+		local.player.flags["coop_isActive"] = -1
+		local.player.flags["coop_iAmTruelyActive"] = 0
+		local.player.flags["coop_justSpawnedDone"] = NIL
+		
+		//this is used for friendly orientation see global/friendly::playernode
+		local.player.fnum = -100
+		
+		local.player unglue
+		local.player threatbias ignoreme		
+
+		waitthread coop_mod/main.scr::resetSpawn local.player
+	}
+//WHILE in spectator
+	//do not allow player in just right away, wait for next handle (1 frametime)
+	else{
+		//[200] Smithy - now we just check for fire button to auto join them to allies and skip weapon menu
+		//[200] Smithy - put here to stop spam that prevents players typing/using menu
+		if (local.player.primaryfireheld){
+			thread coop_mod/main.scr::skipTeamAndWeaponSelect local.player
+		}
+	}
+}end
+
+//no spectator player handling
+//called from ::manage if player is not a spectator
+//=========================================================================
+manageNoSpectator local.player:{
+//=========================================================================
+//PHYSICS
+	if( level.coop_physicsOff != NIL && level.coop_physicsOff == 1){ local.player physics_off }
+	
+//PLACE at spawn
+	//this makes sure that the player does not get spawned anywhere in the map
+	//where he was spectating at, the moment the player spawns he needs to be
+	//already at the spawnlocation or he can telefrag a player, friendly or enemy
+	thread coop_mod/main.scr::playerPlaceAtSpawn local.player
+}end
+
+//alive player handling
+//called from ::manage if player is not a spectator and has positive health
+//=========================================================================
+manageAlive local.player:{
+//=========================================================================
+//Code that is executed upon spawning is now in:
+//coop_mod/main.scr::playerSpawnEvent
+
+// SAVE CURRENT LOCATION FOR RESTORING ON RESPAWN /////
+	if( level.coop_disableSpawnWarper != TRUE && !level.coop_playerGlue ){
+		waitthread manageAliveSaveLocation local.player
+	}
+}end
+
+//alive Spawning player handling
+//called from main.scr::playerSpawnEvent if player just spawned
+//=========================================================================
+manageAliveSpawning local.player:{
+//=========================================================================
+	//isSpectator is a built-in BT bool, more efficient than checking for dmteam string
+	//force them into allies if they spawned as axis and abort current handling
+	if(thread coop_mod/main.scr::forceValidTeam ){
+		//reset the respawn location, makes player spawn at predefined location
+		waitthread coop_mod/main.scr::resetSpawn local.player
+		end
+	}
+	
+	//LAST MAN STANDING
+	if( thread coop_mod/main.scr::lmsForceSpectatorHandle local.player ){
+		end
+	}
+	
+	// RESPAWNING /////////////////////////////////////////
+	//place at spawn or respawn, this needs to be done regardless of glueing
+	if(local.player.flags["coop_respawning"] == TRUE){
+		waitthread coop_mod/player.scr::manageAliveRespawning local.player
+		thread coop_mod/main.scr::startThread ( "maps/"+level.coop_mapname+".scr::coop_playerJustRespawned" ) (local.player)
+	}else{	
+		thread coop_mod/main.scr::playerPlaceAtSpawn local.player
+		thread coop_mod/main.scr::startThread ( "maps/"+level.coop_mapname+".scr::coop_playerJustSpawned" ) (local.player)
+	}
+	
+	//INVENTORY
+	thread coop_mod/itemhandler.scr::managePlayerInventory
+	thread coop_mod/main.scr::itemGetAll
+	thread coop_mod/main.scr::playerHealth	
+	
+	//GLUE
+	thread coop_mod/main.scr::playerGlue local.player "spawn"	
+
+	//VARIABLES
+	local.player.fnum = -1		//this is used for friendly orientation see global/friendly::playernode
+	local.player.flags["coop_iAmTruelyActive"] = 1
+	local.player.flags["coop_isActive"] = 1
+	local.player.flags["coop_isAlive"] = game.true
+	local.player threatbias level.coop_threatbias
+	local.player solid
+	local.player american
+	
+	//HIDE PLAYER
+	if( level.coop_playerHide ){
+		local.player hide
+	}
+		
+	//PLAYER READY
+	//[202] chrissstrahl	
+	//a player has joined a team and picked a weapon
+	//notify other scripts that the mission can now start
+	level.coop_playerReady = 1
+}end
+
+//alive respawning player handling
+//called from player.scr::manageAliveSpawning if player just respawned
+//=========================================================================
+manageAliveRespawning local.player:{
+//=========================================================================
+	//respawn if allowed at last pos before death of player
+	//also do not respawn if coop_respawnOrigin flag is set to 0 0 0 or something very close
+	if( level.coop_disableSpawnWarper != TRUE && vector_length( local.player.flags["coop_respawnOrigin"] ) > 10){
+		
+		//make player solid as soon as possible (checks if inside other players or friendly)
+		thread coop_mod/main.scr::playerMakeSolidAsap local.player
+		
+		//remember when we last respawned, prevent placeing to close at spawnlocation
+		local.player.flags["coop_lastRespawn"] = level.time 
+		local.player origin ( local.player.flags["coop_respawnOrigin"] )
+		
+		//set angle - need to call this delayed or it will not work most of the time in mp
+		if(local.player.flags["coop_respawnAngle"] != 0){
+			local.player thread coop_mod/main.scr::playerFace ( 0 local.player.flags["coop_respawnAngle"] 0 )
+		}
+	}
+	//location restore is off or not possible. spawn at predefined spawnlocation
+	else{
+		thread coop_mod/main.scr::playerPlaceAtSpawn local.player
+	}
+	local.player.flags["coop_respawning"] = FALSE
+}end
+
+//alive player handling - used to save location on player
+//called from ::manageAlive if
+// player is not a spectator and has positive health
+// player has flag set: local.player.flags["coop_respawning"] != TRUE
+// if global var level.coop_disableSpawnWarper != TRUE
+//=========================================================================
+manageAliveSaveLocation local.player:{
+//=========================================================================
+	if(	local.player.flags["coop_respawnTime"] == NIL || local.player.flags["coop_respawnTime"] < (level.time + 2) ){
+		local.player.flags["coop_respawnTime"]		= level.time
+		local.player.flags["coop_respawnOrigin"]	= local.player.origin
+		local.player.flags["coop_respawnAngle"]		= local.player.viewangles[1]
+	}
+}end
+
+//handles dead player
+//called from ::manage if player health is negative or 0
+//=========================================================================
+manageDead local.player:{
+//=========================================================================
+	local.player.flags["coop_iAmTruelyActive"] = 0
+	if(	local.player.flags["coop_isActive"] != -2 ){
+/// LMS Handle
+		if( level.coop_lmsLives > 0 ){
+			//handle death count
+			local.deaths = local.player.flags["coop_deaths"]
+			local.deaths++
+			local.player.flags["coop_deaths"] = local.deaths
+			
+			//print info to player hud
+			local.deaths = (level.coop_lmsLives - local.deaths)
+			if(local.deaths < 0){local.deaths=0}
+			
+			local.deaths = ( "You have [ " + local.deaths + " ] lives left - LastManStanding is active!" ) //[201] chrissstrahl - fixed typo
+			local.player iprint local.deaths 0
+		}
+		thread coop_mod/main.scr::lmsForceSpectatorHandle local.player
+		
+// REGULAR dead handle
+		local.player.flags["coop_isActive"] = -2
+		local.player.flags["coop_justSpawnedDone"] = NIL
+		local.player.flags["coop_respawning"] = TRUE
+		local.player.fnum = -100
+		
+		local.player unglue
+		local.player physics_on
+		local.player threatbias ignoreme
+		
+		//[200] chrissstrahl - start thread in main level-script
+		//used to handle stuff when player dies
+		//used to make sure player is not respawning in a vehicle or something
+		//
+		//There are these optional functions calls:
+		//- FIRST SPAWN:	coop_playerJustSpawned
+		//- EACH RESPAWN:	coop_playerJustRespawned
+		//- EACH DEATH:		coop_playerJustDied
+		thread coop_mod/main.scr::startThread ( "maps/"+level.coop_mapname+".scr::coop_playerJustDied" ) (local.player)
+	}
+}end
+
+//[200] Smithy - fresh dedi servers will have a fake player on startup.
+//we don't need it, and it may mess first client up that takes its spot
+//e.g. 'press fire to join game' doesn't show for first client to join
+//server.
+//This fake player may also mess with map restarts (e.g. missionfailed)
+//=========================================================================
+removeFakePlayer:{
+//=========================================================================
+	if (level.coop_dedicated){
+		if ($player && $player[1].netname == "*** Blank Name ***" && $player[1].entnum == 0){
+			$player[1] delete
+		}		
+	}
+}end
+
+//[200] Smithy - on listen servers vars can carry over from map to map
+//=========================================================================
+resetPlayers:{
+//=========================================================================
+	for (local.i = 1; local.i <= $player.size; local.i++){
+		$player[local.i].flags["coop_isActive"] = NIL
+	}
+}end
+
