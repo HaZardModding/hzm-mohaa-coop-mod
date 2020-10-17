@@ -42,100 +42,36 @@ main:{
 	}
 	
 	//[202] chrissstrahl - once coop_mod/variables.scr::main is iniziallized set up the server
-	thread coop_mod/server.scr::main
+	waitthread coop_mod/server.scr::main
 	
-	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
-	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
-	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
-	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
-	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
-	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
-	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
-	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
-	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
-	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
-	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
-	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
-	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
-	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
-	//until here i got then i got so tired that I eigther had to sleep or die, I decided to sleep
+	//chrissstrahl - create spawnpoints for coop
+	waitthread coop_mod/spawnlocations.scr::main
 	
-	//MULTIPLAYER////////////////////////// //[200] Smithy - not working properly anyway, but can cause issues when using restartMap func
-	//[200] chrissstrahl - check to load the last map on dedicated server
-	// if(level.gametype != 0 ){//&& level.coop_dedicated != 0
-	// 	local.lastmapname = getcvar("ui_startmap")
-	// 	if(local.lastmapname != "" && level.coop_mapname != local.lastmapname){
-	// 		exec global/missioncomplete.scr local.lastmapname
-	// 		end
-	// 	}
-	// }
+	//chrissstrahl - handles spawning, respawning spectator, generic stuff each frame
+	thread coop_mod/player.scr::manage
+
+	//[200] Smithy - initialises the weapon loadout array for this level - moved from itemhandler.scr
+	exec coop_mod/loadout.scr
 	
-    //[200] Smithy - used in coop_mod/aihandler.scr
-    level.coop_actorArray["german"][1]      = NIL
-    level.coop_actorArray["american"][1]    = NIL
-    //if you wish to modify this later on, use 'exec coop_mod/aihandler.scr::updateTeamRunSpeed <team> <speed>'
-    level.coop_aaRunSpeed["american"]       = 0.75  			//75% of SH/BT run speed - do not touch, managed in func ::updateTeamRunSpeed
-    level.coop_maxPlayerScalar              = 4     			//after this number of players, stop scaling difficulty (lower number means steeper difficulty scaling)
-    level.coop_actorAccuracyCalcs           = game.true     	//do dynamic enemy accuracy calculations for difficulty
-    level.coop_actorPainHandler             = game.true     	//use coop method of handling pain
-
-    //list of maps to exclude from custom pain handler
-    //disguise maps should be excluded, as when in disguise the engine doesn't call pain.scr
-    //omaha is excluded because it is heavily scripted with its own pain events for AI
-    level.coop_painHandlerExclusions 		= "m3l1a"::"m2l2a"::"m2l2b"::"m6l1c"::"e1l3"::"e1l4"
-    															//you can exclude entire games from this by using first char and wildcard *
-    															//e.g to exclude all BT maps add "e*" to list
-    //[200] Smithy - used in coop_mod/itemhandler.scr
-    level.coop_itemHandler					= game.true		//use the coop item handler
-    level.coop_healthDropFreq 				= 5 			//every num of axis deaths drop a health kit (5 is default engine behavior)
-    level.coop_healthRespawnTime 			= 30 			//respawn time (seconds) for world (bsp or script) health items
-	level.coop_ammoRespawnTime 				= 30 			//respawn time (seconds) for world (bsp or script) weapon and ammo items
-	level.coop_retainInventory 				= game.true 	//keep all weapons from previous life
-	level.coop_disableHealthItems 			= game.false	//disable all health items except for enemy drops and scripted items (those with targetnames)
-	level.coop_disableAmmoItems 			= game.false 	//disable all ammo items except for scripted items (those with targetnames)
-
-	level.coop_changeGameTypeDebug 			= game.true 	//[200] Smithy - whether or not to print debug info for changeGameType func
-
-	thread setupServer															//chrissstrahl - inizial setup, might be deprecated
-	thread managePlayers														//chrissstrahl - handles spawning, respawning spectator, generic stuff each frame
-	thread coop_mod/events.scr::initialiseEvents								//[200] Smithy - initialise all events we need
-	exec coop_mod/loadout.scr 													//[200] Smithy - initialises the weapon loadout array for this level - moved from itemhandler.scr
-	waitthread coop_mod/spawnlocations.scr::main								//chrissstrahl - create spawnpoints for coop
-	waitthread mom/mom.scr::setup "coop_mod/mom_actions.scr" 2 "coop_mom"		//chrissstrahl - set coop mod specific mom file
-	thread coop_mod/itemhandler.scr::disableAllWeaponsOnMenu 		 			//[200] Smithy - disable weapons on select menu	
-
-	level.coop_mainScriptLoaded = game.true 									//[200] Smithy - used by waitForMainScript to check if main has loaded
+	//[200] Smithy - disable weapons on select menu
+	thread coop_mod/itemhandler.scr::disableAllWeaponsOnMenu
+	
+	//chrissstrahl - set coop mod specific mom file
+	thread mom/mom.scr::setup "coop_mod/mom_actions.scr" 2 "coop_mom"
+	
+	//[200] Smithy - initialise all events we need
+	thread coop_mod/events.scr::initialiseEvents
+	
+	//[200] Smithy - used by waitForMainScript to check if main has loaded
+	level.coop_mainScriptLoaded = game.true
 
 	//[200] Smithy - created funcs for events
 	if (thread coop_mod/eventsystem.scr::isEventActive "mainScriptLoaded"){									
 		println "(" local.threadName "): ***** Loaded *****. Continuing " level.coop_waitingForMainThreads " waiting threads at " level.time "..." //better reporting
-		thread coop_mod/eventsystem.scr::doEvent "mainScriptLoaded" 			//[200] Smithy - used by itemhandler and aihandler (+ future scripts) to notify that main has been loaded
+		//[200] Smithy - used by itemhandler and aihandler (+ future scripts) to notify that main has been loaded
+		thread coop_mod/eventsystem.scr::doEvent "mainScriptLoaded" 			
 	}
 }end
-
-//[200] Smithy - fresh dedi servers will have a fake player on startup.
-//we don't need it, and it may mess first client up that takes its spot
-//e.g. 'press fire to join game' doesn't show for first client to join
-//server.
-//This fake player may also mess with map restarts (e.g. missionfailed)
-//=========================================================================
-removeFakePlayer:
-	if (level.coop_dedicated){
-		if ($player && $player[1].netname == "*** Blank Name ***" && $player[1].entnum == 0){
-			$player[1] delete
-			//waitframe //[202] chrissstrahl - this was causing unhealthy delay in main.scr::manageplayers
-		}		
-	}
-end
-
-//[200] Smithy - on listen servers vars can carry over from map to map
-//=========================================================================
-resetPlayers:
-//=========================================================================
-	for (local.i = 1; local.i <= $player.size; local.i++){
-		$player[local.i].flags["coop_isActive"] = NIL
-	}
-end
 
 //[200] chrissstrahl - have a seperate handle for singleplayer
 //=========================================================================
@@ -145,42 +81,6 @@ spWaitForPlayer:{
 	level.coop_playerReady = 1
 	//[200] chrissstrahl - set variables
 	$player.flags["coop_isHost"] = 1
-}end
-
-//loads next map until check is over or starting maps are reached
-//this is used for unattended level loading and testing of the scripts
-//this sometimes does not work as intended because of game limitations
-//this is how ever much more comfortable than manual handling
-//=========================================================================
-coop_checkMaps:{
-//=========================================================================
-	if((int(getcvar("coop_dev")) == 1) && (int(getcvar("coop_diag")) == 1)){ //[200] chrissstrahl - changed to coop_diag cuz other coop mod also uses same cvar
-		//[200] chrissstrahl - make sure we have at least two clients so it does not wait for player ready in loadingscreen
-		if(int(getcvar("sv_maxclients")) < 2){
-			setcvar "sv_maxclients" 2
-		}
-
-		//[200] chrissstrahl - if we come full circle we can stop
-		if( level.coopNextMap == "briefing/briefing1" ){
-			setcvar "timescale" 1 //[200] chrissstrahl - restore timescale
-			setcvar "coop_diag" "0"
-			end
-		}
-		setcvar "timescale" 3 //[200] chrissstrahl - speedup testing
-		local.waittime = 5 //[200] chrissstrahl - reduced the time from 10 to 5
-		for(local.i=local.waittime;local.i > 0;local.i--){
-			iprintlnbold_noloc("Coop Map Ceck is active, loading next map in: "+local.i)
-			wait 1
-
-			//[200] chrissstrahl - make player autospawn
-			if(local.waittime == local.i){
-				thread autoSpawnHost
-			}
-		}
-		setcvar "timescale" 10 //[200] chrissstrahl - speedup testing
-
-		exec global/missioncomplete.scr level.coopNextMap
-	}
 }end
 
 //[200] chrissstrahl - this autospawns the hosting player
@@ -208,81 +108,6 @@ autoSpawnHost:{
 	if(local.player == NULL){ end }
 
 	local.player stufftext ( "-attackprimary" )
-}end
-
-//this makes sure we have all the settings set we need to operate correctly
-//=========================================================================
-setupServer:{
-//=========================================================================
-	//[200] chrissstrahl - make sure to correct value
-	if( level.coop_disableSpawnWarper == 1){
-		level.coop_disableSpawnWarper = TRUE
-	}
-
-	//[200] chrissstrahl - just to be sure this works
-	setcvar "g_gametypestring" "HZM Coop Mod"
-
-	//[200] Smithy
-	if (level.coop_dedicated){
-		if (level.gametype != 2){
-			println "(coop_mod/main.scr::setupServer): ERROR: Gametype is " level.gametype " on dedicated server! Restarting..."
-			thread restartMap
-		}
-	}else{
-		if (level.gametype != 2){
-			println "(coop_mod/main.scr::setupServer): Warning: Gametype is " level.gametype " on map load!"
-		}
-	}
-	
-	//[200] chrissstrahl - check if map-check should be donemoved here, moved here because of events system
-	//[200] chrissstrahl - added updateServer to handle server settings changes
-	//[200] chrissstrahl - added set this map as last active map for dedicated server reboot
-	waitthread coop_checkMaps			
-	thread updateServer
-	if(level.coop_dedicated != 0){ setcvar "ui_startmap" level.coop_mapname }
-}end
-
-//chrissstrahl - this is only for temporary debug
-//=========================================================================
-setupServerBadSettingInfo local.setting local.message:{
-//=========================================================================
-	//end
-	if( local.setting == 0 ){ end }
-	error ("HZM COOP MOD BAD SETTING("+local.setting+"): "+local.message) 1000
-}end
-
-//=========================================================================
-fixServer:{
-//=========================================================================
-	wait 3
-	for(local.count=0;local.count<8;local.count++){
-		iprintlnbold_noloc ( "=*= BAD SERVER SETTINGS, reloading map =*=" )
-		wait 1
-	}
-
-	setcvar "ui_team_spawn_interval" 0 //local server
-	setcvar "sv_team_spawn_interval" 0
-
-	setcvar "g_gametype" 2
-	setcvar "maxentities" 2048
-	setcvar "timelimit" 0
-	setcvar "fraglimit" 0
-	setcvar "roundlimit" 0
-
-	iprintlnbold_noloc ( "=*= LOADING MAP NOW =*=" )
-	wait 1
-
-	//force all players into spec to prevent players being in a team when the map is reloaded
-	for (local.i = 1;local.i <= $player.size;local.i++){
-		local.player = $player[local.i]
-		if( local.player != NULL /*&& local.player.dmteam != "spectator" */ ) { //[200] chrissstrahl - move into spec, just to be sure it registers right
-			local.player join_team ( "spectator" )
-		}
-	}
-	waitframe
-
-	//this is a ugly way to do this, but the best result so far
-	thread loadMap level.coop_mapname game.false
 }end
 
 //forces player into allies team
@@ -344,7 +169,7 @@ setupCmds local.player:{
 	}
 
 	local.detectionValid = 1
-	if(local.player.dmteam != "spectator"){
+	if(!local.player.isSpectator){
 		local.detectionValid = 0
 		//iprintlnbold_noloc("NOT VALID DETECT")
 	}
@@ -388,270 +213,6 @@ setupCmds local.player:{
 	}
 }end
 
-//=========================================================================
-managePlayers:{
-//=========================================================================
-	//chrissstrahl
-	//1. respawn players right at where they die
-	//note that this might be very troublesome on some missions
-	//this needs to be figured out as we go along
-	////Going into spectator and then joing back in will spawn players at the default spawn
-	//2. sets player max health, based on dificulty settings
-
-	//[200] chrissstrahl - wait for a player to join the game
-	level waittill spawn
-
-	waitthread removeFakePlayer	//[200] Smithy - remove any fake player objects
-	waitthread resetPlayers 	//[200] Smithy - reset any vars that may have transferred from previous map
-
-	//[200] chrissstrahl - used to detect when a player leaves/joins
-	local.prevPlayerCount = 0
-
-	while(1){
-		//if no player on server - also needed for dedicated servers
-		
-		if( $player == NULL || $player.size == 0 ){
-			level.coop_playerReady = 0
-			//waitframe //[200] Smithy - dont need this
-			//continue
-		}
-		
-		//[200] chrissstrahl - used  to detect when a player leaves/joins
-		local.playerCount = 0
-
-//warp player back to the place he was alive last
-		for (local.i = 1;local.i <= $player.size;local.i++){
-			local.player = $player[local.i]
-			//if( local.player != NULL ){
-				//[200] chrissstrahl - used for LMS to detect when a player leaves
-				local.playerCount++
-
-/////////////////////////////////////////SETUP
-			if(	local.player.flags["coop_isActive"] == NIL){
-//[200] chrissstrahl - LMS if not allowed to join, add deaths
-				if( level.coop_lmsAllowJoin != 1){
-					local.lmsLives = level.coop_lmsLives //[201] chrissstrahl - fixed typo
-					//add only deaths if lms is actually active
-					if(local.lmsLives > 0){
-						local.player.flags["coop_deaths"] = local.lmsLives
-					}
-				}
-
-				//[200] chrissstrahl - detect host
-				if(!level.coop_dedicated){
-					local.player.flags["coop_isHost"] = local.player.entnum == 0 //[200] Smithy - as this is a bool, just do it in one line
-				}
-
-				local.player.flags["coop_iAmTruelyActive"] = 0
-				local.player.flags["coop_isActive"] = 0
-				local.player.flags["coop_justSpawnedDone"] = NIL
-				//local.player.flags["coop_team"] = "None" //[200] Smithy - we don't need to track if we know allies is what will make us active
-				local.player.flags["coop_lastRespawn"] = -1
-				local.player.flags["coop_joinedGameAt"] = level.time //[200] chrissstrahl - used for variouse checks
-
-				local.player spectator
-
-				//this is used for friendly orientation see global/friendly::playernode
-				local.player.fnum = -100
-
-				//[200] chrissstrahl - handle delayed setup
-				thread setupCmds local.player
-
-				if( level.coop_playerHide ){
-					local.player hide
-				}
-
-				//[200] chrissstrahl - check if physics is off
-				if( level.coop_physicsOff != NIL && level.coop_physicsOff == 1){
-					local.player physics_off
-				}
-
-				thread resetSpawn local.player
-
-				//[200] Smithy - on listen servers spawn the host player and skip selection
-				if (!level.coop_dedicated && local.player.flags["coop_isHost"]){
-					thread skipTeamAndWeaponSelect local.player
-				}
-			}
-/////////////////////////////////////////SPECTATOR
-			if( local.player.dmteam == "spectator" ){
-				local.player.flags["coop_iAmTruelyActive"] = 0
-				if(	local.player.flags["coop_isActive"] != -1 ){
-					local.player.flags["coop_justSpawnedDone"] = NIL
-					//local.player.flags["coop_team"] = local.player.dmteam //[200] Smithy - we don't need to track if we know allies is what will make us active
-					local.player.flags["coop_isActive"] = -1
-					waitthread resetSpawn local.player
-					local.player unglue
-					local.player threatbias ignoreme
-					local.player.fnum = -100 //this is used for friendly orientation see global/friendly::playernode
-				}
-				//[200] Smithy - now we just check for fire button to auto join them to allies and skip weapon menu
-				if (local.player.primaryfireheld){
-					//[200] Smithy - put here to stop spam that prevents players typing/using menu
-					thread skipTeamAndWeaponSelect local.player
-				}
-			}else{
-				//[200] chrissstrahl - check if physics is off
-				if( level.coop_physicsOff != NIL && level.coop_physicsOff == 1){
-					local.player physics_off
-				}
-/////////////////////////////////////////ALIVE
-				if( local.player.health > 0 ){
-					//CHANGED TEAM/////////////////////////////////////////
-					if( local.player.dmteam != "allies" ){
-						//local.player.flags["coop_team"] = local.player.dmteam //[200] Smithy - we don't need to track if we know allies is what will make us active
-						local.player.flags["coop_justSpawnedDone"] = NIL
-						local.player.flags["coop_isActive"] = 0
-						waitthread resetSpawn local.player
-						//move player to spawn
-						thread playerPlaceAtSpawn local.i //[200] Smithy - is this needed so many times?
-					}
-					
-					//[202] chrissstrahl - code was moded to event based thread
-					//main.scr::playerSpawnEvent
-					//NOT ACTIVE YET///////////////////////////////////////
-/*
-					if(local.player.flags["coop_isActive"] != 1){
-						//iprintlnbold_noloc("not active")
-						if( local.player.flags["coop_iAmTruelyActive"] != 1 ){
-							//move player to spawn
-							thread playerPlaceAtSpawn local.i //[200] Smithy - is this needed so many times?
-							continue
-						}
-						//FIST ACTIVE AFTER INACTIVE - SETUP////////////////////
-						//[200] chrissstrahl - keep track of when first player was really actve
-						if(level.coop_gameStartedAt == NIL){
-							level.coop_gameStartedAt = level.time
-						}
-
-						//move player to spawn
-						thread playerPlaceAtSpawn local.i  //[200] Smithy - is this needed so many times?
-
-						//see if the level script has a special handling for players that just spawned
-						if( local.player.flags["coop_justSpawnedDone"] == NIL ){
-							local.player.flags["coop_justSpawnedDone"] = TRUE
-							//[200] chrissstrahl - added trigger activator (this player)
-							//[200] chrissstrahl - now using filtred level var instead of cvar
-							//[200] chrissstrahl - no longer using player id in func name (use parm.other to get player)
-							//thread startThread ( "maps/"+level.coop_mapname+".scr::coop_playerJustSpawned"+local.i ) (local.player)
-							//
-							//There are these optional functions calls:
-							//- FIRST SPAWN:	coop_playerJustSpawned
-							//- EACH RESPAWN:	coop_playerJustRespawned
-							//- EACH DEATH:		coop_playerJustDied
-							thread startThread ( "maps/"+level.coop_mapname+".scr::coop_playerJustSpawned" ) (local.player)
-						}
-
-						//[202] chrissstrahl - debug
-						println("level.coop_playerReady = 1")
-						
-						level.coop_playerReady = 1
-						local.player.flags["coop_isActive"] = 1
-						local.player threatbias level.coop_threatbias
-						local.player solid
-						local.player american
-						local.player.fnum = -1 //this is used for friendly orientation see global/friendly::playernode
-//HIDE PLAYER
-						if( level.coop_playerHide ){
-							local.player hide
-						}
-//move player to spawn
-						thread playerPlaceAtSpawn local.i //[200] Smithy - is this needed so many times?
-
-//[200] CHRISSTRAHL /// LMS /// ///////////// check if player should be spectator in LMS
-						thread lmsForceSpectatorHandle local.player
-					}
-*/
-// RESPAWNING & RESTORE /////////////////////////////////////////
-					if(local.player.flags["coop_respawning"] == TRUE){
-						if( level.coop_disableSpawnWarper != TRUE && vector_length( local.player.flags["coop_respawnOrigin"] ) > 10){
-							thread playerMakeSolidAsap local.i
-							local.player.flags["coop_lastRespawn"] = level.time //remember when we last respawned, prevent place at spawn
-							local.player origin ( local.player.flags["coop_respawnOrigin"] )
-							if(local.player.flags["coop_respawnAngle"] != 0){
-								//need to call this delayed or it will not work most of the time in mp
-								local.player thread playerFace ( 0 local.player.flags["coop_respawnAngle"] 0 )
-							}
-						}else{
-							thread playerPlaceAtSpawn local.i
-						}
-						//[200] chrissstrahl - moved here
-						local.player.flags["coop_respawning"] = FALSE
-						//[200] chrissstrahl - added special handling for players that just respawned
-						//
-						//There are these optional functions calls:
-						//- FIRST SPAWN:	coop_playerJustSpawned
-						//- EACH RESPAWN:	coop_playerJustRespawned
-						//- EACH DEATH:		coop_playerJustDied
-						//thread startThread ( "maps/"+level.coop_mapname+".scr::coop_playerJustRespawned" ) (local.player)
-					}else if( level.coop_disableSpawnWarper != TRUE ){
-						if(	local.player.flags["coop_respawnTime"] == NIL ||
-							local.player.flags["coop_respawnTime"] < (level.time + 2) ){
-							local.player.flags["coop_respawnTime"] = level.time
-							local.player.flags["coop_respawnOrigin"] = local.player.origin
-							local.player.flags["coop_respawnAngle"] = local.player.viewangles[1]
-						}
-					}
-				}else{
-/////////////////////////////////////////DEAD					
-					local.player.flags["coop_iAmTruelyActive"] = 0
-					if(	local.player.flags["coop_isActive"] != -2 ){
-//[200] CHRISSTRAHL /// LMS /// ///////////// check if player should be spectator in LMS
-						if( level.coop_lmsLives > 0 ){ //[201] chrissstrahl - fixed typo
-							//handle death count
-							local.deaths = local.player.flags["coop_deaths"]
-							local.deaths++
-							local.player.flags["coop_deaths"] = local.deaths
-							
-							//print info to player hud
-							local.deaths = (level.coop_lmsLives - local.deaths)
-							if(local.deaths < 0){local.deaths=0}
-							
-							local.deaths = ( "You have [ " + local.deaths + " ] lives left - LastManStanding is active!" ) //[201] chrissstrahl - fixed typo
-							local.player iprint local.deaths 0
-						}
-						
-						thread lmsForceSpectatorHandle local.player
-
-						local.player.flags["coop_isActive"] = -2
-						local.player.flags["coop_justSpawnedDone"] = NIL
-						local.player.flags["coop_respawning"] = TRUE
-
-						//[200] chrissstrahl - start thread in main level-script
-						//used to handle stuff when player dies
-						//used to make sure player is not respawning in a vehicle or something
-						//
-						//There are these optional functions calls:
-						//- FIRST SPAWN:	coop_playerJustSpawned
-						//- EACH RESPAWN:	coop_playerJustRespawned
-						//- EACH DEATH:		coop_playerJustDied
-						thread startThread ( "maps/"+level.coop_mapname+".scr::coop_playerJustDied" ) (local.player)
-
-						//local.player notarget 1
-						local.player unglue
-						local.player physics_on
-						local.player threatbias ignoreme
-						local.player.fnum = -100 //this is used for friendly orientation see global/friendly::playernode
-					}
-				}
-			}
-		}
-
-		//[200] chrissstrahl - call player changed func if number of players changed
-		if(local.prevPlayerCount != local.playerCount){
-			waitthread playerCountChanged local.prevPlayerCount local.playerCount
-		}
-
-		//[200] chrissstrahl - LMS - check if condistions have changed
-		waitthread lmsCheckLives local.prevPlayerCount local.playerCount
-
-		//[200] chrissstrahl - keep track of player count
-		local.prevPlayerCount = local.playerCount
-		
-		waitframe //[200] Smithy - put back here (taken out of lmsCheckLives)
-	} 
-}end
-
 //[200] Smithy
 //Is called from events.scr every time a player spawners.
 //we can use this to efficiently replace any spawn specific code, 
@@ -662,26 +223,14 @@ managePlayers:{
 //=========================================================================
 playerSpawnEvent:{
 //=========================================================================
-	local.player = self
-	if (!local.player.isSpectator){ //isSpectator is a built-in BT bool, more efficient than checking for dmteam string
-		//---------------------// func calls here
-		thread coop_mod/itemhandler.scr::managePlayerInventory 		//handle his inventory
-		thread itemGetAll                                        	//give him any inv items
-		thread forceValidTeam 										//force them into allies if they spawned as axis
-		thread playerHealth 										//sort their health out
-		thread playerGlue local.player "spawn"  					//any new players will be glued if it's needed
-		//---------------------// vars here
-		local.player.flags["coop_iAmTruelyActive"] = 1
-		local.player.flags["coop_isAlive"] = game.true  						//he's now alive :)
-		//---------------------//
+	//KEEP TRACK /////////////////////////////////////////////
+	//of when any player was active for the first time
+	if(level.coop_gameStartedAt == NIL){
+		level.coop_gameStartedAt = level.time
+	}
 
-		//Add anymore spawn stuff here
-		
-		//@chrissstrahl
-		//place at spawn
-		//SET READY VAR
-		//check what else needs to be ported from original hanlde
-	}						
+	local.player = self
+	thread coop_mod/player.scr::manageAliveSpawning local.player
 }end
 
 //[200] Smithy
@@ -695,6 +244,7 @@ playerSpawnEvent:{
 playerDeathEvent:{
 //=========================================================================
 	local.player = self
+	thread coop_mod/player.scr::manageDead local.player
 }end
 
 //[200] Smithy
@@ -708,14 +258,16 @@ playerTeamChangeEvent:{
 }end
 
 //[200] Smithy
+//[202] chrissstrahl - return if forcing was nessary
 //=========================================================================
 forceValidTeam:{
 //=========================================================================
 	local.player = self
 	if (local.player.dmteam == "axis"){
 		thread forceTeam local.player
+		end 1
 	}
-}end
+}end 0
 
 //[200] Smithy - forces a player to join allies and skip selection process
 //=========================================================================
@@ -778,6 +330,7 @@ playerCountChanged local.prevPlayerCount local.playerCount:{
 	if(local.playerCount == 0){
 		wait 1
 		waitthread restartMap
+		end
 	}
 
 	//[200] chrissstrahl - call Smithys ai handler to update
@@ -926,13 +479,26 @@ playerPlaceAtSpawn local.i:{
 	thread playerMakeSolidAsap local.i
 }end
 
+//checks if objects are touching
+//=========================================================================
+playerMakeSolidAsapCheckTouching local.player local.object local.hasHealth:{
+//=========================================================================
+	if( local.object && local.player isTouching local.object ){
+		if( local.hasHealth && local.object.health <= 0 ){
+			end
+		}
+		println ("playerMakeSolidAsapCheckTouching -> a player is touching: "+local.object)
+		goto playerMakeSolidAsap_touching
+	}
+}end
+
 //makes a player solid as soon as it is saftly possible
 //checking for other players and certain general entities
 //=========================================================================
 playerMakeSolidAsap local.i:{
 //=========================================================================
 	//println("playerMakeSolidAsap Make solid...")
-	if(local.i == NIL || local.i == NULL){ end }
+	if(!local.i){ end }
 
 	local.player = NULL
 
@@ -956,18 +522,18 @@ playerMakeSolidAsap local.i:{
 
 	//run only once per player
 	if(local.player.flags["coop_makesolid"] != NIL){ end }
-
-	//println("playerMakeSolidAsap 1")
-
 	local.player.flags["coop_makesolid"] = 1
+	
 	while( local.player != NULL && local.player.flags["coop_makesolid"] != NIL ){
+		local.touch = 0
+	
 		if(local.player.health <= 0){
 			local.player.flags["coop_makesolid"] = NIL
 			//println("playerMakeSolidAsap 2")
 			end
 		}
 		if(level.gametype != 0){
-			if(local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1 ){
+			if(local.player.isSpectator || local.player.flags["coop_isActive"] != 1 ){
 				local.player.flags["coop_makesolid"] = NIL
 				//println("playerMakeSolidAsap 3")
 				end
@@ -976,114 +542,74 @@ playerMakeSolidAsap local.i:{
 
 		//[200] chrissstrahl - added notsolid here just to be sure the player is notsolid from the get go
 		local.player notsolid
-
-		//[200] chrissstrahl - moved here because it was in the player for loop, which is not nessary
-		//check other special entites, like tanks
-		if( level.coop_mapname == "m1l2b" && $tank02 != NULL && local.player isTouching $tank02){ //[200] chrissstrahl - m1l2b
-			local.touch = 1
-			//iprintlnbold_noloc("DEV: TOUCHING $tank02")
+		
+		//don't do player checks in sp
+		if( level.gametype == 0){
+			goto playerMakeSolidAsap_spCheck
 		}
-		if( $playertank_trigger != NULL && local.player isTouching $playertank_trigger){ //king tiger tank m5l2a,m5l2a
-			local.touch = 1
-			//iprintlnbold_noloc("DEV: TOUCHING $playertank_trigger")
-		}
-		if( $panzer_mask != NULL && local.player isTouching $panzer_mask){ //german panzer m5l2a
-			local.touch = 1
-			//iprintlnbold_noloc("DEV: TOUCHING $panzer_mask")
-		}
-		if( $tank_mask != NULL && local.player isTouching $tank_mask){ //german panzer m5l1b,m5l2a
-			local.touch = 1
-			//iprintlnbold_noloc("DEV: TOUCHING $tank_mask")
-		}
-		if(level.coop_mapname == "m5l2a" && $t214 != NULL && local.player isTouching $t214){ //german strange vehicle m5l2a
-			local.touch = 1
-			//iprintlnbold_noloc("DEV: TOUCHING $t214")
-		}
-		if( $kingtigercollision != NULL && local.player isTouching $kingtigercollision ){ //king tiger m5l3
-			local.touch = 1
-			//iprintlnbold_noloc("DEV: TOUCHING $kingtigercollision")
-		}
-
-//[200] chrissstrahl - added additional checks
-		if(local.touch){ goto playerMakeSolidAsapSet }//[200] chrissstrahl - make sure we skip unnessary checks
-		if( level.coop_mapname == "m5l2a" ){
-			if( $s5_tank && local.player isTouching $s5_tank){
-				local.touch = 1
-			}
-			if( $s10_tank1 && local.player isTouching $s10_tank1){
-				local.touch = 1
-			}
-			if( $s10_tank2 && local.player isTouching $s10_tank2){
-				local.touch = 1
-			}
-			if( $s3_halftrak && local.player isTouching $s3_halftrak){
-				local.touch = 1
-			}
-		}
-		if($playertank && local.player istouching $playertank){
-			local.touch = 1
-		}
-//friendlies
-		if(local.touch){ goto playerMakeSolidAsapSet }//[200] chrissstrahl - make sure we skip unnessary checks
-		if(isalive level.friendly1 && local.player isTouching level.friendly1){
-			local.touch = 1
-		}
-		if(isalive level.friendly2 && local.player isTouching level.friendly2){
-			local.touch = 1
-		}
-		if(isalive level.friendly3 && local.player isTouching level.friendly3){
-			local.touch = 1
-		}
-		if(isalive level.friendly4 && local.player isTouching level.friendly4){
-			local.touch = 1
-		}
-		if(isalive level.friendly5 && local.player isTouching level.friendly5){
-			local.touch = 1
-		}
-		if(isalive level.friendly6 && local.player isTouching level.friendly6){
-			local.touch = 1
-		}
-
-		//[200] chrissstrahl - apperently a goto is the best way to do this, this is so ironic
-		//we have to check player vs player, otherwise the other player might still get stuck
-		playerMakeSolidAsapSet:
-
-		//check if this player is inside another
-		local.touch = 0
+		
+		// CHECK PLAYER AGAINST PLAYER
 		for (local.iOther = 1;local.iOther <= $player.size;local.iOther++){
 			local.otherPlayer =  $player[local.iOther]
-//check player to player - don't check the player against him self
-			if(local.player == local.otherPlayer){
+				
+			//don't check the player against him self
+			if(local.player == local.otherPlayer || local.otherPlayer.isSpectator || local.otherPlayer.health <= 0 ){ //local.otherPlayer.flags["coop_isActive"] != 1
 				continue
 			}
-			//if multiplayer skip player who is a spectator or not active
-			if(local.otherPlayer != NULL && local.otherPlayer.health > 0){
-				if( level.gametype != 0){
-					if(local.otherPlayer.dmteam == "spectator" || local.otherPlayer.flags["coop_isActive"] != 1 ){
-						//println("playerMakeSolidAsap 4")
-						continue
-					}
-				}
-				if(local.player isTouching local.otherPlayer){
-					//println("playerMakeSolidAsap 5")
-					//iprintlnbold_noloc ( "OMG, YOU DID TOUCH EACH OTHER" )
-					local.otherPlayer notsolid
-					thread playerMakeSolidAsap local.iOther
-					local.touch = 1
-				}
+			
+			//check if they are stuck inside each other
+			if(local.player isTouching local.otherPlayer){
+				local.otherPlayer notsolid
+				thread playerMakeSolidAsap local.iOther
+				local.touch = 1
 			}
 		}
-
-		if(local.touch == 0){
-			//println("playerMakeSolidAsap NOW SOLID...")
-			local.player.flags["coop_makesolid"] = NIL
-			local.player solid
-			end
+		//check here if any player was touched
+		//we needed to have this check against all players
+		//so players get their own check to prevent issues
+		if(local.touch){
+			goto playerMakeSolidAsap_touching
 		}
-		//[200] chrissstrahl - moved notsolid here, was in each if statment seperatly before
-		else{
-			local.player notsolid
+		
+		//checks that also are done in singeplayer start here
+		playerMakeSolidAsap_spCheck:
+		
+		//check friendlies
+		waitthread playerMakeSolidAsapCheckTouching local.player level.friendly1 1
+		waitthread playerMakeSolidAsapCheckTouching local.player level.friendly2 1
+		waitthread playerMakeSolidAsapCheckTouching local.player level.friendly3 1
+		waitthread playerMakeSolidAsapCheckTouching local.player level.friendly4 1
+		waitthread playerMakeSolidAsapCheckTouching local.player level.friendly5 1
+		waitthread playerMakeSolidAsapCheckTouching local.player level.friendly6 1
+		
+		//check map specific
+		if(level.coop_levelObstacle[level.coop_mapname]){
+			for(local.i=0;local.i < level.coop_levelObstacle[level.coop_mapname].size;local.i++){
+				local.object = level.coop_levelObstacle[level.coop_mapname][local.i]
+				waitthread playerMakeSolidAsapCheckTouching local.player local.object
+			}
 		}
+		
+		//check general
+		for(local.i=0;local.i < level.coop_levelObstacle["general"].size;local.i++){
+			local.object = level.coop_levelObstacle[level.coop_mapname][local.i]
+			println local.object
+			waitthread playerMakeSolidAsapCheckTouching local.player local.object
+		}
+		
+		//this code is only executed if player did not touch anything relevant
+		local.player.flags["coop_makesolid"] = NIL
+		local.player solid
+		end
+		
+		//german strange vehicle m5l2a
+		if(level.coop_mapname == "m5l2a" && $t214 != NULL && local.player isTouching $t214){
+			local.touch = 1
+		}
+		
+		//code that is executed if objects are touching
+		playerMakeSolidAsap_touching:
+		
 		//println("playerMakeSolidAsap loop")
 		waitframe
 	}
@@ -1214,7 +740,7 @@ friendlyFindPlayer:{ //[201] chrissstrahl - fix typo
 //find a valid player to follow, this is used to direct the ai to a player to follow
 	for (local.i = 1;local.i <= $player.size;local.i++){
 		local.player =  $player[local.i]
-		if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1){
+		if(local.player != NULL && local.player.health > 0 && !local.player.isSpectator && local.player.flags["coop_isActive"] == 1){
 			level.coop_player = local.player
 			//iprintlnbold_noloc ( "player found..." + local.i + "::" + level.coop_player )
 			end
@@ -1240,7 +766,7 @@ isPlayerActive local.player:{
 	}
 
 	if( local.player != NULL ){
-		if( local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+		if( local.player.health > 0 && !local.player.isSpectator && local.player.flags["coop_isActive"] == 1 ){
 			end 1
 		}
 	}
@@ -1444,32 +970,32 @@ checkCoopDeveloper local.text:{
 //=========================================================================
 playerGlue local.player local.spawn:{
 //=========================================================================
-	if (level.coop_playerGlue){
-		if(!level.coop_playerGlueIndividual){
-			local.entity = level.coop_glueTo
+	if (!level.coop_playerGlue){ end }
+	
+	if(!level.coop_playerGlueIndividual){
+		local.entity = level.coop_glueTo
+	}else{
+		local.entity = waitthread getGlueEntity local.player					
+	}
+
+	//[200] chrissstrahl - added forcelegsstate to avoid:
+	//ERROR: Stopping due to possible infinite leg state loop //e1l3 entering rowboat at level start
+	//local.player forcelegsstate "STAND"
+	local.player resetstate //[200] Smithy - nicer than forcing a state, also may stop torso state errors as well as leg state
+
+	if(!local.entity){
+		println "(coop_mod/main.scr::playerGlue): *ERROR* - local.entity is " local.entity " for " local.player local.player.entnum
+	}else{					
+		if(level.coop_glueAngle != NIL){
+			local.player glue local.entity level.coop_glueAngle
 		}else{
-			local.entity = waitthread getGlueEntity local.player					
-		}
+			local.player glue local.entity
+		}	
 
-		//[200] chrissstrahl - added forcelegsstate to avoid:
-		//ERROR: Stopping due to possible infinite leg state loop //e1l3 entering rowboat at level start
-		//local.player forcelegsstate "STAND"
-		local.player resetstate //[200] Smithy - nicer than forcing a state, also may stop torso state errors as well as leg state
-
-		if(!local.entity){
-			println "(coop_mod/main.scr::playerGlue): *ERROR* - local.entity is " local.entity " for " local.player local.player.entnum
-		}else{					
-			if(level.coop_glueAngle != NIL){
-				local.player glue local.entity level.coop_glueAngle
-			}else{
-				local.player glue local.entity
-			}	
-
-			if(!level.coop_playerGlueIndividual){
-				local.player notsolid
-				local.player physics_off
-				local.player hide
-			}
+		if(!level.coop_playerGlueIndividual){
+			local.player notsolid
+			local.player physics_off
+			local.player hide
 		}
 	}
 }end
@@ -1521,7 +1047,7 @@ lmsGetRemainingLives local.player:{
 //=========================================================================
 lmsForceSpectatorHandle local.player:{
 //=========================================================================
-	if(local.player.flags["lmsForceSpectatorHandleActive"] != NIL){ end }
+	if(local.player.flags["lmsForceSpectatorHandleActive"] != NIL){ end 0 }
 
 	while(local.player != NULL){
 		//check if player should be forced in spec
@@ -1529,7 +1055,7 @@ lmsForceSpectatorHandle local.player:{
 			local.player.flags["lmsForceSpectatorHandleActive"] = 1
 
 			//check if player already is in spec, if not force
-			if(local.player.dmteam != "spectator"){
+			if(!local.player.isSpectator){
 				if(local.player.health == 0){
 					local.player hide
 				}
@@ -1550,7 +1076,7 @@ lmsForceSpectatorHandle local.player:{
 				for (local.i = 1;local.i <= $player.size;local.i++){
 					local.player = $player[local.i]
 					if( local.player != NULL){
-						if(local.player.flags["coop_lmsForcedInSpectator"] != 1 && local.player.dmteam != "spectator"){
+						if(local.player.flags["coop_lmsForcedInSpectator"] != 1 && !local.player.isSpectator){
 							local.numActivePlayers++
 						}
 					}
@@ -1560,6 +1086,7 @@ lmsForceSpectatorHandle local.player:{
 					iprintlnbold_noloc("LMS failed all players are dead or inactive.")
 					iprintlnbold_noloc("--")
 					thread coop_mod/replace.scr::missionfailed
+					end 1
 				}			
 			}
 		}
@@ -1571,11 +1098,11 @@ lmsForceSpectatorHandle local.player:{
 			}
 			local.player.flags["coop_lmsForcedInSpectator"] = NIL
 			local.player.flags["lmsForceSpectatorHandleActive"] = NIL
-			end
+			end 0
 		}
 		waitframe
 	}
-}end
+}end 1
 
 //[201] chrissstrahl - changed function name to fix typo
 //[200] Chrissstrahl - check if LMS life count has changed
@@ -1749,7 +1276,7 @@ earthquake_player local.duration local.magnitude:{
 
 	//attach it to player
 	//i won't use glue/bind as the engine has MAX_GLUE_CHILDREN of 8 per ent and it could mess up scripts
-	while (local.earthquake && isAlive local.player && local.player.dmteam != "spectator"){
+	while (local.earthquake && isAlive local.player && !local.player.isSpectator){
 		local.earthquake origin local.player.origin
 		waitframe
 	}
@@ -1859,59 +1386,6 @@ changePlayerFOV local.player local.fov:{
 	local.player fov local.fov
 	waitthread changeGameType 2 0
 	setcvar "developer" local.prevCvar
-}end
-
-//[200] chrissstrahl - checks for changes every secound
-//=========================================================================
-updateServer:{
-//=========================================================================
-	while(1){
-		wait 1
-		waitthread checkForVote
-		waitthread checkScoreboard
-	}
-}end
-
-//[200] chrissstrahl - checks if something changed that needs to be shown in the scoreboard
-//=========================================================================
-checkScoreboard:{
-//=========================================================================
-	local.cvardata = int(getcvar("coop_health"))
-	if(NIL == level.prevCoopHealth || level.coop_health == NIL || level.coop_health != level.prevCoopHealth || local.cvardata > 0 && level.prevCoopHealth != local.cvardata){
-		if(local.cvardata > 0){
-			level.coop_health = local.cvardata
-		}else{
-			level.coop_health = 750
-		}
-		level.prevCoopHealth = level.coop_health
-		setcvar "g_obj_axistext1" ("Health: "+level.prevCoopHealth)
-	}
-	
-	local.cvardata = int(getcvar("coop_lmsLives")) //[201] chrissstrahl - changed cvar from coop_lmsLifes to coop_lmsLives
-	if(NIL == level.prevCoopLmsLives || level.prevCoopLmsLives != local.cvardata){ //[201] chrissstrahl - fixed typo
-		level.prevCoopLmsLives = local.cvardata
-		setcvar "g_obj_axistext2" ("LMS-Lives: "+level.prevCoopLmsLives)
-	}
-}end
-
-//[200] chrissstrahl - checks if change has been requested via vote
-//=========================================================================
-checkForVote:{
-//=========================================================================
-	local.cvarValue = getCvar("coop_callvote")
-	if(local.cvarValue == ""){ end }
-	
-	setCvar "coop_callvote" ""
-	
-	if(local.cvarValue == "nextmap"){
-		exec global/missioncomplete.scr level.coopNextMap 1
-	}
-	else if(local.cvarValue == "previousemap"){
-		exec global/missioncomplete.scr level.coopPrevMap 1
-	}
-	else if(local.cvarValue == "restartmap"){
-		thread restartMap
-	}
 }end
 
 //[202] chrissstrahl - cleans the mapname of savepoints ($...) and returns it
