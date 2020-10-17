@@ -6,6 +6,7 @@
 //////////////////////////////////////////////
 
 //This is executed at the erliest stage from main.scr::main
+//should be run in a single frame
 //=========================================================================
 main:{
 //=========================================================================
@@ -45,21 +46,58 @@ main:{
 	//pretty sure there are more vars that should go below this line but we haven't got the time to sort them out
 	if(level.gametype == 0){ end }
 	
-	//[202] chrissstrahl - made to thread, not time critical
-	thread coop_mod/maplist.scr::main			//[201] Smithy - populates the mapList array
-	thread initMissionNames						//[200] Smithy - initialise the mission names and their descriptions
+    //[200] Smithy - used in coop_mod/aihandler.scr
+    level.coop_actorArray["german"][1]      = NIL
+    level.coop_actorArray["american"][1]    = NIL
 	
 	//[200] Smithy - nicer to have console variables stored in same place 	
 	level.coop_cvars["developer"] = int(getcvar "developer") 		
 	level.coop_cvars["coop_prevMapList"] = string(getcvar "coop_prevMapList")	//[200] Smithy - so we can reset the sv_maplist cvar is it's populated
+	
+	//[202] chrissstrahl - execute non critical vars in the next frame
+	thread initNonCritical
 }end
 
+//This is executed at the erliest stage from main.scr::main
+//=========================================================================
+initNonCritical:{
+//=========================================================================
+	waitframe
+	thread coop_mod/maplist.scr::main			//[201] Smithy - populates the mapList array
+	thread initMissionNames						//[200] Smithy - initialise the mission names and their descriptions
+	
+    //if you wish to modify this later on, use 'exec coop_mod/aihandler.scr::updateTeamRunSpeed <team> <speed>'
+    level.coop_aaRunSpeed["american"]       = 0.75  			//75% of SH/BT run speed - do not touch, managed in func ::updateTeamRunSpeed
+    level.coop_maxPlayerScalar              = 4     			//after this number of players, stop scaling difficulty (lower number means steeper difficulty scaling)
+    level.coop_actorAccuracyCalcs           = game.true     	//do dynamic enemy accuracy calculations for difficulty
+    level.coop_actorPainHandler             = game.true     	//use coop method of handling pain
+
+    //list of maps to exclude from custom pain handler
+    //disguise maps should be excluded, as when in disguise the engine doesn't call pain.scr
+    //omaha is excluded because it is heavily scripted with its own pain events for AI
+    level.coop_painHandlerExclusions 		= "m3l1a"::"m2l2a"::"m2l2b"::"m6l1c"::"e1l3"::"e1l4"
+    															//you can exclude entire games from this by using first char and wildcard *
+    															//e.g to exclude all BT maps add "e*" to list
+    //[200] Smithy - used in coop_mod/itemhandler.scr
+    level.coop_itemHandler					= game.true		//use the coop item handler
+    level.coop_healthDropFreq 				= 5 			//every num of axis deaths drop a health kit (5 is default engine behavior)
+    level.coop_healthRespawnTime 			= 30 			//respawn time (seconds) for world (bsp or script) health items
+	level.coop_ammoRespawnTime 				= 30 			//respawn time (seconds) for world (bsp or script) weapon and ammo items
+	level.coop_retainInventory 				= game.true 	//keep all weapons from previous life
+	level.coop_disableHealthItems 			= game.false	//disable all health items except for enemy drops and scripted items (those with targetnames)
+	level.coop_disableAmmoItems 			= game.false 	//disable all ammo items except for scripted items (those with targetnames)
+	level.coop_changeGameTypeDebug 			= game.false 	//[200] Smithy - whether or not to print debug info for changeGameType func
+	
+	//[202] chrissstrahl - store all the objects we don't want to solidifify in upon spawn
+}end
 
 //[200] Smithy - used for scoreboard - can be used for other stuff if needed
 // - added briefing dir to relevant map names
 //=========================================================================
 initMissionNames:{
 //=========================================================================
+	level.coop_mapDescription["training"]			= "Training Camp"
+	level.coop_mapDescription["m4l0"]				= "Secret Dog Map"
 	level.coop_mapDescription["briefing/briefing1"] = "Lighting the Torch"
 	level.coop_mapDescription["m1l1"] 				= "Rangers Lead the Way"
 	level.coop_mapDescription["m1l2a"] 				= "The Rescue Mission"
@@ -115,5 +153,33 @@ initMissionNames:{
 	level.coop_mapDescription["e3l2"] = "Invasion of Monte Cassino - Part 2"
 	level.coop_mapDescription["e2l3"] = "Battle of Anzio"
 	level.coop_mapDescription["e2l4"] = "Battle of Monte Battaglia"
+}end
+
+//[202] chrissstrahl
+//contains names of level objects that a player might spawn in and could get stuck
+//if a player is inside that, we don't want him to become solid
+//=========================================================================
+levelObstacleArrays:{
+//=========================================================================
+//general objects
+	local.levelObstacle = makeArray
+		$tank02
+		$tank_mask
+		$playertank_trigger
+		$playertank
+		$panzer_mask
+		$kingtigercollision
+	endArray
+	level.coop_levelObstacle["general"] = local.levelObstacle
+	
+//m5l2a specific
+	local.levelObstacleM5l2a = makeArray
+		$t214
+		$s5_tank
+		$s10_tank1
+		$s10_tank2
+		$s3_halftrak
+	endArray
+	level.coop_levelObstacle["m5l2a"] = local.levelObstacleM5l2a
 }end
 
