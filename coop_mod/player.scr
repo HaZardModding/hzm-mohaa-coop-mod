@@ -45,11 +45,18 @@ manage:{
 			local.playerCount++
 			
 /////////////////////////////////////////SPECTATOR
-			if( local.player.isSpectator ){
+			if( local.player.dmteam == "spectator" ){
 				waitthread manageSpectator local.player
 			}
 ////////////////////////////////////////NO SPECTATOR
 			else{
+				//this makes sure that the player does not get spawned anywhere in the map
+				//where he was spectating at, the moment the player spawns he needs to be
+				//already at the spawnlocation or he can telefrag a player, friendly or enemy
+				if(local.player.flags["coop_isActive"] == -1){
+					local.player.flags["coop_isActive"] = 0
+					waitthread coop_mod/main.scr::playerPlaceAtSpawn local.player
+				}
 				waitthread manageNoSpectator local.player
 /////////////////////////////////////////ALIVE
 				if( local.player.health > 0 ){
@@ -167,15 +174,6 @@ manageNoSpectator local.player:{
 //=========================================================================
 //PHYSICS
 	if( level.coop_physicsOff != NIL && level.coop_physicsOff == 1){ local.player physics_off }
-	
-//PLACE at spawn
-	if(local.player.flags["coop_isActive"] == -1){
-		local.player.flags["coop_isActive"] = 0
-		//this makes sure that the player does not get spawned anywhere in the map
-		//where he was spectating at, the moment the player spawns he needs to be
-		//already at the spawnlocation or he can telefrag a player, friendly or enemy
-		thread coop_mod/main.scr::playerPlaceAtSpawn local.player
-	}
 }end
 
 //alive player handling
@@ -197,6 +195,7 @@ manageAlive local.player:{
 //=========================================================================
 manageAliveSpawning local.player:{
 //=========================================================================
+	println("manageAliveSpawning")
 	/////////////////////////////////////////SETUP
 	if(	local.player.flags["coop_isActive"] == NIL){
 		waitthread manageSetup local.player
@@ -204,7 +203,7 @@ manageAliveSpawning local.player:{
 
 	//isSpectator is a built-in BT bool, more efficient than checking for dmteam string
 	//force them into allies if they spawned as axis and abort current handling
-	if( local.player.isSpectator || thread coop_mod/main.scr::forceValidTeam ){
+	if( local.player.dmteam == "spectator" || thread coop_mod/main.scr::forceValidTeam ){
 		//reset the respawn location, makes player spawn at predefined location
 		waitthread coop_mod/main.scr::resetSpawn local.player
 		end
@@ -234,7 +233,7 @@ manageAliveSpawning local.player:{
 	thread coop_mod/main.scr::playerGlue local.player "spawn"	
 	
 	//NO SPEC
-	if(local.player.isSpectator){
+	if(local.player.dmteam == "spectator"){
 		end
 	}
 
@@ -256,6 +255,14 @@ manageAliveSpawning local.player:{
 	//[202] chrissstrahl	
 	//a player has joined a team and picked a weapon
 	//notify other scripts that the mission can now start
+	println("level.coop_playerReady = 1")
+	println("level.coop_playerReady = 1")
+	println("level.coop_playerReady = 1")
+	println("level.coop_playerReady = 1")
+	println("level.coop_playerReady = 1")
+	println("level.coop_playerReady = 1")
+	println("level.coop_playerReady = 1")
+	println("level.coop_playerReady = 1")
 	level.coop_playerReady = 1
 }end
 
@@ -264,6 +271,7 @@ manageAliveSpawning local.player:{
 //=========================================================================
 manageAliveRespawning local.player:{
 //=========================================================================
+	println("manageAliveRespawning")
 	//respawn if allowed at last pos before death of player
 	//also do not respawn if coop_respawnOrigin flag is set to 0 0 0 or something very close
 	if( level.coop_disableSpawnWarper != TRUE && vector_length( local.player.flags["coop_respawnOrigin"] ) > 10){
@@ -307,6 +315,7 @@ manageAliveSaveLocation local.player:{
 //=========================================================================
 manageDead local.player:{
 //=========================================================================
+println("manageDead")
 	local.player.flags["coop_iAmTruelyActive"] = 0
 	if(	local.player.flags["coop_isActive"] != -2 ){
 /// LMS Handle
