@@ -44,10 +44,6 @@ manage:{
 			//[200] chrissstrahl - used for LMS to detect when a player leaves
 			local.playerCount++
 			
-/////////////////////////////////////////SETUP
-			if(	local.player.flags["coop_isActive"] == NIL){
-				waitthread manageSetup local.player
-			}
 /////////////////////////////////////////SPECTATOR
 			if( local.player.isSpectator ){
 				waitthread manageSpectator local.player
@@ -87,6 +83,11 @@ manage:{
 //=========================================================================
 manageSetup local.player:{
 //=========================================================================
+	if(local.player.flags["coop_isActive"] != NIL){
+		end
+	}
+	local.player.flags["coop_isActive"] = -3
+	
 //Host detection
 	if(!level.coop_dedicated){
 		//[200] Smithy - as this is a bool, just do it in one line
@@ -115,11 +116,12 @@ manageSetup local.player:{
 	//	local.player.flags["coop_isActive"] = -1
 	//	local.player.flags["coop_justSpawnedDone"] = NIL
 	//	waitthread coop_mod/main.scr::resetSpawn local.player
-	local.player spectator
 	
 //VARIABLES initialization 
 	local.player.flags["coop_lastRespawn"] = -1
 	local.player.flags["coop_joinedGameAt"] = level.time
+
+	local.player spectator
 }end
 
 //spectator handle
@@ -130,6 +132,10 @@ manageSpectator local.player:{
 //SETUP when entering spectator
 	//run only once per spectator join
 	if(	local.player.flags["coop_isActive"] != -1 ){
+		if(	local.player.flags["coop_isActive"] == NIL){
+			waitthread manageSetup local.player
+		}
+	
 		//Notify scripts instantly this player is no longer valid
 		local.player.flags["coop_isActive"] = -1
 		local.player.flags["coop_iAmTruelyActive"] = 0
@@ -163,10 +169,13 @@ manageNoSpectator local.player:{
 	if( level.coop_physicsOff != NIL && level.coop_physicsOff == 1){ local.player physics_off }
 	
 //PLACE at spawn
-	//this makes sure that the player does not get spawned anywhere in the map
-	//where he was spectating at, the moment the player spawns he needs to be
-	//already at the spawnlocation or he can telefrag a player, friendly or enemy
-	thread coop_mod/main.scr::playerPlaceAtSpawn local.player
+	if(local.player.flags["coop_isActive"] == -1){
+		local.player.flags["coop_isActive"] = 0
+		//this makes sure that the player does not get spawned anywhere in the map
+		//where he was spectating at, the moment the player spawns he needs to be
+		//already at the spawnlocation or he can telefrag a player, friendly or enemy
+		thread coop_mod/main.scr::playerPlaceAtSpawn local.player
+	}
 }end
 
 //alive player handling
@@ -188,9 +197,14 @@ manageAlive local.player:{
 //=========================================================================
 manageAliveSpawning local.player:{
 //=========================================================================
+	/////////////////////////////////////////SETUP
+	if(	local.player.flags["coop_isActive"] == NIL){
+		waitthread manageSetup local.player
+	}
+
 	//isSpectator is a built-in BT bool, more efficient than checking for dmteam string
 	//force them into allies if they spawned as axis and abort current handling
-	if(thread coop_mod/main.scr::forceValidTeam ){
+	if( local.player.isSpectator || thread coop_mod/main.scr::forceValidTeam ){
 		//reset the respawn location, makes player spawn at predefined location
 		waitthread coop_mod/main.scr::resetSpawn local.player
 		end
@@ -207,17 +221,22 @@ manageAliveSpawning local.player:{
 		waitthread coop_mod/player.scr::manageAliveRespawning local.player
 		thread coop_mod/main.scr::startThread ( "maps/"+level.coop_mapname+".scr::coop_playerJustRespawned" ) (local.player)
 	}else{	
-		thread coop_mod/main.scr::playerPlaceAtSpawn local.player
+		waitthread coop_mod/main.scr::playerPlaceAtSpawn local.player
 		thread coop_mod/main.scr::startThread ( "maps/"+level.coop_mapname+".scr::coop_playerJustSpawned" ) (local.player)
 	}
 	
 	//INVENTORY
-	thread coop_mod/itemhandler.scr::managePlayerInventory
+	waitthread coop_mod/itemhandler.scr::managePlayerInventory
 	thread coop_mod/main.scr::itemGetAll
 	thread coop_mod/main.scr::playerHealth	
 	
 	//GLUE
 	thread coop_mod/main.scr::playerGlue local.player "spawn"	
+	
+	//NO SPEC
+	if(local.player.isSpectator){
+		end
+	}
 
 	//VARIABLES
 	local.player.fnum = -1		//this is used for friendly orientation see global/friendly::playernode
@@ -232,7 +251,7 @@ manageAliveSpawning local.player:{
 	if( level.coop_playerHide ){
 		local.player hide
 	}
-		
+	
 	//PLAYER READY
 	//[202] chrissstrahl	
 	//a player has joined a team and picked a weapon
