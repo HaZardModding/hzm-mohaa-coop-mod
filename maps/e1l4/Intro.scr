@@ -198,6 +198,9 @@ GateGuardDialogue: {
 	local.placetospawn = $player.origin + (0 -1000 0)
 	local.person = spawn models/human/german_wehrmact_soldier.tik origin local.placetospawn "targetname" "mrinvisible2"
 	local.person hide
+	
+	//@chrissstrahl //@smithy - this needs to be removed this is just here to speed up testing
+	setcvar "timescale" 1 //[202] chrissstrahl - slow down for player to show papers
 
 	$mrinvisible2.shuddup = 1
 	$mrinvisible2 exec global/enable_ai.scr
@@ -227,8 +230,12 @@ GateGuardDialogue: {
 	//thread keepAskingtillSeePapers
 	while(level.GatePapersAccepted != 1) { wait 0.3 }
 	
+	//@chrissstrahl //@smithy - this needs to be removed this is just here to speed up testing
+	setcvar "timescale" 10 //[202] chrissstrahl - speedup testing
+	
+	//@smithy - I think this paper stuff needs checking
 	//[200] chrissstrahl - make sure players work fine with being glued again
-	exec coop_mod/replace.scr::physics_off
+	exec coop_mod/replace.scr::physics_off 
 
 	$1stgateguard anim A_14_GermATalk4    //if you want to board the boat you will have to see the HM
 	$1stgateguard waittill animdone
@@ -505,29 +512,56 @@ startTruckOptions: {	//self refers to $starttruck
 //============================================================
 PlayerExitVehicle: {
 //============================================================
-	//@smithy
-	local.startpos = $player.origin
+	//@chrissstrahl //@smithy - this needs to be removed this is just here to speed up testing
+	setcvar "timescale" 1 //[202] chrissstrahl - speedup testing
+
+	//[202] chrissstrahl - handle unglue crap
+	local.player = exec coop_mod/replace.scr::player_closestTo $starttruck
+	if(!local.player){
+		goto PlayerExitVehicle_skipunglueing
+	}
+	
+	local.startpos = local.player.origin
 	local.exitpos = $starttruck gettagposition "passenger_enter"
 	local.exitpos[2] = local.startpos[2]
 
 	thread global/MaintainCamera.scr::StopMaintainCamera
-	$player unglue
-	$player solid
-	$player physics_on
-	$player takedamage
-	$player.origin = local.exitpos
-
+	
 	$starttruck notsolid
-	local.playerspot = spawn script_origin origin local.startpos
-	$player glue local.playerspot 0
-
+	local.playerspot = spawn script_origin origin local.startpos	
+	
+	//[202] chrissstrahl - unglue player, then glue to prevent messing up truck
+	if(level.gametype==0){
+		$player unglue
+		$player solid
+		$player physics_on
+		$player takedamage
+		$player.origin = local.exitpos
+		$player glue local.playerspot 0
+	}else{
+		exec coop_mod/replace.scr::unglue local.exitpos NIL
+		exec coop_mod/replace.scr::glue local.playerspot 0
+	}
+	
 	local.disembark_time = 0.8
 	local.playerspot time local.disembark_time
 	local.playerspot moveto local.exitpos
 	local.playerspot move
-
 	wait local.disembark_time
-	$player unglue
+	
+	println("PlayerExitVehicle unglueing")
+	
+	//[202] chrissstrahl - unglue again
+	exec coop_mod/replace.scr::unglue NIL NIL
+	exec coop_mod/replace.scr::physics_on
+	
+	println("PlayerExitVehicle unglueing done")
+	
+	//[202] chrissstrahl - unglueing is skipped if no player was theer to get origins
+	PlayerExitVehicle_skipunglueing:
+	local.playerspot remove
+	println("PlayerExitVehicle unglueing skip")
+	
 	drawhud 1
 }end
 
