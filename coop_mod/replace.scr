@@ -1395,18 +1395,30 @@ glueHandle local.glueTo local.angle:{
 //this is why the show command is missing on purpose here
 //use coop_mod/replace.scr::show instead when you need it
 //=========================================================================
-unglue local.entity:{
+unglue local.ent local.show:{
 //=========================================================================
 	level.coop_playerGlue = 0
 	level.coop_playerGlueIndividual = 0
-
 	level.coop_glueTo = NIL  			//[200] Smithy - reset
 	level.coop_glueAngle = NIL 
-
-	//local.entity keept only for compatibility reasons
+	
+	//[202] chrissstrahl - added support for exitpoint and show
+	if(local.ent){
+		local.varType = thread coop_mod/main.scr::returnVarType local.ent
+		//entity
+		if(local.varType == 2){ local.ent = local.ent.origin } //grab origin
+		//vector
+		else if(local.varType == 3){ local.ent =  local.ent} //use origin
+		//bad type
+		else{ error ( "coop_mod/replace.scr::unglue - does not support var type: "+(thread coop_mod/main.scr::returnVarTypename local.varType) ) 1000 }
+	}
 	if( level.gametype == 0 ){
 		$player unglue
 		$player show //not sure if that is right
+		
+		//[202] chrissstrahl - set origin if given, show if set
+		if(local.exitPoint){ $player origin (local.exitPoint) }
+		if(local.show){ $player show }
 		end
 	}
 	if ($player){ //[200] Smithy - NULL check should be outside loop
@@ -1415,6 +1427,11 @@ unglue local.entity:{
 			local.player solid
 			local.player unglue
 			local.player physics_on
+			
+			//[202] chrissstrahl - set origin if given, show if set
+			if(local.exitPoint){ local.player origin (local.exitPoint) }
+			if(local.show){ local.player show }
+			
 			//added in ver 2.00 making sure unglued players don't get stuck in each other if they are at the same pos
 			thread coop_mod/main.scr::playerMakeSolidAsap local.i
 		}	
