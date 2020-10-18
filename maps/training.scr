@@ -453,32 +453,48 @@ ammo_spawners local.type:{
 	local.ammo_origin = self.origin
 	local.ammo_angles = self.angles
 	
+	//[202] Smithy - more efficient
+	if (local.type == "pistol")
+		local.model = "models/items/item_pistol_ammobox.tik"
+	else if (local.type == "smg")
+		local.model = "models/items/item_smg_ammobox.tik"
+	else if (local.type == "rifle")
+		local.model = "models/items/item_rifle_ammobox.tik"	
+	else if (local.type == "grenade"){
+		local.model = "models/weapons/m2frag_grenade_sp.tik" 
+	}
+	
 	while (1){	
-		if (local.type == "pistol")
-			local.item = spawn models/items/item_pistol_ammobox.tik
-		if (local.type == "smg")
-			local.item = spawn models/items/item_smg_ammobox.tik
-		if (local.type == "rifle")
-			local.item = spawn models/items/item_rifle_ammobox.tik	
-		if (local.type == "grenade")
-			local.item = spawn models/weapons/m2frag_grenade_sp.tik
+
+		//[202] Smithy - spawn custom item if we are in coop
+		if (level.gametype && local.type == "grenade"){
+			local.item = waitthread coop_mod/custom_items.scr::spawn_item_m2frag_grenade
+			println local.item.model			
+		}else{
+			local.item = spawn local.model 
+		}	
 		
 		local.item.origin = local.ammo_origin
 		local.item.angles = local.ammo_angles
 		
-		//[202] chrissstrahl - make sure to give server time to spawn and process item
-		waitframe
+		local.item.flags["coop_itemRespawnTime"] = -1 		//[202] Smithy - don't respawn these items via itemhandler
 
 		while (local.item){
 			wait 1
 		}
 		
 		println "z:       " self " is gone. respawning"
+		
 		if (self.targetname == "ammo_grenade"){
 			level.got_grenade = 1
 			println("ammo_spawners: level.got_grenade = 1")
 		}
-		wait 5
+		
+		if (!level.gametype){ 								//[202] Smithy - wait less time to respawn in mp
+			wait 5
+		}else{
+			wait 2
+		}	
 		
 		//[202] chrissstrahl - just spawn it again in mp regardless
 		if(level.gametype == 0){
