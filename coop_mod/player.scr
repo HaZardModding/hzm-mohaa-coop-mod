@@ -61,11 +61,17 @@ manage:{
 /////////////////////////////////////////ALIVE
 				if( local.player.health > 0 ){
 					//spawning is event based handled in: main.scr::playerSpawnEvent
-					
 					waitthread manageAlive local.player local.i
 				}
 /////////////////////////////////////////DEAD
 				//death is event based handled in: main.scr::playerDeathEvent
+				
+				
+				//@chrissstrahl seperate func and probably rework
+/////////////////////////////////////////RESTORE FOV IF NAME IS CHANGED
+				if(/*local.player.flags["coop_setupComplete"] == 1 &&*/ local.player.flags["coop_netname"] != local.player.netname){
+					thread manageNamechange local.player
+				}
 			}
 		}
 		
@@ -90,9 +96,14 @@ manage:{
 //=========================================================================
 manageSetup local.player:{
 //=========================================================================
+	//once all setup is done these vars are set:
+	//local.player.flags["coop_setupComplete"] = 1
+
 	if(local.player.flags["coop_isActive"] != NIL){
+		//println("manageSetup::::::::::::ALREADY RUN")
 		end
 	}
+	//println("manageSetup::::::::::::RUNNING")
 	local.player.flags["coop_isActive"] = -3
 	
 //Host detection
@@ -100,6 +111,10 @@ manageSetup local.player:{
 		//[200] Smithy - as this is a bool, just do it in one line
 		local.player.flags["coop_isHost"] = local.player.entnum == 0
 	}
+	
+//RUN OTHER SETUPS
+	//RETRIVE DATA FROM NAME
+	thread setupCmds local.player
 
 //LMS reconnect protection
 	//During LMS add deaths to prevent player from playing if he is not allowed to
@@ -128,7 +143,50 @@ manageSetup local.player:{
 	local.player.flags["coop_lastRespawn"] = -1
 	local.player.flags["coop_joinedGameAt"] = level.time
 
+//SPACETAOR - play it save put that thing into spectator
 	local.player spectator
+}end
+
+//[202] chrissstrahl - for changing a player's FOV with a delay based on data from name
+//=========================================================================
+manageNamechange local.player:{
+//=========================================================================
+	local.extract = waitthread extractDataFromNetname local.player "fov"
+	waitframe
+	waitframe
+	//we need a delay before this or it will be reset right away
+	if(local.extract != NIL){
+		local.fov = int(local.extract)
+	}else{
+		local.fov = local.player.flags["coop_fov"]
+	}
+	thread manageFovSet local.player local.fov
+}end
+
+//[200] Smithy - for changing a player's FOV
+//[202] chrissstrahl - moved renamed and changed
+//=========================================================================
+manageFovSet local.player local.fov:{
+//=========================================================================
+	local.threadName = "coop_mod/main.scr::changePlayerFOV"
+	//[202] chrissstrahl - don't accept bad range
+	if(!local.fov || local.fov < 10){
+		end
+	}
+	
+	//println("manageFovSet::::::::::::"+local.fov)
+	//[202] chrissstrahl - update cvars first to prevent resetting the fov
+	if(local.player){
+		local.player.flags["coop_fov"] = local.fov
+		local.player stufftext ("seta g_m2l2 "+local.fov)
+	}
+	
+	local.prevCvar = getcvar "developer"
+	setcvar "developer" "1"
+	waitthread coop_mod/main.scr::changeGameType 0 0	
+	local.player fov local.fov
+	waitthread coop_mod/main.scr::changeGameType 2 0
+	setcvar "developer" local.prevCvar
 }end
 
 //spectator handle
@@ -139,7 +197,8 @@ manageSpectator local.player:{
 //SETUP when entering spectator
 	//run only once per spectator join
 	if(	local.player.flags["coop_isActive"] != -1 ){
-		if(	local.player.flags["coop_isActive"] == NIL){
+		if(	local.player.flags["coop_isActive"] == NIL || local.player.flags["coop_iAmTruelyActive"] == NIL){
+			//println("manageSpectator::::::::::::")
 			waitthread manageSetup local.player
 		}
 	
@@ -155,6 +214,7 @@ manageSpectator local.player:{
 		local.player threatbias ignoreme		
 
 		waitthread coop_mod/main.scr::resetSpawn local.player
+		thread manageFovSet local.player (int(string(local.player.flags["coop_fov"])))
 	}
 //WHILE in spectator
 	//do not allow player in just right away, wait for next handle (1 frametime)
@@ -251,6 +311,9 @@ manageAliveSpawning local.player:{
 		local.player hide
 	}
 	
+	//[202] chrissstrahl - implement script fov
+	thread manageFovSet local.player (int(string(local.player.flags["coop_fov"])))
+	
 	//PLAYER READY
 	//[202] chrissstrahl	
 	//a player has joined a team and picked a weapon
@@ -310,6 +373,9 @@ manageDead local.player:{
 	//println("manageDead")
 	local.player.flags["coop_iAmTruelyActive"] = 0
 	if(	local.player.flags["coop_isActive"] != -2 ){
+		//[202] chrissstrahl - implement script fov
+		thread manageFovSet local.player (int(string(local.player.flags["coop_fov"])))
+	
 /// LMS Handle
 		if( level.coop_lmsLives > 0 ){
 			//handle death count
@@ -371,4 +437,138 @@ resetPlayers:{
 		$player[local.i].flags["coop_isActive"] = NIL
 	}
 }end
+
+//[200] chrissstrahl - handle setup cmds for this player
+//this has to be seperate here
+//=========================================================================
+setupCmds local.player:{
+//=========================================================================
+	if(local.player == NIL || local.player== NULL){
+		error ("coop_mod/main.scr::setupCmds Fatal - Invalid player")
+		end
+	}
+	
+	//we need to give the host some more time, because he is running all the scripts and calculations
+	if(local.player.flags["coop_isHost"] == 1){
+		wait 0.25
+	}
+	//wait 0.5
+	
+	if(local.player == NIL || local.player== NULL){
+		error ("coop_mod/main.scr::setupCmds Fatal - Invalid player")
+		end
+	}	
+	
+	//DETECT FOV AND MOD VERSION
+	waitthread detectCoopFov local.player
+	waitthread detectCoopMod local.player
+
+	//this is used for playing current music, if the player joins mid-game
+	//i suspect we only need to have one command, because tmstart/tmloop are overwriting each other
+	if( level.coop_musicCommand != NIL ){
+		local.player stufftext ( level.coop_musicCommand )
+	}
+	//this is used to set volume of current music, if the player joins mid-game
+	if( level.coop_musicCommandVol != NIL ){
+		local.player stufftext ( level.coop_musicCommandVol )
+	}
+
+	//local.player stufftext ( "tmstop" ) //[200] chrissstrahl - moved to detect.cfg
+	
+	//this is used to set current music loop, if the player joins mid-game
+	//if( level.coop_musicCommandLoop != NIL ){
+		//local.player stufftext ( level.coop_musicCommandLoop )
+	//}
+	
+	//ALL SETUP COMPLETE
+	waitframe
+	local.player.flags["coop_setupComplete"] = 1
+}end
+
+//[202] chrissstrahl - detect fov in name
+//=========================================================================
+extractDataFromNetname local.player local.key:{
+//=========================================================================
+	if(!local.player){ end NULL }
+
+	//CHECK IF DATA CAN BE FOUND
+	local.fullNetName = string(local.player.netname);
+	local.dataStart = waitthread coop_mod/main.scr::containsText local.fullNetName (" #"+local.key+",") game.true
+	
+	//NO FOV IN NAME, UPDATE VAR
+	if(!local.dataStart){
+		local.player.flags["coop_netname"] = local.fullNetName
+		end NIL
+	}
+	
+	//RESTORE PLAYER NAME
+	local.cleanName = ""
+	for(local.current = 0; local.current < local.dataStart;local.current++){
+		local.cleanName += string(local.fullNetName[local.current])
+	}
+	
+	local.player stufftext ("name "+local.cleanName+"\n")
+	local.player.flags["coop_netname"] = local.cleanName
+	
+	//EXTRACT DATA FROM NAME
+	local.dataStart += 6
+	local.filterStage = 0
+	local.dataExtracted = ""
+	for(local.current = local.dataStart; local.current < local.fullNetName.size;local.current++){
+		//filter data, no leading 0 and make sure there is any valid int
+		if(local.filterStage == 0){
+			if(int(string(local.fullNetName[local.current])) > 0 ){
+				local.filterStage++
+				local.dataExtracted += string(local.fullNetName[local.current])
+			}
+		}else{
+			local.dataExtracted += string(local.fullNetName[local.current])
+		}
+	}
+}end local.dataExtracted
+
+//[202] chrissstrahl - detect fov in name
+//=========================================================================
+detectCoopFov local.player:{
+//=========================================================================
+	//[200] chrissstrahl - used to detect if a player has the coop mod installed
+	local.player stufftext ( "vstr g_m2l1\n" )
+	
+	//detect coop mod version
+	local.waitFrames = (1 * int(getcvar("sv_fps")))
+	while(local.player && local.waitFrames > 0){
+		local.extract = waitthread extractDataFromNetname local.player "fov"		
+		if(local.extract != NIL){
+			local.fov = int(local.extract)
+			thread manageFovSet local.player local.fov
+			break
+		}
+		local.waitFrames--
+		waitframe
+	}
+}end
+
+//[202] chrissstrahl - detect coop version
+//=========================================================================
+detectCoopMod local.player:{
+//=========================================================================
+	//[200] chrissstrahl - used to detect if a player has the coop mod installed
+	local.player stufftext ( "exec coop_mod/cfg/detect.cfg\n" )
+	
+	//detect coop mod version
+	//detect coop mod version
+	local.waitFrames = (1 * int(getcvar("sv_fps")))
+	while(local.player && local.waitFrames > 0){
+		local.extract = waitthread extractDataFromNetname local.player "hzm"		
+		if(local.extract != NIL){
+			local.player.flags["coop_installed"] = 1
+			local.player.flags["coop_version"] = int(local.extract)
+			break
+		}
+		local.waitFrames--
+		waitframe
+	}
+}end
+
+
 
