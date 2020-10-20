@@ -145,74 +145,6 @@ resetSpawn local.player:{
 	local.player.flags["coop_respawning"] = FALSE
 }end
 
-
-//[200] chrissstrahl - handle setup cmds for this player
-//this has to be seperate here, because the
-//=========================================================================
-setupCmds local.player:{
-//=========================================================================
-	if(local.player == NIL || local.player== NULL){
-		error ("coop_mod/main.scr::setupCmds Fatal - Invalid player")
-		end
-	}
-
-	//we need to give the host some more time, because he is running all the scripts and calculations
-	if(local.player.flags["coop_isHost"] == 1){
-		wait 0.25
-	}
-
-	wait 0.5
-
-	if(local.player == NIL || local.player== NULL){
-		error ("coop_mod/main.scr::setupCmds Fatal - Invalid player")
-		end
-	}
-
-	local.detectionValid = 1
-	if(local.player.dmteam != "spectator"){
-		local.detectionValid = 0
-		//iprintlnbold_noloc("NOT VALID DETECT")
-	}
-
-	//local.player stufftext ( "tmstop" ) //[200] chrissstrahl - moved to detect.cfg
-	//[200] chrissstrahl - used to detect if a player has the coop mod installed
-	local.player stufftext ( "exec coop_mod/cfg/detect.cfg\n" )
-
-
-	//this is used for playing current music, if the player joins mid-game
-	//i suspect we only need to have one command, because tmstart/tmloop are overwriting each other
-	if( level.coop_musicCommand != NIL ){
-		local.player stufftext ( level.coop_musicCommand )
-	}
-	//this is used to set volume of current music, if the player joins mid-game
-	if( level.coop_musicCommandVol != NIL ){
-		local.player stufftext ( level.coop_musicCommandVol )
-	}
-	//this is used to set current music loop, if the player joins mid-game
-	//if( level.coop_musicCommandLoop != NIL ){
-		//local.player stufftext ( level.coop_musicCommandLoop )
-	//}
-
-	//check for 1 sec after this thread is started
-	if(local.detectionValid != 1){
-		//iprintlnbold_noloc("NOT VALID DETECT")
-		end
-	}
-
-	//iprintlnbold_noloc("DETECTING")
-
-	local.waitFrames = (1 * int(getcvar("sv_fps")))
-	while(local.waitFrames > 0){
-		if(local.player.dmteam == "allies"){
-			//iprintlnbold_noloc("DETECTED!!!!")
-			local.player.flags["coop_installed"] = 1
-			end
-		}
-		local.waitFrames--
-		waitframe
-	}
-}end
-
 //[200] Smithy
 //Is called from events.scr every time a player spawners.
 //we can use this to efficiently replace any spawn specific code, 
@@ -810,22 +742,31 @@ getPlayerId local.player:{
 }end NIL
 
 //checks if a string contains the given text
+//[202] chrissstrahl - returning now starting position of where string was found if instructed to do so
 //=========================================================================
-containsText local.source local.text:{
+containsText local.source local.text local.giveStartPos:{
 //=========================================================================
 	if(local.source == NIL || local.text == NIL || local.source.size < local.text.size){ end 0 }
 
 	local.index = 0
-	local.match = 0
+	local.matchStartsAt = 0 //[202]
 	for(local.i=0;local.i<local.source.size;local.i++){
+		//part of match found
 		if(local.source[local.i] == local.text[local.index]){
 			local.index++
-			//match found
+			if(local.matchStartsAt == 0){ //[202]
+				local.matchStartsAt = local.i
+			}
+			//complete match found
 			if(local.index == local.text.size){
+				if(local.giveStartPos){ //[202]
+					end local.matchStartsAt
+				}
 				end 1
 			}
 		}else{
 			local.index = 0
+			local.matchStartsAt = 0 //[202]
 		}
 	}
 }end 0
@@ -1371,19 +1312,6 @@ isCoopEnabledMap local.map:{
 			end(local.map.size > 5 && local.map[4] == "_" && waitthread containsText local.map "coop_") //[200] Smithy - '_' check is nicer - plus previous check was for '0' not 'o'
 	} 		//[200] Smithy ^^ - size check to fix potential index issue raised by Chris (has to be more than 5 due to coop_ prefix)
 }end(game.false)
-
-//[200] Smithy - for changing a player's FOV
-//=========================================================================
-changePlayerFOV local.player local.fov:{
-//=========================================================================
-	local.threadName = "coop_mod/main.scr::changePlayerFOV"
-	local.prevCvar = getcvar "developer"
-	setcvar "developer" "1"
-	waitthread changeGameType 0 0
-	local.player fov local.fov
-	waitthread changeGameType 2 0
-	setcvar "developer" local.prevCvar
-}end
 
 //[202] chrissstrahl - cleans the mapname of savepoints ($...) and returns it
 //=========================================================================
