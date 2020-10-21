@@ -151,16 +151,104 @@ manageSetup local.player:{
 //=========================================================================
 manageNamechange local.player:{
 //=========================================================================
-	local.extract = waitthread extractDataFromNetname local.player "fov"
-	waitframe
-	waitframe
-	//we need a delay before this or it will be reset right away
-	if(local.extract != NIL){
-		local.fov = int(local.extract)
-	}else{
-		local.fov = local.player.flags["coop_fov"]
+	local.playerNetnameFull = local.player.netname
+	
+	//check if we can find certain data in name
+	//NOTE THAT THE ITTERATION TIMES HAVE TO BE ADJUSTED MANUALLY
+	//ADD ONLY COMMANDS - that we want truly to be executable at all times
+	local.command["0"]=" #fov,"
+	local.command["1"]=" #tp,"
+	local.commandNumber=( -1 ) //on purpose out of range
+	
+	for(local.i=0;local.i<2;local.i++){
+		local.find = waitthread coop_mod/main.scr::containsText local.playerNetnameFull local.command[string(local.i)] 1
+		if(local.find){
+			local.commandNumber = local.i
+			break
+		}
 	}
-	thread manageFovSet local.player local.fov
+
+	//check if datatype is supported
+	local.datatype = local.command[string(local.commandNumber)]
+	
+	//println("manageNamechange:1 - "+local.find+":"+string(local.datatype))
+	
+	//only supported datatypes are handled
+	if(local.datatype != NIL){
+		local.datatype = waitthread coop_mod/main.scr::cleanText local.datatype " "
+		local.datatype = waitthread coop_mod/main.scr::cleanText local.datatype "#"
+		local.datatype = waitthread coop_mod/main.scr::cleanText local.datatype ","
+		
+		local.extract = waitthread extractDataFromNetname local.player local.datatype
+		//println("manageNamechange:2 - NETNAME:"+local.playerNetnameFull+";")
+		//println("manageNamechange:2 - DATATYPE:"+string(local.datatype)+";")
+		//println("manageNamechange:2 - Extract:"+string(local.extract)+";")
+		
+		//handle datatypes
+		//fov - is handled below it has to be set with delay
+		//teleport
+		if(local.datatype == "tp"){
+			//iprintlnbold_noloc("TRANSPORT DATA: "+local.extract)
+			//START - player wants to go spawn location
+			if(local.extract == "start"){
+				thread coop_mod/main.scr::playerPlaceAtSpawn local.player
+			}
+			//PLAYERNAME / NUMBER - if it is non of the above check if it is a player name
+			else{
+				local.validPlayerFound = 0
+				//MATCHING PLAYER NAME
+				for (local.i = 1;local.i <= $player.size;local.i++){
+					local.playerOther =  $player[local.i]
+					if(local.playerOther == local.player){ continue } //disabled during testing
+					
+					//a player with a matching or similar name was found - move player there
+					if( waitthread coop_mod/main.scr::containsText local.playerOther.netname local.extract ){
+						local.validPlayerFound = 1
+						local.player origin local.playerOther.origin
+						thread coop_mod/main.scr::playerMakeSolidAsap local.player
+						thread coop_mod/main.scr::playerMakeSolidAsap local.playerOther
+					}
+				}
+				//MATCHING ENTITY NUMBER
+				if(local.validPlayerFound == 0 && int(local.extract) > -1 && int(local.extract) < int(getcvar("sv_maxclients"))){
+					local.playerOther = getentbyentnum( 0 )
+					if( 	local.playerOther != NULL &&
+							local.playerOther != local.player &&
+							local.playerOther.health > 0 &&
+							local.playerOther.health > 0 &&
+							local.playerOther.classname == "player" &&
+							local.playerOther.dmteam != "spectator")
+					{
+						local.validPlayerFound = 1
+						local.player origin local.playerOther.origin
+						thread coop_mod/main.scr::playerMakeSolidAsap local.player
+						thread coop_mod/main.scr::playerMakeSolidAsap local.playerOther
+					}
+				}
+				//NO VALID PLAYER FOUND
+				if(local.validPlayerFound == 0){
+					local.player iprint "No valid player found. Try with different parameter." 1
+				}
+			}
+		}
+	}else{
+		local.player.flags["coop_netname"] = local.player.netname
+		println("manageNamechange: unsuported data type for player: "+local.player.netname )
+	}
+	
+	//every time name is changed fov needs to be set again
+	//we need a delay before this or it will be reset right away
+	waitframe
+	waitframe
+	//only change fov if player was indeed renamed
+	if(local.player){
+		if(local.datatype == "fov" && local.extract != NIL){
+			local.fov = int(local.extract)
+		}else{
+			local.fov = local.player.flags["coop_fov"]
+		}
+		thread manageFovSet local.player local.fov
+	}
 }end
 
 //[200] Smithy - for changing a player's FOV
@@ -485,7 +573,7 @@ setupCmds local.player:{
 	local.player.flags["coop_setupComplete"] = 1
 }end
 
-//[202] chrissstrahl - detect fov in name
+//[202] chrissstrahl - detect data in name
 //=========================================================================
 extractDataFromNetname local.player local.key:{
 //=========================================================================
@@ -511,17 +599,11 @@ extractDataFromNetname local.player local.key:{
 	local.player.flags["coop_netname"] = local.cleanName
 	
 	//EXTRACT DATA FROM NAME
-	local.dataStart += 6
-	local.filterStage = 0
+	local.dataStart += (3 + local.key.size)
 	local.dataExtracted = ""
 	for(local.current = local.dataStart; local.current < local.fullNetName.size;local.current++){
-		//filter data, no leading 0 and make sure there is any valid int
-		if(local.filterStage == 0){
-			if(int(string(local.fullNetName[local.current])) > 0 ){
-				local.filterStage++
-				local.dataExtracted += string(local.fullNetName[local.current])
-			}
-		}else{
+		local.currentChar = string(local.fullNetName[local.current])
+		if(local.currentChar){
 			local.dataExtracted += string(local.fullNetName[local.current])
 		}
 	}
@@ -531,7 +613,7 @@ extractDataFromNetname local.player local.key:{
 //=========================================================================
 detectCoopFov local.player:{
 //=========================================================================
-	//[200] chrissstrahl - used to detect if a player has the coop mod installed
+	//[200] chrissstrahl - update menu entry
 	local.player stufftext ( "vstr g_m2l1\n" )
 	
 	//detect coop mod version
