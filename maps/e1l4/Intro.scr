@@ -52,6 +52,9 @@ DoIntro: {
 	$starttruck thread startTruckOptions
 	$starttruck rendereffects "+growradius"
 	$starttruck drive $starttruckpath 300 200 200 128		//256
+	
+	//[202] chrissstrahl - speed up for testing
+	thread coop_mod/developer.scr::timescale 8
 
 	//call to briefing dialogue
 	thread doBriefing
@@ -173,6 +176,20 @@ DeleteGuy1: {
 	thread global/EntityCleanup.scr::EntityCleanup "1stgateguard" 1
 }End
 
+//[202] chrissstrahl - do not let player wait during coop
+//============================================================
+coop_GateGuardDialogue:{
+//============================================================
+	$spy anim A_14_Claus_show_papers
+	$spy waittill animdone
+	$spy anim A_14_Claus_Opel_idle
+
+	if(level.GatePapersAccepted != 1) {
+		$1stgateguard say A_14_GermATalk2    //and you sir?
+		$1stgateguard waittill say
+	}
+}end
+
 //============================================================
 GateGuardDialogue: {
 //============================================================
@@ -197,11 +214,11 @@ GateGuardDialogue: {
 	$starttruck setcollisionentity $truckcollide2
 
 
-	//@chrissstrahl - make compatrible
-	local.placetospawn = $player.origin + (0 -1000 0)
+	//[202] chrissstrahl - make compatrible with coop
+	//local.placetospawn = $player.origin + (0 -1000 0)
+	local.placetospawn = ( -5585.637695 5091.588867 53.654541 )
 	local.person = spawn models/human/german_wehrmact_soldier.tik origin local.placetospawn "targetname" "mrinvisible2"
 	local.person hide
-	
 	$mrinvisible2.shuddup = 1
 	$mrinvisible2 exec global/enable_ai.scr
 	$mrinvisible2 notsolid
@@ -217,13 +234,11 @@ GateGuardDialogue: {
 	$1stgateguard say A_14_GermATalk1    //I need to see papers for both of you
 	$1stgateguard waittill saydone
 
-	$spy anim A_14_Claus_show_papers
-	$spy waittill animdone
-	$spy anim A_14_Claus_Opel_idle
-
-	if(level.GatePapersAccepted != 1) {
-		$1stgateguard say A_14_GermATalk2    //and you sir?
-		$1stgateguard waittill say
+	//[202] chrissstrahl - allow to show papers right away in coop (makes this a lil faster)
+	if(level.gametype == 0){
+		waitthread coop_GateGuardDialogue
+	}else{
+		thread coop_GateGuardDialogue
 	}
 
 	//$1stgateguard waitthread askForPapers
@@ -514,6 +529,9 @@ PlayerExitVehicle: {
 //============================================================
 	//[202] chrissstrahl - slow down for testing
 	thread coop_mod/developer.scr::timescale 1
+	
+	//[202] chrissstrahl - setup spawnlocations before unglue
+	waitthread coop_mod/spawnlocations.scr::e1l4_update1
 
 	//[202] chrissstrahl - handle unglue crap
 	local.player = exec coop_mod/replace.scr::player_closestTo $starttruck
@@ -551,9 +569,12 @@ PlayerExitVehicle: {
 	
 	println("PlayerExitVehicle unglueing")
 	
-	//[202] chrissstrahl - unglue again
-	exec coop_mod/replace.scr::unglue NIL NIL
+	//[202] chrissstrahl - unglue again - p1=specific player only, p2=show
+	exec coop_mod/replace.scr::unglue NIL 1
 	exec coop_mod/replace.scr::physics_on
+	
+	//[202] chrissstrahl - put players in 3rd_person to prevent them to from selecting a weapon to make sure they really spawned
+	thread coop_mod/player.scr::set3rdPerson local.player 1
 	
 	println("PlayerExitVehicle unglueing done")
 	
