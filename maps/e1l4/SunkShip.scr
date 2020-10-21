@@ -73,21 +73,29 @@ end
 
 //--------------------------------------------------------------------
 
-playerBlacksOut:
+//[202] chrissstrahl - handels the given playa
+//this changes viewagles of player and moves the player down
+//to simulate a falling/sinking effect
+//=========================================================================
+coop_playerBlacksOut local.player:{
+//=========================================================================	
 	local.blackOutTime = 0.7
-	local.startPos = $player.origin
-	local.endPos = $player.origin + ( 0 0 -80 )
+	local.startPos = local.player.origin
+	local.endPos = local.player.origin + ( 0 0 -80 )
 	local.startRoll = 0
 	local.endRoll = 100
 	local.startTime = level.time
-
-	$player physics_off
-	$player notsolid
+	
+	local.player notsolid
+	local.player physics_off
 
 	// player blacks out
-	fadeout (local.blackOutTime + 0.5) 0 0 0 1
+	if(level.playerBlacksOutActive==NIL){
+		level.playerBlacksOutActive=1
+		fadeout (local.blackOutTime + 0.5) 0 0 0 1
+	}
 
-	while (level.time < local.startTime + local.blackOutTime) {
+	while (level.player && level.time < local.startTime + local.blackOutTime) {
 		local.t = (level.time - local.startTime)/local.blackOutTime
 
 		local.t1 = sin (local.t*180)
@@ -100,15 +108,42 @@ playerBlacksOut:
 		local.roll = (local.t*local.endRoll) + (local.t0*local.startRoll)
 
 
-		$player.origin = local.pos
-		$player.angles = ( ($player.angles[0] + local.pitch) $player.angles[1] local.roll )
-		$player.viewangles = $player.angles
+		local.player.origin = local.pos
+		local.player.angles = ( (local.player.angles[0] + local.pitch) local.player.angles[1] local.roll )
+		local.player.viewangles = local.player.angles
 		waitframe
+	}
+}end
+
+playerBlacksOut:
+	//[202] chrissstrahl - make coop mod compatible
+	for (local.i = 1; local.i <= $player.size; local.i++){
+		local.player = $player[local.i]
+		if( level.gametype != 0 && local.player.dmteam == "spectator" ){ continue }
+		thread coop_playerBlacksOut local.player
 	}
 end
 
-ExplodeShip:
+//[202] chrissstrahl - moves players to the tilted ship map part
+//=========================================================================	
+coop_ExplodeShip local.player:{
+//=========================================================================	
+	local.player origin $playerneworigin.origin
 
+	local.viewangles = local.player.viewangles
+	local.viewangles[2] = 0
+	local.player.viewangles = local.viewangles
+	local.player solid
+	local.player physics_on	
+	
+	//[202] make sure players don't get stuck in each other
+	if(level.gametype != 0){
+		waitframe
+		thread coop_mod/main.scr::playerMakeSolidAsap local.i
+	}
+}end
+
+ExplodeShip:
 	if (level.skipescapeship == 1)
 	{
 		$player.origin = ( 3026 207 121 )
@@ -144,7 +179,8 @@ ExplodeShip:
 	$player playsound e1l4_pipe_thud
 	wait 0.1
 	$player playsound player_pain
-
+	
+iprintlnbold_noloc("DEV: ExplodeShip BLACKOUT")
 	waitthread playerBlacksOut
 	trigger $musicTransitionKnockedOut 
 	wait 4
@@ -152,23 +188,24 @@ ExplodeShip:
 	// ship 1 effects go away, roll ship 2 effects 
 	$explodeEffectShip_1 thread KillEffect
 	$explodeEffectShip_2 thread RollEffect
-
-	//$player physics_on
-	$player.origin = $playerneworigin.origin
-
-	local.viewangles = $player.viewangles
-	local.viewangles[2] = 0
-	$player.viewangles = local.viewangles
+	
+	//[202] chrissstrahl - update spawn location
+	waitthread coop_mod/spawnlocations.scr::e1l4_update4
+	
+	//[202] chrissstrahl - make coop mod compatible
+	for (local.i = 1; local.i <= $player.size; local.i++){
+		local.player = $player[local.i]
+		if( level.gametype != 0 && local.player.dmteam == "spectator" ){ continue }
+		thread coop_ExplodeShip local.player
+	}
 
 	thread CleanUpFirstPart
 	if($truckammo)
 		thread EndTruckAmmo
-	
-	$player solid
-	$player physics_on
 
 	exec global/earthquake.scr 4 0.4 1 0
 	fadein 10 0 0 0 1
+iprintlnbold_noloc("DEV: ExplodeShip BLACKOUT-STOP")
 
 	thread maps/e1l4/SunkShip.scr::ShipShudder
 	thread maps/e1l4/SunkShip.scr::ShipTilt
@@ -186,6 +223,7 @@ ExplodeShip:
 		wait 2
 		$explodeEffectShip_2 thread KillEffect
 	}
+iprintlnbold_noloc("DEV: ExplodeShip END")
 end
 
 CleanUpFirstPart:
@@ -208,8 +246,11 @@ End
 
 
 //------------------------------------------------------------------
+//[202] chrissstrahl looks like it is not in use
 TiltTo local.angle local.time:
-
+iprintlnbold_noloc("DEV: TiltTo START")
+iprintlnbold_noloc("DEV: TiltTo START")
+iprintlnbold_noloc("DEV: TiltTo START")
 	local.originalangles = $player.viewangles
 	local.viewangles = $player.viewangles
 	
@@ -222,14 +263,19 @@ TiltTo local.angle local.time:
 		local.viewangles[2] = local.angle * ( local.timeElapsed / local.time )
 		$player.viewangles = local.viewangles
 		waitframe
+		iprintlnbold_noloc("DEV: TiltTo while")
 	}
 
 	$player.viewangles = local.originalangles
+iprintlnbold_noloc("DEV: TiltTo END")
+iprintlnbold_noloc("DEV: TiltTo END")
+iprintlnbold_noloc("DEV: TiltTo END")
 End
 
 
 //------------------------------------------------------------------
 ShipTilt:
+iprintlnbold_noloc("DEV: ShipTilt START")
 	local.viewangles = $player.viewangles
 	local.viewangles[2] = level.maxTilt
 	$player.viewangles = local.viewangles
@@ -256,13 +302,14 @@ ShipTilt:
 
 		$player.viewangles = local.viewangles
 		waitframe
+		//iprintlnbold_noloc("DEV: ShipTilt while")
 	}
 
 	// Reset the players view
 	local.viewangles = $player.viewangles
 	local.viewangles[2] = 0
 	$player.viewangles = local.viewangles
-
+iprintlnbold_noloc("DEV: ShipTilt END")
 End
 
 //---------------------------------------------------------
