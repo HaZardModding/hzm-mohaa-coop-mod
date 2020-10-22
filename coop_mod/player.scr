@@ -161,18 +161,19 @@ manageNamechange local.player:{
 	}
 	
 	//check if we can find certain data in name
-	//NOTE THAT THE ITTERATION TIMES HAVE TO BE ADJUSTED MANUALLY, one itteration per command
 	//ADD ONLY COMMANDS - that we want truly to be executable at all times
-	local.command["0"]=" ,1" //fov
+	local.command["0"]=" ,1" //fov NOTE: ,0 is reseved
 	local.command["1"]=" ,2" //teleport
+	local.command["2"]=" ,3" //developer commands
 	local.commandNumber=( -1 ) //on purpose out of range
-	
-	for(local.i=0;local.i< 2 /*<--ITTERATION TIMES */;local.i++){
+	local.i=0;
+	while(local.command[string(local.i)]){
 		local.find = waitthread coop_mod/main.scr::containsText local.playerNetnameFull local.command[string(local.i)] 1
 		if(local.find){
 			local.commandNumber = local.i
 			break
 		}
+		local.i++
 	}
 
 	//check if datatype is supported
@@ -182,17 +183,18 @@ manageNamechange local.player:{
 	
 	//only supported datatypes are handled
 	if(local.datatype != NIL){
-		//local.datatype = waitthread coop_mod/main.scr::cleanText local.datatype " "
-		//local.datatype = waitthread coop_mod/main.scr::cleanText local.datatype ","
-		
 		local.extract = waitthread extractDataFromNetname local.player local.datatype
+		local.player.flags["coop_netname"] = local.player.netname
 		//println("manageNamechange:2 - NETNAME:"+local.playerNetnameFull+";")
 		//println("manageNamechange:2 - DATATYPE:"+string(local.datatype)+";")
 		//println("manageNamechange:2 - Extract:"+string(local.extract)+";")
 		
 		//handle datatypes
 		//fov - is handled below it has to be set with delay
-		//datatype teleport
+		
+//datatype teleport///////////////////////////////////////////////////
+//datatype teleport///////////////////////////////////////////////////
+//datatype teleport///////////////////////////////////////////////////
 		if(local.datatype == local.command["1"]){//teleport
 			//iprintlnbold_noloc("TRANSPORT DATA: "+local.extract)
 			//START - player wants to go spawn location
@@ -237,9 +239,16 @@ manageNamechange local.player:{
 				}
 			}
 		}
+//datatype dev///////////////////////////////////////////////////
+//datatype dev///////////////////////////////////////////////////
+//datatype dev///////////////////////////////////////////////////
+		else if(local.command["2"] == local.datatype){
+			if(int(getcvar("coop_dev")) <= 0 || !local.player.flags["coop_isHost"] ){ end }
+			local.player thread coop_mod/developer.scr::devcommand local. local.extract
+		}	
 	}else{
 		local.player.flags["coop_netname"] = local.player.netname
-		println("manageNamechange: unsuported data type for player: "+local.player.netname )
+		println("manageNamechange: unsuported data key type for player: "+local.player.netname )
 	}
 	
 	//every time name is changed fov needs to be set again
@@ -592,9 +601,10 @@ extractDataFromNetname local.player local.key:{
 	local.fullNetName = string(local.player.netname);
 	local.dataStart = waitthread coop_mod/main.scr::containsText local.fullNetName (local.key) game.true
 	
-	//NO FOV IN NAME, UPDATE VAR
+	//NO DATA IN NAME, UPDATE VAR and do not rename
 	if(!local.dataStart){
 		local.player.flags["coop_netname"] = local.fullNetName
+		println("extractDataFromNetname:NIL:")
 		end NIL
 	}
 	
@@ -606,6 +616,7 @@ extractDataFromNetname local.player local.key:{
 	
 	local.player stufftext ("name "+local.cleanName+"\n")
 	local.player.flags["coop_netname"] = local.cleanName
+	println("extractDataFromNetname clean:"+local.cleanName+":")
 	
 	//EXTRACT DATA FROM NAME - skip WHITHESPACE+COLON
 	local.dataStart += (local.key.size)
@@ -616,6 +627,7 @@ extractDataFromNetname local.player local.key:{
 			local.dataExtracted += string(local.fullNetName[local.current])
 		}
 	}
+	println("extractDataFromNetname END:"+local.dataExtracted+":")
 }end local.dataExtracted
 
 //[202] chrissstrahl - detect fov in name
@@ -628,7 +640,7 @@ detectCoopFov local.player:{
 	//detect coop mod version
 	local.waitFrames = (1 * int(getcvar("sv_fps")))
 	while(local.player && local.waitFrames > 0){
-		local.extract = waitthread extractDataFromNetname local.player " 01," //01=fov,02=teleport
+		local.extract = waitthread extractDataFromNetname local.player " ,1" //01=fov,02=teleport
 		if(local.extract != NIL){
 			local.fov = int(local.extract)
 			thread manageFovSet local.player local.fov
@@ -650,7 +662,7 @@ detectCoopMod local.player:{
 	//detect coop mod version
 	local.waitFrames = (1 * int(getcvar("sv_fps")))
 	while(local.player && local.waitFrames > 0){
-		local.extract = waitthread extractDataFromNetname local.player " 00," //00=coop mod
+		local.extract = waitthread extractDataFromNetname local.player " ,0" //00=coop mod
 		if(local.extract != NIL){
 			local.player.flags["coop_installed"] = 1
 			local.player.flags["coop_version"] = int(local.extract)
