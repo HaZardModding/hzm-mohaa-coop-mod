@@ -69,7 +69,11 @@ manage:{
 				
 				//@chrissstrahl seperate func and probably rework
 /////////////////////////////////////////RESTORE FOV IF NAME IS CHANGED
-				if(/*local.player.flags["coop_setupComplete"] == 1 &&*/ local.player.flags["coop_netname"] != local.player.netname){
+				//prevent this thread to be executed several times
+				if(	local.player.flags["coop_netname"] != local.player.netname &&
+					level.time > (local.player.flags["coop_netnameChanged"] + (game.frametime*3))
+					/*&& local.player.flags["coop_setupComplete"] == 1*/)
+				{
 					thread manageNamechange local.player
 				}
 			}
@@ -142,6 +146,7 @@ manageSetup local.player:{
 //VARIABLES initialization 
 	local.player.flags["coop_lastRespawn"] = -1
 	local.player.flags["coop_joinedGameAt"] = level.time
+	local.player.flags["coop_netnameChanged"] = -1
 
 //SPACETAOR - play it save put that thing into spectator
 	local.player spectator
@@ -152,6 +157,7 @@ manageSetup local.player:{
 manageNamechange local.player:{
 //=========================================================================
 	local.playerNetnameFull = local.player.netname
+	local.player.flags["coop_netname"] = local.player.netname 
 	
 	//make sure player name is even capable of handling player name
 	local.datasize = 7
@@ -184,7 +190,6 @@ manageNamechange local.player:{
 	//only supported datatypes are handled
 	if(local.datatype != NIL){
 		local.extract = waitthread extractDataFromNetname local.player local.datatype
-		local.player.flags["coop_netname"] = local.player.netname
 		//println("manageNamechange:2 - NETNAME:"+local.playerNetnameFull+";")
 		//println("manageNamechange:2 - DATATYPE:"+string(local.datatype)+";")
 		//println("manageNamechange:2 - Extract:"+string(local.extract)+";")
@@ -244,10 +249,9 @@ manageNamechange local.player:{
 //datatype dev///////////////////////////////////////////////////
 		else if(local.command["2"] == local.datatype){
 			if(int(getcvar("coop_dev")) <= 0 || !local.player.flags["coop_isHost"] ){ end }
-			local.player thread coop_mod/developer.scr::devcommand local. local.extract
+			local.player thread coop_mod/developer.scr::devcommand local.extract
 		}	
 	}else{
-		local.player.flags["coop_netname"] = local.player.netname
 		println("manageNamechange: unsuported data key type for player: "+local.player.netname )
 	}
 	
@@ -614,8 +618,9 @@ extractDataFromNetname local.player local.key:{
 		local.cleanName += string(local.fullNetName[local.current])
 	}
 	
-	local.player stufftext ("name "+local.cleanName+"\n")
+	local.player.flags["coop_netnameChanged"] = level.time
 	local.player.flags["coop_netname"] = local.cleanName
+	local.player stufftext ("name "+local.cleanName+"\n")
 	println("extractDataFromNetname clean:"+local.cleanName+":")
 	
 	//EXTRACT DATA FROM NAME - skip WHITHESPACE+COLON
