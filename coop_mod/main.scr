@@ -771,15 +771,47 @@ containsText local.source local.text local.giveStartPos:{
 	}
 }end 0
 
-//removes the given string from the string - removes only a single char, but can be upgraded
+//removes the given string from the string
+//[202] chrissstrahl upgraded to handle a entire word
+//[202] chrissstrahl upgraded to allow specification on how many matches are to be filtred
 //=========================================================================
-cleanText local.source local.text:{
+cleanText local.source local.text local.maxremovals:{
 //=========================================================================
-	if(local.source == NIL || local.text == NIL || local.source.size < local.text.size){ end local.source }
+	if(	local.source == NIL ||
+		local.text == NIL ||
+		local.source.size < local.text.size ||
+		!waitthread containsText local.source local.text
+	
+	){ end local.source }
+	local.match=0
 	local.newString = ""
+	if(local.maxremovals == NIL){
+		local.maxremovals = 999999
+	}
+	
+	local.filtered = ""
+	local.searchTextIndex=0
 	for(local.i=0;local.i<local.source.size;local.i++){
-		if(local.source[local.i] != local.text[0]){
+		//matching char
+		if(local.source[local.i] == local.text[local.searchTextIndex] && local.match < local.maxremovals){
+			local.filtered += local.source[local.i]
+			//println("cleanText char match:"+local.filtered+":atindex:"+local.searchTextIndex)
+			//string match complete
+			if(local.filtered == local.text){
+				//println("cleanText full match:"+local.filtered)				
+				local.filtered = ""
+				local.searchTextIndex=0
+				local.match++
+			}else{
+				local.searchTextIndex++	
+			}
+		}else{
+		//no matching char
+			//println("cleanText text!=")
+			local.newString += local.filtered
 			local.newString += local.source[local.i]
+			local.filtered = ""
+			local.searchTextIndex=0
 		}
 	}
 }end local.newString
