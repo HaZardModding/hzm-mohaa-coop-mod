@@ -5,6 +5,61 @@
 //
 
 //[202] chrissstrahl
+//commands that are extracted from netname, see player.scr::manageNamechange
+//=========================================================================
+devcommand local.data:{
+//=========================================================================
+	if(!local.data){ iprintlnbold_noloc("GO SLEEP! YOU ARE SLIPPING.");end }
+	iprintlnbold_noloc("dev command! :"+local.data)
+	
+//SPAWNLOCATION STUFF//////////////////////// test and create spawn locations
+//SPAWNLOCATION STUFF////////////////////////
+//SPAWNLOCATION STUFF////////////////////////
+	if(waitthread coop_mod/main.scr::containsText local.data "spawn," game.false){
+		local.data = waitthread coop_mod/main.scr::cleanText local.data "spawn,"
+//move player to every spawnloc and wait for him to move - ends once all spawns are tested
+		if(waitthread coop_mod/main.scr::containsText local.data "test" game.false){
+			iprintlnbold_noloc("test")
+			self thread spawnpoints
+		}
+//spawns markers for every player spawn based on current player pos to show in game if it works
+		else if(waitthread coop_mod/main.scr::containsText local.data "new" game.false){
+			//iprintlnbold_noloc("show markers")
+			self thread spawnmarkers
+		}
+//spawns markers for every player spawn based on current player pos to show in game if it works
+		else if(waitthread coop_mod/main.scr::containsText local.data "try" game.false){
+			//iprintlnbold_noloc("test markers")
+			self thread testmarkers
+		}
+//prints consoleoutput based on current status of spawnmarkers
+		else if(waitthread coop_mod/main.scr::containsText local.data "p," game.false){
+			local.markernames = waitthread coop_mod/main.scr::cleanText local.data "p,"
+			//iprintlnbold_noloc("print markers ("+local.markernames+") into console")
+			self thread printmarkers local.markernames
+		}
+	}
+//SHOW TOUCH//////////////////////// print info of object touched by developer
+//SHOW TOUCH////////////////////////
+//SHOW TOUCH////////////////////////
+	else if(waitthread coop_mod/main.scr::containsText local.data "touch," game.false){
+		self thread showtouch
+	}
+//NOCLIP//////////////////////// toggels noclip
+//NOCLIP////////////////////////
+//NOCLIP////////////////////////
+	else if(waitthread coop_mod/main.scr::containsText local.data "noclip," game.false){
+		self thread noclip
+	}
+//THREADBIAS//////////////////////// toggels threatbias
+//THREADBIAS////////////////////////
+//THREADBIAS////////////////////////
+	else if(waitthread coop_mod/main.scr::containsText local.data "threat," game.false){
+		self thread threatbias
+	}
+}end
+
+//[202] chrissstrahl
 //used for developer to spot relevant objects while testplaying (makeing them blink)
 //=========================================================================
 timescale local.timeScale:{
@@ -126,7 +181,7 @@ spawnpoints:{
 	//[200] chrissstrahl - check if developer needs to be on
 	if(thread coop_mod/main.scr::checkCoopDeveloper "Test Spawnpoints command"){ end }
 	
-	if( self == NULL || self.health <= 0 ){
+	if( self == NULL || self.health <= 0 || self.dmteam == "spectator"){
 		end
 	}
 	
@@ -152,7 +207,7 @@ spawnpoints:{
 		self tele local.vec
 		self thread coop_mod/main.scr::playerFace level.flags["coop_spawn"+local.i+"angles"]	
 		
-		while( self != NULL && self.health > 0 && vector_length( local.vec - self.origin) < 100 && local.i<8 ){
+		while( self != NULL && self.health > 0 && vector_length( local.vec - self.origin) < 100 && local.i<8 && self.dmteam != "spectator"){
 			waitframe
 		}
 		if(local.i<8){
@@ -249,7 +304,383 @@ threatbias:{
 	}
 }end
 
+//[202] chrissstrahl
+//creates a preview of how spawnspots would look at this clocation
+//=========================================================================
+spawnmarkers:{
+//=========================================================================
+	local.maxcombinations = 20
+	local.origin = self.origin
+	local.devcoopspawnmarkers = self.flag["coop_dev_spawnmarkers"]
+	if(local.devcoopspawnmarkers == NIL || local.devcoopspawnmarkers > local.maxcombinations){
+		self.flag["coop_dev_spawnmarkers"] = 1
+		local.devcoopspawnmarkers = 1
+	}else{
+		self.flag["coop_dev_spawnmarkers"] = (local.devcoopspawnmarkers + 1)
+		local.devcoopspawnmarkers++
+	}
+	
+	//make sure markers are spawned
+	waitthread spawnmarkers_spawn
+	
+	//move markers in +x dir away from player
+	if(local.devcoopspawnmarkers == 1){
+		iprintlnbold_noloc ( "SPAWN CONFIG: +x:1" )
+		local.testorigin = local.origin
+		for(local.i=1;local.i<=8;local.i++){
+			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			local.testorigin[0] += 40
+		}
+	}
+	//move markers in -x dir away from player
+	else if(local.devcoopspawnmarkers == 2){
+		iprintlnbold_noloc ( "SPAWN CONFIG: -x:2" )
+		local.testorigin = local.origin
+		for(local.i=1;local.i<=8;local.i++){
+			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			local.testorigin[0] -= 40
+		}
+	}
+	//move markers in +y dir away from player
+	else if(local.devcoopspawnmarkers == 3){
+		iprintlnbold_noloc ( "SPAWN CONFIG: +y:3" )
+		local.testorigin = local.origin
+		for(local.i=1;local.i<=8;local.i++){
+			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			local.testorigin[1] += 40
+		}
+	}
+	//move markers in -y dir away from player
+	else if(local.devcoopspawnmarkers == 4){
+		iprintlnbold_noloc ( "SPAWN CONFIG: -y:4" )
+		local.testorigin = local.origin
+		for(local.i=1;local.i<=8;local.i++){
+			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			local.testorigin[1] -= 40
+		}
+	}
+	//move markers in +x dir away from player in 2 rows
+	//Kinda like: ::::
+	else if(local.devcoopspawnmarkers == 5){
+		iprintlnbold_noloc ( "SPAWN CONFIG: +x +y 2-Row:5" )
+		local.testorigin = local.origin
+		for(local.i=1;local.i<=8;local.i++){
+			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			local.testorigin[0] += 40
+			if(local.i == 4){
+				local.testorigin = local.origin
+				local.testorigin[1] += 40
+			}
+		}
+	}
+	//move markers in +x dir away from player in 2 rows
+	//Kinda like: ::::
+	else if(local.devcoopspawnmarkers == 6){
+		iprintlnbold_noloc ( "SPAWN CONFIG: +x -y 2-Row:6" )
+		local.testorigin = local.origin
+		for(local.i=1;local.i<=8;local.i++){
+			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			local.testorigin[0] += 40
+			if(local.i == 4){
+				local.testorigin = local.origin
+				local.testorigin[1] -= 40
+			}
+		}
+	}
+	//move markers in -x dir away from player in 2 rows
+	//Kinda like: ::::
+	else if(local.devcoopspawnmarkers == 7){
+		iprintlnbold_noloc ( "SPAWN CONFIG: -x -y 2-Row:7" )
+		local.testorigin = local.origin
+		for(local.i=1;local.i<=8;local.i++){
+			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			local.testorigin[0] -= 40
+			if(local.i == 4){
+				local.testorigin = local.origin
+				local.testorigin[1] -= 40
+			}
+		}
+	}
+	//move markers in -x dir away from player in 2 rows
+	//Kinda like: ::::
+	else if(local.devcoopspawnmarkers == 8){
+		iprintlnbold_noloc ( "SPAWN CONFIG: -x +y 2-Row:8" )
+		local.testorigin = local.origin
+		for(local.i=1;local.i<=8;local.i++){
+			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			local.testorigin[0] -= 40
+			if(local.i == 4){
+				local.testorigin = local.origin
+				local.testorigin[1] += 40
+			}
+		}
+	}
+	//move markers in +x +y dir away from player diagonal
+	else if(local.devcoopspawnmarkers == 9){
+		iprintlnbold_noloc ( "SPAWN CONFIG: +x +y Diagonal:9" )
+		local.testorigin = local.origin
+		for(local.i=1;local.i<=8;local.i++){
+			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			local.testorigin[0] += 25
+			local.testorigin[1] += 25
+		}
+	}
+	//move markers in -x +y dir away from player diagonal
+	else if(local.devcoopspawnmarkers == 10){
+		iprintlnbold_noloc ( "SPAWN CONFIG: -x +y Diagonal:10" )
+		local.testorigin = local.origin
+		for(local.i=1;local.i<=8;local.i++){
+			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			local.testorigin[0] -= 25
+			local.testorigin[1] += 25
+		}
+	}
+	//move markers in -x -y dir away from player diagonal
+	else if(local.devcoopspawnmarkers == 11){
+		iprintlnbold_noloc ( "SPAWN CONFIG: -x -y Diagonal:11" )
+		local.testorigin = local.origin
+		for(local.i=1;local.i<=8;local.i++){
+			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			local.testorigin[0] -= 25
+			local.testorigin[1] -= 25
+		}
+	}
+	//move markers in -x +y dir away from player diagonal
+	else if(local.devcoopspawnmarkers == 12){
+		iprintlnbold_noloc ( "SPAWN CONFIG: -x +y Diagonal:12" )
+		local.testorigin = local.origin
+		for(local.i=1;local.i<=8;local.i++){
+			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			local.testorigin[0] -= 25
+			local.testorigin[1] += 25
+		}
+	}
+	//move markers alternating +x +y dir away from player
+	//Kinda like: ',',',',
+	else if(local.devcoopspawnmarkers == 13){
+		iprintlnbold_noloc ( "SPAWN CONFIG: +x +y alternating:13" )
+		local.testorigin = local.origin
+		for(local.i=1;local.i<=8;local.i++){
+			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			local.testorigin[0] += 40
+			
+			local.powerOfTwo = int(local.i / 2)
+			if(local.i == (local.powerOfTwo * 2)){
+				local.testorigin[1] = local.origin[1]
+			}else{
+				local.testorigin[1] += 40
+			}
+		}
+	}
+	//move markers alternating -x +y dir away from player
+	//Kinda like: ',',',',
+	else if(local.devcoopspawnmarkers == 14){
+		iprintlnbold_noloc ( "SPAWN CONFIG: -x +y alternating:14" )
+		local.testorigin = local.origin
+		for(local.i=1;local.i<=8;local.i++){
+			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			local.testorigin[0] -= 40
+			
+			local.powerOfTwo = int(local.i / 2)
+			if(local.i == (local.powerOfTwo * 2)){
+				local.testorigin[1] = local.origin[1]
+			}else{
+				local.testorigin[1] += 40
+			}
+		}
+	}
+	//move markers alternating +y +x dir away from player
+	//Kinda like: ',',',',
+	else if(local.devcoopspawnmarkers == 15){
+		iprintlnbold_noloc ( "SPAWN CONFIG: +y +x alternating:15" )
+		local.testorigin = local.origin
+		for(local.i=1;local.i<=8;local.i++){
+			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			local.testorigin[1] += 40
+			
+			local.powerOfTwo = int(local.i / 2)
+			if(local.i == (local.powerOfTwo * 2)){
+				local.testorigin[0] = local.origin[0]
+			}else{
+				local.testorigin[0] += 40
+			}
+		}
+	}
+	//move markers alternating -y +x dir away from player
+	//Kinda like: ',',',',
+	else if(local.devcoopspawnmarkers == 16){
+		iprintlnbold_noloc ( "SPAWN CONFIG: -y +x alternating:16" )
+		local.testorigin = local.origin
+		for(local.i=1;local.i<=8;local.i++){
+			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			local.testorigin[1] -= 40
+			
+			local.powerOfTwo = int(local.i / 2)
+			if(local.i == (local.powerOfTwo * 2)){
+				local.testorigin[0] = local.origin[0]
+			}else{
+				local.testorigin[0] += 40
+			}
+		}
+	}
+	//move markers +x +y dir away from player in 3 rows
+	else if(local.devcoopspawnmarkers == 17){
+		iprintlnbold_noloc ( "SPAWN CONFIG: +x +y 3rows :17" )
+		local.testorigin = local.origin
+		local.row = 1
+		for(local.i=1;local.i<=8;local.i++){
+			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			
+			local.testorigin[0] += 40
+			if(local.row == 3){
+				local.testorigin[1] += 40
+				local.testorigin[0] = local.origin[0]
+				local.row = 0
+			}
+			local.row++
+		}
+	}
+	//move markers +x -y dir away from player in 3 rows
+	else if(local.devcoopspawnmarkers == 18){
+		iprintlnbold_noloc ( "SPAWN CONFIG: +x -y 3rows :18" )
+		local.testorigin = local.origin
+		local.row = 1
+		for(local.i=1;local.i<=8;local.i++){
+			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			
+			local.testorigin[0] += 40
+			if(local.row == 3){
+				local.testorigin[1] -= 40
+				local.testorigin[0] = local.origin[0]
+				local.row = 0
+			}
+			local.row++
+		}
+	}
+	//move markers -x +y dir away from player in 3 rows
+	else if(local.devcoopspawnmarkers == 19){
+		iprintlnbold_noloc ( "SPAWN CONFIG: -x +y 3rows :19" )
+		local.testorigin = local.origin
+		local.row = 1
+		for(local.i=1;local.i<=8;local.i++){
+			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			
+			local.testorigin[0] -= 40
+			if(local.row == 3){
+				local.testorigin[1] += 40
+				local.testorigin[0] = local.origin[0]
+				local.row = 0
+			}
+			local.row++
+		}
+	}
+	//move markers -x -y dir away from player in 3 rows
+	else if(local.devcoopspawnmarkers == 20){
+		iprintlnbold_noloc ( "SPAWN CONFIG: -x -y 3rows :20" )
+		local.testorigin = local.origin
+		local.row = 1
+		for(local.i=1;local.i<=8;local.i++){
+			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			
+			local.testorigin[0] -= 40
+			if(local.row == 3){
+				local.testorigin[1] -= 40
+				local.testorigin[0] = local.origin[0]
+				local.row = 0
+			}
+			local.row++
+		}
+	}
+}end
 
+//[202] chrissstrahl - move player to each new marker and wait for him to move away
+//=========================================================================
+testmarkers:{
+//=========================================================================
+	if(thread coop_mod/main.scr::checkCoopDeveloper "Test Spawnpoints command"){ end }
+	
+	if( self == NULL || self.health <= 0 ){
+		end
+	}
+	
+	iprintlnbold_noloc ( "developer test spawnpoints" )
+	iprintlnbold_noloc ( "!!! MOVE AWAY TO CONTINUE !!!" )
+	self nodamage
+	
+	for(local.i=1;local.i<=8;local.i++){
+		if(self.health <= 0 || self.dmteam == "spectator"){
+			if(self){
+				self takedamage
+			}
+			end
+		}
 
+		local.vec = $("hzmCoopModSpawnMarker"+local.i).origin
+		
+		if(local.vec == NIL){
+			iprintlnbold_noloc ( "coop_spawn"+local.i+"origin was NIL!" )
+			continue
+		}
+		
+		self forcelegsstate STAND
+		self tele local.vec
+		
+		while( self != NULL && self.health > 0 && vector_length( local.vec - self.origin) < 100 && local.i<8 && self.dmteam != "spectator"){
+			waitframe
+		}
+		if(local.i<8){
+			iprintlnbold_noloc ( "Developer check" )
+			wait 1
+		}
+	}
+	iprintlnbold_noloc ( "Developer Test complete" )
+	self takedamage
+}end
 
+//=========================================================================
+printmarkers local.markernames:{
+//=========================================================================
+	iprintlnbold_noloc ( "Developer Printed markers ("+local.markernames+")into console" )
+	println("//spawn loacations at ("+string(self.origin)+") for "+local.markernames)
+	local.angle = self.viewangles
+	local.angle[0] = 0
+	local.angle[2] = 0
+	local.angle = waitthread cleanText string(local.angle) "("
+	local.angle = waitthread cleanText string(local.angle) ","
+	local.angle = waitthread cleanText string(local.angle) ")"
+	for(local.i=1;local.i<9;local.i++){
+		local.marker = $("hzmCoopModSpawnMarker"+local.i)
+		if(local.marker){
+			local.origin = local.marker.origin
+			local.angle = waitthread cleanText string(local.origin) "("
+			local.angle = waitthread cleanText string(local.origin) ","
+			local.angle = waitthread cleanText string(local.origin) ")"
+			println("level.flags[\"coop_spawn"+local.i+"origin\"] = ( "+local.origin+" )")
+			println("level.flags[\"coop_spawn"+local.i+"angles\"] = ( "+local.angle+" )")
+		}
+	}
+}end
 
+//creates a preview of how spawnspots would look at this clocation
+//=========================================================================
+spawnmarkers_spawn:{
+//=========================================================================
+	for(local.i=1;local.i<9;local.i++){
+		local.marker = $("hzmCoopModSpawnMarker"+local.i)
+		if(!local.marker){
+			spawn script_model model "models/items/Af_P_Lantern.tik" origin (local.origin) notsolid 1 targetname ("hzmCoopModSpawnMarker"+local.i) scale 2
+		}
+	}
+}end
+
+//creates a preview of how spawnspots would look at this clocation
+//=========================================================================
+spawnmarkers_remove:{
+//=========================================================================
+	for(local.i=1;local.i<9;local.i++){
+		local.marker = $("hzmCoopModSpawnMarker"+local.i)
+		if(local.marker){
+			$("hzmCoopModSpawnMarker"+local.i) remove
+		}
+	}
+}end
