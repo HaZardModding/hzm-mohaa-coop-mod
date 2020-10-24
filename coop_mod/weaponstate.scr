@@ -18,23 +18,30 @@ main local.state:{
 	local.player = self
 
 	if (local.state == "RAISE_WEAPON"){							//unholstered
-		wait game.ms 											//so the weapon is classed as activated in engine					
-
+		wait game.ms 											//so the weapon is classed as activated in engine				
+					
 		//check if the item is a weapon (it could be papers, and if so we don't want to turn disguise off)
 		local.item = waitthread coop_mod/itemhandler.scr::returnActiveWeapon local.player
 		if (local.item && local.item.classname == "Weapon"){
 			local.player.flags["coop_activeWeapon"] = local.item
 			
-			//[202] Smithy - store the previous weapon they used
+			//[202] Smithy - store the previous weapon they used (now stores entity and model)
 			if (local.player.flags["coop_hadWeapon"] && local.player.flags["coop_lastActiveWeapon"]){
-				if (local.player.flags["coop_lastActiveWeapon"] != local.player.flags["coop_activeWeapon"].model){
+				if (local.player.flags["coop_lastActiveWeaponModel"] != local.player.flags["coop_activeWeapon"].model){
 					local.player.flags["coop_previousWeapon"] = local.player.flags["coop_lastActiveWeapon"]
+					local.player.flags["coop_previousWeaponModel"] = local.player.flags["coop_lastActiveWeaponModel"]
 				}
 			}
+			
+			println local.player.flags["coop_previousWeaponModel"]
 				
 			//[200] Smithy - allow the game to know their last active weapon on respawn (suggested by Chris)
 			local.player.flags["coop_lastWeapon"] = local.player.flags["coop_activeWeapon"].model 
-			local.player.flags["coop_lastActiveWeapon"] = local.player.flags["coop_activeWeapon"].model 
+			
+			//[202] Smithy - store last active weapon for use in determining previous weapon
+			local.player.flags["coop_lastActiveWeapon"] = local.player.flags["coop_activeWeapon"]
+			local.player.flags["coop_lastActiveWeaponModel"] = local.player.flags["coop_activeWeapon"].model
+			
 			local.player.flags["coop_hadWeapon"] = game.true
 		}else{
 			local.player.flags["coop_activeWeapon"] = NULL
