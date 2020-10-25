@@ -798,13 +798,12 @@ playsound local.sound local.dowait:{
 	local.playerWait = NULL
 	for (local.i = 1;local.i <= $player.size;local.i++){
 		local.player =  $player[local.i]
-		if(local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+		if(isAlive local.player && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
 			if(local.playerWait == NULL){
 				local.playerWait = local.player
 				if(local.dowait == NIL){
 					local.playerWait playsound local.sound
 				}else{
-					//local.playerWait playsound local.sound wait 	 	//[200] Smithy
 					local.playerWait thread playsound_wait local.sound 	//[200] Smithy - fix playsound callbacks on players
 				}
 				//chrissstrahl - fixme debugme finetune
@@ -813,6 +812,7 @@ playsound local.sound local.dowait:{
 			else{
 				local.player playsound local.sound
 			}
+			local.player forceactivate //[202] Smithy - see if we can execute the sound even if it's outside of the other players' PVS
 		}
 	}
 	if(local.dowait != NIL && local.playerWait != NULL){
@@ -2694,4 +2694,14 @@ local.newTrigName local.newTrigSpawnFlags local.removeOldTrig:{
 	}
 	//println "you ARE right activator! well done!"
 	local.trigger delete
+}end
+
+//[202] Smithy - same as cloneTrigger, but with fewer args
+//============================================================================
+cloneTriggerSimple local.oldTrig local.newTrigType local.newName local.spawnFlags:{
+//============================================================================
+	if (local.spawnFlags == NIL){ local.spawnFlags = 0 }
+
+	local.newTrig = spawn local.newTrigType targetname local.newName spawnflags local.spawnFlags
+	local.newTrig model local.oldTrig.brushmodel
 }end
