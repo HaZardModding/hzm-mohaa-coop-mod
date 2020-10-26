@@ -107,8 +107,7 @@ main:{
 		
 		//[202] Smithy - so it only triggers when they enter, not continuously when inside. we don't want to spam commands on player. 
 		$GrenadeBanTrigger edgetriggered game.true 
-	}
-	
+	}	
 }end
 
 //[202] Smithy - stop players having inventory nades while in mg room
@@ -120,25 +119,20 @@ coop_removeInvGrenades:{
 	//[202] Smithy - if we don't take weapon, the grenade can still be in their hand even with 0 ammo
 	local.player take "models/weapons/m2frag_grenade_sp_start.tik" 
  	local.player take "models/weapons/steilhandgranate_start.tik"
+ 	
+ 	wait game.ms	//[202] Smithy - so we can make them use another gun, a wait is also needed for give commands to work consistently after a take		
 	
 	if (local.player.flags["coop_activeWeapon"]){
 		
 		local.model = local.player.flags["coop_activeWeapon"].model
 		if (local.model == "models/weapons/m2frag_grenade_sp_start.tik" || local.model == "models/weapons/steilhandgranate_start.tik"){
-			
-			wait game.ms	//[202] Smithy - so we can make them use another gun, a wait is also needed for give commands to work consistently after a take						
-			
+											
 			if (local.player.flags["coop_previousWeapon"]){			
 				local.player use local.player.flags["coop_previousWeaponModel"] //[202] Smithy - switch to the last weapon they were holding before nade
 			}else{
 				local.player useweaponclass pistol
-			}
-		
-		}else{
-			wait game.ms 	//[202] Smithy - a wait is needed for give commands to work consistently after a take
+			}		
 		}
-	}else{
-		wait game.ms 		//[202] Smithy - a wait is needed for give commands to work consistently after a take
 	}
 	
 	//[202] Smithy - give the empty grenade weapons back
@@ -604,6 +598,11 @@ seencheck:{
 //=========================================================================
 obj6:{
 //=========================================================================
+	//[202] Smithy - devs used a trigger_use rather than trigger_useonce. *facepalm*
+	//fix it with a property
+	if (self.triggered){ end }
+	self.triggered = game.true
+
 	//CALLED BY BSP WHEN EXPLOSIVES ARE PICKED UP
 	waitthread global/items.scr::add_item "explosives"
 	$explosive hide
