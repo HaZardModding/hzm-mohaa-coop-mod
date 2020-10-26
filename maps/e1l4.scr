@@ -18,7 +18,7 @@ main: {
 	//[201] Smithy - make players disguised on spawn
 	level.coop_enableDisguises = game.true
 	level.coop_uniformOnSpawn = game.true
-	level.coop_disguiseUniform = "german_afrika_officer" //[201] Smithy - Afrika Korps
+	level.coop_disguiseUniform = "sc_ax_ital_inf" //[201] Smithy - Italian army
 
 	exec global/auto.scr e1l4
 	waitexec maps/e1l4/hacks.scr
@@ -26,6 +26,13 @@ main: {
 	//Crimewavez - coop compatibility.
 	//level waittill prespawn
 	waitthread coop_mod/replace.scr::waitTillPrespawn
+	
+	//[202] Smithy - find the weapons by origin and also feed in amount of starting ammo
+	if (level.gametype){
+		thread coop_weaponLoadoutTrigger ( -3221.00 5011.00 156.00) 64 	//[202] Smithy - find the mp40 in the map room and make it add to loadout on pickup
+		thread coop_weaponLoadoutTrigger ( -3726.00 3537.00 -233.00) 64 //[202] Smithy - find the mp40 on the lower deck (just in case one in map room wasn't found)
+		thread coop_weaponLoadoutTrigger ( -3318.00 4194.00 -56.00) 28 	//[202] Smithy - find the shotgun and and make it add to loadout on pickup
+	}	
 
 	exec global/ambience.scr e1l4
 	
@@ -218,6 +225,32 @@ main: {
 	else{
 		exec global/missioncomplete.scr (level.coopNextMap) 1
 	}
+}end
+
+//[202] Smithy - find the weapon and set the method to call
+//when picked up so we can add it to loadout
+//============================================================
+coop_weaponLoadoutTrigger local.origin local.ammo:{
+//============================================================	
+	local.maxEnts = int(getcvar "maxentities") - 1	
+
+	for (local.i = 0; local.i <= local.maxEnts; local.i++){
+		local.ent = getentbyentnum local.i
+		if (!local.ent){ continue }
+		if (local.ent.origin == local.origin && local.ent.classname == "Weapon"){	
+			//println "****SMITHY****: ADDING LOADOUT THREAD FOR: " local.ent.model
+			local.ent setthread coop_addWeaponToLoadout
+			local.ent.coop_startingAmmo = local.ammo
+		}
+	}
+}end
+
+//[202] Smithy - give current and future players the weapon and ammo
+//============================================================
+coop_addWeaponToLoadout:{
+//============================================================
+	thread coop_mod/replace.scr::givePlayerWeapon self.model 	
+	thread coop_mod/replace.scr::ammo (waitthread coop_mod/itemhandler.scr::getAmmoType self.model) self.coop_startingAmmo
 }end
 
 //============================================================
