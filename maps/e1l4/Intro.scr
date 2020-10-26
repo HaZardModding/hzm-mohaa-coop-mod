@@ -46,7 +46,7 @@ DoIntro: {
 
 	drawhud 0
 	thread handleDriver
-	thread handlePlayer
+	waitthread handlePlayer //[202] Smithy - wait for this to finish now we add a wait
 	thread startTruckLightsCheck
 
 	$starttruck thread startTruckOptions
@@ -308,7 +308,7 @@ HACK: {
 	}
 }End
 
-//@smithy
+//[202] Smithy - this is fine
 //============================================================
 askForPapers: {
 //============================================================
@@ -360,8 +360,8 @@ giveDisguise: {
 		setcvar g_playermodel "Sc_AX_Ital_Inf" 
 	}
 	else {
-	//@smithy
-		exec coop_mod/replace.scr::has_disguise  1 //[200] chrissstrahl - give disguise in coop, we might have special features in the future
+		//[202] Smithy - note: has_disguise is added by itemhandler.scr on spawn
+		
 		exec coop_mod/replace.scr::playsound "pickup_papers"
 		exec coop_mod/replace.scr::playsound "pickup_uniform"
 		waitthread global/items.scr::add_item "papers_level1" noMessage
@@ -424,9 +424,11 @@ handlePlayer: {
 	thread giveDisguise
 	level.opelpassengerseat = spawn script_origin
 	local.seatpos = $starttruck gettagposition "passenger"
-	local.seatpos[2] -= 45
+	local.seatpos[2] -= 45 										//[202] Smithy - hmm, we could learn from this to stop jitter, as we don't do much different in jeep missions...
 	level.opelpassengerseat.origin = local.seatpos
 	level.opelpassengerseat bind $starttruck
+	
+	waitframe //[202] Smithy - lets check this makes smoothness more consistent.
 
 	//Crimewavez - coop comp, see replace.scr and SDK in case of questions.
 	if(level.gametype == 0) {
@@ -578,6 +580,13 @@ PlayerExitVehicle: {
 	local.playerspot remove
 	
 	drawhud 1
+	
+	//[202] Smithy - stops papers being stuck as unholstered
+	waitframe
+	for (local.i = 1; local.i <= $player.size; local.i++){		
+		$player[local.i] forcetorsostate PUTAWAY_MAIN
+	}
+	
 	
 	//chrissstrahl - test, remove me again - used to test if spawnspots work
 	//wait 4 
