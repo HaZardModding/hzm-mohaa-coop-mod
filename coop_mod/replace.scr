@@ -874,54 +874,6 @@ say_wait local.dialogue local.idle:{
 	waitthread coop_mod/main.scr::changeGameType 2 0
 }end
 
-//[200] chrissstrahl - replaces $entity waittill sounddone
-//usage:	<entity> waitthread coop_mod/replace.scr::sounddone <soundname> <time>
-//example:	$entity waitthread coop_mod/replace.scr::sounddone mb_101 16
-//
-//Sets gametype cvar to singleplayer as hack to allow the command to execute correctly
-//=========================================================================
-sounddone local.sound local.time:{
-//=========================================================================
-//
-//this function requires the sound, because i hope that at some point the sound length can be
-//detected by script, rathet than manually enter a time. But we are not there yet.
-	local.threadName = "coop_mod/replace.scr::sounddone"
-	iprintlnbold_noloc("(" + local.threadName + "): Func is defunct! Fix me!")
-	end //[200] Smithy - now defunct? Not what we need (will fix references to this (e.g. briefings & m3l1b))
-
-	if( self == NIL || self == NULL ){
-		error ( "coop_mod/replace.scr::sounddone - needs to be executed by a entity" ) 1000
-		end
-	}
-	if( local.sound == NIL ){
-		error ( "coop_mod/replace.scr::sounddone - parameter 1 was NIL should be <string> sound " ) 1000
-		end
-	}
-	//if( local.time == NIL ){ //[200] Smithy - not needed now?
-	//	error ( "coop_mod/replace.scr::sounddone - parameter 2 was NIL should be <int> time " ) 1000
-	//	end
-	//}
-	if(level.gametype == 0){
-		self waittill sounddone
-	}else{
-		//wait local.time
-		//[200] chrissstrahl - fix suggested by Smithy using g_gametype hack
-		local.hackNumber = thread coop_mod/main.scr::hackGametypeOn NIL
-		self waittill sounddone
-		thread coop_mod/main.scr::hackGametypeOnff local.hackNumber NIL //[200] Smithy - "hackGametypeOnff" is a typo. Plus, we dont want to wait for the sound to finish before setting gametype back.
-	}
-}end
-
-
-//[200] chrissstrahl - replaces $entity waittill saydone
-//usage:	<entity> waitthread coop_mod/replace.scr::saydone <soundname> <time>
-//example:	$entity waitthread coop_mod/replace.scr::saydone mb_101 16
-//=========================================================================
-saydone local.sound local.time:{
-//=========================================================================
-	waitthread sounddone local.sound local.time
-}end
-
 //replaces $player ammo ...
 //=========================================================================
 ammo local.type local.amount local.sound:{
@@ -2597,7 +2549,9 @@ givePlayerWeapon local.weapon local.playerToUse local.use local.wait:{
 	}
 
 	wait game.ms //as takePlayerWeapon can take a short time
-
+	wait game.ms //[202] Smithy - as it takes some time for them to be added to their loadout
+	wait game.ms //[202] Smithy - as it takes some time for them to be added to their loadout x2
+	
 	if (!$player || !local.weapon){ end }
 	if (local.use == NIL){ local.use = "none"}
 
@@ -2608,9 +2562,9 @@ givePlayerWeapon local.weapon local.playerToUse local.use local.wait:{
 			continue
 		}
 
-		//check if he already has this weapon
+		//check if he already has this weapon (this is why we have extra waits up above, so we can be sure it is found in their inv)
 		if (waitthread coop_mod/itemhandler.scr::playerHasWeapon local.player local.weapon){
-			println "(coop_mod/replace.scr::givePlayerWeapon): " local.player.netname " already has this weapon"
+			println "(coop_mod/replace.scr::givePlayerWeapon): " local.player.netname " already has a " local.weapon
 			if (local.use == "one" && local.playerToUse && local.player == local.playerToUse){
 				local.playerToUse = NULL //ok, no weapon found on him, so he shouldn't use it
 			}
@@ -2696,12 +2650,19 @@ local.newTrigName local.newTrigSpawnFlags local.removeOldTrig:{
 	local.trigger delete
 }end
 
-//[202] Smithy - same as cloneTrigger, but with fewer args
+//[202] Smithy - clone any object with a brush model
+//this is a more generic method, but can be used to clone triggers too.
+//it will return the object, then you can then do what you wish with it.
+//If you want to clone an object completely (including class), just do:
+//local.newObj = waitthread coop_mod/replace.scr::cloneBrushObject local.objToClone
+//otherwise you can specify the object type you want to create in the class arg.
+//Optional ability to feed in spawnflags.
 //============================================================================
-cloneTriggerSimple local.oldTrig local.newTrigType local.newName local.spawnFlags:{
+cloneBrushObject local.sourceObj local.class local.spawnFlags:{
 //============================================================================
 	if (local.spawnFlags == NIL){ local.spawnFlags = 0 }
+	if (local.class == NIL){ local.class = local.sourceObj.classname }
 
-	local.newTrig = spawn local.newTrigType targetname local.newName spawnflags local.spawnFlags
-	local.newTrig model local.oldTrig.brushmodel
-}end
+	local.newObj = spawn local.class spawnflags local.spawnFlags
+	local.newObj model local.sourceObj.brushmodel
+}end (local.newObj)
