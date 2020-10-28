@@ -217,10 +217,10 @@ end
 //----------------------------------------------------------------------
 
 invisibleAdvice:
-	while(self && (self.thinkstate != "attack" ||  self.thinkstate != attack))
+	while (isAlive self && self.thinkstate != "attack") //[202] Smithy - removed redundant duplicate thinkstate condition, also check if alive
 		wait 1
 	
-	if !(self && isAlive self)
+	if (!isAlive self) 									//[202] Smithy - isAlive checks for null. the devs didn't know this? :x
 		end
 		
 	$clerk.obtainPapersThread delete
@@ -230,7 +230,7 @@ invisibleAdvice:
 	$clerk thread runForTheAlarm
 
 	$clerkbuddy exec global/enable_ai.scr	
-	$clerkbuddy unholster
+	$clerkbuddy thread coop_mod/replace.scr::unholster //[202] Smithy - his unholstering is bugged... use this instead
 	
 	$clerkbuddy attackplayer
 	self remove
@@ -271,31 +271,39 @@ clerkBuddyLeave:
 
 	local.gotoNode = $clerkbuddynode
 	self.movedoneradius = 30
-	
-	//[202] Smithy - better checks. the devs were damn lazy not doing any null checks or thinkstate stuff...
-	while (isAlive self && !(vector_within self.origin local.gotoNode.origin 20) && self.thinkstate != "attack") {
-		self walkto local.gotoNode
-		wait 1
-	}
+		
+	self type_disguise "none"   	//[202] Smithy - added this. i suspect devs didnt want him saluting, so they disabled him instead. this is better.
+	self exec global/enable_ai.scr 	//[202] Smithy - moved this above loop. he should be enabled so he reacts to whats happening around him
 	
 	//[202] Smithy - better checks. the devs were damn lazy not doing any null checks or thinkstate stuff...
 	//there is so much damn spam in BT, because simple NULL checks are missing. ugh...
-	if (!isAlive self){ end }
+	while (!(vector_within self.origin local.gotoNode.origin 20)) {
+		self walkto local.gotoNode
+		wait 1
+		if (!isAlive self){ end }
+		if (self.thinkstate == "attack"){ break }
+		if (level.alarm){ break }
+	}
 	
 	self lookat NULL
+	
+	//[202] Smithy - stop him walking if he's interrupted
+	self walkto NULL 		
+	self exec global/stand.scr
+	self thread coop_mod/replace.scr::unholster //[202] Smithy - his unholstering is bugged... use this instead
 
 //	self walkto $clerkbuddynode
-//	self waittill movedone
-
-	self exec global/enable_ai.scr
+//	self waittill movedone	
 	
 	/*
 	if(self.gun == NIL)
 		self.gun = models/weapons/kar98.tik 
 	*/	
-		
-	//self unholster
-	self thread coop_mod/replace.scr::unholster //[202] Smithy - his unholstering is bugged... use this instead
+			
+	if (self.thinkstate == "attack"){ end } //[202] Smithy - dont do following if they are in attack mode 
+	
+	self type_disguise "salute" 			//[202] Smithy - now he's done his walk, make him a saluting dude.
+	
 	$clerkbuddy thread detectDockFight
 
   	self turnto $guysLookat
