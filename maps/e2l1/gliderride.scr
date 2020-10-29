@@ -1,15 +1,41 @@
 // gliderride.scr
 
+//=========================================================================
+coop_StartRide:{
+//=========================================================================
+//level.stickPlayerAtGlider == 1 // debug hack to put player near the glider, for debugging
+
+	//[202] chrissstrahl
+	thread coop_mod/replace.scr::physics_off
+	
+	//@smithy lets say it together - lazzy chriss, lazzy chriss, lazzy chriss
+	while(!level.ejectedFromGlider){
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player =  $player[local.i]
+			if(local.player && local.player.health > 0 && local.player.flags["coop_isActive"] == 1){
+			local.player.origin = $glider.origin
+			local.player notsolid
+		}
+		wait 1
+	}
+}
+
 //============================================================================
 StartRide: {
 //============================================================================
 	thread maps/e2l1/fog.scr::setFog level.fogDistanceTow level.fogBiasTow level.fogColorTow
-	self physics_off
+	
+	//[202] chrissstrahl - make coop compatible
+	if(level.gametype == 0){
+		$player physics_off
 
-	if (level.stickPlayerAtGlider == 1) {
-		// debug hack to put player near the glider, for debugging
-		self.origin = $glider.origin
-		self notsolid
+		if (level.stickPlayerAtGlider == 1) {
+			// debug hack to put player near the glider, for debugging
+			$player.origin = $glider.origin
+			$player notsolid
+		}	
+	}else{
+		thread coop_StartRide
 	}
 
 	level.skipDialogue 	 = 0
@@ -308,7 +334,9 @@ TruckGuyGoToCrashSite: {
 	}
 
 	if ( isAlive self ) {
-		self turnto $player
+		//[202] chrissstrahl
+		//self turnto $player
+		self thread coop_mod/replace.scr::turnto
 	}
 }end
 
@@ -334,7 +362,10 @@ handleCrash: {
 	//waitthread global/objectives.scr::add_objectives 2 2 "Locate your squad" local.waypoint1a
 	wait 1
 
-	$player playsound e2l1_crash1
+	//[202] chrissstrahl
+	//$player playsound e2l1_crash1
+	thead coop_mod/replace.scr::playsound e2l1_crash1
+	
 	level.gliderCrashOver = 1
 	thread HandleSearchParty
 
@@ -346,27 +377,39 @@ handleCrash: {
 
 	// tell the player to eject from the glider
 	wait 3
-	local.usekey = getboundkey1 "+use"
-	local.msg = (loc_convert_string "Press ") + local.usekey + (loc_convert_string " to eject from the glider.")
-	thread global/throbtext.scr::throbtext local.msg 0
 	
-	exec global/autosave.scr 1
+	//[202] chrissstrahl
+	if(level.gametype == 0){
+		local.usekey = getboundkey1 "+use"
+		local.msg = (loc_convert_string "Press ") + local.usekey + (loc_convert_string " to eject from the glider.")
+		thread global/throbtext.scr::throbtext local.msg 0
+		
+		exec global/autosave.scr 1
 
-	while (!$player.useheld && $player.health > 0) {
-		waitframe
+		while (!$player.useheld && $player.health > 0) {
+			waitframe
+		}
 	}
 
 	waitthread global/items.scr::add_item "explosives" noprint
 	drawhud 1
 	waitthread maps/e2l1/objectives.scr::transition "start"
 
-	$player useweaponclass rifle
-	thread global/throbtext.scr::throbtext "" 0
+	//[202] chrissstrahl
+	if(level.gametype == 0){
+		$player useweaponclass rifle
+		thread global/throbtext.scr::throbtext "" 0
+	}//@smithy - else use rifle in coop
+	else{
+	
+	}
+	
+	//[202] chrissstrahl
+	thread coop_mod/replace.scr::physics_on
 
 	//time to roll up the truck
     thread WaitToStartTruck   
 
-	self physics_on
 	$searchparty thread EnableAI
 
 	//wait 1
@@ -412,8 +455,8 @@ GetPlayer: {
 //============================================================================
 	// wake up the patrollers
 	self waitthread EnableAI
-	self turnto $player
-	self lookat $player
+	//[202] chrissstrahl
+	self thread coop_mod/replace.scr::turntolookat
 }end
 
 //============================================================================
@@ -578,6 +621,7 @@ handleDialogue: {
 //============================================================================
 detectDialogueSkip: {
 //============================================================================
+	//@smithy //@chrissstrahl - not sure yet which dialog and if we should allow to skip it
 	while (level.dialogueFinished == 0 && level.skipDialogue == 0) {
 		if ($player.useheld) {
 			level.skipDialogue = 1
@@ -612,6 +656,7 @@ handleCamera: {
 		cuecamera $gliderCamera
 	}
 	
+	//@chrissstrahl - you need to be more awake to do this part
 	level.oldPlayerAngles = $player.viewangles
 
 	// don't start synching the angles until after the fade in has happened
@@ -622,6 +667,7 @@ handleCamera: {
 		wait 8
 	}
 
+	//@chrissstrahl - you need to be more awake to do this part
 	while (level.gliderRideOver == 0) {
 		local.deltaAngles = $player.viewangles - level.oldPlayerAngles
 		$gliderCamera.angles = $glider.angles + local.deltaAngles
@@ -640,6 +686,7 @@ handleCamera: {
 //============================================================================
 cameraLookatPilot: {
 //============================================================================
+	//@chrissstrahl - you need to be more awake to do this part
 	local.y = -160 + $glider.angles[1] + $player.viewangles[1]
 	local.x = -10 + $glider.angles[0] + $player.viewangles[0]
 	level.oldPlayerAngles = ( local.x local.y 0 )
@@ -825,6 +872,7 @@ doEarthquake local.duration local.magnitude local.no_rampup local.no_rampdown: {
 //============================================================================
 RestrictView: {
 //============================================================================
+	//@smithy //@chrissstrahl
 	// don't let player mess with the mouse while we do this...
 	level.restrict = spawn models/statweapons/camera_restrict.tik
 	level.restrict.origin = $player.origin
