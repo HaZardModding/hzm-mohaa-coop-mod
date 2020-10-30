@@ -56,6 +56,8 @@ main local.thread local.arg1 local.arg2:{
 			end
 		}
 	}
+	
+	thread removeAdditionalStartAmmo
 
 	//store parm.other that is updated on specific events, such as playerspawn:
 	//https://github.com/openmoh/openmohaa/blob/54355278307a64d2e62e68f8450aeb3cdf7651b3/code/game/player.cpp#L4252
@@ -1104,11 +1106,14 @@ spawnInventory local.default:{
 			local.weaponArray = group.player.flags["coop_inventoryWeapons"]	//all the weapons the player has ever picked up
 		}	
 	}
-
-	for (local.i = 1; local.i <= local.weaponArray.size; local.i++){ 	//do the spawning
+	
+	//[202] Smithy - spawn them backwards so the grenade start tiks are done first
+	//so additionalStartAmmo is removed from weaps, otherwise we can end up with 0 nades that are still usable
+	for (local.i = local.weaponArray.size; local.i > 0; local.i--){ 	//do the spawning
 		local.weapon = spawn local.weaponArray[local.i] targetname group.invTargetname tracerfrequency 0
 		local.weapon.flags["coop_playerNewWeapon"] 	= game.true
 		local.weapon.flags["coop_itemOwner"] 		= group.player
+		local.weapon thread removeAdditionalStartAmmo
 	}
 }end
 
@@ -1118,13 +1123,13 @@ spawnInventory local.default:{
 giveInventory:{
 //=========================================================================
 	local.threadName = "coop_mod/itemhandler.scr::giveInventory"
-
+	
 	waitthread coop_mod/main.scr::changeGameType 0 0
 	group.weapons triggereffect group.player
 	for (local.i = 1; local.i <= level.coop_ammoLoadout.size; local.i++){
 		group.player ammo level.coop_ammoType[local.i] level.coop_ammoLoadout[level.coop_ammoType[local.i]]
 	}
-	waitthread coop_mod/main.scr::changeGameType 2 0
+	waitthread coop_mod/main.scr::changeGameType 2 0	
 
 	//ok, stop the text showing on the screen by pushing it up...
 	for (local.i = 1; local.i <= 5; local.i++){ group.player iprint "" }
@@ -1884,5 +1889,16 @@ disableAllWeaponsOnMenu:{
 	268435456 //landmine (1 << 28)
 	*/
 	setcvar dmflags 532676608
+}end
+
+//remove any start ammo that is added by the default tiki
+//=========================================================================
+removeAdditionalStartAmmo:{
+//=========================================================================	
+	if (self.classname != "Weapon" || !waitthread notStartGrenade self.model){ end }
+	self additionalstartammo "grenade" 6
+	self additionalstartammo "smokegrenade" 6
+	self additionalstartammo "grenade" -6
+	self additionalstartammo "smokegrenade" -6
 }end
 
