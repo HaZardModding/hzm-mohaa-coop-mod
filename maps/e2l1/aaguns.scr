@@ -223,7 +223,11 @@ FriendsRunAway: {
 	//	dprintln "failsafe trigger fired again.."
 	if (isAlive $hudson) {
 		$hudson.friendtype = 1
-		$hudson.destination = $player
+		
+		//[202] chrissstrahl
+		//$hudson.destination = $player
+		$hudson thread coop_mod/replace.scr::destination
+		
 		$hudson thread global/friendly.scr::friendlythink
 		$hudson.distance = 175
 		$hudson.interval = 128
@@ -231,7 +235,11 @@ FriendsRunAway: {
 
 	if (isAlive $michaels) {
 		$michaels.friendtype = 1
-		$michaels.destination = $player
+		
+		//[202] chrissstrahl
+		//$michaels.destination = $player
+		$michaels thread coop_mod/replace.scr::destination
+		
 		$michaels thread global/friendly.scr::friendlythink
 		$michaels.distance = 200
 		$michaels.interval = 128
@@ -239,7 +247,11 @@ FriendsRunAway: {
 
 	if (isAlive $mcmartin) {
 		$mcmartin.friendtype = 1
-		$mcmartin.destination = $player
+		
+		//[202] chrissstrahl
+		//$mcmartin.destination = $player
+		$mcmartin thread coop_mod/replace.scr::destination
+
 		$mcmartin thread global/friendly.scr::friendlythink
 		$mcmartin.friendtype = 1
 		$mcmartin.distance = 150
@@ -252,18 +264,26 @@ SayThanks: {
 //============================================================================
 	//dprintln "hudson attempting to say thanks..."
 	while ( isAlive(self) ) {
-		self runto $player
+		//[202] chrissstrahl
+		if(level.gametype == 0){
+			self runto $player
+		}else if(level.coop_player){
+			self runto level.coop_player
+		}
+		
+		//[202] chrissstrahl
+		if(level.gametype == 0 || level.coop_player){
+			if ( vector_length(level.coop_player.origin - self.origin) < 300 && self.enemy==NULL ) {
+				$hudson lookat level.coop_player 
+				$hudson say A_21_Hudson_2		// "Thanks a lot, Baker!" maps "e2l1 "
+				$hudson waittill saydone
+				wait .6
 
-		if ( vector_length($player.origin - self.origin) < 300 && self.enemy==NULL ) {
-			$hudson lookat $player 
-			$hudson say A_21_Hudson_2		// "Thanks a lot, Baker!" maps "e2l1 "
-			$hudson waittill saydone
-			wait .6
-
-			$hudson say A_21_Hudson_3		// "The rest of the five-oh-five should be here any minute now.  Keep moving!" maps "e2l1 "
-			$hudson waittill saydone
-			$hudson lookat NULL
-			end
+				$hudson say A_21_Hudson_3		// "The rest of the five-oh-five should be here any minute now.  Keep moving!" maps "e2l1 "
+				$hudson waittill saydone
+				$hudson lookat NULL
+				end
+			}
 		}
 		wait 0.1
 	}
@@ -276,10 +296,12 @@ DestroyAAGun: {
 	// "self.target" refers to the static weapon it's attached to  
 
 	// put a hurtin' on the player who thinks standing close is a good idea
-	local.dist = vector_length( $player.origin - self.origin )
+	//[202] chrissstrahl
+	self thread damage_playersWithinDistance 2500 250
+	l/*ocal.dist = vector_length( $player.origin - self.origin )
 	if ( local.dist < 250 ) {
 		$player damage $world 2500 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0
-	}
+	}*/
 
 	if (self.target == "aagun2") {
 		thread maps/e2l1/gliders.scr::startthirdflyby
@@ -440,6 +462,7 @@ AAGunThink: {
 		self.shottrigger.origin = self.driver.origin
 		self.shottrigger.angles = self.driver.angles
 
+//@chrissstrahl
 		if (self.aimingatplayer == 0 && (vector_length($player.origin-self.driver.origin) < 700 || self.driver.pain == 1)) {
 			self thread AimAtPlayerAndGetOut
 		}
