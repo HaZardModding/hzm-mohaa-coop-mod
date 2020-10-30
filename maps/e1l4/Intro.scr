@@ -10,7 +10,10 @@ InitIntro: {
 	// Crimewavez = Only in SP.
 	// Disguise managed in e1l4.scr, line 7.
 	//[200] chrissstrahl - we are using the replacment in any case, so that if we get it working in the future all scripts are prepared
-	exec coop_mod/replace.scr::has_disguise 1 //@smithy - this still valid ?
+	//[202] Smithy - we don't need a replacement for has_disguise now. itemhandler sorts this out.
+	if (!level.gametype){
+		$player.has_disguise = 1
+	}
 
 	waitthread AIdisable
 	level.RideOver = 0
@@ -86,14 +89,13 @@ DoIntro: {
 	
 	// Hand the player the gun
 	//[200] chrissstrahl - force weapon in coop
-	//@Smithy - can u do me a list for stuff like give take weapons and stelth and papers then i can do them in the future
+	//[202] Smithy - papers can be given with replace.scr::item as usual. my give replacements are just for weapons on players. 
+	//don't worry too much about adding stealth to maps now. this is the last stealth mission left to do (no more in BT, and none were in SH)
+	//taking the pistol below, for example, would be thread coop_mod/replace.scr::takePlayerWeapon "models/weapons/silencedpistol.tik"
 	if(level.gametype == 0){
 		$player item weapons/silencedpistol.tik  
 		$player ammo pistol 16	
 	}else{
-		//level.coop_forceSecondary = "weapons/silencedpistol.tik" 							//[202] Smithy - not needed
-		//[200] chrissstrahl - give item/ammo and make player use it right away
-		//thread coop_mod/replace.scr::item "weapons/silencedpistol.tik" 1 					//[202] Smithy - not needed		
 		thread coop_mod/replace.scr::givePlayerWeapon "models/weapons/silencedpistol.tik" 	//[202] Smithy - give current and future players the weapon
 		thread coop_mod/replace.scr::ammo pistol 32
 	}
@@ -134,17 +136,17 @@ DontBeCaught: {
 IfPullGunFail: {
 //============================================================
 	self dontdropweapons
-	//@smithy - not sure if that will work right, we will have to keep an eye on it
-	while(self && (self.thinkstate != "attack" ||  self.thinkstate != attack)) {
+	
+	while(self && self.thinkstate != "attack") {
 		wait 1.0
 
-		if(level.failongun == 0) { End }
+		if(level.failongun == 0) { end }
 	}
 
-	if(self != NIL && self != NULL) {
+	if(self) {
 		thread FAILEDMISSION
 	}
-}End
+}end
 
 //============================================================
 FAILEDMISSION: {
@@ -248,7 +250,7 @@ GateGuardDialogue: {
 	//[202] chrissstrahl - speedup for testing
 	thread coop_mod/developer.scr::timescale 5
 	
-	//@smithy - I think this paper stuff needs checking
+	//[202] Smithy - TODO: look into showing papers being pulled out
 	//[200] chrissstrahl - make sure players work fine with being glued again
 	exec coop_mod/replace.scr::physics_off
 
@@ -273,7 +275,6 @@ KillPlayerIfFailPapers: {
 	if (!$1stgateguard || !(isalive $1stgateguard)) { end }
 	wait 1
 
-	//@smithy
 	if (level.GatePapersAccepted != 1){
 		waitthread global/throbtext.scr::throbtext_off
 		waitframe
@@ -417,7 +418,6 @@ driverStopDriving: {
 	level.driverDrivingStraight = 0
 }end
 
-//@smithy
 //============================================================
 handlePlayer: {
 //============================================================

@@ -82,8 +82,14 @@ naughtyFenceHopping:
 	{
 		$NaughtyAccessFreighterTrigger waittill trigger
 
-		if (level.gateguardaccepted != 1)
-			$player.has_disguise = 0 //@smithy
+		if (level.gateguardaccepted != 1){		
+			if (level.gametype){
+					//[202] Smithy - global disguise turn off
+					thread coop_mod/itemhandler.scr::takeAllDisguises
+				}else{
+					$player.has_disguise = 0
+				}		
+		}
 
 		if (level.playerBoardedShip != 1) {
 			// if we haven't gotten the papers yet, then don't bother, they are useless at this point
@@ -431,7 +437,11 @@ getPapers:
 	$goodpapers hide //[200] chrissstrahl
 	waitthread global/items.scr::remove_item "papers_level1"
 	waitthread global/items.scr::add_item "papers_level2"
-	$player.hasPapers = 2 //@smithy
+	
+	if (!level.gametype){
+		$player.hasPapers = 2 //[202] Smithy - not convinced these are even use in sp
+	}
+	
 	$clerk.obtainPapersThread delete
 	
 	//[200] chrissstrahl - used to play sound
@@ -442,11 +452,13 @@ end
 //----------------------------------------------------------------------
 
 failedPapers:
-	//@smithy
-	$player.hasPapers = 0
-	$player.hasDisguise = 0
+	//[202] Smithy - not convinced these are even use in sp
+	if (!level.gametype){
+		$player.hasPapers = 0
+		$player.hasDisguise = 0
+	}
 	level.alarm = 1
-	thread maps/e1l4/ship.scr::AlarmSounded
+	thread maps/e1l4/ship.scr::AlarmSounded //[202] Smithy - this is where i disable disguises
 	local.trigger = waitthread global/FindTrigger.scr::FindTrigger "spawnclerkguys"
 
 	wait 3
