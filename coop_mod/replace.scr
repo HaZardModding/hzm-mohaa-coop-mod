@@ -517,7 +517,6 @@ tmstartloop local.file:{
 
 //TMSTART
 //replaces $player stufftext "tmstart ..."
-
 //=========================================================================
 tmstart local.file local.stop:{
 //=========================================================================
@@ -748,14 +747,7 @@ aimat:{
 
 //SET_HASDISGUISE
 //replaces $player.has_disguise
-//=========================================================================
-set_hasdisguise local.disguise:{
-//=========================================================================
-	error ( "deprecated - coop_mod/replace.scr::set_hasdisguise - use has_disguise instead" ) 1000
-}end
-
-//SET_HASDISGUISE
-//replaces $player.has_disguise
+//[202] Smithy - we handle disguises in itemhandler now. so only do sp stuff here.
 //=========================================================================
 has_disguise local.disguise:{
 //=========================================================================
@@ -763,12 +755,13 @@ has_disguise local.disguise:{
 		error ( "coop_mod/replace.scr::has_disguise - parameter 1 was NIL" ) 1000
 		end
 	}
-	level.coop_playerHasDisguise = local.disguise
+	
 	//keep for sp
 	if(level.gametype == 0){
 		$player.has_disguise = local.disguise
 	}
 	//mp
+	/*
 	else{
 		for (local.i = 1;local.i <= $player.size;local.i++){
 			local.player =  $player[local.i]
@@ -777,6 +770,7 @@ has_disguise local.disguise:{
 			}
 		}
 	}
+	*/
 }end
 
 
@@ -1970,28 +1964,23 @@ teleportToOnTouch local.ent:{
 //INPVS
 //replaces $player inpvs $actor
 //i haven't the faintest what this pvs is suppose to do
+//[202] Smithy - cleaned it up a bit. 
+//treat inpvs as 'in-areaportal' (areas sealed by doors)
 //=========================================================================
 inpvs local.ent:{
 //=========================================================================
-	if( local.ent == NIL ){
-		error ( "coop_mod/replace.scr::inpvs - parameter 1 was NIL" ) 1000
-		end
-	}
-	if( local.ent == NULL ){
-		error ( "coop_mod/replace.scr::inpvs - entity in parameter 1 was NULL" ) 1000
+	if (!local.ent){
+		error ("coop_mod/replace.scr::inpvs - parameter 1 was " + local.ent) 1000
 		end
 	}
 
 	if(level.gametype == 0){	//chrissstrahl - sp handle
-		if($player inpvs self){
-			end 1
-		}
-		end 0
+		end($player inpvs self)
 	}
 
 	for (local.i = 1;local.i <= $player.size;local.i++){
 		local.player =  $player[local.i]
-		if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 &&local.player.flags["coop_isActive"] == 1){
+		if (isAlive local.player && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1){
 			if(local.player inpvs local.ent){
 				end 1
 			}
@@ -2005,36 +1994,6 @@ onTouchKill:{
 //=========================================================================
 //kills players touching this entity
 	self thread killzone
-}end
-
-//SPECIALWEAPONPRIMARY
-//sets info that this player has aquired a special weapon he shall keep
-//makes player spawn with that weapon
-//=========================================================================
-specialweaponPrimary local.weapon:{
-//=========================================================================
-	if(self == NIL || self == NULL){ end }
-	self.flags["coop_specialWeaponPrimary"] = local.weapon
-}end
-
-//SPECIALWEAPONSECONDARY
-//sets info that this player has aquired a special weapon he shall keep
-//makes player spawn with that weapon
-//=========================================================================
-specialweaponSecondary local.weapon:{
-//=========================================================================
-	if(self == NIL || self == NULL){ end }
-	self.flags["coop_specialWeaponSecondary"] = local.weapon
-}end
-
-//SPECIALINVENTORY
-//sets info that this player has aquired a special item he shall keep
-//makes player spawn with that item
-//=========================================================================
-specialInventory local.weapon:{
-//=========================================================================
-	if(self == NIL || self == NULL){ end }
-	self.flags["coop_specialInventory"] = local.weapon
 }end
 
 //RADIUSFREEZE
@@ -2191,310 +2150,6 @@ waitWithinDistance local.origin local.distance:{
 	}
 	iprintlnbold_noloc("DEV: distance:"+vector_length(local.origin-$player.origin))
 }end
-
-/* [202] chrissstrahl - deactivated to see if it is no longer in use
-//needs accepted thread
-//grabs level, period and range from actor
-//=========================================================================
-actorWaitForPapers local.acceptRange local.acceptedThread local.file:{
-//=========================================================================
-	if( level.gametype == 0 ){ end }
-	if(self == NULL || self == NIL || local.file == NIL && local.acceptedThread == NIL){
-		error ( "coop_mod/replace.scr::??? - needs to be executed by a actor" ) 1000
-		end
-	}
-
-	if(local.file == NIL){
-		local.file = level.script
-	}
-
-	//self.disguise_period //not sure what it is used for
-	local.disguiseRange = self.disguise_range
-	local.disguiseLevel = self.disguise_level
-	while(self != NULL){
-		local.status = 0
-		local.player = waitthread player_closestTo self NIL
-		local.playerDistance = vector_length(local.player.origin-self.origin)
-
-//player comes into range, halt then asks for papers...
-		if(local.playerDistance <= local.disguiseRange){
-			//iprintlnbold_noloc("DEV: in disguise range")
-//salute if player has been already accepted
-			if(self.flags["coop_disguiseAccepted"] != NIL && self.flags["coop_disguiseAccepted"] == local.disguiseLevel){
-				//iprintlnbold_noloc("DEV: salute")
-				self waitexec anim/disguise_salute.scr
-				wait 10 //wait before next salute
-				break
-			}
-
-			//play halting animation, play ask for papers animation, play waitanimation start accepting papers now
-			self waitexec anim/disguise_halt.scr //halting player if he comes into range ?
-			local.papersThread = self thread anim/disguise_papers.scr::main //asking for papers - for some reason the thread can not be ended
-			//self waitexec anim/disguise_wait.scr	//not sure what this is used for
-
-			//check for the papers of player
-			//actor,acceptdistance
-			//level.papers
-			local.status = waitthread checkForPapers self local.acceptRange
-			if(local.papersThread != NIL){
-				iprintlnbold_noloc("DEV: Killing papers thread")
-				local.papersThread delete
-			}
-
-			//reaction when player has shown papers
-			//0 - nothing/waiting
-			//1 - accepted
-			//2 - denied
-			//3 - enemy
-			//iprintlnbold_noloc("DEV: status returned: "+local.status)
-			if(local.status == 1){
-				//iprintlnbold_noloc("DEV: accepted")
-				self.flags["coop_disguiseAccepted"] = level.papers
-				self waitexec anim/disguise_accept.scr
-				//iprintlnbold_noloc("DEV: accepted - thread starting now")
-				self thread (local.file)::(local.acceptedThread)
-				wait 5
-				//iprintlnbold_noloc("DEV: accepted has ended")
-			}else if(local.status == 2){
-				iprintlnbold_noloc("DEV: deney")
-				self.flags["coop_disguiseAccepted"] = NIL
-				self waitexec anim/disguise_deny.scr
-			}else if(local.status == 3){
-				iprintlnbold_noloc("DEV: enemy")
-				self.flags["coop_disguiseAccepted"] = -1
-				self exec anim/disguise_enemy.scr
-				end
-			}
-		}
-		//player out of range, relax again
-		//else{
-		//}
-		waitframe
-	}
-}end
-
-//checks if player papers are valid, as long as ai exists and player is in range
-//=========================================================================
-checkForPapers local.actor local.acceptRange:{
-//=========================================================================
-	local.status = 0
-	local.playerInrange = 1
-	local.actorRange = self.disguise_range
-	local.maxentities = int(getcvar("maxentities"))
-	while(local.actor != NULL && local.playerInrange != 0){
-//set/reset values
-		local.playerInrange = 0
-		for (local.i = 1;local.i <= 8;local.i++){
-			level.flags["coop_player"+local.i+"HandTagOrigin"] = NIL
-		}
-//check if any player is in range, grab hand origin then
-		for (local.i = 1;local.i <= $player.size;local.i++){
-			local.player = $player[local.i]
-			//exists
-			//is alive
-			//is within accept range
-			//is not a spectator
-			//really is active (not in the weapon selection screen) in game
-			if( local.player != NULL &&
-				local.player.health > 0 &&
-				vector_length(local.player.origin - local.actor.origin) <= local.actorRange &&
-				local.player.dmteam != "spectator" &&
-				local.player.flags["coop_isActive"] == 1)
-			{
-				//iprintlnbold_noloc("DEV: in range 1")
-				local.playerInrange = 1
-				if(vector_length(local.player.origin - local.actor.origin) <= local.acceptRange ){
-					level.flags["coop_player"+local.i+"HandTagOrigin"] = local.player gettagposition "tag_weapon_right"
-					local.playerInrange = 2
-					//iprintlnbold_noloc("DEV: in range 2")
-				}
-			}
-		}
-//a player is in range
-		if(local.playerInrange == 2){//local.status
-			//iprintlnbold_noloc("DEV: status 2")
-			for (local.i = 0; local.i < local.maxentities; local.i++) {
-				local.ent = getentbyentnum local.i
-				if ( local.ent != NULL && local.ent.model != NIL && local.ent.model == "models/items/papers.tik"){
-
-					for (local.pl = 1;local.pl <= $player.size;local.pl++){
-						local.handTagOrigin = level.flags["coop_player"+local.pl+"HandTagOrigin"]
-						if(local.handTagOrigin != NIL && vector_length(local.handTagOrigin - local.ent.origin) < 2){
-
-							//iprintlnbold_noloc("DEV: entity valid hand origin valid")
-
-							local.player = $player[local.pl]
-							local.playerOrigin = local.player.origin
-							//iprintlnbold_noloc("player holding papers")
-
-							if(vector_length(local.playerOrigin - local.actor.origin) <= local.acceptRange){
-								//iprintlnbold_noloc("player holding papers and within range")
-
-								if(local.actor cansee local.player){
-									//iprintlnbold_noloc("actor can see player")
-
-									//if papers are closer than the player they are facing towards actor (this is still 180 degreeish)
-									local.papersMatchOrigin = local.handTagOrigin
-									local.papersMatchOrigin[2] = local.playerOrigin[2] //match papers and player z axis for comparison of distance
-
-									local.papersActorDist = vector_length(local.papersMatchOrigin - local.actor.origin)
-									local.playerActorDist = vector_length(local.playerOrigin - local.actor.origin)
-									if(local.papersActorDist < local.playerActorDist){
-										local.dist = (local.playerActorDist-local.papersActorDist)
-										if( local.dist > 20 ){ //20 seams to be decent
-											if(level.papers >= self.disguise_level){
-												//iprintlnbold_noloc("right in your face: "+local.dist)
-												local.player iprint "Your papers have been accepted" 0
-												end 1
-											}end{
-												//iprintlnbold_noloc("right in your face: "+local.dist)
-												local.player iprint "Your papers have been rejected" 0
-												end 2
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-		wait 0.25
-	}
-}end 0
-
-//waits until a player is within the given distance - returns player holding up the papers
-//actor - the actor the papers need to be shown to
-//distance - the maximum distance a player can ge away from this actor
-//thread - the thread this actor should start on succsess (must be complete script file path)
-//level - the level of the papers 1,2,3 etc (not build in yet)
-//=========================================================================
-waitForPapers local.actor local.distance local.thread local.level:{
-//=========================================================================
-
-//use disguise predefined scripts to show animations and stuff
-//use disguise predefined scripts to show animations and stuff
-//use disguise predefined scripts to show animations and stuff
-//use disguise predefined scripts to show animations and stuff
-//use disguise predefined scripts to show animations and stuff
-//use disguise predefined scripts to show animations and stuff
-//use disguise predefined scripts to show animations and stuff
-
-	if( level.gametype == 0 ){ end NULL }
-
-	if(local.distance == NIL ){ local.distance = 128 }
-
-	local.maxentities = int(getcvar("maxentities"))
-	while(local.actor != NULL){
-		//get all hand tag origins (where player holds weapons/papers)
-		waitthread grabAllPlayerHandTagOrigins
-
-		local.playerInrange = 0
-		//see if a player could be in range, before we start the massive checking
-
-
-		for (local.pl = 1;local.pl <= $player.size;local.pl++){
-			local.player = $player[local.pl]
-			if(vector_length(local.player.origin - local.actor.origin) <= local.distance){
-				if(level.flags["coop_player"+local.pl+"HandTagOrigin"] != NIL){
-
-				}
-				local.playerInrange = 1
-			}
-		}
-
-		//see if a player holds papers in his hands
-		if(local.playerInrange){
-			for (local.i = 0; local.i < local.maxentities; local.i++) {
-				local.ent = getentbyentnum local.i
-				if ( local.ent != NULL && local.ent.model != NIL && local.ent.model == "models/items/papers.tik"){
-					for (local.pl = 1;local.pl <= $player.size;local.pl++){
-						local.handTagOrigin = level.flags["coop_player"+local.pl+"HandTagOrigin"]
-						if(local.handTagOrigin != NIL && vector_length(local.handTagOrigin - local.ent.origin) < 2){
-							local.player = $player[local.pl]
-							local.playerOrigin = local.player.origin
-							//iprintlnbold_noloc("player holding papers")
-
-							if(vector_length(local.playerOrigin - local.actor.origin) <= local.distance){
-								//iprintlnbold_noloc("player holding papers and within range")
-
-								if(local.actor cansee local.player){
-									//iprintlnbold_noloc("actor can see player")
-
-									//if papers are closer than the player they are facing towards actor (this is still 180 degreeish)
-									local.papersMatchOrigin = local.handTagOrigin
-									local.papersMatchOrigin[2] = local.playerOrigin[2] //match papers and player z axis for comparison of distance
-
-									local.papersActorDist = vector_length(local.papersMatchOrigin - local.actor.origin)
-									local.playerActorDist = vector_length(local.playerOrigin - local.actor.origin)
-									if(local.papersActorDist < local.playerActorDist){
-										local.dist = (local.playerActorDist-local.papersActorDist)
-										//if( local.dist < 0){
-											//local.dist = (local.dist * -1)
-										//}
-
-										if( local.dist > 20 ){ //20 seams to be decent
-											//iprintlnbold_noloc("right in your face: "+local.dist)
-
-											if( local.thread != NIL){
-												local.actor exec local.thread
-											}
-											local.player iprint "Your papers have been accepted" 0
-											end local.player
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-		//papers are presented for about 3 secs, so waiting 1 sec here, this will have a positive impact on performance
-		wait 1
-	}
-}end NULL
-
-//animates a actor and sets new animation only after current anim is over
-//this is designed to handle 2 animations one following imideatly the other
-//=========================================================================
-actorAnimationForce local.animation:{
-//=========================================================================
-	if(self == NULL){ end }
-
-	iprintlnbold_noloc("1")
-
-	if(self.flags["coop_actorAnimForceActive"] != NIL ){
-		self.flags["coop_actorAnimForceNew"] = local.animation
-		end
-	}
-	iprintlnbold_noloc("2")
-
-	self.flags["coop_actorAnimForceActive"] = 1
-
-	local.timeout = 2
-	while(local.timeout){
-		iprintlnbold_noloc("3")
-		if(local.animation != NIL ){
-			iprintlnbold_noloc("3a")
-			self setmotionanim local.animation
-			local.animation = NIL
-			self waittill flaggedanimdone
-		}
-		if(self.flags["coop_actorAnimForceNew"] != NIL ){
-			iprintlnbold_noloc("3b")
-			self setmotionanim self.flags["coop_actorAnimForceNew"]
-			self.flags["coop_actorAnimForceNew"] = NIL
-			self waittill flaggedanimdone
-		}
-		local.timeout--
-	}
-	iprintlnbold_noloc("4")
-	self.flags["coop_actorAnimForceActive"] = NIL
-}end
-
-[202] chrissstrahl - deactivated to see if it is no longer in use */
 
 //grabs the hand tag origin of every player
 //stores it in a level var, so we can use it
