@@ -35,12 +35,13 @@ main local.thread local.arg1 local.arg2:{
 
 	if (!waitthread coop_mod/main.scr::inCoopMode){ end } //dont load this if we aren't in coop mode
 	if (!self){ end }
+	
 	if (local.thread == NIL){ end } 
 	if (self.classname != "Health" && self.classname != "AmmoEntity" && self.classname != "Weapon"){ end }	
 
 	//make sure main.scr has loaded
 	waitthread coop_mod/main.scr::waitForMainScript
-	if (self == NULL){ end }
+	if (!self){ end }
 
 
 	//if we don't allow item handler end here
@@ -69,7 +70,7 @@ main local.thread local.arg1 local.arg2:{
 	wait game.ms 							//so entities have properly initialised
 	wait game.ms                            //two, so aihandler executes first if it is needed
 											//(otherwise, when actors spawn, the weapon is handled first)
-	if(self == NULL){ end }
+	if(!self){ end }
 
 	//only init this once
 	if(!level.coop_initItemHandler){
@@ -989,6 +990,8 @@ activatePlayerWeapon:{
 //=========================================================================
 takeAllDisguises:{
 //=========================================================================
+	if (!level.coop_enableDisguises){ end } //[202] Smithy - don't bother doing this if all disguises are already taken
+
 	local.threadName = "coop_mod/itemhandler.scr::takeAllDisguises"
 	level.coop_enableDisguises 	= game.false
 	level.coop_uniformOnSpawn 	= game.false
@@ -1201,7 +1204,7 @@ addWeaponToInventory local.player local.model local.pickup local.ammo:{
 	}
 	local.weaponIndex = (local.player.flags["coop_inventoryWeapons"].size + 1)
 	local.player.flags["coop_inventoryWeapons"][local.weaponIndex] = local.model
-
+	
 }end
 
 //new, more robust version
@@ -1257,6 +1260,7 @@ removeWeaponFromInventory local.player local.model:{
 		}
 	}
 	local.player.flags["coop_inventoryWeapons"] = local.newArray
+	
 }end
 
 //removes weapon from the loadout array.
@@ -1625,6 +1629,12 @@ enableClickablePapers local.guard local.player:{
 	while (isAlive local.player && local.player.flags["coop_clickablePapersEnabled"] && isAlive local.guard){
 		if (local.player.primaryfireheld && local.player.flags["coop_activeWeapon"] == NULL){
 			local.player use level.coop_itemPapers
+			/*
+			wait game.ms
+			local.player weaponcommand dual targetname ("player" + local.player.entnum + "papers")
+			local.papers = $("player" + local.player.entnum + "papers")
+			local.papers surface papers "-nodraw"
+			*/
 			wait 3
 		}
 		waitframe
@@ -1862,7 +1872,7 @@ isPrimaryWeapon local.weapon:{
 
 //disable weapons on the weapon select menu
 //=========================================================================
-disableAllWeaponsOnMenu:
+disableAllWeaponsOnMenu:{
 //=========================================================================
 	/*
 	4194304 //rifle (1 << 22) 
@@ -1874,6 +1884,5 @@ disableAllWeaponsOnMenu:
 	268435456 //landmine (1 << 28)
 	*/
 	setcvar dmflags 532676608
-end
-
+}end
 
