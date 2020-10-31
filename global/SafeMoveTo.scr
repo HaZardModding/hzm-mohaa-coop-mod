@@ -36,7 +36,7 @@ SafeRunTo local.dest local.trigger_when_done local.movedonerad local.retry_delay
 	self.safemoveto_in_progress = 1
 	self.safemoveto_done = 0
 
-	self.destination = local.dest
+	self.destination = local.dest //@smithy //@chrissstrahl - //this is suppose to only activate in coop if ai should go to a player and not anything else
 	self.movedoneradius_backup = self.movedoneradius
 	self.movedoneradius = local.movedonerad
 	self.safemoveto_trigger = local.trigger_when_done
@@ -44,7 +44,7 @@ SafeRunTo local.dest local.trigger_when_done local.movedonerad local.retry_delay
 	self.safemoveto_gotmovedoneevent = 0
 	self thread SafeRunTo_WaitMoveThread
 
-	self runto self.destination
+	self runto self.destination //@smithy //@chrissstrahl - //this is suppose to only activate in coop if ai should go to a player and not anything else
 	self thread SafeRunTo_MaintenanceThread local.crouch_at_dest local.retry_delay
 end
 
@@ -59,7 +59,7 @@ SafeRunTo_MaintenanceThread local.crouch_at_dest local.retry_delay:
 
 		wait local.retry_delay
 		self.safemoveto_gotmovedoneevent = 0
-		self runto self.destination
+		self runto self.destination //@smithy //@chrissstrahl - //this is suppose to only activate in coop if ai should go to a player and not anything else
 	}
 
 	if (isalive self){
@@ -123,18 +123,36 @@ end
 //-----------------------------------------------------------
 reach local.point:
 //-----------------------------------------------------------
-
 	if (self.reach_thread)
 		self.reach_thread delete
 
 	self.reach_thread = local
-
+	
+	//[202] chrissstrahl
+	//this is suppose to only activate if ai should go to a player and not anything else
+	local.targetIsPlayer = 0
+	if(level.gametype != 0){
+		if(waitthread coop_mod/replace.scr::isPlayerArray){
+			local.targetIsPlayer = 1
+		}
+	}
+	
 reach_loop:
+	//@smithy - there are probably more like this here, but I only needed this on to work, if you are bored you can have a look at them
+	
 	//[200] chrissstrahl - fixed null entity issue
 	if(self == NULL){
 		//[200] chrissstrahl - make sure we know whats going on
 		println("safeMoveTo.scr::reach_loop self was NULL - ended")
 		end
+	}
+	
+	//[202] chrissstrahl - fixed missing player to follow issue
+	//this is suppose to only activate if ai should go to a player and not anything else
+	while(local.targetIsPlayer && !local.point){
+		thread managePlayerToFollow
+		local.point = level.coop_player
+		wait 1
 	}
 	
 	self runto local.point
