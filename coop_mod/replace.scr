@@ -117,9 +117,28 @@ waitForPlayer:{
 	level.coop_waitforPlayer = 0
 }end
 
+//[202] chrissstrahl
+//purpose to detect if the object is or was meant to be a player
+//=========================================================================
+isPlayerObject local.object:{
+//=========================================================================
+	//HIRACY:
+	//1. ENTITY CHECK
+	//2. VECTOR CHECK -> CHAR>1 STRING CHECK -> INT/FLOAT CHECK -> DEFAULT TO STRING
+	//3. DEFAULT TO STRING
+	//4. NO MATCHING TYPE (-1 could not detect type)
+	local.varType = thread coop_mod/main.scr::returnVarType local.ent game.true
+	
+	if(local.varType == 2 && local.object.entnum < level.coop_svmaxclients){ end 1 }
+	if(local.varType == 5 && waitthread isPlayerArray local.object){ end 1 }
+	if(local.varType == 1){
+		if(local.object == "player" || local.object == "$player"){ end 1 }
+	}
+}end 0
+
 //check if the given entity is of type player and a array
 //problems arise as soon as there is more than 1 player on the level
-//but if there are more - we need to take action, before "they breed like rabbits" that would be wie...-...chill
+//[202] chrissstrahl - updated func
 //=========================================================================
 isPlayerArray local.entity:{
 //=========================================================================
@@ -127,18 +146,13 @@ isPlayerArray local.entity:{
 	//level.coop_svmaxclients reads cvar sv_maxclients value upon level start once
 
 	//singeplayer or var is empty or entity is missing
-	if( level.gametype == 0 || local.entity == NIL || local.entity == NULL ){
-		end 0
-	}
+	if( level.gametype == 0 || !local.entity ){ end 0 }
 
 	if( local.entity.size > 1 ){
 		for(local.i = 1;local.i <= local.entity.size;local.i++){
 			local.current =	local.entity[local.i]
-			//just to be perfectly paranoid:
-			//- make sure the player exists
-			//- make sure the player has the targetname player - removed, this is tottaly redundant and slow
-			//- make sure the player has the correct entity number 0 to sv_maxclients(-1) are reserved for players
-			if(local.current != NULL && local.current.entnum < level.coop_svmaxclients /*&& local.current.targetname == "player"*/ ){
+			//- make sure the player has the correct entity number 0 to sv_maxclients(- 1) are reserved for players
+			if(local.current.entnum < level.coop_svmaxclients){
 				end 1
 			}
 		}
