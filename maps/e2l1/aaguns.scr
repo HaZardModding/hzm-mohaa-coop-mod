@@ -462,8 +462,9 @@ AAGunThink: {
 		self.shottrigger.origin = self.driver.origin
 		self.shottrigger.angles = self.driver.angles
 
-//@chrissstrahl
-		if (self.aimingatplayer == 0 && (vector_length($player.origin-self.driver.origin) < 700 || self.driver.pain == 1)) {
+		//[202] chrissstrahl
+		//if (self.aimingatplayer == 0 && (vector_length($player.origin-self.driver.origin) < 700 || self.driver.pain == 1)) {
+		if (self.aimingatplayer == 0 && (vector_length((waitthread coop_mod/replace.scr::origin self)-self.driver.origin) < 700 || self.driver.pain == 1)) {
 			self thread AimAtPlayerAndGetOut
 		}
 		//waitframe
@@ -488,10 +489,16 @@ AimAtPlayerAndGetOut: {
 	self.pause = 1
 	//self.stopfiring = 1
 	self.getting_off = 1
-	self.driver lookat $player
-	self.turret turnspeed 60
-	self.turret setaimtarget $player
-	self.turret waittill ontarget
+	
+	//[202] chrissstrahl
+	local.player = exec coop_mod/replace.scr::player_closestTo self
+	if(local.player){
+		self.driver lookat local.player
+		self.turret turnspeed 60
+		self.turret setaimtarget local.player
+		self.turret waittill ontarget
+	}
+	
 	self.turret setaimtarget NULL
 	self.turret turnspeed 30
 
@@ -575,7 +582,9 @@ AAGunExit: {
 	self.turret thread CenterTurret
 	wait 1.5
 
-	self.driver runto $player	// make sure we go after player...
+	//[202] chrissstrahl
+	local.player = exec coop_mod/replace.scr::player_closestTo self
+	self.driver runto local.player	// make sure we go after player...
 	self.driver attackplayer
 }End
 
@@ -699,6 +708,9 @@ GunOrExplosive: {
 	//self.charge setusable 0
 	self.explosiveset = 0
 	
+	//@smithy - there is a working example in e1l1 but I am not sure if that is a good thing to use that, as the code is a bit fishy
+	//e1l1 might need a fix for the bolters and devcomments anyway
+	//we might want a global coop version for this stuff anyway ?
 	while (self) {
 		local.gundist = vector_length($player.origin-self.origin)
 		local.explosivedist = vector_length($player.origin-self.charge.origin)
@@ -1057,7 +1069,9 @@ CancelGag local.gun: {
 Fire: {
 //============================================================================
 	if(self.target == "") {
-		self.turret setaimtarget $player
+		//[202] chrissstrahl
+		local.player = exec coop_mod/replace.scr::player_closestTo self
+		self.turret setaimtarget local.player
 	}
 	else {
 		self.turret setaimtarget self.target
@@ -1219,3 +1233,4 @@ Init802: {
 		break
 	}
 }end
+
