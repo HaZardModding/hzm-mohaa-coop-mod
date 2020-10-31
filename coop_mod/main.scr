@@ -818,10 +818,19 @@ cleanText local.source local.text local.maxremovals:{
 
 //return type of variable
 //performs a series of checks to determine the variable type ?
-//type: 0-NIL, 1-string,2-entity,3-vector,4-int/float
+//type: 0-NIL, 1-string,2-entity,3-vector,4-int/float,5-entityarray
 //-1 could not detect type
+//
+//[202] chrissstrahl - added feature to differ between entity and entity array via parameter
+//@smithy - maybe you see something wrong here, I don't think there is but Paranoya is a lifestyle (this func needs to work perfectly reliable)
+//
+//HIRACY:
+//1. ENTITY CHECK (NO ARRAY)
+//2. VECTOR CHECK -> CHAR>1 STRING CHECK -> INT/FLOAT CHECK -> DEFAULT TO STRING
+//3. DEFAULT TO STRING
+//4. NO MATCHING TYPE (-1 could not detect type)
 //=========================================================================
-returnVarType local.var:{
+returnVarType local.var local.differArray:{
 //=========================================================================
 	if(local.var == NIL){ end 0 }
 
@@ -831,24 +840,29 @@ returnVarType local.var:{
 	//println("size:   "+local.var.size)
 	//println("string: "+local.stringified)
 
-//var is of type entity or string
+//var is of type entity(one) or string
 	if(local.var.size == 0){
 	//it can be either a empty string or a entity
 		if(local.stringifiedSize == 0 ){ end 1 }
 		else{ end 2 }
 	}
-//var is type of integer, entity or vector or singleletter string
+//var is type of integer, entity(array) or vector or singleletter string
 	else if(local.var.size == 1){
 		local.firstChar = string(local.stringified[0])
 	//assume it is a vector if it is in brackets
 		if( local.stringified[0] == "(" && local.stringified[local.stringifiedSize-1] == ")" ){
 			end 3
 		}
-	//note: cant detect entities with a targetname < 2 chars
+	//note: can NOT detect entities with a targetname < 2 chars
 		if(local.stringifiedSize > 1){
 		//entity targetnames never start with a number or a colon not a number will be 0 when converted
 			if(	int(local.firstChar) == 0 && int(local.stringified) == 0 && local.stringified != "0.000" && local.stringified[0] != "."){
-				end 2
+				//[202] chrissstrahl - differ between entity and entity array if wanted
+				if(local.differArray){
+					end 5
+				}else{
+					end 2
+				}
 			}
 
 			//[200] chrissstrahl - allow this thread to be executed within 1 frame
