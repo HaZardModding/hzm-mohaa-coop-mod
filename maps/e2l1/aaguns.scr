@@ -708,30 +708,24 @@ GunOrExplosive: {
 	//self.charge setusable 0
 	self.explosiveset = 0
 	
-	//@smithy - there is a working example in e1l1 but I am not sure if that is a good thing to use that, as the code is a bit fishy
-	//e1l1 might need a fix for the bolters and devcomments anyway
-	//we might want a global coop version for this stuff anyway ?
+	//[202] Smithy - needs more but initial testing passed. didn't look at e1l2 so maybe there is a better way, but this seems simple enough.
 	while (self) {
 		//[202] Smithy - get closest player
-		local.player = waitthread coop_mod/replace.scr::player_closestTo self
+		group.player = waitthread coop_mod/replace.scr::player_closestTo self
 		
 		//[202] Smithy - wait until we have a valid player
-		if (!local.player){
+		if (!group.player){
 			wait 1
 			continue
 		}
 		
-		local.gundist = vector_length(local.player.origin - self.origin)
-		local.explosivedist = vector_length(local.player.origin - self.charge.origin)
-		local.canuse = self canuse local.player
+		local.gundist = vector_length(group.player.origin - self.origin)
+		local.explosivedist = vector_length(group.player.origin - self.charge.origin)
+		local.canuse = self canuse group.player
 
-		if ( local.gundist < 200 && self.explosiveset == 0) {
-			if ((self.flak == 1 && self.bFlakCancelled == 1) || (self.flak == 0 && self.stopfiring == 0)) {
-				local.aionturret = 1
-			}
-			else {
-				local.aionturret = 0
-			}
+		if (local.gundist < 200 && self.explosiveset == 0) {
+			
+			local.aionturret = (self.flak == 1 && self.bFlakCancelled == 1) || (self.flak == 0 && self.stopfiring == 0)
 
 			if (self.playerinturret == 0 && local.aionturret == 0) {
 				if ( local.canuse==1 ) {
@@ -739,12 +733,12 @@ GunOrExplosive: {
 						self.helpactiveexplosive = 0
 						self.helpactiveturret = 1
 						local.usekey = getboundkey1 "+use"
-
+						
 						if (self.flak == 1) {
-							local.msg = (loc_convert_string "Press ") + local.usekey + (loc_convert_string " to use the flak cannon.")
+							local.msg = (loc_convert_string "Hold ") + "USE" + (loc_convert_string " to use the flak cannon.")
 						}
 						else {
-							local.msg = (loc_convert_string "Press ") + local.usekey + (loc_convert_string " to use the AA gun.")
+							local.msg = (loc_convert_string "Hold ") + "USE" + (loc_convert_string " to use the AA gun.")
 						}
 
 						thread global/throbtext.scr::throbtext local.msg 1000
@@ -755,7 +749,7 @@ GunOrExplosive: {
 						self.helpactiveturret = 0
 						self.helpactiveexplosive = 1
 						local.usekey = getboundkey1 "+use"
-						local.msg = (loc_convert_string "Press ") + local.usekey + (loc_convert_string " to set the explosive.")
+						local.msg = (loc_convert_string "Hold ") + "USE" + (loc_convert_string " to set the explosive.")
 						thread global/throbtext.scr::throbtext local.msg 1000
 					}
 				}
@@ -766,8 +760,8 @@ GunOrExplosive: {
 				}
 			}
 			
-			if (local.player.useheld) {
-				println "player used this turret!"
+			if (group.player.useheld) {
+				//println "player pressed use on this turret!"
 				if (self.helpactiveexplosive == 1) {
 					self.explosiveset = 1
 					//jsl->invalid command					self.charge setusable 1
@@ -778,26 +772,29 @@ GunOrExplosive: {
 					self.helpactiveturret = 0
 					thread global/throbtext.scr::throbtext_off
 					self.playerinturret = 1
-					self unlock
-					self.turret unlock
-					self doUse local.player
-					self lock
-					self.turret lock
-					self.turret aimat
+					thread coop_turretDoUse group.player
+					//self.turret aimat //[202] Smithy - invalid - stop spam
 					
-					wait 1
+					//[202] Smithy - wait a bit longer until user can get off
+					wait 2 
 					
 					//[202] Smithy - check if player is still here
-					if (!isAlive local.player || local.player.dmteam != "allies"){
+					if (!isAlive group.player || group.player.dmteam != "allies"){
 						self.playerinturret = 0
+						//println "player no longer in this turret - premature!"
+						
+						//[202] Smithy - we need this, otherwise turret gets stuck in 'use' mode and kicks player off instantly on next turn
+						thread coop_turretDoUse $world
+						
+						wait 1
 						continue
 					}
 					
 					//[202] Smithy - wait until player leaves turret
-					waitthread coop_waittillTurretEmpty local.player 
+					waitthread coop_waittillTurretEmpty 
 					
-					println "player no longer in this turret!"
-					
+					//println "player no longer in this turret!"
+										
 					//[202] Smithy - no point waiting an extra .1 of a second below
 					continue
 					
@@ -805,7 +802,7 @@ GunOrExplosive: {
 					self.playerinturret = 0
 					self unlock
 					self.turret unlock
-					self doUse local.player
+					self doUse group.player
 					self lock
 					self.turret lock
 					self.turret thread CenterTurret
@@ -827,24 +824,33 @@ GunOrExplosive: {
 
 //[202] Smithy - wait until the player leaves turret for whatever reason
 //============================================================================
-coop_waittillTurretEmpty local.player:{
+coop_waittillTurretEmpty:{
 //============================================================================
-	while (isAlive local.player && local.player.dmteam == "allies" && !local.player.useheld){
+	//println "coop_waittillTurretEmpty"
+
+	while (isAlive group.player && group.player.dmteam == "allies" && !group.player.useheld){
 		wait .1
 	}
 	
 	self.playerinturret = 0
 	
-	if (isAlive local.player && local.player.dmteam == "allies"){	
-		self unlock
-		self.turret unlock
-		self doUse local.player
-		self lock
-		self.turret lock						
+	if (isAlive group.player && group.player.dmteam == "allies"){	
+		thread coop_turretDoUse group.player					
 	}
 	
 	self.turret thread CenterTurret
 	wait 1	
+}end
+
+//[202] Smithy - reusable code. don't like seeing unnecessary noise.
+//============================================================================
+coop_turretDoUse local.ent:{
+//============================================================================
+	self unlock
+	self.turret unlock
+	self doUse local.ent
+	self lock
+	self.turret lock		
 }end
 
 //============================================================================
