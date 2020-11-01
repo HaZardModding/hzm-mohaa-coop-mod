@@ -776,19 +776,25 @@ GunOrExplosive: {
 					//self.turret aimat //[202] Smithy - invalid - stop spam
 					
 					//[202] Smithy - wait a bit longer until user can get off
-					wait 2 
-					
-					//[202] Smithy - check if player is still here
-					if (!isAlive group.player || group.player.dmteam != "allies"){
-						self.playerinturret = 0
-						//println "player no longer in this turret - premature!"
+					//added it to a loop so player can't switch to spec and back before time is up
+					local.waittime = level.time + 2
+					while (level.time < local.waittime){
+						wait .1
+						//[202] Smithy - check if player has gone
+						if (!isAlive group.player || group.player.dmteam != "allies"){
+							self.playerinturret = 0
+							//println "player no longer in this turret - premature!"
 						
-						//[202] Smithy - we need this, otherwise turret gets stuck in 'use' mode and kicks player off instantly on next turn
-						thread coop_turretDoUse $world
+							//[202] Smithy - we need this, otherwise turret gets stuck in 'use' mode and kicks player off instantly on next turn
+							thread coop_turretDoUse $world
 						
-						wait 1
-						continue
+							wait 1
+						}
 					}
+					
+					if (!self.playerinturret){
+						continue
+					}				
 					
 					//[202] Smithy - wait until player leaves turret
 					waitthread coop_waittillTurretEmpty 
@@ -956,7 +962,7 @@ FlakGunSetup local.guy1 local.guy2 local.guy3: {
 		self.guy3 hearing 1
 		self.guy3 sight 1
 	}
-}End
+}end
 
 //============================================================================
 UpdatePosition local.trackobj local.xoff local.yoff local.spin: {
