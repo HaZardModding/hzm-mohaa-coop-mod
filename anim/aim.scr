@@ -1,0 +1,176 @@
+//-----
+// Aim
+//-----
+// Aim script - causes the character to aim its current weapon.  Right now it requires 
+// that the character stop moving first.  Once we get this working we can think about 
+// allowing the characters to fire while moving.
+
+//println "aim.scr called"
+
+// Initialise say manager
+self waitthread anim/SayManager.scr::Init
+
+waitexec "anim/default_inithandler.scr"
+waitexec anim/smoking.scr::SmokeRemoveCigarette
+self weaponcommand mainhand attachtohand mainhand
+
+start:
+
+self.blendtime = 0.20
+
+switch (self.position)
+{
+	walk:
+	run:
+	stand:
+		switch (self.weapongroup)
+		{
+			rifle:
+				self setmotionanim (self.weapongroup + "_stand_alert_legs")
+				waitexec anim/aim.scr::PlayAimActionAnim
+				break
+			pistol:
+			mp40:
+			mp44:
+			bar:
+			thompson:
+			bazooka:
+			vickers:
+				self setsay face_aiming
+				self setmotionanim (self.weapongroup + "_stand_alert_legs")
+				self setactionanim (self.weapongroup + "_aim") -60 60
+				break
+							
+			grenade:
+				self setmotionanim idle_grenade		// Do we need this or should ai just 
+										// begin the throw after finding a 
+										// target?
+				break
+			
+			unarmed:
+				self setmotionanim unarmed_stand_alert_legs
+				break
+
+			default:
+				println ("^~^~^ Stand Aim Default case for "+self.weapongroup+" weapon group - fix aim.scr")
+				self setmotionanim unarmed_stand_alert_legs
+				break
+		}
+		break
+
+	crouchwalk:
+	crouchrun:
+		// For now at least, we need to stop in order to fire
+		waitexec anim/crouch.scr::transition
+		goto start
+		
+	crouch:
+		switch (self.weapongroup)
+		{
+			pistol:
+			rifle:
+			mp40:
+			mp44:
+			bar:
+			vickers:
+			thompson:
+			bazooka:
+				self setsay face_aiming
+				self.blendtime = 0.5
+				self setmotionanim (self.weapongroup + "_crouch_alert")
+				self setactionanim (self.weapongroup + "_aim") -60 60
+				break
+			
+			grenade:
+				self setmotionanim grenade_aim_action	// Kinda works... better than I thought 
+										// it would, this is a standing action 
+										// blended with a crouch
+				self setmotionanim (self.weapongroup + "_crouch_alert")
+				break
+			
+			default:
+				println ("^~^~^ Crouch Aim Default case for "+self.weapongroup+" weapon group - fix aim.scr")
+				self setmotionanim rifle_crouch_alert
+				break
+		}
+		
+		break
+
+	pronewalk:
+		// Can't crawl and fire at the same time
+		waitexec anim/prone.scr
+		goto start
+
+	prone:
+		//self.emotion = emotion_aiming
+		switch (self.weapongroup)
+		{
+			pistol:
+			rifle:
+			mp40:
+			mp44:
+			bar:
+			vickers:
+			thompson:
+				self setsay face_aiming
+				self.blendtime = 0.2
+				self setactionanim (self.weapongroup + "_prone_aim") -60 60
+				self setmotionanim (self.weapongroup + "_prone_legs")
+				break
+			
+			bazooka:
+				// Can't fire the bazooka while lying down
+				waitexec anim/crouch.scr::transition
+				goto start
+
+			default:
+				println ("^~^~^ Prone Aim Default case for "+self.weapongroup+" weapon group - fix aim.scr")
+				break
+		}
+		
+		break
+
+	knees:
+	crawl:
+	floor:
+		// Incapacitated, can't aim.  Just go on being in pain.
+		waitexec anim/continue_pain.scr
+		goto start
+
+	default:
+		// Should never happen
+		println ("^~^~^ Aim Default case for "+self.position+" position - fix aim.scr")
+		self thread anim/SayManager.scr::SayManager face_aiming 3
+		self setmotionanim rifle_crouch_alert
+		self setactionanim rifle_aim -60 60
+		break
+}
+wait self.blendtime
+end
+
+
+//=============================================================
+//=============================================================
+PlayAimActionAnim:
+	
+	self.playedhipshootanim = 0
+	
+	switch (self.weapon)
+	{
+		case "springfield '03 sniper":
+		case "mauser kar 98k":
+		case "mauser kar 98d sniper":
+			//NOTE: self.hipshootdistance set in default_inithandler.scr
+			if (self.distancetoenemy < self.hipshootdistance)
+			{
+				self setactionanim kar98_hipaim -60 60
+				self.playedhipshootanim = 1
+				break
+			}
+			//fall through and play regular anim
+		default:
+			if (self.weapongroup == "unarmed"){ end } //[202] Smithy - stop console spam
+			self setactionanim (self.weapongroup + "_aim") -60 60
+			break
+	}
+end
