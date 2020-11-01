@@ -1,0 +1,261 @@
+//-------
+// Shoot
+//-------
+// Shoot at someone.
+
+//println "Shoot.scr called"
+waitexec "anim/default_inithandler.scr"
+waitexec anim/smoking.scr::SmokeRemoveCigarette
+waitexec anim/reload.scr::ReloadInit
+self weaponcommand mainhand attachtohand mainhand
+
+// Initialise say manager
+self waitthread anim/SayManager.scr::Init
+
+start:
+
+if (self.enemy)
+{
+	local.distance = self.distancetoenemy
+	if (local.distance < self.reallyshortrange)
+	{
+		waitexec anim/attack.scr::AttackDoMelee
+		end
+	}
+}
+
+// Need a fast crossblend so the shoot is snappy, which means we rely on the aim animation
+// lining up perfectly.
+self.blendtime = 0.10
+
+
+switch (self.position)
+{
+	dead:
+		println "ERROR SHOOT.SCR Error: Dead guy trying to shoot.  This isn't meant to be Undying!"
+		break
+
+	stand:
+	walk:
+	run:
+		switch (self.weapongroup)
+		{
+			// If this works, it should be able to handle most weapons:
+			mp44:
+			bar:
+			vickers:
+			thompson:
+			mp40:
+				self thread anim/SayManager.scr::SayManager face_attack 5
+				self setmotionanim (self.weapongroup + "_stand_alert_legs")
+				self setactionanim (self.weapongroup + "_shootauto") -60 60
+				self waittill upperanimdone
+				waitexec anim/reload.scr::Reload 1 NIL 1
+				break
+			rifle:
+			pistol:
+			bazooka:
+				self thread anim/SayManager.scr::SayManager face_attack 5
+				self setmotionanim (self.weapongroup + "_stand_alert_legs")
+				//self setactionanim (self.weapongroup + "_shoot") -60 60
+				waitexec anim/shoot.scr::PlayShootActionAnim
+				self waittill upperanimdone
+				waitexec anim/reload.scr::Reload 1 NIL 1
+				break
+
+			//bazooka:
+			//	self thread anim/SayManager.scr::SayManager face_attack 5
+			//	self setmotionanim (rifle_stand_alert_legs)
+			//	self setactionanim (self.weapongroup + "_shoot") -60 60
+			//	self waittill upperanimdone
+			//	waitexec anim/reload.scr::Reload 1 NIL 1
+			//	break
+
+			grenade:
+				//println "Stand/Throw Grenade"
+				self setmotionanim grenade_throw
+				self waittill flaggedanimdone
+				break
+
+			unarmed:
+				self setmotionanim unarmed_stand_alert_legs
+				self waittill flaggedanimdone
+				break
+
+			default:
+				println ("ERROR SHOOT.SCR Shoot Stand Default case for "+self.weapongroup+" weapon group - fix shoot.scr")
+				//self setmotionanim aim_leg_stance
+				//self setactionanim rifle_shoot	-60 60
+				self setmotionanim unarmed_stand_alert_legs
+				self waittill flaggedanimdone
+				break
+		}
+		break
+
+	crouch:
+	crouch_walk:
+	crouch_run:
+		switch (self.weapongroup)
+		{
+			// autos - jbw
+			bar:
+			vickers:
+			thompson:
+			mp44:
+			mp40:
+				self thread anim/SayManager.scr::SayManager face_attack 5
+				self setmotionanim (self.weapongroup + "_crouch_alert")
+				self setactionanim (self.weapongroup + "_shootauto") -60 60
+				self waittill upperanimdone
+				waitexec anim/reload.scr::Reload 1 NIL 1
+				break
+			bazooka:
+			pistol:
+			rifle:
+			grenade:
+				self thread anim/SayManager.scr::SayManager face_attack 5
+				switch (self.weapon)
+				{
+					case "springfield '03 sniper":
+					case "mauser kar 98k":
+					case "mauser kar 98d sniper":
+					case "carcano":
+						self setmotionanim (self.weapongroup + "_crouch_alert")
+						self setactionanim kar98_shoot -60 60
+						self waittill upperanimdone
+						waitexec anim/reload.scr::Reload 1 1 1
+						break
+					default:
+						self setmotionanim (self.weapongroup + "_crouch_alert")
+						self setactionanim (self.weapongroup + "_shoot") -60 60
+						self waittill upperanimdone
+						waitexec anim/reload.scr::Reload 1 0 1
+						break
+				}
+				break
+
+			default:
+				println ("ERROR SHOOT.SCR Shoot Crouch Default case for "+self.weapongroup+" weapon group - fix shoot.scr")
+				self setmotionanim rifle_crouch_alert
+				self waittill flaggedanimdone
+				break
+		}
+
+		break
+
+	prone:
+	prone_walk:
+		switch (self.weapongroup)
+		{
+			pistol:
+			rifle:
+			mp40:
+			mp44:
+			bar:
+			vickers:
+			thompson:
+				//println "Prone/Fire SMG"
+				self thread anim/SayManager.scr::SayManager face_attack 5
+				self setmotionanim (self.weapongroup + "_prone_legs")
+				self setactionanim (self.weapongroup + "_prone_shoot") -60 60
+				self waittill upperanimdone
+				break
+
+			bazooka:
+				// Need to crouch first (aim should take care of this)
+				println "ERROR SHOOT.SCR Tried to shoot bazooka while prone.  Going to crouch first"
+				waitexec anim/crouch.scr::transition
+				self thread anim/SayManager.scr::SayManager face_attack 5
+				self setmotionanim (bazooka_crouch_alert)
+				self setactionanim (self.weapongroup + "_aim") -60 60
+				wait self.blendtime
+				self.position = crouch
+				goto start
+
+			grenade:
+				//println "Prone/Fire Grenade"
+				//what is grenade_prone_attack_straight ?
+				self setmotionanim grenade_prone_throw_straight // broken legs
+				self waittill flaggedanimdone
+				break
+
+			default:
+				println ("ERROR SHOOT.SCR Shoot Prone Default case for "+self.weapongroup+" weapon group - fix shoot.scr")
+				break
+		}
+		break
+
+	knees:
+	crawl:
+	floor:
+		// Incapacitated, so we can't shoot.
+		println "ERROR SHOOT.SCR Trying to shoot while in pain."
+		waitexec anim/idle.scr
+		goto start
+	default:
+		println ("ERROR SHOOT.SCR Shoot Default case for "+self.position+" position - fix shoot.scr")
+		waitexec anim/idle.scr
+		goto start
+}
+end
+
+//=============================================================
+//=============================================================
+PlayShootActionAnim:
+	self.playedhipshootanim = 0
+
+	switch (self.weapon)
+	{
+		case "springfield '03 sniper":
+		case "mauser kar 98k":
+		case "mauser kar 98d sniper":
+		case "carcano":
+			//NOTE: self.hipshootdistance set in default_inithandler.scr
+			if (self.distancetoenemy < self.hipshootdistance)
+			{
+				self setactionanim kar98_hipshot -60 60
+				self.playedhipshootanim = 1
+			}
+			else
+			{
+				if (self.roundsinclip <= 1)
+				{
+					self setactionanim (self.weapongroup + "_shoot") -60 60
+				}
+				else
+				{
+					self setactionanim kar98_shoot -60 60
+				}
+			}
+			break
+		default:
+			if (self.weapongroup == "unarmed"){ end } //[202] Smithy - stop console spam
+			self setactionanim (self.weapongroup + "_shoot") -60 60
+			break
+	}
+end
+
+//=================================================
+//=================================================
+CanShoot:
+	if (self.enemy != NULL)
+	{
+		// check angle
+		local.vec = self.enemy.origin - self.origin
+		local.vec[2] = 0.0
+		local.vec = vector_normalize(local.vec)
+		local.angle = local.vec * self.forwardvector
+		if (local.angle > 0.95 && (self cansee self.enemy))		// ~10deg
+		{
+			self.canshoot = 1
+		}
+		else
+		{
+			self.canshoot = 0
+		}
+	}
+	else
+	{
+		self.canshoot = 0
+	}
+end
