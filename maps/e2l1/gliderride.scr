@@ -28,11 +28,14 @@ coop_StartRide:{
 //============================================================================
 StartRide: {
 //============================================================================
+	thread coop_startGliderSpawnManager //[202] Smithy - start the spawn manager
+
 	thread maps/e2l1/fog.scr::setFog level.fogDistanceTow level.fogBiasTow level.fogColorTow
 	
 	//[202] chrissstrahl - make coop compatible
 	//if(level.gametype == 0){ 
-		$player physics_off
+		thread coop_mod/replace.scr::physics_off
+		//$player physics_off
 
 		if (level.stickPlayerAtGlider == 1) {
 			// debug hack to put player near the glider, for debugging
@@ -656,26 +659,38 @@ cockpitBulletHit local.wait local.lightFlashTime local.sound local.shakeTime loc
 	thread doEarthquake local.shakeTime local.shakeMag 1 0
 }end
 
+//[202] Smithy - made this work with multiple players and handler their cameras
 //============================================================================
 handleCamera: {
 //============================================================================
+	/* //[202] Smithy - done in coop_spawnGliderCamera per player now
 	spawn Camera targetname gliderCamera
 	$gliderCamera showquakes 1
 	$gliderCamera attach $glider seat 1 ( 0 0 40 )
-
+	
+		//[202] Smithy - not needed now we cue each camera separately
 	if (level.stickPlayerAtGlider != 1) {
 		cuecamera $gliderCamera
 	}
+	*/
 	
-	//@chrissstrahl //@smithy - talk
-	level.oldPlayerAngles = $player.viewangles
+	//[202] Smithy - done on an individual basis now
+	//level.oldPlayerAngles = $player.viewangles
 
 	// don't start synching the angles until after the fade in has happened
 	
-	//@chrissstrahl //@smithy - talk
+	//[202] Smithy - handled on an individual basis now
+	//local.deltaAngles = $player.viewangles - level.oldPlayerAngles
+	//$gliderCamera.angles = $glider.angles + local.deltaAngles
 	
-	local.deltaAngles = $player.viewangles - level.oldPlayerAngles
-	$gliderCamera.angles = $glider.angles + local.deltaAngles
+	//[202] Smithy - spawn any cameras we need for players that may have spawned before the handler started
+	for (local.i = 1; local.i <= $player.size; local.i++){
+		group.player = $player[local.i]
+		if (!group.player.gliderCamera){
+			iprintlnbold_noloc("ADDING PLAYER TO CAM (handleCamera)")
+			thread coop_spawnGliderCamera
+		}
+	}
 
 	if (level.allowSkipGliderDialogue == 0) {
 		wait 8
@@ -683,26 +698,128 @@ handleCamera: {
 
 	while (level.gliderRideOver == 0) {
 	
-		//@chrissstrahl //@smithy - talk
+		//[202] Smithy - loop over all cameras
+		for (local.i = 1; local.i <= $gliderCamera.size; local.i++){
+			local.cam = $gliderCamera[local.i]
+			group.player = local.cam.player
+
+			
+			if (isAlive group.player && !group.player.isSpectator){
+				if (!group.player.inGliderCamera){
+					thread coop_startGliderCamera
+				}
+				//[202] Smithy - this guy doesn't have a gliderCamera, give him one
+				/*
+				if (!group.player.gliderCamera){
+					waitthread coop_spawnGliderCamera 
+					
+					//[202] Smithy - restart from the beginning
+					local.i = 1;
+					continue						
+				}
+				*/
 				
-		local.deltaAngles = $player.viewangles - level.oldPlayerAngles
-		$gliderCamera.angles = $glider.angles + local.deltaAngles
+			}else{
+				if (group.player){
+					thread coop_stopGliderCamera
+				}
+				local.cam delete
+				continue
+			}	
+			
+			//[202] Smithy - handle his camera view
+			local.deltaAngles = group.player.viewangles - group.player.oldViewAngles
+			local.cam.angles = $glider.angles + local.deltaAngles				
+		}
+				
+		//local.deltaAngles = $player.viewangles - level.oldPlayerAngles
+		//$gliderCamera.angles = $glider.angles + local.deltaAngles
 		waitframe
 	}
 
 	while (level.gliderCrashOver == 0) {
 		waitframe
 	}
-
-	cueplayer
+	
+	thread coop_stopGliderSpawnManager 	//[202] Smithy - stop handling glider spawns now
+	cueplayer 					 
+	
 	thread maps/e2l1/fog.scr::setFog level.fogDistanceGround level.fogBiasGround level.fogColorGround
 	delete $gliderCamera
+}end
+
+//[202] Smithy - checks for player spawns during the glider scene
+//============================================================================
+coop_startGliderSpawnManager:{
+//============================================================================	
+	if (level.gliderRideOver){ end }
+	
+	level.thread["coop_manageSpawnsDuringGlider"] = local
+	
+	while (1){
+		level waittill playerspawn
+		commanddelay 0.2 iprintlnbold_noloc("ADDING PLAYER TO CAM (playerspawn)")
+		group.player = parm.other
+		if (!group.player.isSpectator){ 			
+			thread coop_spawnGliderCamera
+		}
+	}	
+}end
+
+//[202] Smithy - spawn a camera for a player and set it up in glider
+//============================================================================
+coop_stopGliderSpawnManager:{
+//============================================================================
+	local.thread = level.thread["coop_manageSpawnsDuringGlider"]
+	if (local.thread){ local.thread delete }		
+}end
+
+
+//[202] Smithy - spawn a camera for a player and set it up in glider
+//============================================================================
+coop_spawnGliderCamera:{
+//============================================================================	
+	if !(level.gliderRideOver && group.player.gliderCamera){
+		local.cam = spawn Camera targetname gliderCamera 	//[202] Smithy - give them all the same name so they are handled in the targetname array
+		local.cam showquakes 1
+		local.cam attach $glider seat 1 ( 0 0 40 )
+		local.cam.player = group.player
+		group.player.gliderCamera = local.cam
+		group.player.oldViewAngles = group.player.viewangles
+	}
+}end
+
+//[202] Smithy - make them look through their glider camera
+//============================================================================
+coop_startGliderCamera:{
+//============================================================================	
+	if (!level.gliderRideOver && group.player.gliderCamera && !group.player.inGliderCamera){
+		group.player.inGliderCamera = game.true
+		local.camerause = spawn trigger_camerause target group.player.gliderCamera
+		local.camerause doUse group.player
+		local.camerause delete
+	}
+}end
+
+//[202] Smithy - stop them looking through their glider camera
+//============================================================================
+coop_stopGliderCamera:{
+//============================================================================	
+	if (!level.gliderRideOver && group.player.gliderCamera && group.player.inGliderCamera){
+		group.player.inGliderCamera = game.false
+		local.camerause = spawn trigger_camerause target group.player.gliderCamera
+		local.camerause doUse group.player
+		local.camerause delete
+	}
 }end
 
 //============================================================================
 cameraLookatPilot: {
 //============================================================================
-	//@chrissstrahl //@smithy - talk
+	//[202] Smithy - don't think it's used
+	iprintlnbold_noloc("DEV: gliderride.scr::cameraLookatPilot method called. FIX!")
+	end
+	
 	local.y = -160 + $glider.angles[1] + $player.viewangles[1]
 	local.x = -10 + $glider.angles[0] + $player.viewangles[0]
 	level.oldPlayerAngles = ( local.x local.y 0 )
