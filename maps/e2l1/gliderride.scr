@@ -28,7 +28,6 @@ coop_StartRide:{
 //============================================================================
 StartRide: {
 //============================================================================
-	thread coop_startGliderSpawnManager //[202] Smithy - start the spawn manager
 
 	thread maps/e2l1/fog.scr::setFog level.fogDistanceTow level.fogBiasTow level.fogColorTow
 	
@@ -367,7 +366,10 @@ handleCrash: {
 	musicvolume 1.0 3.0
 
 	// this is where we hit the tree
-	$gliderCamera playsound e2l1_crash2
+	if ($gliderCamera){
+		$gliderCamera[1] playsound e2l1_crash2
+	}
+	
 	thread doEarthquake 1.1 20 1 0
 
 	//waitthread global/objectives.scr::add_objectives 2 2 "Locate your squad" local.waypoint1a
@@ -505,7 +507,9 @@ handleDialogue: {
 		
 	if (level.skipDialogue == 0) {
 		// "Look at this soup! ..."
-		$gliderCamera playsound dfr_E2L1_C471_01 //dfr_E2L1_C471 
+		if ($gliderCamera){
+			$gliderCamera[1] playsound dfr_E2L1_C471_01 //dfr_E2L1_C471 
+		}
 		wait 7
 	}
 
@@ -524,14 +528,18 @@ handleDialogue: {
 
 	if (level.skipDialogue == 0) {
 		// "Looks like we're coming up on it right now..."
-		$gliderCamera playsound dfr_E2L1_C473   
+		if ($gliderCamera){
+			$gliderCamera[1] playsound dfr_E2L1_C473   
+		}
 
 		wait 4
 	}
 
 	if (level.skipDialogue == 0) {
 		// "Ready for detachment..."
-		$gliderCamera playsound dfr_E2L1_C474
+		if ($gliderCamera){
+			$gliderCamera[1] playsound dfr_E2L1_C474
+		}
 		wait 2.4
 	}
 
@@ -544,7 +552,9 @@ handleDialogue: {
 
 	if (level.skipDialogue == 0) {
 		// "detaching now..."
-		$gliderCamera playsound dfr_E2L1_C475
+		if ($gliderCamera){
+			$gliderCamera[1] playsound dfr_E2L1_C475
+		}
 		wait 1.6
 	}
 
@@ -570,7 +580,9 @@ handleDialogue: {
 
 	if (level.skipDialogue == 0) {
 		// "Roger that, Two-Five..."
-		$gliderCamera playsound dfr_E2L1_C472
+		if ($gliderCamera){
+			$gliderCamera[1] playsound dfr_E2L1_C472
+		}
 		wait 5
 	}
 
@@ -622,12 +634,16 @@ handleDialogue: {
 
 	// hit some trees
 	wait 1.2
-	$gliderCamera playsound e2l1_tree1
+	if ($gliderCamera){
+		$gliderCamera[1] playsound e2l1_tree1
+	}
 	$glider anim bank_left
 	thread doEarthquake 0.25 2 1 0
 	
 	wait 0.5
-	$gliderCamera playsound e2l1_tree2
+	if ($gliderCamera){
+		$gliderCamera[1] playsound e2l1_tree2
+	}
 	$glider anim bank_right
 	thread doEarthquake 0.5 4 1 0
 }end
@@ -683,18 +699,11 @@ handleCamera: {
 	//local.deltaAngles = $player.viewangles - level.oldPlayerAngles
 	//$gliderCamera.angles = $glider.angles + local.deltaAngles
 	
-	//[202] Smithy - spawn any cameras we need for players that may have spawned before the handler started
-	for (local.i = 1; local.i <= $player.size; local.i++){
-		group.player = $player[local.i]
-		if (!group.player.gliderCamera){
-			iprintlnbold_noloc("ADDING PLAYER TO CAM (handleCamera)")
-			thread coop_spawnGliderCamera
-		}
-	}
-
 	if (level.allowSkipGliderDialogue == 0) {
 		wait 8
 	}
+	
+	thread coop_startGliderSpawnManager //[202] Smithy - start the spawn manager
 
 	while (level.gliderRideOver == 0) {
 	
@@ -706,15 +715,17 @@ handleCamera: {
 			
 			if (isAlive group.player && !group.player.isSpectator){
 				if (!group.player.inGliderCamera){
-					thread coop_startGliderCamera
+					thread coop_startGliderCamera					
 				}			
 			}else{
-				if (group.player){
+				if (group.player && group.player.inGliderCamera){
 					thread coop_stopGliderCamera
 				}
-				local.cam delete
+				local.cam delete	
+				level waittill postthink 	//[202] Smithy - delete isn't faster than remove. they all call the same function internally lol... so lets wait until thinks have finished
+				local.i = 0 				//[202] Smithy - gliderCamera.size will change, so, to stop someone being delayed by an extra frame, start again
 				continue
-			}	
+			}
 			
 			//[202] Smithy - handle his camera view
 			local.deltaAngles = group.player.viewangles - group.player.oldViewAngles
@@ -731,7 +742,7 @@ handleCamera: {
 	}
 	
 	thread coop_stopGliderSpawnManager 	//[202] Smithy - stop handling glider spawns now
-	cueplayer 					 
+	cueplayer 							//[202] Smithy - will loop over all clients and turn off the cams for us		 
 	
 	thread maps/e2l1/fog.scr::setFog level.fogDistanceGround level.fogBiasGround level.fogColorGround
 	delete $gliderCamera
@@ -744,6 +755,19 @@ coop_startGliderSpawnManager:{
 	if (level.gliderRideOver){ end }
 	
 	level.thread["coop_manageSpawnsDuringGlider"] = local
+	
+	if ($gliderCamera){
+		$gliderCamera delete //[202] Smithy - start the number of cams at 0
+	}
+	
+	//[202] Smithy - spawn any cameras we need for players that may have spawned before the handler started
+	for (local.i = 1; local.i <= $player.size; local.i++){
+		group.player = $player[local.i]
+		if (!group.player.gliderCamera){
+			iprintlnbold_noloc("ADDING PLAYER TO CAM (handleCamera)")
+			thread coop_spawnGliderCamera
+		}
+	}
 	
 	while (1){
 		level waittill playerspawn
@@ -774,7 +798,7 @@ coop_spawnGliderCamera:{
 		local.cam attach $glider seat 1 ( 0 0 40 )
 		local.cam.player = group.player
 		group.player.gliderCamera = local.cam
-		group.player.oldViewAngles = group.player.viewangles
+		group.player.oldViewAngles = group.player.viewangles		
 	}
 }end
 
