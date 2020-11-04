@@ -818,10 +818,10 @@ cleanText local.source local.text local.maxremovals:{
 
 //return type of variable
 //performs a series of checks to determine the variable type ?
-//type: 0-NIL, 1-string,2-entity,3-vector,4-int/float,5-entityarray
+//type: 0-NIL/NULL, 1-string,2-entity,3-vector,4-int/float,5-entityarray
 //-1 could not detect type
 //
-//[202] chrissstrahl - added feature to differ between entity and entity array via parameter
+//[202] chrissstrahl - added feature to differ between entity and entity array via parameter, added NULL check
 //@smithy - maybe you see something wrong here, I don't think there is but Paranoya is a lifestyle (this func needs to work perfectly reliable)
 //
 //HIRACY:
@@ -832,22 +832,37 @@ cleanText local.source local.text local.maxremovals:{
 //=========================================================================
 returnVarType local.var local.differArray:{
 //=========================================================================
-	if(local.var == NIL){ end 0 }
+	if(local.var == NIL || local.var == NULL ){
+		println("main.scr::returnVarType was NIL or NULL") //[202]chrissstrahl - debug
+		end 0
+	}
 
 	local.stringified = string(local.var)
 	local.stringifiedSize = local.stringified.size
 
-	//println("size:   "+local.var.size)
-	//println("string: "+local.stringified)
+//chrissstrahl - debug activated
+//println("size   ("+local.var.size+")")
+//println("string ("+local.stringified+")")
 
-//var is of type entity(one) or string
+//var is of type entity(single one) or string
 	if(local.var.size == 0){
 	//it can be either a empty string or a entity
 		if(local.stringifiedSize == 0 ){ end 1 }
-		else{ end 2 }
+		end 2
 	}
 //var is type of integer, entity(array) or vector or singleletter string
 	else if(local.var.size == 1){
+		//[202] chrissstrahl - try to catch strange error we are having
+		if(local.stringifiedSize == 0 && local.stringified == ""){
+			//println("main.scr::returnVarType unknown var at unexpected place")
+			//[202] Smithy - e.g. this can be ScriptModel or ScriptSlave
+			//yes, classname property assumes it is an entity
+			//local.class = local.var.classname 
+			//if (local.class != NIL){
+				end 2
+			//}
+			//end -1
+		}		
 		local.firstChar = string(local.stringified[0])
 	//assume it is a vector if it is in brackets
 		if( local.stringified[0] == "(" && local.stringified[local.stringifiedSize-1] == ")" ){
@@ -904,6 +919,15 @@ returnVarType local.var local.differArray:{
 	}
 //must be a string
 	else{
+		if(local.stringifiedSize == 0 && local.stringified == ""){
+			//[202] Smithy - e.g. this can be ScriptModel or ScriptSlave
+			//yes, classname property assumes it is an entity
+			//local.class = local.var.classname 
+			//if (local.class != NIL){
+				end 2
+			//}
+			//end -1
+		}	
 		end 1
 	}
 }end -1
@@ -916,6 +940,8 @@ returnVarTypename local.var:{
 	if(local.var == 2){ end "Entity" }
 	if(local.var == 3){ end "Vector" }
 	if(local.var == 4){ end "Int/Float" }
+	//[202] chrissstrahl - updated typenames
+	if(local.var == 5){ end "Entity Array" }
 }end "Unknown"
 
 //check if it is a float, game makes sure float always has 3 digits after the dot
