@@ -13,7 +13,7 @@ Init: {
 //============================================================================
 manageVisibility local.distance local.sampleTime local.animon local.animoff: {
 //============================================================================
-	//	dprintln "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ manageVisibility running on " self.targetname " (" self.entnum ")"
+	println "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ manageVisibility running on " self.targetname " (" self.entnum ")" //chrissstrahl - debug turned on
 	if ( local.distance == NIL ) {
 		local.distance = 2500
 	}
@@ -29,26 +29,45 @@ manageVisibility local.distance local.sampleTime local.animon local.animoff: {
 	if ( self.viewradius != NIL ) {
 		local.distance = self.viewradius
 	}
-
-	while ( 1 ) {
+	
+	//[202] chrissstrahl
+	//while ( 1 ) {
+	while ( self ) {
 		self anim local.animoff
 		waitframe
+		
+		if (!self){ end } //[202] Smithy - NULL CHECKS FOR GOD SAKE DEVS
+		
+		println "manageVisibility 1 " self " " self.targetname " " $(self.targetname).size //chrissstrahl - debug
 
 		//[202] chrissstrahl
 		//while (!(vector_within $player.origin self.origin local.distance)) {
-		while (!(waitthread coop_mod/replace.scr::withinDistanceOf self local.distance)) {
+		while (self) {
+			if(waitthread coop_mod/replace.scr::withinDistanceOf self local.distance){
+				break
+			}
 			wait local.sampleTime
 		}
+		
+		if (!self){ end } //[202] Smithy - NULL CHECKS FOR GOD SAKE DEVS
 
 		//dprintln "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ showing " self.entnum
 		self anim local.animon
 		waitframe
+		
+		if (!self){ end } //[202] Smithy - NULL CHECKS FOR GOD SAKE DEVS
+		
+		println "manageVisibility 2 " self " " self.targetname " " $(self.targetname).size //chrissstrahl - debug
 
 		//[202] chrissstrahl
 		//while (vector_within $player.origin self.origin local.distance) {
-		while (waitthread coop_mod/replace.scr::withinDistanceOf self local.distance) {
+		while (self) {
+			if(!(waitthread coop_mod/replace.scr::withinDistanceOf self local.distance)){
+				break
+			}
 			wait local.sampleTime
 		}
+
 		//dprintln "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ hiding " self.entnum
 	}
 }end	
@@ -56,6 +75,9 @@ manageVisibility local.distance local.sampleTime local.animon local.animoff: {
 //============================================================================
 truck: {
 //============================================================================
+	//iprintlnbold_noloc "STARTING TRUCK VISIBILITY " self " " self.size
+	level.truckent = self
+	
 	self thread manageVisibility 2500 0.1 "smoke" "smoke_off"
 }end
 
