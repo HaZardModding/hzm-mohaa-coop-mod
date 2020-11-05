@@ -1,0 +1,528 @@
+//------
+// PainStand
+//------
+
+// Hit locations
+// 0  head
+// 1  helmet
+// 2  neck
+// 3  upper torso
+// 4  middle torso
+// 5  lower torso
+// 6  pelvis
+// 7  right upper arm
+// 8  left upper arm
+// 9  right upper leg
+// 10 left upper leg
+// 11 right lower arm
+// 12 left lower arm
+// 13 right lower leg
+// 14 left lower leg
+// 15 right hand
+// 16 left hand
+// 17 right foot
+// 18 left foot
+
+
+
+
+// Find the local yaw for later use
+//println "Local yaw: " local.yaw "."
+
+// need to handle initial position when hit (stand,crouch,...)
+// need to return to said state upon exit..
+// death handlers...
+
+PainStand:
+	if (!self.fact){ end } //[202] Smithy - please, ffs devs...
+	
+	waitexec anim/smoking.scr::SmokeRemoveCigarette
+	waitthread painglobals
+
+	self weaponcommand mainhand attachtohand mainhand
+	
+	
+	local.yaw = self GetLocalYawFromVector self.fact.direction
+
+	self.blendtime = 0.4
+	self.deathhandler = anim/killed.scr
+
+	switch (self.position)
+	{
+		prone:
+		pronewalk:
+			goto PainProne
+			break
+
+		stand:
+		walk:
+		default:
+			local.randnum = randomint 100
+			switch (self.fact.location)
+			{
+				// headshot
+     			case 1: // helmet
+				case 0: // head
+    			case 2: // neck
+					if (self.weaponpos == down)
+					{
+						self setmotionanim (self.weapongroup+"_pain_gundown_stand_head")
+					}
+					else
+					{
+						self setmotionanim ( self.weapongroup + "_stand_hit_head" )
+					}
+					break
+
+				// Stand Knees
+				case 9: // right upper leg
+				case 13: // right lower leg
+				case 17: // right foot
+				case 10: // left upper leg
+				case 14: // left lower leg
+				case 18: // left foot
+
+					if ( (self.aistandpainonly == NIL) || (self.aistandpainonly == 0) )
+					{
+						if ( (self.fact.damage * 2) > local.randnum)
+						{
+							self setmotionanim ( self.weapongroup + "_pain_standtoknees")
+							self.painhandler = anim/pain.scr::pain_knees
+							self waittill flaggedanimdone
+							goto pain_knees
+						}
+						else
+						{
+							self setmotionanim ( self.weapongroup + "_stand_hit_leg")
+						}
+						break
+					}
+					// no break on else
+//					println "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ self.aistandpainonly is " self.aistandpainonly ", falling through..."
+
+				// Stand Straight
+				case 3: // upper torso
+				case 4: // middle torso
+				case 5: // lower torso
+				case 6: // pelvis
+					if (local.yaw > -45 && local.yaw < 45 && self.fact.damage > 50)
+					{
+						self setmotionanim (self.weapongroup + "_pain_standstraight")
+					}
+					else
+					{
+						if (self.fact.damage*2 > local.randnum)
+						{
+							self setmotionanim ( self.weapongroup + "_stand_hit_uppertorso")
+						}
+						else
+						{
+							self setmotionanim ( self.weapongroup + "_stand_hit_lowertorso")
+						}
+					}
+					break
+
+				// Stand Left
+				case 8: // left upper arm
+				case 12: // left lower arm
+				case 16: // left hand
+					if (self.weaponpos == down)
+					{
+						self setmotionanim (self.weapongroup + "_pain_gundown_stand_left")
+					}
+					else
+					{
+						self setmotionanim (self.weapongroup + "_pain_standleft")
+					}
+					break
+
+				// Stand Right
+				case 7: // right upper arm
+				case 11: // right lower arm
+				case 15: // right hand
+					self setmotionanim (self.weapongroup + "_pain_standright")
+	   				break
+
+				default:
+//					println "Pain in unknown location " self.fact.location "."
+					// Add some variety until we're confident of our
+					// location detection.
+					local.randnum = randomint 100
+					if ( (local.randnum > 30) || ((self.aistandpainonly != NIL) && (self.aistandpainonly == 1)) )
+					{
+						local.randnum = randomint 100
+						if ( local.randnum > 80 )
+							self setmotionanim (self.weapongroup + "_pain_standstraight")
+						else if (local.randnum > 40)
+							self setmotionanim (self.weapongroup + "_pain_standleft")
+						else
+							self setmotionanim (self.weapongroup + "_pain_standright")
+					}
+					else
+					{
+						self setmotionanim (self.weapongroup + "_pain_standtoknees")
+						self.painhandler = anim/pain.scr::pain_knees
+						self waittill flaggedanimdone
+						goto pain_knees
+					}
+					break
+			}
+			break
+
+		knees:
+		crouch:
+			goto kneeshit
+			break
+
+		crawl:
+			goto crawlhit
+			break
+
+		floor:
+			goto floorhit
+			break
+
+	}
+
+	///////
+
+	self waittill flaggedanimdone
+end
+
+
+
+pain_knees:
+	waitexec anim/smoking.scr::SmokeRemoveCigarette
+
+	self.painhandler = anim/pain.scr::kneeshit
+	self.deathhandler = anim/pain.scr::kneesdeath
+
+	// repeat random # times (1-4)
+//	local.randnum = randomint 4
+	local.randnum = 0
+	while(local.randnum > -1)
+	{
+		self setmotionanim (self.weapongroup + "_pain_kneesidle")
+		self waittill flaggedanimdone
+		local.randnum--
+	}
+
+	// low health we crawl, good health we get up
+
+//	println self.health
+
+	if (self.normal_health>40)
+	{
+		goto stand_recover
+	}
+	else
+	{
+		goto kneeshit
+	}
+end
+
+
+
+kneeshit:
+	waitexec anim/smoking.scr::SmokeRemoveCigarette
+	waitthread painglobals
+
+	local.randnum = randomint 100
+
+	if (local.randnum>50)	// hmm crawl or hit the deck
+	{	// lets crawl
+		self setmotionanim (self.weapongroup + "_pain_kneestocrawl")
+		self waittill flaggedanimdone
+
+		goto pain_crawl
+	}
+	else
+	{
+		self.painhandler = anim/pain.scr::floorhit
+		self setmotionanim (self.weapongroup + "_pain_kneestofloor")
+		self waittill flaggedanimdone
+
+		goto pain_floor
+	}
+
+end
+
+
+pain_crawl:
+	waitexec anim/smoking.scr::SmokeRemoveCigarette
+
+	self.painhandler = anim/pain.scr::crawlhit
+	self.deathhandler = anim/pain.scr::crawldeath
+
+	local.randnum = randomint 2
+
+	while(local.randnum > -1)
+	{
+		self setmotionanim (self.weapongroup + "_pain_crawl")
+		self waittill flaggedanimdone
+		local.randnum--
+	}
+
+	goto crawlhit
+end
+
+
+crawlhit:
+	waitexec anim/smoking.scr::SmokeRemoveCigarette
+	waitthread painglobals
+
+	self setmotionanim (self.weapongroup + "_pain_crawltofloor")
+	self waittill flaggedanimdone
+
+	goto pain_floor
+end
+
+
+pain_floor:
+	waitexec anim/smoking.scr::SmokeRemoveCigarette
+
+	self.painhandler = anim/pain.scr::floorhit
+	self.deathhandler = anim/pain.scr::floordeath
+
+//	local.randnum = randomint 5
+	local.randnum = 0
+	while(local.randnum > -1)
+	{
+		self setmotionanim (self.weapongroup + "_pain_flooridle")
+		self waittill flaggedanimdone
+		local.randnum--
+	}
+
+//	if (self.normal_health < 25)
+	if (0)
+	{
+		self setmotionanim (self.weapongroup + "_pain_floortocrawl")
+		self waittill flaggedanimdone
+
+		goto pain_crawl
+	}
+	else
+	{
+		self setmotionanim (self.weapongroup + "_pain_floortoknees")
+		self waittill flaggedanimdone
+		goto pain_knees_recover
+	}
+
+end
+
+floorhit:
+	waitthread painglobals
+	goto pain_floor
+end
+
+
+
+////////////////////////////////////
+
+
+
+recover:
+	switch(self.position)
+	{
+		case stand:
+			goto stand_recover
+			break
+		case walk:
+			goto stand_recover
+			break
+		case knees:
+			goto crouch_recover
+			break
+		case crawl:
+			break
+		case floor:
+			break
+	}
+end
+
+
+
+
+pain_knees_recover:
+	waitexec anim/smoking.scr::SmokeRemoveCigarette
+
+	self.painhandler = anim/pain.scr::kneeshit
+	self.deathhandler = anim/pain.scr::kneesdeath
+
+	// repeat random # times (1-4)
+//	local.randnum = randomint 4
+	local.randnum = 0
+	while(local.randnum > -1)
+	{
+		self setmotionanim (self.weapongroup + "_pain_kneesidle")
+		self waittill flaggedanimdone
+		local.randnum--
+	}
+
+	goto recover
+end
+
+
+
+stand_recover:
+	waitexec anim/smoking.scr::SmokeRemoveCigarette
+
+	self setmotionanim (self.weapongroup + "_pain_kneestostand")
+	self waittill flaggedanimdone
+	self.position=stand
+	self.painhandler = anim/pain.scr::PainStand
+	self.deathhandler = anim/killed.scr
+end
+
+crouch_recover:
+	waitexec anim/smoking.scr::SmokeRemoveCigarette
+
+	self setmotionanim (self.weapongroup + "_pain_kneestocrouch")	// Boon 9-13-01 Changed animation from kneesidle
+	self waittill flaggedanimdone
+	self.position=crouch
+	self.painhandler = anim/pain.scr::PainStand
+	self.deathhandler = anim/killed.scr
+end
+
+
+
+kneesdeath:
+	waitexec anim/smoking.scr::SmokeRemoveCigarette
+
+	self setmotionanim (self.weapongroup + "_pain_kneestodeath")
+	self waittill flaggedanimdone
+	self.position = "dead"
+end
+
+crawldeath:
+	waitexec anim/smoking.scr::SmokeRemoveCigarette
+
+	self setmotionanim (self.weapongroup + "_pain_crawltodeath")
+	self waittill flaggedanimdone
+	self.position = "dead"
+end
+
+floordeath:
+	waitexec anim/smoking.scr::SmokeRemoveCigarette
+
+	self setmotionanim (self.weapongroup + "_pain_floortodeath")
+	self waittill flaggedanimdone
+	self.position = "dead"
+end
+
+//============================================
+PainProne:
+	//self.painhandler = anim/pain.scr::PainProne
+	waitexec anim/smoking.scr::SmokeRemoveCigarette
+	self.blendtime = 0.50
+	waitthread painglobals
+	switch(self.fact.location)
+	{
+		// Stand Straight
+		case 3: // upper torso
+		case 4: // middle torso
+		case 5: // lower torso
+		case 6: // pelvis
+			if (self.fact.damage > 50)
+			{
+				self setmotionanim (self.weapongroup + "_prone_hit_uppertorso")
+				self waittill flaggedanimdone
+			}
+			else
+			{
+				self setmotionanim (self.weapongroup + "_prone_hit_lowertorso")
+				self waittill flaggedanimdone
+			}
+			break
+
+		// headshot
+		case 1: // helmet
+		case 0: // head
+		case 2: // neck
+			self setmotionanim (self.weapongroup + "_prone_hit_head")
+			self waittill flaggedanimdone
+			break
+
+		// Stand Right
+		case 7: // right upper arm
+		case 11: // right lower arm
+		case 15: // right hand
+			self setmotionanim (self.weapongroup + "_prone_hit_rarm")
+			self waittill flaggedanimdone
+			break
+
+		// Stand Left
+		case 8: // left upper arm
+		case 12: // left lower arm
+		case 16: // left hand
+			self setmotionanim (self.weapongroup + "_prone_hit_larm")
+			self waittill flaggedanimdone
+			break
+
+		// Stand Knees
+		case 9: // right upper leg
+		case 13: // right lower leg
+		case 17: // right foot
+		case 10: // left upper leg
+		case 14: // left lower leg
+		case 18: // left foot
+			self setmotionanim (self.weapongroup + "_prone_hit_leg")
+			self waittill flaggedanimdone
+			break
+
+		default:
+			//println "Painhitstand got hit in unknown location: " self.fact.location
+			local.randnum = randomint 100
+			if (local.randnum < 25)
+			{
+				self setmotionanim (self.weapongroup + "_prone_hit_leg")
+				self waittill flaggedanimdone
+			}
+			else if (local.randnum < 50)
+			{
+				self setmotionanim (self.weapongroup + "_prone_hit_rarm")
+				self waittill flaggedanimdone
+			}
+			else if (local.randnum < 75)
+			{
+				self setmotionanim (self.weapongroup + "_prone_hit_larm")
+				self waittill flaggedanimdone
+			}
+			else
+			{
+				self setmotionanim (self.weapongroup + "_prone_hit_lowertorso")
+				self waittill flaggedanimdone
+			}
+			break
+	}
+end
+
+//============================================
+painchair:
+	waitexec anim/smoking.scr::SmokeRemoveCigarette
+	waitthread painglobals
+	self.blendtime = 0.2
+	self setmotionanim "chair_alert_stand"
+	self waittill flaggedanimdone
+	self.painhandler = anim/pain.scr::PainStand
+	self.deathhandler = anim/killed.scr
+end
+
+//============================================
+painglobals:
+
+	// Pop off the helmet
+	if ( (self.fact.location == 0) || (self.fact.location == 1) )
+	{
+		self pophelmet
+	}
+
+
+	// Make a pain sound
+	if ( (self.nextsaypain == NULL) || (self.nextsaypain == NIL) || (level.time > self.nextsaypain) )
+	{
+		self.nextsaypain = level.time + 1 + ((randomint 4)/4)
+		self setsay pain_generic
+	}
+
+end
