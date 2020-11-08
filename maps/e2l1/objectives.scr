@@ -1,0 +1,238 @@
+//
+// objectives.scr
+//
+
+// -------------------------------------------------------------------------------
+init:
+// -------------------------------------------------------------------------------
+
+	waitthread InitObj 1 "Locate and Destroy Anti-Aircraft Artillery [6 Remaining]"
+	waitthread InitObj 2 "Rendezvous with your Allies" $hudson
+	waitthread InitObj 3 "Destroy the Italian Rail Tank" $AB41
+	waitthread InitObj 4 "Protect the 505th Airborne from Ambush"
+
+	level.currentobjective = 1
+
+//	waitthread DoAAGunObjective
+//	waitthread global/objectives.scr::current_objectives 1
+
+end
+
+// -------------------------------------------------------------------------------
+transition local.trans:
+// -------------------------------------------------------------------------------
+
+	println "objective transition:" local.trans //[202] Smithy - changed to println (from dprintln)
+
+	switch ( local.trans )
+	{
+	case	"start":
+		waitthread RevealObj 1
+		waitthread RevealObj 2
+		waitthread DoAAGunObjective
+		break;
+	case	"destroyedAA":
+		waitthread DoAAGunObjective
+		break;
+	case	"rendezvou_done":
+		waitthread SucceedObj 2
+//		waitthread DoAAGunObjective
+		break;
+	case	"destroyAB41":
+		waitthread SetCurrObj 3
+		break;
+	case	"destroyAB41_done":
+		waitthread SucceedObj 3
+		waitthread DoAAGunObjective
+		break;
+	case	"protect505":
+		waitthread UpdateObj 4 NIL $phillips
+		waitthread SetCurrObj 4
+		break;
+	case	"protect505_done":
+		waitthread SucceedObj 4
+		waitthread DoAAGunObjective
+		break;
+	}
+
+
+	end
+
+// -------------------------------------------------------------------------------
+DoAAGunObjective:
+// -------------------------------------------------------------------------------
+
+	level.numAAGunsAlive = 0
+	if ($aagun6 && isalive $aagun6)
+	{
+		local.objorigin = $aagun6
+		level.numAAGunsAlive++
+	}
+	if ($aagun5 && isalive $aagun5)
+	{
+		local.objorigin = $aagun5
+		level.numAAGunsAlive++
+	}
+	if ($aagun4 && isalive $aagun4)
+	{
+		local.objorigin = $aagun4
+		level.numAAGunsAlive++
+	}
+	if ($aagun3 && isalive $aagun3)
+	{
+		local.objorigin = $aagun3
+		level.numAAGunsAlive++
+	}
+	if ($aagun2 && isalive $aagun2)
+	{
+		local.objorigin = $aagun2
+		level.numAAGunsAlive++
+	}
+	if ($aagun1 && isalive $aagun1)
+	{
+		local.objorigin = $aagun1
+		level.numAAGunsAlive++
+	}
+	if (level.numAAGunsAlive > 0)
+	{
+		waitthread SetCurrObj 1
+		waitthread UpdateObj 1 ("Locate and Destroy Anti-Aircraft Artillery [" + level.numAAGunsAlive + " Remaining]") local.objorigin
+		if (level.numAAGunsAlive == 1)
+		{
+			$fifthflybytrigger triggerable
+			$end_dialog triggerable
+		}
+	}
+	else
+	{
+		thread SucceedObj 1 "Locate and Destroy Anti-Aircraft Artillery"
+//		waitthread global/objectives.scr::add_objectives 1 3 "Locate and Destroy Anti-Aircraft Artillery"
+		wait 2
+		exec global/missioncomplete.scr e2l2 1
+
+	}
+
+End
+
+// -------------------------------------------------------------------------------
+InitAB41Objective:
+// -------------------------------------------------------------------------------
+
+//	level.ab41ready = 1
+//	waitthread SetCurrObj 3
+//	// $StartAB41Trigger remove
+
+//	waitthread global/objectives.scr::add_objectives 3 2 "Destroy the Italian AB-41 with the Flak cannon" $AB41
+//	waitthread global/objectives.scr::current_objectives 3
+
+End
+
+// -------------------------------------------------------------------------------
+DoAB41Objective:
+// -------------------------------------------------------------------------------
+
+	if ( level.did_ab_gag==1 )
+		end
+
+  // some dialog interaction here
+  // hudson stands up and talks to player
+
+
+	waitthread transition "destroyAB41"	
+
+	$AB41 takedamage
+
+	$aagun4 takedamage
+	$aagun4.turret takedamage
+
+	// Wait for AB41 to die
+
+//	thread maps/e2l1/ab41_scene.scr::AB41_motion
+
+	$AB41 waittill death
+
+	$aagun4 thread maps/e2l1/aaguns.scr::GunOKExplode
+
+	waitthread transition "destroyAB41_done"
+	
+end
+
+// -------------------------------------------------------------------------------
+StartFinalBattleObjective:
+// -------------------------------------------------------------------------------
+
+	waitthread maps/e2l1/FinalBattle.scr::StartEndBattle
+
+//	waitthread global/objectives.scr::add_objectives 5 2 "Protect your squad leader" $phillips
+//	waitthread global/objectives.scr::current_objectives 4
+//	waitthread maps/e2l1/FinalBattle.scr::StartTankBattle
+//	waitthread global/objectives.scr::add_objectives 5 3 "Protect your squad leader"
+
+End
+
+
+// -------------------------------------------------------------------------------
+InitObj local.num local.desc local.point:
+// -------------------------------------------------------------------------------
+
+	waitthread global/objectives.scr::add_objectives local.num 1 local.desc
+
+	if (local.point!=NIL)
+	{
+		waitthread InitObjCompass local.num local.point
+	}
+
+end
+
+
+// -------------------------------------------------------------------------------
+InitObjCompass local.num local.point:
+// -------------------------------------------------------------------------------
+
+	waitthread global/objectives.scr::add_objectives local.num 1 NIL local.point
+
+end
+
+
+// -------------------------------------------------------------------------------
+RevealObj local.num:
+// -------------------------------------------------------------------------------
+
+	waitthread global/objectives.scr::add_objectives local.num 2
+
+end
+
+
+// -------------------------------------------------------------------------------
+SucceedObj local.num local.newtext:
+// -------------------------------------------------------------------------------
+
+	waitthread global/objectives.scr::add_objectives local.num 3 local.newtext
+
+end
+
+
+// -------------------------------------------------------------------------------
+UpdateObj local.num local.newtext local.point:
+// -------------------------------------------------------------------------------
+	waitthread global/objectives.scr::add_objectives local.num 2 local.newtext local.point
+
+	// we have to call this to get the objective to update
+	if (level.currentobjective == local.num)
+		waitthread SetCurrObj local.num
+
+
+end
+
+// -------------------------------------------------------------------------------
+SetCurrObj local.num:
+// -------------------------------------------------------------------------------
+
+	waitthread RevealObj local.num
+	waitthread global/objectives.scr::current_objectives local.num
+	level.curr_obj_num = local.num
+
+end
+
+
+
