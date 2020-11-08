@@ -3,6 +3,7 @@
 //=========================================================================
 coop_StartRide:{
 //=========================================================================
+end
 //level.stickPlayerAtGlider == 1 // debug hack to put player near the glider, for debugging
 
 	//[202] chrissstrahl
@@ -97,14 +98,23 @@ handlePassengers: {
 	$gliderDude2 thread handlePassenger2Idle
 
 	// wait for the pilot to get shot
+	waitthread game.waittill gliderPilotShot
+	/*
 	while (level.gliderPilotShot == 0) {
 		waitframe
 	}
+	*/
 
 	// wait for the scene to end and delete the passengers
+	if (!level.gliderRideOver){
+		waitthread game.waittill gliderRideOver //[202] Smithy - save cpu cycles
+	}
+	
+	/*
    	while (level.gliderRideOver == 0) {
 		waitframe
    	}
+   	*/
 
 	delete $gliderDude1
 	delete $gliderDude2
@@ -120,9 +130,13 @@ doPanicSound local.sound: {
 //============================================================================
 handlePassenger1React: {
 //============================================================================
+	waitthread game.waittill gliderTakingFire //[202] Smithy - save cpu cycles
+	wait 0.1 //[202] Smithy - add extra time now we don't do a loop
+	/*
 	while (level.gliderTakingFire == 0) { 
 		wait 0.1
 	}
+	*/
 
 	// how long to wait before reacting
 	wait 2.9
@@ -149,12 +163,16 @@ handlePassenger1Idle: {
 //============================================================================
 handlePassenger2React: {
 //============================================================================
-	while (level.gliderTakingFire == 0) {
+	waitthread game.waittill gliderTakingFire //[202] Smithy - save cpu cycles
+	wait 0.1 //[202] Smithy - add extra time now we don't do a loop	
+	/*
+	while (level.gliderTakingFire == 0) { 
 		wait 0.1
 	}
+	*/
 
 	// how long to wait before reacting
-	wait 2.5	
+	wait 2.5
 	$gliderDude2 thread doPanicSound snd_den_pain_generic
 
 	// animate the dudes to react
@@ -224,7 +242,7 @@ WaitToStartTruck: {
 		break;
 	}
 	thread startTruck
-}End
+}end
 
 //============================================================================
 MyTruckThink local.hp local.passengers local.passengertype: {
@@ -358,9 +376,12 @@ handleCrash: {
 	$dead_dude1 notsolid
 	$dead_dude2 notsolid
 
+	waitthread game.waittill gliderRideOver //[202] Smithy - save cpu cycles
+	/*
 	while (level.gliderRideOver == 0) {
 		waitframe
 	}
+	*/
 
 	//	thread UnrestrictView
 	musicvolume 1.0 3.0
@@ -379,14 +400,18 @@ handleCrash: {
 	//$player playsound e2l1_crash1
 	thread coop_mod/replace.scr::playsound e2l1_crash1
 	
+	thread game.event gliderCrashOver //[202] Smithy - save cpu cycles
 	level.gliderCrashOver = 1
 	thread HandleSearchParty
 
-	// find out what 75% of health is
-	local.newHealth = 0.90*self.max_health
+	if (self){
+		// find out what 75% of health is
+		local.newHealth = 0.90*self.max_health
 
-	// set current health to that
-	self healthonly local.newHealth
+		// set current health to that
+		self healthonly local.newHealth
+	}
+
 
 	// tell the player to eject from the glider
 	wait 3
@@ -407,11 +432,6 @@ handleCrash: {
 	waitthread global/items.scr::add_item "explosives" noprint
 	drawhud 1
 	waitthread maps/e2l1/objectives.scr::transition "start"
-
-	//[202] Smithy - useweaponclass can be used against player array
-	if ($player){
-		$player useweaponclass rifle
-	}
 	
 	//[202] chrissstrahl
 	if(level.gametype == 0){		
@@ -421,42 +441,53 @@ handleCrash: {
 	}
 	
 	//[202] chrissstrahl
-	thread coop_mod/replace.scr::physics_on
+	thread coop_mod/replace.scr::physics_on 
+	
+	//[202] Smithy - handle their eject stuff individually
+	for (local.i = 1; local.i <= $player.size; local.i++){
+		local.player = $player[local.i]
+		if (waitthread game.playerActive local.player && !local.player.ejectHandled){
+			local.player thread coop_handlePlayerGliderEject
+		}
+	}
 
 	//time to roll up the truck
     thread WaitToStartTruck   
 
+    /* //[202] Smithy - done in coop_handlePlayerGliderEject now
 	$searchparty thread EnableAI
 
 	//wait 1
 	level.abortSearchParty = 1
+	*/
 }end
 
 //============================================================================
 HandleSearchParty: {
 //============================================================================
+
 	level.abortSearchParty = 0
 	$searchparty[1] runto $searchpartyrunto1
 	$searchparty[2] runto $searchpartyrunto2
 
 	wait 2
 	if (level.abortSearchParty == 0) {
-		$searchparty[1] say den_E2L1_ITALIAN1
+		$searchparty[1] waitthread game.say den_E2L1_ITALIAN1
 		$searchparty[1] waittill saydone
 	}
 
 	if (level.abortSearchParty == 0) {
-		$searchparty[1] say den_E2L1_ITALIAN2
+		$searchparty[1] waitthread game.say den_E2L1_ITALIAN2
 		$searchparty[1] waittill saydone
 	}
 
 	if (level.abortSearchParty == 0) {
-		$searchparty[2] say den_E2L1_ITALIAN3
+		$searchparty[2] waitthread game.say den_E2L1_ITALIAN3
 		$searchparty[2] waittill saydone
 	}
 
 	if (level.abortSearchParty == 0) {
-		$searchparty[1] say den_E2L1_ITALIAN4
+		$searchparty[1] waitthread game.say den_E2L1_ITALIAN4
 		$searchparty[1] waittill saydone
 	}
 
@@ -464,11 +495,12 @@ HandleSearchParty: {
 	if (level.abortSearchParty == 0) {
 		$searchparty thread GetPlayer
   	}
-}End
+}end
 
 //============================================================================
 GetPlayer: {
 //============================================================================
+
 	// wake up the patrollers
 	self waitthread EnableAI
 	//[202] chrissstrahl
@@ -559,6 +591,7 @@ handleDialogue: {
 	}
 
 	// detach the glider from the C47
+	thread game.event gliderDetached //[202] Smithy - save cpu cycles
 	level.gliderDetached = 1
 	thread doEarthquake 0.3 1 1 0
 
@@ -595,6 +628,8 @@ handleDialogue: {
 	level.dialogueFinished = 1
 
 	// now begin the descent
+	thread game.event gliderDescentBegun 	//[202] Smithy - save cpu cycles
+	thread game.event gliderTakingFire 		//[202] Smithy - save cpu cycles
 	level.gliderDescentBegun = 1
 	level.gliderTakingFire = 1
 	wait 2
@@ -606,6 +641,7 @@ handleDialogue: {
 	$glider anim shot
 	waitthread cockpitBulletHit 0.5  0.1 snd_bh_wood1  0.1 2 
 	waitthread cockpitBulletHit 0.3  0.1 snd_bh_wood2  0.1 2 
+	thread game.event gliderPilotShot //[202] Smithy - save cpu cycles
 	level.gliderPilotShot = 1
 
 	waitthread cockpitBulletHit 0.2  0.1 snd_bh_wood3  0.1 2 
@@ -722,8 +758,8 @@ handleCamera: {
 					thread coop_stopGliderCamera
 				}
 				local.cam delete	
-				level waittill postthink 	//[202] Smithy - delete isn't faster than remove. they all call the same function internally lol... so lets wait until thinks have finished
-				local.i = 0 				//[202] Smithy - gliderCamera.size will change, so, to stop someone being delayed by an extra frame, start again
+				local.cam waitthread game.replace::delete   //[202] Smithy - delete isn't faster than remove. they all call the same function internally lol... so lets wait until thinks have finished
+				local.i = 0 								//[202] Smithy - gliderCamera.size will change, so, to stop someone being delayed by an extra frame, start again
 				continue
 			}
 			
@@ -737,12 +773,18 @@ handleCamera: {
 		waitframe
 	}
 
+	if (!level.gliderCrashOver){
+		waitthread game.waittill gliderCrashOver //[202] Smithy - save cpu cycles
+	}
+	
+	/*
 	while (level.gliderCrashOver == 0) {
 		waitframe
 	}
+	*/
 	
-	thread coop_stopGliderSpawnManager 	//[202] Smithy - stop handling glider spawns now
-	cueplayer 							//[202] Smithy - will loop over all clients and turn off the cams for us		 
+	//thread coop_stopGliderSpawnManager 	//[202] Smithy - stop handling glider spawns now
+	cueplayer 								//[202] Smithy - will loop over all clients and turn off the cams for us		 
 	
 	thread maps/e2l1/fog.scr::setFog level.fogDistanceGround level.fogBiasGround level.fogColorGround
 	delete $gliderCamera
@@ -764,19 +806,73 @@ coop_startGliderSpawnManager:{
 	for (local.i = 1; local.i <= $player.size; local.i++){
 		group.player = $player[local.i]
 		if (!group.player.gliderCamera){
-			iprintlnbold_noloc("ADDING PLAYER TO CAM (handleCamera)")
+			println("ADDING PLAYER TO CAM (handleCamera)")
 			thread coop_spawnGliderCamera
+			
+			if (!group.player.handleDeathThread){ //[202] Smithy - handle deaths
+				group.player thread coop_handleDeath
+			}
 		}
 	}
 	
 	while (1){
 		level waittill playerspawn
-		commanddelay 0.2 iprintlnbold_noloc("ADDING PLAYER TO CAM (playerspawn)")
+		/*commanddelay 0.2*/ println("ADDING PLAYER TO CAM (playerspawn)")
 		group.player = parm.other
-		if (!group.player.isSpectator){ 			
-			thread coop_spawnGliderCamera
+		
+		if (!group.player.handleDeathThread){ //[202] Smithy - handle deaths
+			group.player thread coop_handleDeath
 		}
+		
+		if (!group.player.isSpectator){ 	
+			if (!level.gliderRideOver){					
+				thread coop_spawnGliderCamera
+			}else{	
+				if (!group.player.coop_dead){ //[202] Smithy - as players can respawn at location of death, check for this
+					group.player thread coop_handlePlayerGliderEject
+				}							
+			}
+		}
+		group.player.coop_dead = game.false
 	}	
+}end
+
+//[202] Smithy - handle ejecting from the glider on fresh spawn
+//============================================================================
+coop_handlePlayerGliderEject:{
+//============================================================================
+	local.player = self
+	local.player.ejectHandled = game.true
+	local.player physics_off	
+	local.player commanddelay 0.05 iprint("Hold USE to eject from the glider") game.true
+	local.player.gliderEjectThread = local
+	while (waitthread game.playerActive local.player && !local.player.useheld) {
+		wait .1
+	}
+	if (local.player){
+		local.player physics_on		
+		local.player.ejectHandled = game.false
+		if (!level.coop_searchPartyAborted){
+			level.coop_searchPartyAborted = game.true
+			$searchparty thread EnableAI
+			level.abortSearchParty = 1
+		}
+	}
+}end
+
+//[202] Smithy - check for death events so we know when to handle glider eject.
+//we don't want players who respawn at death location to eject from the sky, do we? :D
+//============================================================================
+coop_handleDeath:{
+//============================================================================
+	local.player = self
+	local.player.handleDeathThread = local
+	local.player waitthread game.waittill2 playerdeath
+	
+	//[202] Smithy - sure, player can go to spec after dying, which means spawns reset
+	//but not a big deal. if that happens then they will just drop from the glider like a normal spawn.
+	//no biggie.
+	local.player.coop_dead = game.true 					
 }end
 
 //[202] Smithy - spawn a camera for a player and set it up in glider
@@ -859,9 +955,12 @@ handleGlider: {
 	$glider playsound e2l1_c47_snd_teather
 
 	// wait for the signal for the glider start the final descent
+	waitthread game.waittill gliderDescentBegun //[202] Smithy - save cpu cycles
+	/*
 	while (level.gliderDescentBegun == 0) {
 		waitframe
 	}
+	*/
 
 	// don't want the flak anymore...
 	thread maps/e2l1/pocketflash.scr::StopGliderFlak
@@ -873,6 +972,7 @@ handleGlider: {
 	$glider waitmove	
 
 	// give the signal for the camera to give control back to the player
+	thread game.event gliderRideOver //[202] Smithy - might as well use our event system to save cpu cycles. the BT devs really needed to make one themselves...
 	level.gliderRideOver = 1
 	$glider stoploopsound
 	$gliderJeep delete
@@ -952,9 +1052,12 @@ handleC47: {
 	$c47Teather anim idle
 
 	// wait for the detach signal
+	waitthread game.waittill gliderDetached //[202] Smithy - save cpu cycles
+	/*
 	while (level.gliderDetached == 0) {
 		waitframe
 	}
+	*/
 
 	// play the teather detach animation
 	$c47Teather anim detach
@@ -980,9 +1083,12 @@ handlePilot:{
 	$gliderPilot thread handlePilotIdle
 
 	// wait for the pilot to get shot
+	waitthread game.waittill gliderPilotShot //[202] Smithy - save cpu cycles
+	/*
 	while (level.gliderPilotShot == 0) {
 		waitframe
 	}
+	*/
 
 	// animate the his death
 	$gliderPilot anim AA_pilot1_death2
@@ -991,9 +1097,12 @@ handlePilot:{
 	$gliderPilot ai_off
 
 	// wait for the scene to end and delete the pilot
+	waitthread game.waittill gliderRideOver //[202] Smithy - save cpu cycles
+	/*
    	while (level.gliderRideOver == 0) {
 		waitframe
    	}
+   	*/
 
 	delete $gliderPilot
 }end
