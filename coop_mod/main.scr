@@ -678,35 +678,21 @@ friendlyFindPlayer:{ //[201] chrissstrahl - fix typo
 	level.coop_player = NULL
 }end
 
+//[202] Smithy - tidied and simplified
 //=========================================================================
 isPlayerActive local.player:{
 //=========================================================================
 //checks if a player is valid
 	if(level.gametype == 0){
-		if($player != NULL && $player.health > 0){
-			end 1
-		}
-		//[200] chrissstrahl - fix missing end 0 if player is dead
-		end 0
+		end (isAlive $player) //[202] Smithy - simpler
 	}
-	if( local.player == NIL ){
+	
+	if (local.player == NIL){
 		error ( "coop_mod/main.scr::isPlayerActive - parameter 1 was NIL, needs to be player" ) 1000
-		end 0
+		end 0		
 	}
-
-	if( local.player != NULL ){
-		if( local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
-			end 1
-		}
-	}
-}end 0
-
-//=========================================================================
-playerActives:{
-//=========================================================================
-	error ( "coop_mod/main.scr::playerActives - used, use player_numActive in replace.scr instead" ) 1000
-	end
-}end local.actives
+	
+}end (isAlive local.player && !local.player.isSpectator && local.player.flags["coop_isActive"]) //[202] Smithy - simpler, plus checks for temp and active spectators
 
 //PLEASE NOTE! THIS FUNCTION HAS A INTENTIONAL 1 FRAME DELAY!
 //=========================================================================
@@ -1370,14 +1356,14 @@ isCoopEnabledMap local.map:{
 //=========================================================================
 	//[200] chrissstrahl - lets upgrade this a bit, make sure to reduce errors
 	//[200] Smithy - improved further - moved extra checks inside the return as breaks (that were required now extra checks were added) were missing
-
+	
 	if(local.map.size < 4){ end game.false }
 	
 	switch (local.map[0]){		
 		case m: //missions pattern m1l,e1l,t1l
 		case e:
 		case t: 													//[200] Smithy - dont need uppercase checks (we dont do that anywhere else here, and getcvar command passes map name into here...)
-			end(local.map[2] == "l" && bool(string(local.map[1])) || waitthread containsText local.map "training") //[202] chrissstrahl - added training level	//[200] Smithy - this is nicer - it will return 0 if a letter or 0, returns 1 if an int higher than 0
+			end(local.map[2] == "l" && bool(string(local.map[1])) || local.map == "training") //[202] chrissstrahl - added training level	//[200] Smithy - this is nicer - it will return 0 if a letter or 0, returns 1 if an int higher than 0
 		case b: //briefings
 			end(local.map[1] == "r" && waitthread containsText local.map "iefing") //for extra efficiency we can add optional index pos as an arg
 		case c: //coop_ maps
