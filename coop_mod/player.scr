@@ -26,13 +26,13 @@ manage:{
 	//[200] Smithy - reset any vars that may have transferred from previous map
 	waitthread resetPlayers
 	
+	//[202] Smithy - moved out from inside loop //[200] chrissstrahl - used to detect when a player leaves/joins
+	local.prevPlayerCount = 0
+	
 	//[202] chrissstrahl - handle players
-	while(1){
-		//[200] chrissstrahl - used to detect when a player leaves/joins
-		local.prevPlayerCount = 0
-		
+	while(1){	
 		//[202] chrissstrahl - if server is empty wait
-		if( $player == NULL || $player.size == 0 ){
+		if ($player.size == 0){
 			waitframe
 			continue
 		}
@@ -40,9 +40,6 @@ manage:{
 		//[202] chrissstrahl - handle all players
 		for (local.i = 1;local.i <= $player.size;local.i++){
 			local.player = $player[local.i]
-			
-			//[200] chrissstrahl - used for LMS to detect when a player leaves
-			local.playerCount++
 			
 /////////////////////////////////////////SPECTATOR
 			if( local.player.dmteam == "spectator" ){
@@ -54,14 +51,25 @@ manage:{
 				//where he was spectating at, the moment the player spawns he needs to be
 				//already at the spawnlocation or he can telefrag a player, friendly or enemy
 				if(local.player.flags["coop_isActive"] == -1){
-					local.player.flags["coop_isActive"] = 0
-					waitthread coop_mod/main.scr::playerPlaceAtSpawn local.player
+					commanddelay .1 iprintlnbold_noloc("PLAYER HIT BACKUP SPAWN") //[202] Smithy - i dont believe this will ever hit if spawnEvent takes care of it
+					//local.player.flags["coop_isActive"] = 0
+					//waitthread coop_mod/main.scr::playerPlaceAtSpawn local.player
 				}
 				waitthread manageNoSpectator local.player
 /////////////////////////////////////////ALIVE
-				if( local.player.health > 0 ){
+				if (!local.player.isSpectator && local.player.health > 0){ //[202] Smithy - fixed players being able to respawn anywhere
 					//spawning is event based handled in: main.scr::playerSpawnEvent
 					waitthread manageAlive local.player local.i
+					
+					//[202] Smithy - 'isSpectator' also checks for temp spectators (very useful).
+					//i.e. those who have died and are floating around but not actually in spectator team.
+					//see game code:					
+					//bool Player::IsSpectator( void )
+					//{
+					//	return ( m_bSpectator || m_bTempSpectator );
+					//}		
+					//m_bSpectator = team spectator
+					//m_bTempSpectator = floaty dude but not on spec team
 				}
 /////////////////////////////////////////DEAD
 				//death is event based handled in: main.scr::playerDeathEvent
@@ -71,13 +79,16 @@ manage:{
 /////////////////////////////////////////RESTORE FOV IF NAME IS CHANGED
 				//prevent this thread to be executed several times
 				if(	local.player.flags["coop_netname"] != local.player.netname &&
-					level.time > (local.player.flags["coop_netnameChanged"] + (game.frametime*3))
+					level.time > (local.player.flags["coop_netnameChanged"] + (game.frame * 3))
 					/*&& local.player.flags["coop_setupComplete"] == 1*/)
 				{
 					thread manageNamechange local.player
 				}
 			}
 		}
+		
+		//[202] Smithy - moved here and done in one //[200] chrissstrahl - used for LMS to detect when a player leaves
+		local.playerCount = $player.size
 		
 		//[200] chrissstrahl - call player changed func if number of players changed
 		if(local.prevPlayerCount != local.playerCount){
@@ -350,7 +361,7 @@ manageSpectator local.player:{
 manageNoSpectator local.player:{
 //=========================================================================
 //PHYSICS
-	if( level.coop_physicsOff != NIL && level.coop_physicsOff == 1){ local.player physics_off }
+	if (level.coop_physicsOff){ local.player physics_off }
 }end
 
 //alive player handling
