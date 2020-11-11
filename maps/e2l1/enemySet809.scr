@@ -42,11 +42,13 @@ init: {
 		if (level.endParade != 0) {
 			break
 		}
-		
-		//@chrissstrahl //@smithy - talk
 
 		// time to spawn another dude
-		local.touching = $player istouching $water_tower_trigger
+		
+		//[202] chrissstrahl //@smithy - talk
+		//local.touching = $player istouching $water_tower_trigger
+		local.touching = exec coop_mod/replace.scr::istouching $water_tower_trigger
+		
 		if ( local.touching ) {
 			local.spawnerIndex = local.spawnedCount % local.spawnerCount
 			local.currentSpawner = local.spawner[local.spawnerIndex]
@@ -125,10 +127,10 @@ paradeRun local.rallyPoint: {
 		wait local.random
 	}
 
-	//@chrissstrahl //@smithy - talk
-
-	self favoriteenemy $player
-	self aimat $player
+	//[202] chrissstrahl //@smithy - talk
+	local.player = exec coop_mod/replace.scr::player_closestTo self
+	self favoriteenemy local.player
+	self aimat local.player
 }end
 
 //============================================================================
@@ -201,16 +203,20 @@ CheckForTowerExplosion: {
 			$mg42_guy_350_a delete
 		}
 
-		//@chrissstrahl //@smithy - talk
+		
 
 		// only do this if an NPC caused the trigger to trip
-		if ( parm.owner != $player ) {
+		//[202] chrissstrahl //@smithy - talk
+		//if ( parm.owner != $player ) {
+		if ( parm.owner.classname != "Player" ) {
 			// do the exploder stuff
 			thread global/exploder.scr::explode 227
 
 			// and remove the func_ladder
 			$towerladder remove
-
+			
+			//@smithy - I think you will have more fun with this
+			//local.player = getAPlayerWIthTurretInRangeOfThisThenHandleHIm
 			if ( $player.turret!=NULL ) {
 				//dprintln "PLAYER ON TURRET, GET HIM OFF IT!"
 				$player usestuff
@@ -224,7 +230,6 @@ CheckForTowerExplosion: {
 			wait 5
 			
 			//@chrissstrahl //@smithy - talk
-
 			$player safeholster 0
 			end
 		}
