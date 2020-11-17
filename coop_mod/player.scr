@@ -45,7 +45,7 @@ manage:{
 			if( local.player.dmteam == "spectator" ){
 				waitthread manageSpectator local.player
 			}
-////////////////////////////////////////NO SPECTATOR
+////////////////////////////////////////NO SPECTATOR TEAM
 			else{
 				//this makes sure that the player does not get spawned anywhere in the map
 				//where he was spectating at, the moment the player spawns he needs to be
@@ -125,6 +125,11 @@ manageSetup local.player:{
 	if(!level.coop_dedicated){
 		//[200] Smithy - as this is a bool, just do it in one line
 		local.player.flags["coop_isHost"] = local.player.entnum == 0
+	}
+
+	//[202] Smithy - store client 0
+	if (local.player.entnum == 0){
+		level.coop_clientZero = local.player
 	}
 	
 //RUN OTHER SETUPS
@@ -712,5 +717,23 @@ set3rdPerson local.player local.activate:{
 	iprintlnbold_noloc("set3rdPerson: "+local.activate)
 }end
 
+//[202] Smithy - checks if client zero exists, if not reconnect a player
+//=========================================================================
+checkClientZero:{
+//=========================================================================
+	if ($player && !waitthread isClientZeroActive){
+		thread reconnectPlayer $player[1]
+	}
+}end
 
+//=========================================================================
+isClientZeroActive: end(level.coop_clientZero != NULL)
+//=========================================================================
 
+//[202] Smithy - make a player reconnect to server
+//we can use this to fix player 0 issue
+//=========================================================================
+reconnectPlayer local.player:{
+//=========================================================================
+	local.player stufftext "disconnect; wait 1; reconnect" //needs work, dont use yet
+}end
