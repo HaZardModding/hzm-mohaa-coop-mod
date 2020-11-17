@@ -82,11 +82,12 @@ setUp1stFloorGuys:
 		wait 1
 	// iprintln "DEBUG:  TRIGGERED"
 	wait 1
-	$1stfloorguys[1].movespot = "t649"
-	$1stfloorguys[2].movespot = "t650"
-	$1stfloorguys[3].movespot = "t683"
-	$1stfloorguys[4].movespot = "t684"
-
+	
+	//[202] chrissstrahl - added check to stop spam
+	if($1stfloorguys[1]){$1stfloorguys[1].movespot = "t649"}
+	if($1stfloorguys[2]){$1stfloorguys[2].movespot = "t650"}
+	if($1stfloorguys[3]){$1stfloorguys[3].movespot = "t683"}
+	if($1stfloorguys[4]){$1stfloorguys[4].movespot = "t684"}
 end
 
 //-------------------------------------------------------------
@@ -95,7 +96,8 @@ moveFirstFloorGuys:
 	for (local.i = 1; local.i <= $1stfloorguys.size; local.i++)
 	{
 		// iprintln ( "my runto = " + $1stfloorguys[local.i].movespot )
-		$1stfloorguys[local.i] thread moveGuy
+		//[202] chrissstrahl - added check to stop spam
+		if($1stfloorguys[local.i]){ $1stfloorguys[local.i] thread moveGuy }
 	}
 end
 
@@ -120,12 +122,12 @@ doorClosingGuy:
 	//unlock the L2 doors
 	$2bdoor unlock
 	
-	$2bdoor open $player
+	$2bdoor open $world //[202] chrissstrahl - prevent null player issue
 	level.trigger2b waittill trigger
 	waitframe
 	$2bdoorguy waitexec global/disable_ai.scr
 	wait 1
-	$2bdoor close $player
+	$2bdoor close $world //[202] chrissstrahl - prevent null player issue
 	waitframe
 	$2bdoorguy nodamage
 
@@ -176,9 +178,6 @@ ObjectivePlaceExplosives:
 	//turn on the trigger for player to fight way back up stairs
 	level.trigger3f triggerable
 	// level.trigger3f thread GetridofGuns "deleteguy3"
-	
-	//[202] chrissstrahl - set spawnpoint for escaping after explocives are set and player did go up stairs
-	thread coop_mod/spawnlocations.scr::e1l4_update5 //escape 2
 end
 
 // This function takes a trigger as self and will get rid of the guns of local.guys when the trigger is triggered
@@ -207,6 +206,11 @@ end
 SetExplosive:
 
 	level.numexplosivesset ++
+	//[202] chrissstrahl - set spawn now
+	if(level.numexplosivesset > 1){ //2 in total ?
+		//[202] chrissstrahl - set spawnpoint for escaping after explocives are set and player did go up stairs
+		thread coop_mod/spawnlocations.scr::e1l4_update5 //escape 2
+	}
 end
 
 
@@ -219,7 +223,7 @@ end
 
 
 //-----------------------------------------------------------------------------------------------------------------
-compassTracker local.objNumber local.objMessage local.objOrigin: 
+compassTracker local.objNumber local.objMessage local.objOrigin: //@smithy - I think you should handle that
 //-----------------------------------------------------------------------------------------------------------------
 //local.objNumber     the number of the objective
 //local.objMessage    the message of the objective
@@ -241,9 +245,14 @@ compassTracker local.objNumber local.objMessage local.objOrigin:
 
 	while (local.objNumber == level.currentobjective && level.abortCompassTracker == 0)
 	{
-
-		local.playerFloor = waitthread WhichFloor $player.origin
-
+		//[202] chrissstrahl - temporary fix
+		if(level.gametype == 0){
+			local.playerFloor = waitthread WhichFloor $player.origin
+		}else{
+			local.playerFloor = waitthread WhichFloor (waitthread game.main::friendlyPlayerOrigin)
+		}
+		
+		
 		if (local.playerFloor != local.lastPlayerFloor)
 		{
 			if (local.playerFloor == local.objectiveFloor)
@@ -419,10 +428,12 @@ manageEnteringShip:
 	while ($insideShip1) {
 		waitframe
 		$insideShip1 waittill trigger
-		$boatguard thread guyOff
-		$deleteguy2 thread guyOff
-		$clerkbuddy thread guyOff
-		$ai_alarm thread guyOff
+		
+		//[202] chrissstrahl - stop spam
+		if($boatguard){$boatguard thread guyOff}
+		if($deleteguy2){$deleteguy2 thread guyOff}
+		if($clerkbuddy){$clerkbuddy thread guyOff}
+		if($ai_alarm){$ai_alarm thread guyOff}
 	}
 end
 
@@ -430,10 +441,12 @@ manageLeavingShip:
 	while ($outsideShip1) {
 		waitframe
 		$outsideShip1 waittill trigger
-		$boatguard thread guyOn
-		$deleteguy2 thread guyOn
-		$clerkbuddy thread guyOn
-		$ai_alarm thread guyOn
+		
+		//[202] chrissstrahl - stop spam
+		if($boatguard){$boatguard thread guyOn}
+		if($deleteguy2){$deleteguy2 thread guyOn}
+		if($clerkbuddy){$clerkbuddy thread guyOn}
+		if($ai_alarm){$ai_alarm thread guyOn}
 	}
 end
 
