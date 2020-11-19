@@ -1,0 +1,1075 @@
+// Entity list
+// $autotruck // Any number
+
+// To make the truck initialize and go, create a trigger named autotrucktrigger and target your truck
+
+// Each truck must have these things associated with it:
+//---------------------------------------------------------
+// $autotruck.passengers      -- number of passengers, 1-6
+// $autotruck.target          -- path used by the truck Each truck
+// $autotruck.collisionent -- script model of collision hull
+
+/*
+// Optional stuff:
+//----------------------------------------------------------
+1. $collisionent    : the script_model of the collision entity
+		    (default: none)
+
+2. $target          : path along which the truck will drive,  
+		    (default: none)
+
+3. #passengers      : the number of passengers
+		    (default: 0)
+
+4. #health          : amount of health for each truck 
+		    (default: 4000)
+
+5. $drivermodel     : driver's model 
+		    (default: "models/human/german_wehrmact_soldier")
+
+5a. $drivergun      : what the driver will have
+			(default: not done yet)
+
+6. $passengermodel  : passenger's model 
+		    (default: "models/human/german_afrika_private")
+  
+
+7. $passengergun    : what guns the passengers will have 
+		    (default: "Mauser KAR 98K")
+
+8. $passengername   : the targetname assigned to all the passengers
+		    and the driver on spawn
+		    (default: the trucks targetname + "_passenger")
+
+9. #passengerstakedamage : Do passengers take damage or are they nodamage?
+		    (default: 1)
+
+10. #dontdropweapons : flag for if guys on truck should not drop 
+		    weapons, set to 1 if want to not drop
+		    (default: 0)
+
+11. #stoponpain	    : whether or not the truck should stop if a
+		    passenger feels pain or dies
+		    (default: 0)
+
+12. #headlights      : flag for headlights to be on, set to 1 for 
+		    headlights on
+		    (default: 0)
+
+13. #speed	    : speed at which to drive
+		    (default: 200)
+
+14. #accel	    : acceleration
+		    (default: 50)
+
+15. #lookahead	    : how far ahead on the path the truck should aim
+		    (usually can be left to default)
+		    (default: 256)
+
+16. #smokedist	    : how far away the player is when the smoke gets deleted
+		    (usually can be left to default)
+		    (default: 2048)
+
+17. #removewhendone : should we remove the truck and guys when it is done with it's path?
+		    (default: 0)
+
+18. #unloadwhendone : should we unload the truck when it is done with it's path?
+		    (default: 1)
+
+19. #visiblebeforedrive : should the truck be visible before we tell it to drive?
+		    (default: 0)
+
+20. #loadedbeforedrive : should the truck be fully loaded before we tell it to drive?
+		    (default: 0)
+
+21. #takedamage	       : should the truck be immune to damage?
+		    (default: 1)
+
+22. $trucktype         : What type of truck is it?  This will determine destroyed model, passenger anims
+			(default: "opel")
+
+23. #takedamagewhendone : If I am nodamage, should I take damage after I am done with my path?
+		    (default: 0)
+
+24. #allstoptogether : If I stop, should all other trucks in my group stop too?
+		    (default: 0)
+
+*/
+
+main:
+	if($autotrucktrigger == NULL || $autotrucktrigger == NIL)
+	 End
+			
+	for(local.i = 1; local.i <= $autotrucktrigger.size; local.i++)
+	{
+		if ($autotrucktrigger[local.i].target == NIL ||
+			$autotrucktrigger[local.i].target == NULL)
+		{
+			println "autotrucktrigger has no target"
+			End
+		}
+
+		for (local.j=1; local.j<=$($autotrucktrigger[local.i].target).size; local.j++)
+		{
+			$($autotrucktrigger[local.i].target)[local.j] waitthread init
+		}
+
+		$autotrucktrigger[local.i] setthread StartTargets
+	}
+End
+
+/*
+*************************************************************
+PUBLIC FUNCTIONS
+***************************************************************
+*/
+
+init:
+	// Defaults
+	local.health				= 4000
+	local.speed					= 200
+	local.accel					= 50
+	local.lookahead				= 256
+	local.drivermodel			= "models/human/german_wehrmact_soldier"
+	local.passengers			= 0
+	local.passengermodel		= "models/human/german_afrika_private"
+	local.passengername			= self.targetname + "_passenger"
+	local.passengergun			= "Mauser KAR 98K"
+    local.drivergun             = "walter p38"
+	local.passengerhealth		= 100
+	local.passengerstakedamage  = 1
+	local.stoponpain			= 0
+	local.dontdropweapons		= 0
+	local.smokedist				= 2048
+	local.removewhendone		= 0
+	local.unloadwhendone		= 1
+	local.visiblebeforedrive	= 0
+	local.loadedbeforedrive		= 0
+	local.takedamage			= 1
+	local.trucktype				= "opel"
+	local.takedamagewhendone	= 1
+	local.allstoptogether		= 0
+
+	if (self.collision != NIL)
+		self setcollisionentity self.collision
+	else if (self.collide != NIL)
+		self setcollisionentity self.collide
+	else if (self.collisionent != NIL)
+		self setcollisionentity self.collisionent
+	else
+		println "autotruck has no collisionent"
+	
+	if (self.speed == NIL)
+		self.speed = local.speed
+
+	if (self.accel == NIL)
+		self.accel = local.accel
+
+	if (self.lookahead == NIL)
+		self.lookahead = local.lookahead
+
+	if (self.passengers == NIL)
+		self.passengers = local.passengers
+
+	if (self.passengermodel == NIL)
+		self.passengermodel = local.passengermodel
+
+	if (self.passengername == NIL)
+		self.passengername = local.passengername
+
+	if (self.passengergun == NIL)
+		self.passengergun = local.passengergun
+
+	if (self.passengerhealth == NIL)
+		self.passengerhealth = local.passengerhealth
+
+	if (self.passengerstakedamage == NIL)
+		self.passengerstakedamage = local.passengerstakedamage
+
+	if (self.stoponpain == NIL)
+		self.stoponpain = local.stoponpain
+
+	if (self.drivermodel == NIL)
+		self.drivermodel = local.drivermodel
+		
+	if(self.drivergun == NIL)
+		self.drivergun = local.drivergun
+
+	if (self.health == NIL)
+		self.health = local.health
+
+	if (self.dontdropweapons == NIL)
+		self.dontdropweapons = local.dontdropweapons
+
+	if (self.smokedist == NIL)
+		self.smokedist = local.smokedist
+
+	if (self.removewhendone == NIL)
+		self.removewhendone = local.removewhendone
+
+	if (self.unloadwhendone == NIL)
+		self.unloadwhendone = local.unloadwhendone
+
+	if (self.visiblebeforedrive == NIL)
+		self.visiblebeforedrive = local.visiblebeforedrive
+
+	if (self.loadedbeforedrive == NIL)
+		self.loadedbeforedrive = local.loadedbeforedrive
+
+	if (self.takedamage == NIL)
+		self.takedamage = local.takedamage
+
+	if (self.trucktype == NIL)
+		self.trucktype = local.trucktype
+
+	if (self.takedamagewhendone == NIL)
+		self.takedamagewhendone = local.takedamagewhendone
+
+	if (self.allstoptogether == NIL)
+		self.allstoptogether = local.allstoptogether
+
+	if (self.headlights == 1 && self.trucktype == "opel")
+	{
+		exec global/spotlight.scr::corona self "light left" // Turn on headlight coronas
+		exec global/spotlight.scr::corona self "light right"
+		self vehicleanim idlelights
+	}
+	else
+	{
+		self vehicleanim idlenolights
+	}
+
+	self rendereffects "-shadow"
+
+	self.loaded = 0
+
+	if (self.takedamage == 1)
+	{
+		self takedamage
+	}
+	else
+	{
+		self nodamage
+	}
+
+	self solid
+	self removeondeath 0
+
+	if (self.visiblebeforedrive == 0)
+	{
+		self hide
+		self notsolid
+	}
+
+	if (self.loadedbeforedrive == 1)
+		self waitthread TruckLoad
+
+		
+	//todo -- make the guys on the trucks smart enough to stop the convoy when they spot you
+	
+end
+
+StartTruck local.path local.speed local.accel:
+	if (local.path != NIL)
+		self.target = local.path
+	if (local.speed != NIL)
+		self.speed = local.speed
+	if (local.accel != NIL)
+		self.accel = local.accel
+
+	self show
+	self solid
+
+	if (self.takedamage == 1)
+	{
+		self takedamage
+	}
+	else
+	{
+		self nodamage
+	}
+
+	self.home_location = self.origin	// ** dks **
+	self.home_angle = self.angle		// cache the truck's location & angle
+	if (self.driveloopon == NIL)		// (1) = truck will restart drive at path's end
+		self.driveloopon = 0
+
+	if (self.loadedbeforedrive == 0)
+		self waitthread TruckLoad
+
+	switch (self.trucktype)
+	{
+		case "green":
+		case "opel":
+			self.driver anim 00A004_driversitstill
+			break
+		case "jeep":
+			self.driver anim jeep_idle_drive
+			self anim high
+			break
+		case "bmwbike":
+			self.driver thread global/LoopAnim.Scr::LoopAnim 13G101_Colonel
+			break
+		case "gmc":
+			self.driver anim 00A004_driversitstill
+			break
+		case "italtroop":
+			self anim start_wheels
+			self.driver anim 00A004_driversitstill
+			break
+	}
+
+	self thread TruckDeath
+	self thread TruckDrive
+
+End
+
+
+KillMe: 
+	self takedamage
+	local.howmuchdamage = self.health * 2
+	self hurt local.howmuchdamage 1
+	self.health = 1 // I think this is bogus. just discovered not sure why here, if have problems remove
+	self takedamage
+	//local.enginepos = self gettagposition "engine1"
+	//radiusdamage local.enginepos 5000 200
+	println ("I should be dead try three: " + self.health)
+	
+End
+
+
+/*
+*************************************************************
+PRIVATE FUNCTIONS
+*************************************************************
+*/
+
+
+StartTargets:
+
+		for (local.j=1; local.j<=$(self.target).size; local.j++)
+		{
+			$(self.target)[local.j] waitthread StartTruck
+		}
+
+		self delete
+End
+
+TruckDrive:
+	/* ** dks ** old code
+
+	self.collisionent connect_paths
+	self drive self.target self.speed self.accel 200 self.lookahead
+	self waitTill drive
+
+	self waitthread StopTruck
+	*/
+	
+	while (self != NIL && self != NULL) {
+		self.collisionent connect_paths
+		self drive self.target self.speed self.accel 200 self.lookahead
+		self waitTill drive
+		if (self) {
+			self stop
+			self.driving = 0
+		}
+		if (!(self.driveloopon))
+			break
+		self stop
+		self.origin = self.home_location
+		self.angle = self.home_angle
+		self.driving = 1
+	}
+	self waitthread StopTruck
+end
+
+TruckDeath:
+	
+	self waittill death
+
+	if (self.removewhendone == 0)
+	{
+		thread truck_killed local.type
+
+		self waitthread PassengersDie
+
+		self thread TruckSmoke self.smokedist
+	}
+
+	self waitthread StopTruck
+	
+end
+
+//This is wacky and loads from the back
+TruckLoad:
+
+	if (self.loaded == 0)
+	{
+		self.loaded = 1
+
+		self waitthread LoadDriver self.passengername self.drivermodel self.drivergun
+
+		
+		switch (self.trucktype)
+		{
+			case "italtroop":
+			case "opel":
+				switch ( self.passengers )
+				{
+					case 6:
+						self waitthread LoadPassenger self.passengername 4 self.passengermodel self.passengergun
+					case 5:
+						self waitthread LoadPassenger self.passengername 1 self.passengermodel self.passengergun
+					case 4:
+						self waitthread LoadPassenger self.passengername 5 self.passengermodel self.passengergun
+					case 3:
+						self waitthread LoadPassenger self.passengername 2 self.passengermodel self.passengergun
+					case 2:
+						self waitthread LoadPassenger self.passengername 6 self.passengermodel self.passengergun
+					case 1:
+						self waitthread LoadPassenger self.passengername 3 self.passengermodel self.passengergun
+					default:
+				}
+				break
+			case "bmwbike":
+				break
+			case "jeep":
+				if (self.passengers && self.passengers > 0)
+					self waitthread LoadPassenger self.passengername 1 self.passengermodel self.passengergun
+				break
+		}
+	}
+
+end
+
+LoadDriver local.name local.guy_type local.gun:
+
+	self.driver = spawn self.drivermodel "gun" "none" "health" "65"
+	self.driver.targetname = local.name
+	self.driver.origin = self.origin
+	self.driver rendereffects "-shadow"
+	self.driver exec global/disable_ai.scr
+	self.driver.usegun = local.gun
+
+	println "trucktype:"
+	switch (self.trucktype)
+	{
+		case "italtroop":
+		case "opel":
+			println "opel"
+			self AttachDriverSlot 0 self.driver
+			self.driver anim 00A004_driversitstill
+			self.driver exec global/setdeathanim.scr "opel_driver_death"
+			break
+		case "bmwbike":
+			println "bmwbike"
+			self AttachDriverSlot 0 self.driver
+			self.driver thread global/LoopAnim.Scr::LoopAnim 13G101_Colonel
+			break
+		case "jeep":
+			println "jeep"
+			self.driver physics_off
+			self.driver notsolid
+			self.driver nodamage
+			self.driver angles self.angles
+			self.driver attach self driver 1
+			self.driver anim jeep_idle_still
+			self.driver gun "none"	
+			break
+	}
+	self.driver.driving = 1
+	self.driver.done_unloading = 0
+	self.driver.health = self.passengerhealth*level.enemyhealthscalar
+
+	if (self.passengerstakedamage == 0)
+	{
+		self.driver nodamage
+	}
+end
+
+LoadPassenger local.name local.slot local.guy_type local.gun:
+
+	local.guy = spawn local.guy_type "gun" local.gun "health" "65"
+	local.guy.targetname = local.name
+	local.guy.origin = self.origin
+	local.guy rendereffects "-shadow"
+	local.guy.done_unloading = 0
+
+	// don't prone while on vehicle!
+	local.guy.ainoprone = 1
+	local.guy.ainocrouch = 1
+
+	local.guy.health = self.passengerhealth*level.enemyhealthscalar
+
+	self.passenger[local.slot]	= local.guy
+
+	if (self.dontdropweapons == 1)
+		local.guy dontdropweapons
+	if(self.dontdrophealth == 1)
+		local.guy thread dontdrophealth
+
+	switch (self.trucktype)
+	{
+		case "italtroop":
+			self AttachPassengerSlot local.slot local.guy
+			// NOTE:  The code below means passengers in Italian troop truck will not attack when riding in the truck.
+			//			If that needs to change, then the below needs to be changed.
+			//			(When I put this in, I did not know immediately how to get an AI to remain crouched and still
+			//			have general ai/enemy-targeting turned on.)
+			local.guy exec global/disable_ai.scr
+			local.guy exec global/crouch.scr
+			break
+		case "opel":
+			self AttachPassengerSlot local.slot local.guy
+			break
+		case "bmwbike":
+			break
+		case "jeep":
+			local.guy exec global/disable_ai.scr
+			local.guy nodamage
+			local.guy notsolid
+			local.guy physics_off
+			local.guy angles self.angles
+			local.guy attach self passenger0 1
+			local.guy thread global/LoopAnim.scr::LoopAnim A_31_GetIn_jeepidle
+			local.guy gun "none"
+			break
+
+	}
+	local.guy type_attack "cover"
+	local.guy leash 0
+	local.guy fixedleash 1
+	local.guy physics_off
+	if (self.passengerstakedamage == 0)
+		local.guy nodamage
+
+	local.guy hearing 1024
+	local.guy sight   1536
+		
+	switch (local.slot)
+	{
+		case 1:
+			local.guy exec global/setdeathanim.scr "death_headpistol"
+			break
+		case 2:
+			local.guy exec global/setdeathanim.scr "death_crotch"
+			break
+		case 3:
+			local.guy exec global/setdeathanim.scr "death_left"
+			break
+		case 4:
+			local.guy exec global/setdeathanim.scr "death_run"
+			break
+		case 5:
+			local.guy exec global/setdeathanim.scr "death_shoot"
+			break
+		case 6:
+			local.guy exec global/setdeathanim.scr "death_right"
+			break
+		default:
+			local.guy exec global/setdeathanim.scr "death_collapse"
+			break
+	}
+
+	if(self.stoponpain == 1)
+	{
+		local.guy thread StopTruckOnPain self
+		local.guy thread StopTruckOnDeath self
+	}
+end
+
+// self is the guy
+dontdrophealth:
+	self waittill death
+	if(self)
+		self takeall
+end
+
+// May have busted this stuff -- AJS
+/*
+// DeleteAutoTruck local.autotruck is the truck to be deleted
+//                 local.trigger   is the trigger around which to delete truck
+DeleteAutoTruck local.autotruck local.trigger:
+	local.trigger waittill trigger
+	local.trigger delete
+	local.dist = 10
+DeleteTag:
+		local.result = 0
+		local.count = 0
+		
+		if(local.dist == NIL || local.dist == NULL)
+			local.dist = 2048
+		
+		local.distance = vector_length($player.origin-self.origin)
+		// println("Player distance from Smoke = " + local.distance )
+		local.flag = 0
+	    local.flag = vector_length($player.origin-self.origin) > local.dist 
+	    
+		local.vObjDir	= vector_subtract self.origin $player.origin
+		local.vObjDir	= vector_normalize local.vObjDir
+		local.vForward  = angles_toforward ( $player.angles )
+
+		local.dot		= vector_dot local.vForward local.vObjDir
+		
+		// println("dot angle: " + local.dot)
+		if ( local.dot < 0.707 )
+			local.result = 1
+		else
+			local.result = 0
+
+		if(local.result == 1 && local.flag == 1)
+		{
+			// println( " Deleting Smoke ")
+			local.autotruck delete
+			local.count++
+			End
+		}
+
+	
+	if(local.count != 1 || self != NIL) // this is giving me the infinite loop problem
+		{
+			// iprintlnbold "Does this go forever?"
+			wait 4.0	
+			goto DeleteTag
+		}
+
+End
+*/
+
+PassengersDie:
+
+	local.ent = self.driver
+	//[202] chrissstrahl - prevent spam
+	if(local.ent){
+		local.ent exec global/bullethit.scr (0 0 20) 5000 0 1
+	}
+
+	for ( local.i = 1; local.i <= 8; local.i++ )
+	{
+		if ( self.passenger[local.i] != NULL && self.passenger[local.i] != NIL && self.passenger[local.i].done_unloading == 0)
+		{
+			self.passenger[local.i] exec global/bullethit.scr (0 0 20) 5000 0 1
+		}
+	}
+end
+
+PassengersRemove:
+
+	local.ent = self.driver
+	local.ent remove
+
+	for ( local.i = 1; local.i <= 6; local.i++ )
+	{
+		if ( self.passenger[local.i] != NULL)
+		{
+			self.passenger[local.i] remove
+		}
+	}
+end
+
+StopTruck:
+
+	self stop
+	self.stoppedtruck = 1
+
+	if (self.takedamagewhendone)
+		self takedamage
+
+	if (self.allstoptogether)
+	{
+		// Any other trucks with the same name will stop as well
+		if($(self.targetname).size > 1)
+		{
+			for(local.i = 1; local.i < $(self.targetname).size; local.i++)
+			{
+				$(self.targetname)[local.i] stop
+				$(self.targetname)[local.i].stoppedtruck = 1
+			}
+		}
+	}
+
+	switch (self.trucktype)
+	{
+		case "italtroop":
+		case "green":
+		case "opel":
+			self anim stop_wheels
+			break
+		case "jeep":
+			self.driver thread global/LoopAnim.Scr::LoopAnimStop
+			self anim idle
+			break
+		case "gmc":
+			break
+	}
+
+	if (isalive self)
+	{
+		if (self.removewhendone == 1)
+		{
+			self waitthread PassengersRemove
+			self remove
+			End
+		}
+		else
+		{
+			self.collisionent disconnect_paths
+			if (self.unloadwhendone == 1)
+			{
+				switch (self.trucktype)
+				{
+					case "italtroop":
+					case "green":
+					case "opel":
+						thread global/vehicles_thinkers.scr::truck_unload
+						break
+					case "jeep":
+						if (self.driver) thread global/jeepanim.scr::DriverGetOutJeep self self.driver
+						if (self.passenger[1]) thread global/jeepanim.scr::PassengerGetOutJeep self self.passenger[1]
+						break
+					case "gmc":
+						break
+				}
+			}
+			else
+			{
+				switch (self.trucktype)
+				{
+					case "italtroop":
+					case "green":
+					case "opel":
+						break
+					case "jeep":
+						self.driver anim jeep_idle_still
+						break
+					case "gmc":
+						break
+				}
+			}
+		}
+	}
+End
+
+
+StopTruckOnPain local.truck:
+	self waittill pain
+	if ( local.truck.stoppedtruck == 1 )
+		end
+
+	self.removewhendone = 0
+
+	self playsound den_E3L3_GER01
+	local.truck waitthread StopTruck
+	self solid
+end
+
+StopTruckOnDeath local.truck:
+	self waittill death
+	if ( local.truck.stoppedtruck == 1 )
+		end
+
+	self.removewhendone = 0
+
+	self playsound den_E3L3_GER01
+	local.truck waitthread StopTruck
+
+end
+
+// Local.dist is the distance you want the player to get from the smoke before it deletes itself
+// if not set defaults to 2048
+JeepSmoke local.dist:
+	// iprintlnbold "TruckSmoke"
+	// self.damaged anim smoke
+	// self.damaged anim sizzle
+	if(local.dist == NIL || local.dist == NULL)
+		local.dist = 2048
+	if ( self.smoke==NIL )
+	{
+			self.smoke = spawn "models/emitters/linger_smoke.tik"
+			self.smoke notsolid
+			self.smoke anim start
+			local.place = self gettagposition "steeringwheel_center"
+			self.smoke.origin = local.place //+ (0 10 0)  (local.place + (0 0 80))
+			//self.smoke glue self
+	}
+	
+	self.smoke thread DeleteSmoke local.dist
+	
+End
+
+// Local.dist is the distance you want the player to get from the smoke before it deletes itself
+// if not set defaults to 2048
+TruckSmoke local.dist:
+	// iprintlnbold "TruckSmoke"
+	// self.damaged anim smoke
+	// self.damaged anim sizzle
+	if(local.dist == NIL || local.dist == NULL)
+		local.dist = 2048
+	if ( self.smoke==NIL )
+	{
+			self.smoke = spawn "models/emitters/linger_smoke.tik"
+			self.smoke notsolid
+			self.smoke anim start
+
+			if (self.trucktype == "italtroop")
+			{
+				self.smoke.origin = self.origin + (0 0 60)		// temporary
+			}
+			else
+			{
+				local.place = self gettagposition "engine1"
+				self.smoke.origin = local.place //+ (0 10 0)  (local.place + (0 0 80))
+				//self.smoke glue self
+			}
+
+			self.smoke.sound = spawn script_model
+			self.smoke.sound model "fx/dummy.tik"
+			self.smoke.sound.origin = self.smoke.origin
+			self.smoke.sound loopsound fire_med
+	}
+	
+	self.smoke thread DeleteSmoke local.dist
+	
+End
+
+// Delete Smoke
+// local.dist describes how far for the smoke is for the user before it is deleted
+// if no local.dist passed in then it defaults to 2048
+// it also will only delete if the user is turned around
+DeleteSmoke local.dist:
+		local.result = 0
+		local.count = 0
+		
+		if(local.dist == NIL || local.dist == NULL)
+			local.dist = 2048
+		
+		if!(self)
+			End
+		
+		
+		//[202] chrissstrahl - make sure all players are checked
+		for (local.pl = 1;local.pl <= $player.size;local.pl++){
+			local.player =  $player[local.pl]
+			
+			local.distance = vector_length(local.player.origin - self.origin)
+			// println("Player distance from Smoke = " + local.distance )
+			local.flag = 0
+			local.flag = vector_length(local.player.origin-self.origin) > local.dist 
+			
+			local.vObjDir	= vector_subtract self.origin local.player.origin
+			local.vObjDir	= vector_normalize local.vObjDir
+			local.vForward  = angles_toforward ( local.player.angles )
+
+			local.dot		= vector_dot local.vForward local.vObjDir
+			
+			// println("dot angle: " + local.dot)
+			if ( local.dot < 0.707 ){
+				local.result = 1
+			}else{
+				local.result = 0
+			}
+			
+			//player can see it, stop checking other players
+			if(local.result == 0){
+				break
+			}
+		}
+
+		if(local.result == 1 && local.flag == 1)
+		{
+println( "global/autotruck.scr::DeleteSmoke - Deleting Smoke " ) //[202] chrissstrahl - activated to check if it works
+			if (self.sound != NIL && self.sound != NULL)
+				self.sound delete
+			self delete
+			local.count++
+			End
+		}
+
+	
+		if(local.count != 1 || self != NIL) // this is giving me the infinite loop problem
+		{
+			// iprintlnbold "Does this go forever?"
+			wait 4.0	
+println( "global/autotruck.scr::DeleteSmoke - Smoke was NOT deleted! " ) //[202] chrissstrahl - added to check if it works
+			goto DeleteSmoke local.dist
+		}
+end
+
+truck_killed:
+
+	self show
+	
+	switch (self.trucktype)
+	{
+		case "green":
+		case "opel":
+			self playsound explode_truck
+			exec global/earthquake.scr .2 4 0 0	
+			local.explosion1 = spawn script_model model models/fx/fx_truck_explosion.tik
+			local.explosion1.origin = self gettagposition "engine1"
+			local.explosion1.angles = self gettagangles "engine1"
+			self.trigger = spawn trigger_hurt "damagetype" "fire" "origin" local.explosion1.origin
+			//self.trigger setsize $player.getmins $player.getmaxs
+			self.trigger setsize ( -16 -16 0 ) ( 16 16 96 ) //[202] chrissstrahl - set bbox size manually, works even better
+			self.trigger triggerable
+			
+			local.explosion1 anim start
+			local.explosion1 notsolid
+
+			wait .4
+			
+			self playsound explode_truck
+			exec global/earthquake.scr .2 4 0 0	
+			local.explosion2 = spawn script_model model models/fx/fx_truck_explosion.tik
+			local.explosion2.origin = self gettagposition "engine2"
+			local.explosion2.angles = self gettagangles "engine2"
+			local.explosion2 anim start
+			local.explosion2 notsolid
+			break
+		case "jeep":
+			self playsound explode_truck
+			exec global/earthquake.scr .2 4 0 0	
+			local.explosion1 = spawn script_model model models/fx/fx_truck_explosion.tik
+			local.explosion1.origin = self gettagposition "steeringwheel_center"
+			local.explosion1.angles = self gettagangles "steeringwheel_center"
+			local.explosion1 anim start
+			local.explosion1 notsolid
+
+			wait .4
+			
+			self playsound explode_truck
+			exec global/earthquake.scr .2 4 0 0	
+			local.explosion2 = spawn script_model model models/fx/fx_truck_explosion.tik
+			local.explosion2.origin = self gettagposition "gearstick02"
+			local.explosion2.angles = self gettagangles "gearstick02"
+			local.explosion2 anim start
+			local.explosion2 notsolid
+			self thread JeepSmoke 2048
+			break
+		case "gmc":
+			self playsound explode_truck
+			exec global/earthquake.scr .2 4 0 0	
+			local.explosion1 = spawn script_model model models/fx/fx_truck_explosion.tik
+			local.explosion1.origin = self.origin + (0 0 100)
+			local.explosion1.angles = self.angles
+			local.explosion1 anim start
+			local.explosion1 notsolid
+
+			wait .4
+			
+			self playsound explode_truck
+			exec global/earthquake.scr .2 4 0 0	
+			local.explosion2 = spawn script_model model models/fx/fx_truck_explosion.tik
+			local.explosion2.origin = self.origin + (0 0 100)
+			local.explosion2.angles = self.angles
+			local.explosion2 anim start
+			local.explosion2 notsolid
+			break
+		case "italtroop":
+			self playsound explode_truck
+			exec global/earthquake.scr .2 4 0 0	
+			local.explosion1 = spawn script_model model models/fx/fx_truck_explosion.tik
+			local.explosion1.origin = self gettagposition "emitter_engine_fire"
+			local.explosion1.angles = self gettagangles "emitter_engine_fire"
+			local.explosion1 anim start
+			local.explosion1 notsolid
+
+			wait .4
+			
+			self playsound explode_truck
+			exec global/earthquake.scr .2 4 0 0	
+			local.explosion2 = spawn script_model model models/fx/fx_truck_explosion.tik
+			local.explosion2.origin = self gettagposition "steering_wheel"
+			local.explosion2.angles = self gettagangles "steering_wheel"
+			local.explosion2 anim start
+			local.explosion2 notsolid
+			break
+	}
+
+	//[202] chrissstrahl - make sure all players are checked
+	for (local.pl = 1;local.pl <= $player.size;local.pl++){
+		local.player =  $player[local.pl]
+		if(local.player istouching self.collisionent){
+			local.player normal_damage 100
+		}
+	}
+	
+	radiusdamage self.origin 200 200
+
+	self.collisionent disconnect_paths
+
+
+	local.name = self
+	local.angles = self.angles
+	local.origin = self.origin
+
+	switch (self.trucktype)
+	{
+		case "green":
+			self hide
+			self notsolid
+			self.damaged = thread spawn_damaged models/vehicles/opeltruckgreen_d.tik local.angles local.origin
+			self.damaged notsolid
+			self.damaged targetname (self.targetname + "damaged")
+			local.brushmodel = self.collisionent.brushmodel
+			local.collision = thread damaged_collision local.angles local.origin local.brushmodel
+			local.collision disconnect_paths
+			
+			break
+		case "opel":
+			self hide
+			self notsolid
+			self.damaged = thread spawn_damaged models/vehicles/opeltruck_d.tik local.angles local.origin	
+			self.damaged notsolid
+			local.brushmodel = self.collisionent.brushmodel
+			local.collision = thread damaged_collision local.angles local.origin local.brushmodel
+			local.collision disconnect_paths
+			break
+		case "jeep":
+			break
+		case "gmc":
+			break
+		case "italtroop":
+			self hide
+			self notsolid
+			self.damaged = thread spawn_damaged models/vehicles/It_V_TroopTruckdes.tik local.angles local.origin
+			self.damaged notsolid
+			local.brushmodel = self.collisionent.brushmodel
+			local.collision = thread damaged_collision local.angles local.origin local.brushmodel
+			local.collision disconnect_paths
+			break
+	}
+	if(self.damaged)
+		self.damaged targetname (self.targetname + "damaged")
+	if(self.trigger)
+		self.damaged thread DeleteIfIDisappear self.trigger
+	wait 10
+	
+	local.explosion1 remove
+	local.explosion2 remove
+end
+
+
+//local.collision = thread damaged_collision local.angles local.origin local.brushmodel
+//local.damaged = thread spawn_damaged_new local.model local.angles local.origin
+//----------------------------------
+spawn_damaged local.model local.angles local.origin:
+	local.damaged = spawn script_model model local.model
+	local.damaged.origin = local.origin
+	local.damaged.angles = local.angles
+end local.damaged
+
+
+damaged_collision local.angles local.origin local.brushmodel:
+	local.collision = spawn script_object model local.brushmodel
+	local.collision.origin = local.origin
+	local.collision.angles = local.angles
+end local.collision
+
+
+// Used to make sure the trigger hurt does not exist beyond the destroyed model
+DeleteIfIDisappear local.itemtodelete:
+	while(self)
+		wait 0.5
+	local.itemtodelete delete
+End
