@@ -100,7 +100,11 @@ ShowFinalBattleStuff: {
 //============================================================================
 startMusic_e2l1_finalBattle: {
 //============================================================================
-	$player stufftext "tmstop; tmstart sound/music/mus_aircraftfacility.mp3"
+	
+	//[202] chrissstrahl
+	//$player stufftext "tmstop; tmstart sound/music/mus_aircraftfacility.mp3"
+	thread coop_mod/replace.scr::tmstart "sound/music/mus_aircraftfacility.mp3" 1
+	
 	//waitthread global/music.scr::StopSong 1.0
 	//thread global/music.scr::PlaySong "sound/music/mus_aircraftfacility.mp3"
 }end
@@ -214,7 +218,11 @@ StartledSoldier local.anim local.scale: {
   
   self.startled = 0
   while (self.startled == 0) {
-	  local.vec = $player.origin - self.origin
+	  //[202] chrissstrahl
+	  local.player = exec coop_mod/replace.scr::player_closestTo self
+	  if(!local.player){ local.player = self }
+	  
+	  local.vec = local.player.origin - self.origin
 	  local.temp = local.vec[0]
 	  local.vec[0] = local.vec[1] * -1
 	  local.vec[1] = local.temp
@@ -274,9 +282,13 @@ StartTankBattle: {
 		$phillips nodamage
 		$phillips.movedoneradius = 150
 		$phillips.enableEnemy = 0
+		
+		//[202] chrissstrahl - this is auto handled in the SafeMoveTo script
 		$phillips waitthread global/SafeMoveTo.scr::reach $player
-		$phillips turnto $player
-		$phillips lookat $player
+		
+		//[202] chrissstrahl
+		$phillips thread coop_mod/replace.scr::turntolookat 1
+
 		wait 0.5
 
 		if ( isAlive $aagun6 ) {
@@ -400,8 +412,13 @@ paradeRun local.rallyPoint: {
 	}
 		
 	self.enableEnemy = 1
-	self favoriteenemy $player
-	self aimat $player
+	
+	//[202] chrissstrahl - select closest valid player
+	local.player = exec coop_mod/replace.scr::player_closestTo self
+	if(local.player){
+		self favoriteenemy local.player
+		self aimat local.player
+	}
 }end
 
 // If I am close to my spawn point for 10 seconds, die
@@ -502,7 +519,10 @@ nexttanktarget: {
 		end
 	}
 
-	level.tank_target = $player
+	//[202] chrissstrahl - select closest valid player
+	//cheap easy fix, this needs more work, like a trace if tank can actually hit the player or should select next best target
+	//maybe we should have such a function in replace.scr that does that //@smithy
+	level.tank_target = exec coop_mod/replace.scr::player_closestTo self
 }end
 
 //============================================================================
