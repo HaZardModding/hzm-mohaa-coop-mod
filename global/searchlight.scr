@@ -1,0 +1,456 @@
+// ----------------------------------------------------------------
+//	searchlight.scr
+//	Jeff Leggett
+//	08/04/2003
+//	
+//	Simplified searchlight system.  (also see spotlight.scr for the mohaa version.)
+//
+//	Doesn't require the guy on the search light to be a mg42
+//	Player can be spotted when they hit a trigger or shoot the light..
+//
+//
+//	How to use:
+//		
+//		1. Before level waittill prespawn "exec global/searchlight.scr".
+//		1. Create a script_model with model "miscobj/searchlightbase.tik"
+//		2. Give it a targetname of "searchlight"
+//		3. Give it a #set.
+//		4. Create a trigger_multiple around the searchlight and connect it to the searchlight and give it a $targetname of "searchlightdamagetrigger"
+//			- Check the damage checkbox
+//		5. Connect the searchlight object to an enemy.
+//			- Note: the enemy may carry any weapon you want.
+//		6. Along the ground, create a loop of info_splinepaths
+//			- give the first node a $targetname of searchlightpath
+//			- give the first node the same #set as the searchlight
+//		6. Create a trigger_multiple you want to use to alert the searchlight and connect it to the searchlight.
+//		7. Optionally, create a bunch of script origins that you'd like
+//		   the searchlight to quickly move to when it is in alert mode.
+//			- give the first node a $targetname of searchlight_alertpath
+//			- give the first node the same #set as the searchlight
+//			- connect these nodes in the order you'd like the search light to move
+//			- when the searchlight gets to the last one, it will stop and the AI will be alerted
+//			- Optional parameters in each of the script_origins:
+//				"time"  - how long it will take for the light to get to that origin ( must NOT put a # )
+//				"#wait"  - how long the light will stay at that position. (must put the #)
+//
+// ----------------------------------------------------------------
+
+init:
+
+	level waittill spawn
+
+
+	if ( $searchlightdamagetrigger )
+		$searchlightdamagetrigger thread InitSearchlightDamageTrigger
+
+
+	if ( $searchlight )
+	{
+		println "There are " $searchlight.size " searchlight(s) in this level."
+		if ( $searchlightpath )
+			$searchlightpath waitthread InitSearchlightPath
+
+		if ( $searchlight_alertpath )
+			$searchlight_alertpath waitthread InitSearchlightAlertPath
+
+		$searchlight waitthread InitSearchlight
+	}
+
+	if (level.spottarget == NIL)
+		level.spottarget = $player
+
+
+end
+
+// ----------------------------------------------------------------
+InitSearchlight:
+// ----------------------------------------------------------------
+
+//	self addwaittill searchlightdamaged
+
+	if ( self==NULL )
+		end
+
+	if ( self.searchlightpath==NIL )
+	{
+		dprintln "searchlight without a searchlight path at origin:" self.origin[0] " " self.origin[1] " " self.origin[2]
+		end
+	}
+	
+	if ( self.target==NIL )
+	{
+		dprintln "searchlight without an operator at origin: " self.origin[0] " " self.origin[1] " " self.origin[2]
+	}
+	else
+	{
+		local.ent = self.target
+		local.ent.searchlight = self
+		local.ent thread DoSearchlightOwner
+	}
+
+	self thread DoSearchlight
+	self thread DoSearchlightWakeup
+
+end
+
+// ----------------------------------------------------------------
+InitSearchlightPath:
+// ----------------------------------------------------------------
+
+	if ( self.set==NIL )
+	{
+		dprintln "searchlight path with no set #!!"
+		end
+	}
+
+	for ( local.i=1;local.i<= $searchlight.size;local.i++ )
+	{
+		local.searchlight = $searchlight[local.i]
+
+		if ( local.searchlight.set!=NIL )
+		{
+			if ( local.searchlight.set==self.set )
+			{
+				local.searchlight.searchlightpath = self
+				end
+			}
+		}
+	}
+
+	dprintln "searchlightpath didn't find the searchlight for set#" self.set
+
+end
+
+
+// ----------------------------------------------------------------
+InitSearchlightAlertPath:
+// ----------------------------------------------------------------
+	if ( self.set==NIL )
+	{
+		dprintln "searchlight path with no set #!!"
+		end
+	}
+
+	for ( local.i=1;local.i<= $searchlight.size;local.i++ )
+	{
+		local.searchlight = $searchlight[local.i]
+
+		if ( local.searchlight.set!=NIL )
+		{
+			if ( local.searchlight.set==self.set )
+			{
+				local.searchlight.alertpath = self
+				end
+			}
+		}
+	}
+
+	dprintln "alert searchlightpath didn't find the searchlight for set#" self.set
+
+
+end
+
+// ----------------------------------------------------------------
+InitSearchlightDamageTrigger:
+// ----------------------------------------------------------------
+
+	if ( self.target==NIL || self.target==NULL )
+		end
+
+	self waittill trigger
+
+
+	self.target.damaged = 1
+	self.target.checkdeath = 1
+
+	self.target playsound explode_searchlight
+	exec global/model.scr self.target.origin models/fx/fx_spotlighthit
+
+	self.target.searching = 0
+
+	self.target.org lightOff
+	self.target.light delete
+	self.target.flare delete
+
+	self delete
+
+end
+
+
+// ----------------------------------------------------------------
+DoSearchlightOwner:
+// ----------------------------------------------------------------
+
+	self.sight = 0
+	self.hearing = 2000
+
+	self.leash = 0
+	self tether self.searchlight
+	self mindist 0
+	self maxdist 1
+	self.enableEnemy = 0
+
+	self thread checkdeath
+	self thread checkpain
+
+	// we will get triggered when we've been alerted...
+	self waittill trigger
+
+	self playsound whistle_blow
+
+
+	self.enableEnemy = 1
+//	self AttackPlayer
+	self.sight = 2048
+
+
+end
+
+//--------------------------------------------------------------
+checkpain:
+//--------------------------------------------------------------
+
+	self waittill pain
+	self.enableEnemy = 1
+	self.sight = 2048
+
+end
+
+//--------------------------------------------------------------
+checkdeath:
+//--------------------------------------------------------------
+
+	self waittill death
+
+	self.searchlight thread StopSearching
+
+	end
+
+
+// ----------------------------------------------------------------
+DoSearchlight:
+// ----------------------------------------------------------------
+
+	self.damaged = 0
+
+	self.set = 0
+	self.group = 0
+
+	self.health = 1
+	self scale 1
+	self.searchtime = level.time
+	self.lightdist = 0
+	self.spotterdeath = 0
+
+	local.light = spawn script_model
+	local.light model "fx/dummy.tik"
+	self.spotlight = local.light
+	self.light = local.light
+
+	self.light light (1.0 1.0 1.0)
+	self.light lightRadius 300
+	self.light lightOn
+	self.light notsolid
+
+	self model "miscobj/searchlightbase.tik"
+	self.angles = (0 0 0)
+
+	local.bulb = spawn script_model
+	local.bulb model "miscobj/searchlight.tik"
+	local.bulb scale 1
+	local.bulb.origin = self.origin + (0 0 32)
+	self.bulb = local.bulb
+
+	local.bulb bind self
+	local.bulb notsolid
+
+	local.flare = spawn script_model
+	local.flare model "fx/searchlight.tik"
+	local.flare.origin = self.origin + (64 0 64)
+	self.flare = local.flare
+
+	local.flare bind self
+	local.flare notsolid
+
+	local.org = spawn script_origin
+	local.org.origin = self.origin
+	self.org = local.org
+
+	self.currentaim = self.org
+	self.checkdeath = 0
+	self.searching = 1
+
+	self notsolid
+	self.checkdeath = 0
+//	local.org anim start
+	local.org light (1.0 1.0 1.0)
+	local.org lightRadius 300
+	local.org lightOn
+	local.org notsolid
+
+	self.fastcheck	= 0
+
+	self thread DoSearchlightPath
+	
+	local.threadtimer = level.time + 0.15
+	self thread global/spotlight.scr::light_corona
+
+	local.done = 0
+
+	while (local.done==0)
+	{
+		if (self.currentaim == self.org)
+		{
+			self.spotlight.origin = self.org.origin
+			self waitthread aimspot
+
+			if (self.fastcheck == 0)
+				local.threadtimer = level.time + 0.2
+			else
+				local.threadtimer = level.time
+		}
+		else if (level.time > local.threadtimer)
+		{
+			self.spotlight.origin = trace self.bulb.origin self.currentaim.origin 0
+			self waitthread aimspot
+
+			if (self.fastcheck == 0)
+				local.threadtimer = level.time + 0.2
+			else
+				local.threadtimer = level.time
+		}
+
+		if ( self.damaged==1 )
+			local.done = 1
+
+		if ( local.done==0 )
+		{
+			if ( self.target.health<=0 )
+				local.done = 1
+		}
+
+		waitframe
+	}
+
+	self waitthread StopSearching
+
+	local.bulb model "miscobj/searchlightoff.tik"
+	local.bulb notsolid
+
+
+	if ( isAlive $(self.target) )
+	{
+		// trigger our owner so he'll get angry...
+		trigger self.target
+	}
+
+
+end
+
+
+//--------------------------------------------------------------
+DoSearchlightPath:
+//
+//	This sends the spotlight around on the path....
+//--------------------------------------------------------------
+
+	self.searchlightthread = local
+
+	while (self.searching==1)
+	{
+		self.org flypath self.searchlightpath 250 750 200
+		self.org waitmove
+	}
+
+
+end
+
+//--------------------------------------------------------------
+DoSearchlightAlert:
+//--------------------------------------------------------------
+	self waitthread StopSearching
+
+	self.searchlightthread = local
+
+	if ( self.alertpath )
+	{
+		// 
+		local.done = 0
+		local.moveto = self.alertpath
+
+		while ( local.moveto!=NULL )
+		{
+			if ( local.moveto.time )
+				self.org time local.moveto.time
+			else
+				self.org time 0.5
+
+			self.org moveto local.moveto
+			self.org waitmove
+
+			if ( local.moveto.wait )
+				wait local.moveto.wait
+			else
+				wait 1
+
+			local.moveto = local.moveto.target
+
+			if (!local.moveto)
+				break
+		}
+	}
+
+end
+
+//--------------------------------------------------------------
+StopSearching:
+//--------------------------------------------------------------
+	if ( self.searchlightthread )
+	{
+		self.searchlightthread delete
+		self.org stop
+		self.org endpath
+		self.searchlightthread = NULL
+//		self.checkdeath =1
+	}
+
+end
+
+
+//--------------------------------------------------------------
+aimspot: 
+//--------------------------------------------------------------
+
+	self.lightdist = 100 + ((vector_length(self.origin - self.spotlight.origin)) * 0.15)
+	self.light lightRadius self.lightdist
+
+	local.org = self.currentaim.origin
+	local.vect1 = (local.org - self.origin)
+	local.vect1 = vector_toangles (local.vect1)
+	local.angles = self.angles
+	local.angles[1] = local.vect1[1]
+	self.angles = local.angles
+	local.angles = self.angles
+	local.angles[0] = local.vect1[0] + 180
+	local.angles[1] = 0
+	self.bulb.angles = local.angles
+
+	end
+
+//--------------------------------------------------------------
+DoSearchlightWakeup:
+//--------------------------------------------------------------
+
+	self waittill trigger
+
+	self waitthread DoSearchlightAlert
+
+	self thread StopSearching
+
+	// wakeup our guy..
+
+	if ( isAlive $(self.target) )
+		trigger self.target
+
+	end
+
