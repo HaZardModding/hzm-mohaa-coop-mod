@@ -705,7 +705,17 @@ foealarmhit:{
 		thread level.script::self.setthread
 	}
 	
-	thread spawn self.set
+	//[202] chrissstrahl - not sure what negative sideeffect this will have
+	//but we are rejecting spawns while the previouse spawn is still going
+	if(level.coopLockMarkerForAi_foealarmhit != NIL){
+		println("dev: ai.scr - rejected to spawn, while spawn was still going foealarmhit at: "+level.time+"")
+		end
+	}
+	
+	//[202] chrissstrahl - changed this to wait for the thread to finish
+	level.coopLockMarkerForAi_foealarmhit = 1
+	waitthread spawn self.set
+	level.coopLockMarkerForAi_foealarmhit = NIL
 }end
 
 //[200] chrissstrahl - made coop compatible
@@ -751,7 +761,7 @@ spawn local.set local.pause local.thread local.off local.group local.enemyname l
 	if ( local.get_there==NIL )
 		local.get_there = 0
 
-	if (getcvar(debug) == "1")
+	//if (getcvar(debug) == "1")
 		println ("ai.scr spawned " + local.set)
 
 	if (local.pause != NIL)
