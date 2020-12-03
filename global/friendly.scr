@@ -455,11 +455,13 @@ friendlythinkstart:
 					if (isalive level.friendly[local.i])
 					{
 						if ((level.friendly[local.i].friendtype == 1) && (level.friendly[local.i].destination == self.destination) && (self != level.friendly[local.i])){
-							if (((self.origin - self.destination.origin) * (self.origin - self.destination.origin)) >
-							((level.friendly[local.i].origin - self.destination.origin) * (level.friendly[local.i].origin - self.destination.origin)))
+							if ( self && self.destination && //[202] chrissstrahl - added check to prevent console spam if ai is active but no player present
+								((self.origin - self.destination.origin) * (self.origin - self.destination.origin)) > (level.friendly[local.i].origin - self.destination.origin) * (level.friendly[local.i].origin - self.destination.origin))
+							{
 								self.destination = level.friendly[local.i]
-							else
+							}else{
 								level.friendly[local.i].destination = self 
+							}
 						}
 					}
 				}
@@ -504,7 +506,10 @@ friendlythinkstart:
 
 					if (getcvar(debug) == "1")
 						println "Ending the run"
-					if (vector_length (self.destination.origin - self.origin) < self.distance + local.friendrange){
+					
+					//[202] chrissstrahl - fixed console spam if there is no player on the server but ai is already going
+					//we can expect more of these to pop up, because we can't predict all the issues, so keep an eye on the server-logs
+					if (!self.destination || vector_length (self.destination.origin - self.origin) < self.distance + local.friendrange){
 						self exec global/stand.scr
 //						println "standing"
 					}
