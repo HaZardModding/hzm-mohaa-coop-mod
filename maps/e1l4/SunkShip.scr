@@ -151,8 +151,8 @@ coop_ExplodeShip local.player:{
 }end
 
 ExplodeShip:
-	if (level.skipescapeship == 1)
-	{
+	//[202] chrissstrahl - this is developer stuff, we can leave it in
+	if (level.skipescapeship == 1){
 		$player.origin = ( 3026 207 121 )
 		thread CleanUpFirstPart
 		end
@@ -162,10 +162,13 @@ ExplodeShip:
 	$explodeshiptrigger waittill trigger
 
 	// ship blows up now
-
-	$player playsound e1l4_ship_explodeA
+	
+	//[202] chrissstrahl
+	thread game.replace::playsound e1l4_ship_explodeA
 	wait 0.2
-	$player playsound e1l4_ship_explodeB
+	//[202] chrissstrahl
+	thread game.replace::playsound e1l4_ship_explodeB
+	
 	exec global/earthquake.scr 3.25 7.5 1 0
 	thread squeaks
 
@@ -181,11 +184,19 @@ ExplodeShip:
 
 	// knock the player on the head
 	wait 1.25
-	$player playsound e1l4_pipe_squeek
+	
+	//[202] chrissstrahl
+	thread game.replace::playsound e1l4_pipe_squeek
+
 	wait 0.5
-	$player playsound e1l4_pipe_thud
+	
+	//[202] chrissstrahl
+	thread game.replace::playsound e1l4_pipe_thud
+	
 	wait 0.1
-	$player playsound player_pain
+	
+	//[202] chrissstrahl
+	thread game.replace::playsound player_pain
 	
 iprintlnbold_noloc("DEV: ExplodeShip BLACKOUT")
 	waitthread playerBlacksOut
@@ -199,7 +210,7 @@ iprintlnbold_noloc("DEV: ExplodeShip BLACKOUT")
 	//[202] chrissstrahl - update spawn location
 	waitthread coop_mod/spawnlocations.scr::e1l4_update6
 	
-	//[202] chrissstrahl - make coop mod compatible
+	//[202] chrissstrahl - move players
 	for (local.i = 1; local.i <= $player.size; local.i++){
 		local.player = $player[local.i]
 		if( level.gametype != 0 && local.player.dmteam == "spectator" ){ continue }
@@ -255,10 +266,19 @@ End
 //------------------------------------------------------------------
 //[202] chrissstrahl looks like it is not in use
 TiltTo local.angle local.time:
-	//@smithy
-iprintlnbold_noloc("DEV: TiltTo START")
-iprintlnbold_noloc("DEV: TiltTo START")
-iprintlnbold_noloc("DEV: TiltTo START")
+	//[202] chrissstrahl - have seperate coop handle
+	if(level.gametype != 0){
+		local.player = NULL
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+			thread coop_tiltTo local.player
+		}
+		//this is keept, so we don't mess up any time dependencies, I have no time to check if there are any
+		while (level.time < local.endtime){
+			waitframe
+		}
+		end
+	}
 	local.originalangles = $player.viewangles
 	local.viewangles = $player.viewangles
 	
@@ -271,21 +291,40 @@ iprintlnbold_noloc("DEV: TiltTo START")
 		local.viewangles[2] = local.angle * ( local.timeElapsed / local.time )
 		$player.viewangles = local.viewangles
 		waitframe
-		iprintlnbold_noloc("DEV: TiltTo while")
 	}
 
 	$player.viewangles = local.originalangles
-iprintlnbold_noloc("DEV: TiltTo END")
-iprintlnbold_noloc("DEV: TiltTo END")
-iprintlnbold_noloc("DEV: TiltTo END")
 End
 
+//[202] chrissstrahl - tilt view for all players
+//this starts the tilt thread on players that join in after sequence started
+//=========================================================================
+coop_tiltTo local.player:{
+//=========================================================================
+	local.originalangles = local.player.viewangles
+	local.viewangles = local.player.viewangles
+	
+	local.starttime = level.time
+	local.endtime = level.time + local.time
+	
+	while (local.player && level.time < local.endtime)
+	{
+		local.timeElapsed = level.time - local.starttime
+		local.viewangles[2] = local.angle * ( local.timeElapsed / local.time )
+		local.player.viewangles = local.viewangles
+		waitframe
+	}
+
+	if( local.player ){ local.player.viewangles = local.originalangles }
+}end
 
 //------------------------------------------------------------------
 ShipTilt:
-
-	//@smithy
-	iprintlnbold_noloc("DEV: ShipTilt START")
+	//[202] chrissstrahl - have seperate coop handle
+	if(level.gametype != 0){
+		waitthread coop_shipTilt
+		end
+	}
 	
 	local.viewangles = $player.viewangles
 	local.viewangles[2] = level.maxTilt
@@ -313,15 +352,61 @@ ShipTilt:
 
 		$player.viewangles = local.viewangles
 		waitframe
-		//iprintlnbold_noloc("DEV: ShipTilt while")
 	}
 
 	// Reset the players view
 	local.viewangles = $player.viewangles
 	local.viewangles[2] = 0
 	$player.viewangles = local.viewangles
-	iprintlnbold_noloc("DEV: ShipTilt END")
 End
+
+//[202] chrissstrahl - tilt view for all players
+//this starts the tilt thread on players that join in after sequence started
+//=========================================================================
+coop_shipTilt:{
+//=========================================================================
+	local.player = NULL
+	while( level.ontruck == 0 ){
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+			if( local.player.flags["coopHandleShipTiltActive"] == NIL){
+				local.player.flags["coopHandleShipTiltActive"] = 1
+				thread coop_shipTiltPlayer local.player
+			}
+		}
+		wait 1
+	}
+}end
+
+//=========================================================================
+coop_shipTiltPlayer local.player:{
+//=========================================================================
+	local.viewangles = local.player.viewangles
+	local.viewangles[2] = level.maxTilt
+	local.player.viewangles = local.viewangles
+	local.velocity = 0
+	local.constant = -.001
+	while (local.player && level.ontruck == 0){
+		if (local.viewangles[2] > level.maxTilt && local.velocity > 0){
+			local.velocity = 0
+		}else if (local.viewangles[2] < -level.maxTilt && local.velocity < 0){
+			local.velocity = 0
+		}
+
+		local.viewangles = local.player.viewangles
+		local.velocity += local.constant * local.viewangles[2]
+		local.viewangles[2] += local.velocity
+		local.player.viewangles = local.viewangles
+		waitframe
+	}
+	
+	if(!local.player){ end }
+	
+	// Reset the players view
+	local.viewangles = $player.viewangles
+	local.viewangles[2] = 0
+	local.player.viewangles = local.viewangles
+}end
 
 //---------------------------------------------------------
 UpdateTilt:
@@ -336,7 +421,6 @@ UpdateTilt:
 end
 
 ShipShudder:
-
 	// Wait 10-20 seconds
 	local.waittime = 5 + randomint 15
 	wait local.waittime
@@ -348,8 +432,10 @@ ShipShudder:
 		// Trigger earthquake and shudder sound
 		exec global/earthquake.scr local.quaketime local.quakesize 1 1
 
-		//@smithy
-		$player playsound ship_metal_rumble
+		//[202]chrissstrahl - select a random player in coop
+		local.player = waitthread game.replace::player_random
+		
+		if( local.player ){ local.player playsound ship_metal_rumble }
 
 		// Wait 10-20 seconds
 		local.waittime = 20 + randomint 10
@@ -389,8 +475,10 @@ squeaks:
 	local.interval = 0.05
 	local.dInterval = 0.15
 	while (level.onship == 1) {
-		//@smithy
-		$player playsound ship_squeak
+		//[202]chrissstrahl - select a random player in coop
+		local.player = waitthread game.replace::player_random
+		if( local.player ){ local.player playsound ship_squeak }
+		
 		wait local.interval
 		local.interval += local.dInterval
 		if (local.interval > 3.0)
