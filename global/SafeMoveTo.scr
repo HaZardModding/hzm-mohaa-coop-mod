@@ -49,17 +49,21 @@ SafeRunTo local.dest local.trigger_when_done local.movedonerad local.retry_delay
 end
 
 SafeRunTo_MaintenanceThread local.crouch_at_dest local.retry_delay:
-
 	while (self && isalive self){
-		while ((self.safemoveto_gotmovedoneevent == 0) && (self.safemoveto_done == 0) && (self && isalive self))
+		//[202] chrissstrahl - I don't get it how is this even possible 
+		//within the same frame the entity just disapears - delete ?
+		while (isalive self && (self.safemoveto_gotmovedoneevent == 0) && (self.safemoveto_done == 0) )
 			waitframe
 
 		if ((self && isalive self) || (self.safemoveto_done == 1) || (vector_within self.origin self.destination.origin self.movedoneradius))
 			break
 
 		wait local.retry_delay
-		self.safemoveto_gotmovedoneevent = 0
-		self runto self.destination //@smithy //@chrissstrahl - //this is suppose to only activate in coop if ai should go to a player and not anything else
+		//[202] chrissstrahl - just in case check again
+		if (isalive self){
+			self.safemoveto_gotmovedoneevent = 0
+			self runto self.destination //@smithy //@chrissstrahl - //this is suppose to only activate in coop if ai should go to a player and not anything else
+		}
 	}
 
 	if (isalive self){
@@ -69,16 +73,22 @@ SafeRunTo_MaintenanceThread local.crouch_at_dest local.retry_delay:
 				self waittill animdone
 			}
 
-			self.safemoveto_done = 1
-			if (self.safemoveto_trigger != NULL)
-				trigger self.safemoveto_trigger
+			//[202] chrissstrahl - just in case check again
+			if (isalive self){
+				self.safemoveto_done = 1
+				if (self.safemoveto_trigger != NULL){
+					trigger self.safemoveto_trigger
+				}
+			}
 		}
 
-		self.safemoveto_trigger = NULL
-		self.movedoneradius = self.movedoneradius_backup
-		self.safemoveto_in_progress = 0
+		//[202] chrissstrahl - just in case check again
+		if (isalive self){
+			self.safemoveto_trigger = NULL
+			self.movedoneradius = self.movedoneradius_backup
+			self.safemoveto_in_progress = 0
+		}
 	}
-
 end
 
 SafeRunTo_WaitMoveThread:
