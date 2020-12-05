@@ -846,17 +846,15 @@ DeleteSmoke local.dist:
 		if!(self)
 			End
 		
-		//local.distance = vector_length($player.origin-self.origin)
-		// println("Player distance from Smoke = " + local.distance )
-		local.flag = 0
-	    
-		//[202] chrissstrahl - make coop compatible
-		//this could be done better by checking all the players if they are in range and looking.
-		//@chrissstrahl @smithy - if you have time take a look
-		//local.flag = vector_length($player.origin-self.origin) > local.dist 
-		local.player = waitthread game.replace::player_closestTo self
-		if(local.player){
-			local.flag = vector_length(local.player.origin-self.origin) > local.dist
+		
+		//[202] chrissstrahl - make sure all players are checked
+		for (local.pl = 1;local.pl <= $player.size;local.pl++){
+			local.player =  $player[local.pl]
+			
+			local.distance = vector_length(local.player.origin - self.origin)
+			// println("Player distance from Smoke = " + local.distance )
+			local.flag = 0
+			local.flag = vector_length(local.player.origin-self.origin) > local.dist 
 			
 			local.vObjDir	= vector_subtract self.origin local.player.origin
 			local.vObjDir	= vector_normalize local.vObjDir
@@ -865,15 +863,21 @@ DeleteSmoke local.dist:
 			local.dot		= vector_dot local.vForward local.vObjDir
 			
 			// println("dot angle: " + local.dot)
-			if ( local.dot < 0.707 )
+			if ( local.dot < 0.707 ){
 				local.result = 1
-			else
+			}else{
 				local.result = 0
+			}
+			
+			//player can see it, stop checking other players
+			if(local.result == 0){
+				break
+			}
 		}
 
 		if(local.result == 1 && local.flag == 1)
 		{
-			// println( " Deleting Smoke ")
+println( "global/autotruck.scr::DeleteSmoke - Deleting Smoke " ) //[202] chrissstrahl - activated to check if it works
 			if (self.sound != NIL && self.sound != NULL)
 				self.sound delete
 			self delete
@@ -882,13 +886,14 @@ DeleteSmoke local.dist:
 		}
 
 	
-	if(local.count != 1 || self != NIL) // this is giving me the infinite loop problem
+		if(local.count != 1 || self != NIL) // this is giving me the infinite loop problem
 		{
 			// iprintlnbold "Does this go forever?"
 			wait 4.0	
+println( "global/autotruck.scr::DeleteSmoke - Smoke was NOT deleted! " ) //[202] chrissstrahl - added to check if it works
 			goto DeleteSmoke local.dist
 		}
-End
+end
 
 truck_killed:
 
