@@ -265,6 +265,71 @@ init:
 
 		
 	//todo -- make the guys on the trucks smart enough to stop the convoy when they spot you
-	
 end
+
+StartTruck local.path local.speed local.accel:
+	if (local.path != NIL)
+		self.target = local.path
+	if (local.speed != NIL)
+		self.speed = local.speed
+	if (local.accel != NIL)
+		self.accel = local.accel
+
+	self show
+	self solid
+
+	if (self.takedamage == 1)
+	{
+		self takedamage
+	}
+	else
+	{
+		self nodamage
+	}
+
+	self.home_location = self.origin	// ** dks **
+	self.home_angle = self.angle		// cache the truck's location & angle
+	if (self.driveloopon == NIL)		// (1) = truck will restart drive at path's end
+		self.driveloopon = 0
+
+	if (self.loadedbeforedrive == 0)
+		self waitthread TruckLoad
+
+	switch (self.trucktype)
+	{
+		case "green":
+		case "opel":
+			self.driver anim 00A004_driversitstill
+			break
+		case "jeep":
+			self.driver anim jeep_idle_drive
+			self anim high
+			break
+		case "bmwbike":
+			self.driver thread global/LoopAnim.Scr::LoopAnim 13G101_Colonel
+			break
+		case "gmc":
+			self.driver anim 00A004_driversitstill
+			break
+		case "italtroop":
+			self anim start_wheels
+			self.driver anim 00A004_driversitstill
+			break
+	}
+
+	self thread TruckDeath
+	self thread TruckDrive
+End
+
+
+KillMe: 
+	self takedamage
+	local.howmuchdamage = self.health * 2
+	self hurt local.howmuchdamage 1
+	self.health = 1 // I think this is bogus. just discovered not sure why here, if have problems remove
+	self takedamage
+	//local.enginepos = self gettagposition "engine1"
+	//radiusdamage local.enginepos 5000 200
+	println ("I should be dead try three: " + self.health)
+End
 
