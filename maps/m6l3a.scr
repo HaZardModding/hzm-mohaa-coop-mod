@@ -71,7 +71,13 @@ main:{
 	level.aipronechance = 0
 	level.aicrouchchance = 0
 	
-	//chrissstrahl - moved here so we can easier adjust the scheisse
+	//[202] chrissstrahl - moved here to ensure it is spawned before it is used
+	//chrissstrahl - wait until the train is ready to move with coop setup complete
+	if(level.gametype != 0){
+		waitthread coop_createSpawningInTrain
+	}
+	
+	//chrissstrahl - moved here so we can easier adjust the Scheisse
 	level.scene2_spawntower1_population = 3	//change this to alter gameplay balance
 	level.scene2_spawntower2_population = 3	//change this to alter gameplay balance
 	level.scene2_spawntower3_population = 3	//change this to alter gameplay balance
@@ -281,17 +287,14 @@ $objective1_fireball7 anim stop
 
 	//***	Find out what skill the player is using for difficulty checking 
 	level.skill = getcvar (skill)
-	
-	
-	
-	//chrissstrahl - wait until the train is ready to move with coop setup complete
-	if(level.gametype != 0){
-		waitthread coop_createSpawningInTrain
-	}
 
 	//level waitTill spawn //chrissstrahl
 	waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl - coop mod replacement
 	
+	//[202] chrissstrahl - update spawnpoints ince a player has joined
+	if(level.gametype != 0){
+		waitthread coop_updateSpawningInTrain
+	}
 	
 	waitthread global/items.scr::add_item "explosives" nomessage
 
@@ -3061,22 +3064,26 @@ alarmer:{
 //============================================================================
 coop_createSpawningInTrain:{
 //============================================================================
-	thread coop_createAndBindObjectAt ( -6492 -6756 -492)
-	thread coop_createAndBindObjectAt ( -6452 -6756 -492)
-	thread coop_createAndBindObjectAt ( -6412 -6756 -492)
-	thread coop_createAndBindObjectAt ( -6372 -6756 -492)
-	thread coop_createAndBindObjectAt ( -6492 -6808 -492)
-	thread coop_createAndBindObjectAt ( -6452 -6808 -492)
-	thread coop_createAndBindObjectAt ( -6412 -6808 -492)
-	thread coop_createAndBindObjectAt ( -6372 -6808 -492)
+	//[202] chrissstrahl - changed the way this is handled, spawn them all then attach them
+	spawn script_origin "targetname" "coop_playerSpawnOrigin" origin ( -6492 -6756 -492 )
+	spawn script_origin "targetname" "coop_playerSpawnOrigin" origin ( -6452 -6756 -492 )
+	spawn script_origin "targetname" "coop_playerSpawnOrigin" origin ( -6412 -6756 -492 )
+	spawn script_origin "targetname" "coop_playerSpawnOrigin" origin ( -6372 -6756 -492 )
+	spawn script_origin "targetname" "coop_playerSpawnOrigin" origin ( -6492 -6808 -492 )
+	spawn script_origin "targetname" "coop_playerSpawnOrigin" origin ( -6452 -6808 -492 )
+	spawn script_origin "targetname" "coop_playerSpawnOrigin" origin ( -6412 -6808 -492 )
+	spawn script_origin "targetname" "coop_playerSpawnOrigin" origin ( -6372 -6808 -492 )
 	waitframe
-	waitframe
-	thread coop_manageSpawningInTrain
+	for(local.i=1;local.i<=$coop_playerSpawnOrigin.size;local.i++){
+		local.object = $coop_playerSpawnOrigin[local.i]
+		local.object bind $train_boxcars
+		level.flags["coop_spawn"+(local.i)+"origin"] = (local.object.origin)
+	}
 }end
 
-//chrissstrahl - spawn spawnpoint origins we can bind to the moving train
+//chrissstrahl - update spawnpoint in script
 //============================================================================
-coop_manageSpawningInTrain:{
+coop_updateSpawningInTrain:{
 //============================================================================
 	level.coop_trainIsMoving = 1
 	while(level.coop_trainIsMoving == 1){
@@ -3087,16 +3094,5 @@ coop_manageSpawningInTrain:{
 		waitframe
 	}
 	level.coop_disableSpawnWarper = FALSE //enable spawn warper now again
-	
-}end
-
-//chrissstrahl - creates object we can "Beate Uhse" to get the origin where to spawn a player inside the moving train
-//============================================================================
-coop_createAndBindObjectAt local.origin:{
-//============================================================================
-	local.object = spawn script_origin origin (local.origin)
-	waitframe
-	local.object targetname "coop_playerSpawnOrigin"
-	local.object bind $train_boxcars
 }end
 
