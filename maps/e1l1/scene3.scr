@@ -902,7 +902,18 @@ InitFlak88:
 
 	while (1) {
 		// wait for player to get on this gun
-		while ($player.vehicle != self){
+		//[202] chrissstrahl - made coop compatible
+		local.validPlayer = 0
+		while(!local.validPlayer){
+			for (local.i = 1;local.i <= $player.size;local.i++){
+				local.player = $player[local.i]
+				if(local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1){
+					if(local.player.vehicle == self){
+						local.validPlayer=1
+						break
+					}
+				}
+			}
 			waitframe
 		}
 
@@ -911,11 +922,12 @@ InitFlak88:
 		waitthread spawnPoorBastard
 
 		// wait for player to get off this gun
-		while ($player.vehicle == self){
+		//[202] chrissstrahl - made coop compatible - make sure we do exit if player is gone/dead/spectator
+		while (local.player && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.vehicle == self){
 			waitframe
 		}
 
-		$player waitthread maps/e1l1/storm.scr::AttachStorm
+		local.player waitthread maps/e1l1/storm.scr::AttachStorm
 		thread killPoorBastard
 		waitframe
 	}
