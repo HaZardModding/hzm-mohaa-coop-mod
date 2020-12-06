@@ -231,6 +231,10 @@ coop_tankIdle:
 	thread showText
 	
 	while (!level.lastTankDead || level.playerJumpedOnTank){
+		if(level.coop_playerTank && level.coop_playerTank.dmteam == "spectator"){
+			println("DEV: ::coop_tankIdle - player is spectator, exiting tank now")
+			waitthread playerGetOut local.player
+		}
 		for (local.i = 1;local.i <= $player.size;local.i++){
 			local.player = $player[local.i]
 			if(local.player.useheld && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1){
@@ -292,6 +296,7 @@ playerGetIn local.player:
 	if( level.gametype != 0 ){
 		if(!local.player || local.player.health <= 0 || local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1){
 			level.playerIsInTank = 0
+			level.coop_playerTank = NULL
 			end
 		}
 	}
@@ -302,6 +307,9 @@ playerGetIn local.player:
 		//self waitthread maps/e1l1/storm.scr::AttachStorm
 	}
 
+	//[202] chrissstrahl - make sure we can keep track of who is using the tank
+	level.coop_playerTank = local.player
+	
 	local.player physics_off
 	self unlockmovement
 	self removeondeath 0
@@ -379,6 +387,7 @@ playerGetOut local.player:
 		self.collisionent solid
 	}
 
+	level.coop_playerTank = NULL //[202] chrissstrahl - make sure we can keep track of who is using the tank
 	level.playerIsInTank = 0
 
 	if (level.bunker_gun_exploder_trigger_1){
