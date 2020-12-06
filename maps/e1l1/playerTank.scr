@@ -52,7 +52,7 @@ TankThrobText_Thread:
 
 			//[202] chrissstrahl - handle for coop
 			//if (!level.playerIsInTank && (vector_within $player.origin $playerTank.origin local.throb_text_dist)){
-			if (!level.playerIsInTank && (waitthread game.replace::withinDistanceOf $playerTank.origin  local.throb_text_dist)){
+			if (!level.playerIsInTank && (waitthread game.replace::withinDistanceOf $playerTank.origin local.throb_text_dist)){
 				// "get on tank" text needs to be up
 
 				if (local.text_up != 1){
@@ -148,6 +148,12 @@ showText:
 tankIdle:
 //=========================================================================
 {
+	//[202] chrissstrahl - have coop seperate
+	if(level.gametype != 0){
+		self thread coop_tankIdle
+		end
+	}
+
 	local.usedistance = 200
 
 	//	$tankCommanderDoneTalking waittill trigger
@@ -190,12 +196,12 @@ tankIdle:
 			}
 
 			if (local.doGetOut){
-				waitthread playerGetOut
+				waitthread playerGetOut $player
 			}
 
 			else if (local.doGetIn) {
 				level.playerJumpedOnTank = 1
-				waitthread playerGetIn
+				waitthread playerGetIn $player
 			}
 		}
 		//else if (local.dist < local.usedistance) {
@@ -216,15 +222,79 @@ tankIdle:
 	}
 }end
 
+//[202] chrissstrahl - handle the tank in coop
 //=========================================================================
-playerGetIn:
+coop_tankIdle:
+//=========================================================================
+{
+	local.usedistance = 200
+	thread showText
+	
+	while (!level.lastTankDead || level.playerJumpedOnTank){
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+			if(local.player.useheld && local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1){
+				//tank already in use, check if player wants to exit
+				if ( self.inuse || level.playerIsInTank ) {
+					println("DEV: ::coop_tankIdle - Tank is in use")
+					if(level.coop_playerTank){
+						println("DEV: ::coop_tankIdle - Tank player is valid")
+						if(local.player == level.coop_playerTank){
+							println("DEV: ::coop_tankIdle - player wants to exit tank")
+							while (local.player && local.player.useheld){
+								println("DEV: ::coop_tankIdle - waiting for player to stop pressing use - exit")
+								waitframe
+							}
+							println("DEV: ::coop_tankIdle - player exiting tank")
+							//make sure level.playerJumpedOnTank = 1 is cleared if leaving tank fails
+							waitthread playerGetOut local.player							
+						}else{
+							println("DEV: ::coop_tankIdle - Tank used by other player -> ignoring")
+						}
+					}else{
+						println("DEV: ::coop_tankIdle - Tank player(level.coop_playerTank) was invalid but tank seemingly in use")
+					}
+				}
+				//tank not yet in use
+				else{
+					local.dist = vector_length (local.player.origin - self.origin)
+					if(local.dist < local.usedistance){
+						println("DEV: ::coop_tankIdle - Tank not in use, player within distance wants to enter")
+						level.playerJumpedOnTank = 1
+						println("DEV: ::coop_tankIdle - player wants to enter tank")
+						while (local.player && local.player.useheld){
+							println("DEV: ::coop_tankIdle - waiting for player to stop pressing use - enter")
+							waitframe
+						}
+						//make sure level.playerJumpedOnTank = 1 is cleared if entering tank fails
+						waitthread playerGetIn local.player
+					}
+				}
+				
+			}
+		}
+		waitframe
+	}
+}end
+
+//[202] chrissstrahl - made coop compatible
+//=========================================================================
+playerGetIn local.player:
 //=========================================================================
 {
 	// have to wait a sec after holstering before we mount the tank, or
 	//    else the weapon isn't holstered
-	$player safeholster 1
+	local.player safeholster 1
 	level.playerIsInTank = 1 //[200] Smithy - fix original devs supplied in latest file
 	wait 1
+
+	//[202] chrissstrahl - this is required for mp - if player disconnects the instance he wants to enter the tank
+	if( level.gametype != 0 ){
+		if(!local.player || local.player.health <= 0 || local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1){
+			level.playerIsInTank = 0
+			end
+		}
+	}
 
 	if (!level.noStorm){
 		//$storm detach
@@ -232,7 +302,7 @@ playerGetIn:
 		//self waitthread maps/e1l1/storm.scr::AttachStorm
 	}
 
-	$player physics_off
+	local.player physics_off
 	self unlockmovement
 	self removeondeath 0
 	self.inuse = 1
@@ -243,10 +313,10 @@ playerGetIn:
 	}
 
 	waitthread maps/e1l1/storm.scr::SafeStormTankTransitionStart
-	$player notsolid
-	$player nodamage
-	self attachdriverslot 0 $player
-	$player perferredweapon "88mm Tank Gun"
+	local.player notsolid
+	local.player nodamage
+	self attachdriverslot 0 local.player
+	local.player perferredweapon "88mm Tank Gun"
 	self takedamage
 
 	if (level.bunker_gun_exploder_trigger_1){
@@ -261,11 +331,12 @@ playerGetIn:
 	self waitthread maps/e1l1/storm.scr::AttachStorm
 
 	waitthread maps/e1l1/storm.scr::SafeStormTankTransitionEnd
-	thread spawnPoorBastard
+	thread spawnPoorBastard local.player
 }end
 
+//[202] chrissstrahl - made coop compatible
 //=========================================================================
-playerGetOut:
+playerGetOut local.player:
 //=========================================================================
 {
 	thread killPoorBastard
@@ -280,7 +351,7 @@ playerGetOut:
 		self.collisionent notsolid
 	}
 
-	self detachdriverslot 0 $player
+	self detachdriverslot 0 local.player
 
 	// remove the turret, spawn it again later
 	if(self.gun){
@@ -289,12 +360,12 @@ playerGetOut:
 	}
 
 	// reset the player
-	$player physics_on
-	$player show
-	$player solid
-	$player takedamage
-	$player.origin 		= self.origin + (0 0 150)
-	$player.viewangles 	= ($player.viewangles[0] $player.viewangles[1] 0)
+	local.player physics_on
+	local.player show
+	local.player solid
+	local.player takedamage
+	local.player.origin 		= self.origin + (0 0 150)
+	local.player.viewangles 	= (local.player.viewangles[0] local.player.viewangles[1] 0)
 	waitframe
 
 	// reset the turret, finish resetting the tank
@@ -318,7 +389,7 @@ playerGetOut:
 		level.bunker_gun_exploder_trigger_2 nottriggerable
 	}
 
-	$player waitthread maps/e1l1/storm.scr::AttachStorm
+	local.player waitthread maps/e1l1/storm.scr::AttachStorm
 	waitthread maps/e1l1/storm.scr::SafeStormTankTransitionEnd
 }end
 
@@ -386,13 +457,13 @@ tankPain:
 				println "z:     local.health_fraction: " local.health_fraction
 
 				if (local.health_fraction >= 0.7){
-					$player playsound tank_hurt1
+					self playsound tank_hurt1 //[202] chrissstrahl - changed fro, $player to tank
 				}
 				else if (local.health_fraction >= 0.4){
-					$player playsound tank_hurt2
+					self playsound tank_hurt2 //[202] chrissstrahl - changed fro, $player to tank
 				}
 				else{
-					$player playsound tank_hurt3
+					self playsound tank_hurt3 //[202] chrissstrahl - changed fro, $player to tank
 				}
 			}
 			local.previoushealth = self.health
@@ -467,14 +538,15 @@ playertank_reset_health local.fullhealth local.prevhealth:
 	}
 }end
 
+//[202] chrissstrahl - made coop compatible
 //=========================================================================
-spawnPoorBastard:
+spawnPoorBastard local.player:
 //=========================================================================
 {
 	waitframe
 	local.model = spawn models/human/Sc_AL_US_infmask.tik targetname "poorSoul"
 	local.model hide
-	local.model.angles = $player.angles
+	local.model.angles = local.player.angles
 	local.model.enableEnemy = 0
 	local.model physics_off
 	local.model attach $playerTank turret0 1 ( 50 0 30 )
