@@ -144,20 +144,26 @@ StartEndBattle: {
 	$briefingtrigger waittill trigger
 	wait 1
 
-	$phillips say AA_Phillips_talk01 // Sgt. Baker, glad...
 	thread StartTankBattle
-
-   	$phillips waittill saydone
+	
+	//[202] chrissstrahl - i need this to work or tank rolls over Phillips
+   	thread game.replace::say_wait AA_Phillips_talk01 // Sgt. Baker, glad...
+	
 	$phillips turnto $tank_spot
 	$phillips lookat $tank_spot
 	thread new_look
-
-  	$phillips say AA_Phillips_talk02 // What's that?
-  	$phillips waittill saydone
+	
+	//[202] chrissstrahl - i need this to work or tank rolls over Phillips
+   	thread game.replace::say_wait AA_Phillips_talk02 // Sgt. Baker, glad...
+	
 	waitthread maps/e2l1/objectives.scr::transition "protect505"
 	
 	//$gobs lookat NULL
-	$phillips takedamage
+	
+	//[202] chrissstrahl - prevent philips from getting killed in coop
+	if(level.gametype != 0){ $phillips nodamage }
+	else{ $phillips takedamage }
+	
 	$johnson  takedamage
 	thread FriendliesTakeCover
 }end
@@ -289,12 +295,14 @@ StartTankBattle: {
 		//[202] chrissstrahl
 		$phillips thread coop_mod/replace.scr::turntolookat 1
 
-		wait 0.5
+		wait 0.25
 
 		if ( isAlive $aagun6 ) {
-			$phillips say AA_Phillips_talk03
-			$phillips waittill saydone
-			wait 2
+		
+			//[202] chrissstrahl - make sure this works in coop
+			thread game.replace::say_wait AA_Phillips_talk03
+			wait 0.5
+			
 			$phillips waitthread global/SafeMoveTo.scr::reach $phillips_fight
 		}
 		$phillips.enableEnemy = 1
