@@ -127,7 +127,7 @@ isPlayerObject local.object:{
 	//2. VECTOR CHECK -> CHAR>1 STRING CHECK -> INT/FLOAT CHECK -> DEFAULT TO STRING
 	//3. DEFAULT TO STRING
 	//4. NO MATCHING TYPE (-1 could not detect type)
-	local.varType = thread coop_mod/main.scr::returnVarType local.ent game.true
+	local.varType = thread coop_mod/main.scr::returnVarType local.ent game.true "isPlayerObject"
 	
 	if(local.varType == 2 && local.object.entnum < level.coop_svmaxclients){ end 1 }
 	if(local.varType == 5 && waitthread isPlayerArray local.object){ end 1 }
@@ -1353,13 +1353,16 @@ unglue local.ent local.show:{
 	
 	//[202] chrissstrahl - added support for exitpoint and show
 	if(local.ent){
-		local.varType = thread coop_mod/main.scr::returnVarType local.ent
+		local.varType = thread coop_mod/main.scr::returnVarType local.ent "replace::unglue 1"
 		//entity
 		if(local.varType == 2){ local.ent = local.ent.origin } //grab origin
 		//vector
 		else if(local.varType == 3){ local.ent =  local.ent} //use origin
 		//bad type
-		else{ error ( "coop_mod/replace.scr::unglue - does not support var type: "+(thread coop_mod/main.scr::returnVarTypename local.varType) ) 1000 }
+		else{
+			local.varTypeName = thread coop_mod/main.scr::returnVarTypename local.varType
+			error ("coop_mod/replace.scr::unglue - does not support var type: "+local.varTypeName) 1000
+		}
 	}
 	if( level.gametype == 0 ){
 		$player unglue
@@ -1504,7 +1507,7 @@ withinDistanceOf local.ent local.distance:{
 
 	//[200] chrissstrahl - added to detect vector or entity
 	local.vOrigin = (0 0 0)
-	local.varType = thread coop_mod/main.scr::returnVarType local.ent
+	local.varType = thread coop_mod/main.scr::returnVarType local.ent "replace::withinDistanceOf"
 
 	//[200] chrissstrahl - fixed type detection
 	if(local.varType == 3){
@@ -1519,7 +1522,8 @@ withinDistanceOf local.ent local.distance:{
 	}
 	//[200] chrissstrahl - added error info if bad type
 	else{
-		error ( "coop_mod/replace.scr::withinDistanceOf - parameter1 was ("+(waitthread coop_mod/main.scr::returnVarTypename(local.varType))+") needs to be VECTOR or ENTITY" ) 1000
+		local.vartypeName = waitthread coop_mod/main.scr::returnVarTypename local.varType
+		error ( "coop_mod/replace.scr::withinDistanceOf - parameter1 was ("+local.vartypeName+") needs to be VECTOR or ENTITY" ) 1000
 		end 0
 	}
 
@@ -1768,11 +1772,12 @@ solid local.awaypos:{
 	if(self == NULL){ end }
 	self solid
 
-	local.vartype = waitthread coop_mod/main.scr::returnVarType local.awaypos
+	local.vartype = waitthread coop_mod/main.scr::returnVarType local.awaypos "replace::solid"
 
 	//[200] chrissstrahl - make sure the right var type is used
 	if(local.vartype != 2 && local.vartype != 3){
-		error ( "coop_mod/replace.scr::solid - parameter1 was of type "+(waitthread coop_mod/main.scr::returnVarTypename local.vartype)+", but needs to be: Enity or Vector" ) 1000
+		local.varTypeName = waitthread coop_mod/main.scr::returnVarTypename local.vartype
+		error ( "coop_mod/replace.scr::solid - parameter1 was of type "+local.varTypeName+", but needs to be: Enity or Vector" ) 1000
 		end
 	}
 
@@ -1910,11 +1915,12 @@ teleportToOnTouch local.ent:{
 	}
 
 	//[200] chrissstrahl - allow detection of var type of parameter1
-	local.vartype =	waitthread coop_mod/main.scr::returnVarType local.ent
+	local.vartype =	waitthread coop_mod/main.scr::returnVarType local.ent "replace::teleportToOnTouch"
 
 	//[200] chrissstrahl - make sure the right var type is used
 	if(local.vartype != 2 && local.vartype != 3){
-		error ( "coop_mod/replace.scr::teleportToOnTouch - parameter1 was of type "+(waitthread coop_mod/main.scr::returnVarTypename local.vartype)+", but needs to be: Enity or Vector" ) 1000
+		local.varTypeName = waitthread coop_mod/main.scr::returnVarTypename local.vartype
+		error ( "coop_mod/replace.scr::teleportToOnTouch - parameter1 was of type "+local.varTypeName+", but needs to be: Enity or Vector" ) 1000
 		end
 	}
 
