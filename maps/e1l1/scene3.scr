@@ -1130,6 +1130,10 @@ FlakGunTaken:
 	else{
 		// we've taken both guns...
 		waitthread maps/e1l1/objectives.scr::transition "seizedFlaks"
+		
+		//[202] Smithy
+		level.artilleryNeutralised = game.true 
+		thread game.event artilleryNeutralised
 	}
 }end
 
@@ -1156,10 +1160,19 @@ DoBunkerBuddy:
 	if(level.gametype != 0){
 		//chrissstrahl - create spawnpoints for coop
 		waitthread coop_mod/spawnlocations.scr::e1l1_update9
-	}
+	}		
 
 	waitthread global/ai.scr::spawnset 1965 BunkerBaddies
 	$BunkerBaddies thread TrackBunkerBaddies
+	
+	//[202] Smithy - wait until the artillery has been neutralised before carrying on with this thread
+	if (!level.artilleryNeutralised){
+		//println "WAITING FOR ARTILLERY TO DIE"
+		thread coop_bunkerDoorHint
+		waitthread game.waittill artilleryNeutralised 
+		thread coop_terminateBunkerDoorHint
+		//println "ARTILLERY DEAD"	 
+	}
 
 	self show
 	self ai_on
@@ -1167,19 +1180,28 @@ DoBunkerBuddy:
 	wait 0.1
 
 	// don't do anything until all these baddies are gone..
-	while ( level.bunkerBaddies>0 ){
+	while (level.bunkerBaddies){
 		wait 0.25
 	}
 
 	// turn the MG guys off while I am talking
-	$blokes0011 ai_off
-	$blokes0022 ai_off
+	//[202] Smithy - check they exist and are alive
+	if (isAlive $blokes0011){
+		$blokes0011 ai_off
+	}	
+	if (isAlive $blokes0022){
+		$blokes0022 ai_off
+	}
 
 	self.enableEnemy 	= 0
 	self.movedoneradius = 175
 	self exec coop_mod/replace.scr::turnto //chrissstrahl - coop compatible
 	self exec coop_mod/replace.scr::lookat //chrissstrahl - coop compatible
-	self exec coop_mod/replace.scr::runtoClosest //chrissstrahl - coop compatible
+	self exec coop_mod/replace.scr::runtoClosest //chrissstrahl - coop compatible 
+	
+	//[202] Smithy - as players can now be outside of area when this thread fires, runtoClosest may fail (e.g. no path to find player)
+	//this means 'movedone' can trigger prematurely and he may say his lines to himself like a madman. 
+	//not a biggie, but if we really think it's a big enough issue we can come back to this and rework it.
 	
 	//iprintlnbold("DoBunkerBuddy->movedone")
 	self waittill movedone
@@ -1193,17 +1215,22 @@ DoBunkerBuddy:
 	self waittill saydone
 
 	// turn the MG guys back on
-	$blokes0011 ai_on
-	$blokes0022 ai_on
+	//[202] Smithy - check they exist and are alive
+	if (isAlive $blokes0011){
+		$blokes0011 ai_on
+	}	
+	if (isAlive $blokes0022){
+		$blokes0022 ai_on
+	}
 
-	iprintlnbold("DoBunkerBuddy->unlockbunker")
+	//iprintlnbold("DoBunkerBuddy->unlockbunker")
 	thread maps/e1l1/scene5.scr::unlockBunker
 
 	self lookat NULL
 	self turnto NULL
  	self waitthread global/SafeMoveTo.scr::SafeRunTo_Wait $bunkerBuddyGoto
 	
-	iprintlnbold("DoBunkerBuddy->movedone 2")
+	//iprintlnbold("DoBunkerBuddy->movedone 2")
  	self waittill movedone
 	self turnto $bunkerBuddyAimat 	
 	self thread global/loopanim.scr::LoopAnim rifle_crouch_alert
@@ -1213,6 +1240,41 @@ DoBunkerBuddy:
 	thread maps/e1l1/objectives.scr::transition "talkedToSoldier"
 	$triggercleanup10 waittill trigger
 	self remove
+}end
+
+//[202] Smithy - tell player they haven't completed the previous objective yet.
+//we stop player using door until this is completed as mission end fails to trigger otherwise.
+//=========================================================================
+coop_bunkerDoorHint:{
+//=========================================================================
+	//store thread for termination
+	level.threads["coop_bunkerDoorHint"] = local	
+	
+	//create a trigger the same size and location as the door
+	local.trigger = waitthread game.replace::cloneBrushObject $enterbunkerdoor trigger_use	
+	local.trigger.origin = $enterbunkerdoor.origin
+	
+	//store it on the door so it can be deleted later
+	$enterbunkerdoor.flags["coop_bunkerDoorHintTrigger"] = local.trigger 		
+				
+	//handle trigger events
+	while (1){
+		local.trigger waittill trigger	
+		if (parm.other.classname == "Player"){			
+			thread global/throbtext.scr::throbtext "You have not seized all enemy artillery!"
+			wait 10
+		}else{
+			wait 1
+		}	
+	}
+}end
+
+//[202] Smithy - terminate door hint thread and trigger
+//=========================================================================
+coop_terminateBunkerDoorHint:{
+//=========================================================================	
+	level.threads["coop_bunkerDoorHint"] delete
+	$enterbunkerdoor.flags["coop_bunkerDoorHintTrigger"] delete
 }end
 
 /*
