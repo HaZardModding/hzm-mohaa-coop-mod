@@ -159,7 +159,7 @@ level waittill prespawn
 	}
 
 
-	if ($ai_respondspawn == NULL)
+	if (!$ai_respondspawn)
 		level.ai_respondspawns = 0
 		else
 		level.ai_respondspawns = $ai_respondspawn.size
@@ -178,7 +178,7 @@ level waittill prespawn
 
 	}
 
-	if ($ai_trigger == NULL)
+	if (!$ai_trigger)
 		level.ai_triggers = 0
 		else
 		level.ai_triggers = $ai_trigger.size
@@ -201,7 +201,7 @@ level waittill prespawn
 		println ("Spawned " + level.ai_triggers + " ai_triggers")
 	}
 
-	if ($ai_location == NULL)
+	if (!$ai_location)
 		level.ai_locations = 0
 		else
 		level.ai_locations = $ai_location.size
@@ -697,6 +697,13 @@ end
 //=========================================================================
 foealarmhit:{
 //=========================================================================
+	//[202] Smithy - just add flag to enemy and stop any further executions, and also block the setthread. alarm threads from here should only execute once per enemy anyway.
+	if (self.flags["coop_foeAlarmHitThread"]){
+		println "(ai.scr::foealarmhit) stopped multiple threads executing on alarmthread for " self " at " level.time
+		end
+	}	
+	self.flags["coop_foeAlarmHitThread"] = game.true
+	
 	if (getcvar(debug) == "1"){
 		println ("Setting OFF alarm " + self.set)
 	}
@@ -707,15 +714,17 @@ foealarmhit:{
 	
 	//[202] chrissstrahl - not sure what negative sideeffect this will have
 	//but we are rejecting spawns while the previouse spawn is still going
+	/*
 	if(level.coopLockMarkerForAi_foealarmhit != NIL){
 		println("dev: ai.scr - rejected to spawn, while spawn was still going foealarmhit at: "+level.time+"")
 		end
 	}
+	*/
 	
 	//[202] chrissstrahl - changed this to wait for the thread to finish
-	level.coopLockMarkerForAi_foealarmhit = 1
+	//level.coopLockMarkerForAi_foealarmhit = 1
 	waitthread spawn self.set
-	level.coopLockMarkerForAi_foealarmhit = NIL
+	//level.coopLockMarkerForAi_foealarmhit = NIL
 }end
 
 //[200] chrissstrahl - made coop compatible
@@ -755,21 +764,33 @@ end
 
 spawn local.set local.pause local.thread local.off local.group local.enemyname local.get_there:
 
+	//[202] Smithy - only do this once for spawner triggers
+	local.trigger = self
+	if (local.trigger && local.trigger.flags["coop_enemySpawnerTrigger"]){ 
+		if (local.trigger.flags["coop_spawnTriggerActivated"]){
+			println "(ai.scr::spawn): multiple threads for single spawner trigger - terminating this thread!"
+			end
+		}		
+		local.trigger.flags["coop_spawnTriggerActivated"] = game.true
+	}
+
 	if (game.medic != NIL)
 		end
 
 	if ( local.get_there==NIL )
 		local.get_there = 0
 
-	//if (getcvar(debug) == "1")
+	if (getcvar(debug) == "1")
 		println ("ai.scr spawned " + local.set)
 
 	if (local.pause != NIL)
 		wait local.pause
 
 	local.nSpawned = 0
+	
+	local.enemyspawners = level.enemyspawners //[202] Smithy - store locally, just in case this count is being changed and causes loop to run longer and cause command overflow
 
-	for (local.i=1;local.i<level.enemyspawners+1;local.i++)
+	for (local.i =1; local.i < local.enemyspawners + 1; local.i++) //[202] Smithy - use local count instead
 	{
 		local.num = 0
 
@@ -928,6 +949,10 @@ enemyspawnertrigger:{
 	//chrissstrahl - replace level waittill spawn
 	waitthread coop_mod/replace.scr::waitForPlayer
 	
+	if (!self){ end } //[202] Smithy - now we wait for players, check for NULL
+	
+	self.flags["coop_enemySpawnerTrigger"] = game.true
+	
 	if (getcvar(notrigger) == "1"){
 		wait 4
 		self delete
@@ -943,8 +968,8 @@ enemyspawnertrigger:{
 		
 		while (local.break == 0){
 			self waittill trigger
-
-			if ((parm.other == parm.other.targetname == "player") || (parm.other.targetname == "friendly")){ //[200] chrissstrahl - made coop compatible
+			
+			if (parm.other.classname == "Player" || parm.other.targetname == "friendly"){ //[200] chrissstrahl - made coop compatible //[202] Smithy - removed redundant bool operation, and use classname for player
 				if (getcvar(debug) == "1"){
 					println (parm.other + " set off the trigger")
 				}
