@@ -1,0 +1,701 @@
+//
+// ObjMgr (Objectives Manager)
+//
+
+
+/*
+
+The low-down:
+
+
+Objectives are referred to by nicknames.
+
+Initialization consists of:
+
+	- Initializing the ObjMgr script
+	- Initializing the master list of objectives (order is significant here)
+		- At this step, each objective is given a nickname and a description (which shows up in the player's obj list)
+
+The above should be done *before* initializing gags, scenes, individual level sections.
+
+So then *after* initializing the latter, you will need to:
+
+	- Set up any initial compass target locations (optional)
+	- Reveal any objectives that should be visible as soon as the level starts (optional)
+	- Set up the "current-objectives strategy" (mandatory)
+
+
+
+Example:
+
+	// init objectives
+
+	waitthread global/ObjMgr.scr::Init		// must be called first
+
+	waitthread global/ObjMgr.scr::InitObj		"killNorman"		"Kill Norman before he gets to the eggs"
+	waitthread global/ObjMgr.scr::InitObj		"eatEggs"			"Eat the Magic Eggs"
+	waitthread global/ObjMgr.scr::InitObj		"rendezvous"		"Rendezvous with Abner Luxor"
+	waitthread global/ObjMgr.scr::InitObj		"findKeys"			"Find all the golden keys [" 4 " remaining ]"
+					// previous is a special multi-part objective
+	waitthread global/ObjMgr.scr::InitObj		"armageddon"		"Destroy the entire Earth"
+
+
+	// .... init level gags, sections, scenes
+
+
+	// now finish objective system initialization	
+
+	waitthread global/ObjMgr.scr::SetObjCompassTarg 	"killNorman"				$Norman
+	waitthread global/ObjMgr.scr::SetObjCompassTarg 	"eatEggs"					$MagicEggBasket
+	waitthread global/ObjMgr.scr::SetObjCompassTarg 	"rendezvous"				$AbnerLuxor
+	waitthread global/ObjMgr.scr::SetObjCompassTargs	"findKeys"	"inOrder"		$GoldenKey1 $GoldenKey2 $GoldenKey3 $GoldenKey4
+			// in previous, second parameter is a "compass target selection strategy"
+			//		"nearest" means the compass will always point to the nearest target point
+			//		"inOrder" means the compass will point to the destinations in order, as they are ticked off
+			// Note: You can in fact set multiple compass targs for an objective that is *not* multi-part.
+			//			However, in this case the only acceptable strategy to use is "nearest", since "inOrder" requires
+			//			there be separately-completable objective sub-parts.
+
+	waitthread global/ObjMgr.scr::RevealObj				"killNorman"
+	waitthread global/ObjMgr.scr::RevealObj				"eatEggs"
+
+	waitthread global/ObjMgr.scr::SetCurrObjStrategy	"inOrder"
+
+
+Setting the current objective can either be done with the SetCurrObj routine, or done behind the scenes.
+
+If you choose to have it done automatically, you initially select a "strategy" that the ObjMgr should use in 
+determining the current objective at any given time.
+
+Currently there is only "inOrder".
+In this strategy, the current objective will always be the earliest objective in the list that is both:
+	- Revealed
+		*and*
+	- Not completed
+
+(A possible variation on this could be something like "inOrderWithBubbles", a "bubble" being a small sub-set of objectives
+that, once you've completed everything up to and not including them, you can complete those in any order before moving on
+to the next linear stretch.  And so then the compass might point to the nearest one, sort of like a multi-part objective,
+but using separate objectives.)
+
+
+Thenceforth, any time while the level is running, the following may be used:
+
+	// revealing objectives
+	waitthread global/ObjMgr.scr::RevealObj				"findKeys"
+
+	// completing objectives
+	waitthread global/ObjMgr.scr::CompleteObj			"killNorman"
+	waitthread global/ObjMgr.scr::CompleteObj			"findKeys" 1	// found key 1
+	waitthread global/ObjMgr.scr::CompleteObj			"findKeys" 2	// found key 2
+	waitthread global/ObjMgr.scr::CompleteObj			"findKeys" 3	// found key 3
+	waitthread global/ObjMgr.scr::CompleteObj			"findKeys" 4	// found key 4, and now the objective is complete
+
+	// updating objective compass targets
+	waitthread global/ObjMgr.scr::SetObjCompassTarg 	"rendezvous"	$AnotherAbnerLuxor
+
+	// updating objective descriptions
+	waitthread global/ObjMgr.scr::SetObjDesc			"rendezvous"	"Rendezvous with the real Abner Luxor"
+	waitthread global/ObjMgr.scr::SetObjDesc			"findKeys"		"Find all the golden DELICIOUS keys [" " still delicious]"
+
+	// set current objective (if not using the automatic scheme)
+	waitthread global/ObjMgr.scr::SetCurrObj			"findKeys"
+
+
+
+And finally, there is a handy routine for completing all objectives up to a point, as when warping to
+a section in a level, for debug purposes:
+
+	thread global/ObjMgr.scr::CatchUpObjs "rendezvous" "findKeys" "armageddon"
+
+First parameter is latest objective in the list to be marked complete.
+All objectives up to that point will be revealed and marked complete as well.
+
+Subsequent optional parameters are objectives that should be revealed at this point.
+
+NOTE:  Please note that you should use "thread" and not "waitthread".  This is because inside of CatchUpObjs, there is
+		a wait for one second.  This presumes you're calling this somewhere in your scene init code, and is a half-assed
+		wait to ensure that the entire objective system has been initialized before doing the catch-up mechanism.
+
+ANOTHER NOTE:  This particular mechanism is kind of rough, so attempts to refine it or make it more robust are
+				very much welcome.
+
+*/
+
+
+
+/////////////////////////////////////////////////////////////////
+
+Init:
+
+	level.obj_num_objs = 0
+	level.obj_curr_num = 0
+	level.obj_curr_obj_strat = "none"
+
+	spawn trigger_relay "targetname" "OBJ_CompassTickler"
+	thread priv_ContinuousCompassUpdateThread
+
+end
+
+
+InitObj local.name local.desc1 local.num_things local.desc2:
+
+	level.obj_num_objs++
+	local.num = level.obj_num_objs
+
+	level.obj_name[local.num] = local.name
+	level.obj_curr_status[local.num] = 1
+	level.obj_desc1[local.num] = local.desc1
+	level.obj_num_compass_targs[local.num] = 0
+	level.obj_compass_targ[local.num][1] = NULL
+	level.obj_compass_targ_strat[local.num] = " "
+	level.obj_alt_compass_targ[local.num] = NULL
+	level.obj_contin_refresh[local.num] = 0
+
+	if ((local.num_things != NIL) && (local.num_things > 0))		// numbered objective
+	{
+		if (!local.desc2)
+			local.desc2 = NULL
+
+		level.obj_num_things_remaining[local.num] = local.num_things
+		level.obj_total_num_things[local.num] = local.num_things
+		level.obj_desc2[local.num] = local.desc2
+
+		for (local.i=1; local.i<=local.num_things; local.i++)
+		{
+			level.obj_thing_done[local.num][local.i] = 0
+		}
+	}
+	else
+	{
+		level.obj_num_things_remaining[local.num] = -1
+		level.obj_total_num_things[local.num] = -1
+		level.obj_desc2[local.num] = NULL
+	}
+
+	waitthread priv_RefreshObjNum local.num
+
+end
+
+
+SetObjDesc local.name local.desc1 local.desc2:
+
+	local.num = waitthread priv_GetObjNumForName local.name
+	if (local.num == 0)
+		end
+
+	level.obj_desc1[local.num] = local.desc1
+
+	if ((level.obj_desc2[local.num] != NULL) && (local.desc2 != NIL))
+		level.obj_desc2[local.num] = local.desc2
+	else
+		level.obj_desc2[local.num] = NULL
+
+	waitthread priv_RefreshObjNum local.num
+
+end
+
+
+SetObjCompassTarg local.name local.targ local.targ_moves:
+
+	local.num = waitthread priv_GetObjNumForName local.name
+	if (local.num == 0)
+		end
+
+	if (local.targ == NIL)
+		local.targ = NULL
+	if (local.targ_moves == NIL)
+		local.targ_moves = 0
+
+	if (local.targ == NULL)
+	{
+		level.obj_num_compass_targs[local.num] = 0
+		level.obj_compass_targ[local.num][1] = NULL
+		level.obj_compass_targs_are_guys[local.num] = 0
+		level.obj_compass_targ_strat[local.num] = " "
+	}
+	else
+	{
+		level.obj_num_compass_targs[local.num] = 1
+		level.obj_compass_targ[local.num][1] = local.targ
+		level.obj_compass_targs_are_guys[local.num] = 0
+		level.obj_compass_targ_strat[local.num] = " "
+	}
+
+	level.obj_alt_compass_targ[local.num] = NULL
+	level.obj_contin_refresh[local.num] = local.targ_moves
+
+	waitthread priv_RefreshObjNum local.num
+
+	trigger $OBJ_CompassTickler
+
+end
+
+
+SetObjCompassTargs local.name local.strat local.targ1 local.targ2 local.targ3 local.targ4 local.targ5 local.targ6:
+
+	local.num = waitthread priv_GetObjNumForName local.name
+	if (local.num == 0)
+		end
+
+
+	level.obj_num_compass_targs[local.num] = 0
+
+	if (local.targ1 != NIL)
+	{
+		level.obj_num_compass_targs[local.num]++
+		level.obj_compass_targ[local.num][level.obj_num_compass_targs[local.num]] = local.targ1
+	}
+	if (local.targ2 != NIL)
+	{
+		level.obj_num_compass_targs[local.num]++
+		level.obj_compass_targ[local.num][level.obj_num_compass_targs[local.num]] = local.targ2
+	}
+	if (local.targ3 != NIL)
+	{
+		level.obj_num_compass_targs[local.num]++
+		level.obj_compass_targ[local.num][level.obj_num_compass_targs[local.num]] = local.targ3
+	}
+	if (local.targ4 != NIL)
+	{
+		level.obj_num_compass_targs[local.num]++
+		level.obj_compass_targ[local.num][level.obj_num_compass_targs[local.num]] = local.targ4
+	}
+	if (local.targ5 != NIL)
+	{
+		level.obj_num_compass_targs[local.num]++
+		level.obj_compass_targ[local.num][level.obj_num_compass_targs[local.num]] = local.targ5
+	}
+
+	level.obj_alt_compass_targ[local.num] = NULL
+	level.obj_compass_targs_are_guys[local.num] = 0
+	level.obj_compass_targ_strat[local.num] = local.strat
+
+	waitthread priv_RefreshObjNum local.num
+
+	trigger $OBJ_CompassTickler
+
+end
+
+
+SetObjCompassTargsGuys local.name local.targ1 local.targ2 local.targ3 local.targ4 local.targ5 local.targ6:
+
+	local.num = waitthread priv_GetObjNumForName local.name
+	if (local.num == 0)
+		end
+
+
+	level.obj_num_compass_targs[local.num] = 0
+
+	if (local.targ1 != NIL)
+	{
+		level.obj_num_compass_targs[local.num]++
+		level.obj_compass_targ[local.num][level.obj_num_compass_targs[local.num]] = local.targ1
+	}
+	if (local.targ2 != NIL)
+	{
+		level.obj_num_compass_targs[local.num]++
+		level.obj_compass_targ[local.num][level.obj_num_compass_targs[local.num]] = local.targ2
+	}
+	if (local.targ3 != NIL)
+	{
+		level.obj_num_compass_targs[local.num]++
+		level.obj_compass_targ[local.num][level.obj_num_compass_targs[local.num]] = local.targ3
+	}
+	if (local.targ4 != NIL)
+	{
+		level.obj_num_compass_targs[local.num]++
+		level.obj_compass_targ[local.num][level.obj_num_compass_targs[local.num]] = local.targ4
+	}
+	if (local.targ5 != NIL)
+	{
+		level.obj_num_compass_targs[local.num]++
+		level.obj_compass_targ[local.num][level.obj_num_compass_targs[local.num]] = local.targ5
+	}
+
+	level.obj_alt_compass_targ[local.num] = NULL
+	level.obj_compass_targs_are_guys[local.num] = 1
+	level.obj_compass_targ_strat[local.num] = local.strat
+
+	waitthread priv_RefreshObjNum local.num
+
+	trigger $OBJ_CompassTickler
+
+end
+
+
+SetObjAltCompassTarg local.name local.targ:
+
+	local.num = waitthread priv_GetObjNumForName local.name
+	if (local.num == 0)
+		end
+
+	level.obj_alt_compass_targ[local.num] = local.targ
+
+end
+
+
+RevealObj local.name:
+
+	local.num = waitthread priv_GetObjNumForName local.name
+	if (local.num == 0)
+		end
+
+	if (level.obj_curr_status[local.num] < 2)
+	{
+		level.obj_curr_status[local.num] = 2
+		waitthread priv_RefreshObjNum local.num
+	}
+
+	waitthread priv_UpdateCurrObj
+
+end
+
+
+HideObj local.name:
+
+	local.num = waitthread priv_GetObjNumForName local.name
+	if (local.num == 0)
+		end
+
+	level.obj_curr_status[local.num] = 1
+	waitthread priv_RefreshObjNum local.num
+	waitthread priv_UpdateCurrObj
+
+end
+
+
+CompleteObj local.name local.thing_num:		// thing_num is optional, and only used for multi-part objectives
+
+	local.num = waitthread priv_GetObjNumForName local.name
+	if (local.num == 0)
+		end
+
+	if (level.obj_curr_status[local.num] < 3)
+	{
+		if (level.obj_total_num_things[local.num] > 0)		// is a numbered objective
+		{
+			if (level.obj_num_compass_targs[local.num] > 0)		// we keep track of individual things
+			{
+				if (local.thing_num == NIL)
+				{
+					// we must want the whole thing solved
+
+					level.obj_num_things_remaining[local.num] = 0
+
+					for (local.i=1; local.i<=level.obj_total_num_things[local.num]; local.i++)
+					{
+						level.obj_thing_done[local.num][local.i] = 1
+						level.obj_compass_targ[local.num][local.i] = NULL
+					}
+
+					level.obj_curr_status[local.num] = 3
+					waitthread priv_RefreshObjNum local.num
+					waitthread priv_UpdateCurrObj
+				}
+				else
+				{
+					if ((local.thing_num < 1) || (local.thing_num > level.obj_total_num_things[local.num]))
+					{
+						println "***** CompleteObj:  invalid thing_num for numbered objective"
+						end
+					}
+
+					if (level.obj_num_compass_targs[local.num] != level.obj_total_num_things[local.num])
+					{
+						println "***** CompleteObj:  number of compass targs does not match total number of things"
+						end
+					}
+
+					level.obj_num_things_remaining[local.num]--
+					level.obj_thing_done[local.num][local.thing_num] = 1
+					level.obj_compass_targ[local.num][local.thing_num] = NULL
+					if (level.obj_num_things_remaining[local.num] <= 0)
+					{
+						level.obj_num_things_remaining[local.num] = 0
+						level.obj_curr_status[local.num] = 3
+					}
+					waitthread priv_RefreshObjNum local.num
+					waitthread priv_UpdateCurrObj
+				}
+			}
+			else
+			{
+				level.obj_num_things_remaining[local.num]--
+				if (level.obj_num_things_remaining[local.num] <= 0)
+				{
+					level.obj_num_things_remaining[local.num] = 0
+					level.obj_curr_status[local.num] = 3
+					level.obj_compass_targ[local.num][1] = NULL
+				}
+				waitthread priv_RefreshObjNum local.num
+				waitthread priv_UpdateCurrObj
+			}
+		}
+		else											// is a regular objective
+		{
+			level.obj_curr_status[local.num] = 3
+			level.obj_compass_targ[local.num][1] = NULL
+			waitthread priv_RefreshObjNum local.num
+			waitthread priv_UpdateCurrObj
+		}
+	}
+
+end
+
+
+SetCurrObj local.name:
+
+	local.num = waitthread priv_GetObjNumForName local.name
+	if (local.num == 0)
+		end
+
+	waitthread priv_SetCurrObjNum local.num
+
+end
+
+
+SetCurrObjStrategy local.strat:
+
+	level.obj_curr_obj_strat = local.strat
+
+	waitthread priv_UpdateCurrObj
+
+end
+
+
+CatchUpObjs local.name_last_completed local.reveal1 local.reveal2 local.reveal3 local.reveal4 local.reveal5:
+
+	wait 1.0		// ensure inits are all done
+
+	if (level.obj_curr_obj_strat == "none")
+		end
+
+	if (local.reveal1 != NIL)
+		waitthread RevealObj local.reveal1
+	if (local.reveal2 != NIL)
+		waitthread RevealObj local.reveal2
+	if (local.reveal3 != NIL)
+		waitthread RevealObj local.reveal3
+	if (local.reveal4 != NIL)
+		waitthread RevealObj local.reveal4
+	if (local.reveal5 != NIL)
+		waitthread RevealObj local.reveal5
+
+	local.num = waitthread priv_GetObjNumForName local.name
+	if (local.num == 0)
+		end
+
+	switch (level.obj_curr_obj_strat)
+	{
+		case "inOrder":
+			for (local.i=1; local.i<=local.num; local.i++)
+			{
+				if (level.obj_total_num_things[local.i] > 0)		// numbered objective
+				{
+					level.obj_num_things_remaining[local.i] = 0
+					for (local.j=1; local.j<=level.obj_total_num_things[local.i]; local.j++)
+					{
+						level.obj_thing_done[local.i][local.j] = 1
+					}
+				}
+
+				level.obj_curr_status[local.i] = 3
+				waitthread priv_RefreshObjNum local.i
+			}
+			waitthread priv_UpdateCurrObj
+			break
+	}
+
+end
+
+
+
+//////////////
+// privates
+
+priv_GetObjNumForName local.name:		// 0 = nonexistent
+
+	local.num = 0
+	for (local.i=1; local.i<=level.obj_num_objs; local.i++)
+	{
+		if (local.name == level.obj_name[local.i])
+		{
+			local.num = local.i
+			break
+		}
+	}
+
+	if (local.num == 0)
+	{
+		println ("**** ObjMgr Warning:  There is no objective called " + local.name)
+	}
+
+end local.num
+
+
+priv_SetCurrObjNum local.num:
+
+	if (local.num != level.obj_curr_num)
+	{
+		level.obj_curr_num = local.num
+		waitthread global/objectives.scr::current_objectives level.obj_curr_num
+
+		trigger $OBJ_CompassTickler
+	}
+
+end
+
+
+priv_RefreshObjNum local.num:
+
+	// determine compass targ
+
+	local.compass_targ = NIL
+
+	if (level.obj_compass_targs_are_guys[local.num] == 1)
+	{
+		local.nearest_guy = NULL
+
+		for (local.i=1; local.i<=level.obj_num_compass_targs[local.num]; local.i++)
+		{
+			local.guy_name = level.obj_compass_targ[local.num][local.i]
+
+			local.num_guys = $(local.guy_name).size
+			local.guy_array = exec global/makearray.scr $(local.guy_name)
+
+			//[202] chrissstrahl - made coop compatible
+			local.player = waitthread coop_mod/replace.scr::player_anyValid
+			local.originPlayer = (0 0 0)
+			
+			if(local.player){
+				local.originPlayer = local.player.origin
+			}
+
+			for (local.j=1; local.j<=local.num_guys; local.j++)
+			{
+				//if (local.guy_array[local.j] && (isalive local.guy_array[local.j]) && ((local.nearest_guy == NULL) || (vector_closer local.guy_array[local.j].origin local.nearest_guy.origin $player.origin)))
+				if (local.guy_array[local.j] && (isalive local.guy_array[local.j]) && ((local.nearest_guy == NULL) || (vector_closer local.guy_array[local.j].origin local.nearest_guy.origin local.originPlayer)))
+				{
+					local.nearest_guy = local.guy_array[local.j]
+				}
+			}
+			//eof chrissstrahl
+		}
+
+		if (local.nearest_guy == NULL)
+			local.compass_targ = level.obj_alt_compass_targ[local.num]
+		else
+			local.compass_targ = local.nearest_guy
+	}
+	else if (level.obj_num_compass_targs[local.num] == 1)
+	{
+		local.compass_targ = level.obj_compass_targ[local.num][1]
+	}
+	else if (level.obj_num_compass_targs[local.num] > 1)
+	{
+		switch (level.obj_compass_targ_strat[local.num])
+		{
+			case "inOrder":
+				for (local.i=1; local.i<=level.obj_num_compass_targs[local.num]; local.i++)
+				{
+					if (level.obj_thing_done[local.num][local.i] == 0)
+					{
+						if (level.obj_compass_targ[local.num][local.i] != NULL)
+							local.compass_targ = level.obj_compass_targ[local.num][local.i]
+						break
+					}
+				}
+				break
+
+			case "nearest":
+				//[202] chrissstrahl - made coop compatible
+				local.player = waitthread coop_mod/replace.scr::player_anyValid
+				local.originPlayer = (0 0 0)
+				
+				if(local.player){
+					local.originPlayer = local.player.origin
+				}			
+				for (local.i=1; local.i<=level.obj_num_compass_targs[local.num]; local.i++)
+				{
+					if (((level.obj_total_num_things[level.obj_curr_num] == -1) || (level.obj_thing_done[local.num][local.i] == 0)) &&
+						(level.obj_compass_targ[local.num][local.i] != NULL))
+					{
+
+						//if ((local.compass_targ == NIL) || (vector_closer level.obj_compass_targ[local.num][local.i].origin local.compass_targ.origin $player.origin)){
+						if ((local.compass_targ == NIL) || (vector_closer level.obj_compass_targ[local.num][local.i].origin local.compass_targ.origin local.originPlayer)){
+							local.compass_targ = level.obj_compass_targ[local.num][local.i]
+						}
+					}
+				}
+				//eof chrissstrahl
+				break
+		}
+	}
+	if (local.compass_targ == NULL)
+		local.compass_targ = NIL
+
+
+	// determine description text
+
+	if ((level.obj_total_num_things[local.num] >= 0) && level.obj_desc2[local.num])
+	{
+		local.desc = (level.obj_desc1[local.num] + level.obj_num_things_remaining[local.num] + level.obj_desc2[local.num])
+	}
+	else
+	{
+		local.desc = level.obj_desc1[local.num]
+	}
+
+
+	// refresh it
+
+	waitthread global/objectives.scr::add_objectives local.num level.obj_curr_status[local.num] local.desc local.compass_targ
+
+	if (level.obj_curr_num == local.num)
+		waitthread global/objectives.scr::current_objectives local.num
+
+end
+
+
+priv_UpdateCurrObj:
+
+	if (level.obj_curr_obj_strat == "none")
+		end
+
+	switch (level.obj_curr_obj_strat)
+	{
+		case "inOrder":
+			for (local.i=1; local.i<=level.obj_num_objs; local.i++)
+			{
+				if (level.obj_curr_status[local.i] == 2)
+				{
+					waitthread priv_SetCurrObjNum local.i
+					break
+				}
+			}
+			break
+	}
+
+end
+
+
+priv_ContinuousCompassUpdateThread:
+
+	while (1)
+	{
+		$OBJ_CompassTickler waittill trigger
+		//[202] chrissstrahl - added check to prevent NIL error message
+		while (level.obj_num_compass_targs[level.obj_curr_num] && (level.obj_num_compass_targs[level.obj_curr_num] > 0) &&
+				((		((level.obj_total_num_things[level.obj_curr_num] == -1) || (level.obj_num_things_remaining[level.obj_curr_num] > 0)) &&
+					(level.obj_compass_targ_strat[level.obj_curr_num] == "nearest")) ||
+				(level.obj_contin_refresh[level.obj_curr_num] == 1) ||
+				(level.obj_compass_targs_are_guys[level.obj_curr_num] == 1) ))
+		{
+			wait 1
+			waitthread priv_RefreshObjNum level.obj_curr_num
+		}
+	}
+
+end
+
