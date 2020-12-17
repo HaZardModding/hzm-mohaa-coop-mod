@@ -8,6 +8,7 @@
 // @leadplayer		4)		AI Leads Player (the SAS Agent)
 // @medic			5)		AI Medic follows and heals team and player
 // @unknown			2,6,8)	OtherAI States 
+// @heal					This is where the healing magic happens
 ////////////////////////////////////////////////////////////
 
 
@@ -1519,22 +1520,51 @@ checkmovedone:
 end
 
 
-
+//@heal
+//@heal
+//@heal
 heal local.ent:
 	if (isalive local.ent)
 	{
 		//[202] chrissstrahl - assume this is a $player array in multiplayer and heal cloeset player
-		if( local.ent.size > 1 ){
-			local.ent = exec coop_mod/replace.scr::player_closestTo self
+		if( level.gametype != 0 && local.ent.size > 1 ){
+			//[202] chrissstrahl - heal cloeset player, regardless which player he was running to
+			//upgraded to select only hurt players based on coop_mod/replace.scr::player_closestTo
+			if(!local.ent || local.ent.classname == "Player" ){
+				local.player = NULL
+				local.ent = NULL
+				local.currentDistance = 999999
+				local.closestDistance = 999999
+				for (local.i = 1;local.i <= $player.size;local.i++){
+					local.player = $player[local.i]
+					
+					local.maxHealthData = local.ent.maxhealth
+					if!(local.maxHealthData){ local.maxHealthData = local.ent.max_health }
+					local.health = (local.ent.health * 100) / local.maxHealthData
+				
+					if(local.player.health > 0 && local.health < level.medicmin && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1){
+						local.currentDistance = vector_length( local.player.origin - self.origin )
+						if( local.currentDistance < local.closestDistance ){
+							local.ent = local.player
+							local.closestDistance = local.currentDistance
+						}
+					}
+				}
+				//[202] chrissstrahl - make sure we exit here if there is no valid player on server
+				if!(local.ent){
+					end
+				}
+			}
 		}
-		
-		//[202] chrissstrahl - make sure this works
-		local.maxHealthData = local.ent.maxhealth
-		if!(local.maxHealthData){
-			local.maxHealthData = local.ent.max_health
+		else{
+			//[202] chrissstrahl - make sure this works
+			local.maxHealthData = local.ent.maxhealth
+			if!(local.maxHealthData){
+				local.maxHealthData = local.ent.max_health
+			}
+			
+			local.health = (local.ent.health * 100) / local.maxHealthData //[202] chrissstrahl		
 		}
-		
-		local.health = (local.ent.health * 100) / local.maxHealthData //[202] chrissstrahl
 
 		if (local.health < level.medicmin)
 		{
@@ -1545,14 +1575,7 @@ heal local.ent:
 			self waittill movedone
 
 			self exec global/stand.scr
-			
-			//[202] chrissstrahl - heal cloeset player, regardless which player he was running to
-			if( level.gametype != 0){
-				if(!local.ent || local.ent.classname == "Player" ){
-					local.ent = exec coop_mod/replace.scr::player_closestTo self
-				}
-			}
-			
+				
 			if (isalive local.ent)
 			{
 				local.vec = vector_length (self.origin - local.ent.origin)
@@ -1570,10 +1593,16 @@ heal local.ent:
 					
 					//[202] chrissstrahl - make sure the player is still valid
 					if(isalive local.ent){
-						if(self.medichealrate == NIL || self.medichealrate == 0)
-							local.ent heal 0.5
-						else
-							local.ent heal self.medichealrate
+						//[202] chrissstrahl - fully heal in coop - or medic runs to several players and friendlies back and forth multiple times
+						if(level.gametype != 0){
+							local.ent heal 1
+						}
+						else{
+							if(self.medichealrate == NIL || self.medichealrate == 0)
+								local.ent heal 0.5
+							else
+								local.ent heal self.medichealrate								
+						}
 					}
 					
 					if(self.medichealrate == NIL || self.medichealrate == 0 || self.medichealrate > 0.5 )
