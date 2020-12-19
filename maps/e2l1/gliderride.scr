@@ -1,48 +1,17 @@
 // gliderride.scr
-
-//=========================================================================
-coop_StartRide:{
-//=========================================================================
-end
-//level.stickPlayerAtGlider == 1 // debug hack to put player near the glider, for debugging
-
-	//[202] chrissstrahl
-	thread coop_mod/replace.scr::physics_off
-
-	//[202] Smithy - do we even need this? if we set players to a camera (give each player their own camera and handleCamera thread) during glider we can leave them wherever. 
-	//i know how to do that so let me know if you need help.
-	//then tele them to right place when glider crashes
-	while (!level.ejectedFromGlider){ 
-		for (local.i = 1;local.i <= $player.size;local.i++){
-			local.player =  $player[local.i]
-			if(local.player && local.player.health > 0 && local.player.flags["coop_isActive"] == 1){
-				local.player.origin = $glider.origin
-				local.player notsolid
-			}		
-		}
-		wait 1
-	}
-}
-
 //============================================================================
 StartRide: {
 //============================================================================
 
 	thread maps/e2l1/fog.scr::setFog level.fogDistanceTow level.fogBiasTow level.fogColorTow
 	
-	//[202] chrissstrahl - make coop compatible
-	//if(level.gametype == 0){ 
-		thread coop_mod/replace.scr::physics_off
-		//$player physics_off
+	thread coop_mod/replace.scr::physics_off
 
-		if (level.stickPlayerAtGlider == 1) {
-			// debug hack to put player near the glider, for debugging
-			$player.origin = $glider.origin
-			$player notsolid
-		}	
-	//}else{
-	//	thread coop_StartRide //[202] Smithy - temp disabled for testing - caused overflow
-	//}
+	if (level.stickPlayerAtGlider == 1) {
+		// debug hack to put player near the glider, for debugging
+		$player.origin = $glider.origin
+		$player notsolid
+	}	
 
 	level.skipDialogue 	 = 0
 	level.dialogueFinished	 = 0
@@ -96,7 +65,7 @@ handlePassengers: {
 	$gliderDude2 thread handlePassenger2Idle
 
 	// wait for the pilot to get shot
-	waitthread game.waittill gliderPilotShot
+	waitthread game.waittill gliderPilotShot //[202] Smithy - save cpu cycles
 	/*
 	while (level.gliderPilotShot == 0) {
 		waitframe
@@ -741,6 +710,8 @@ handleCamera: {
 		wait 8
 	}
 	
+	println "STARTING CAMMMMMMMMSSS"
+	
 	thread coop_startGliderSpawnManager //[202] Smithy - start the spawn manager
 
 	while (level.gliderRideOver == 0) {
@@ -759,7 +730,6 @@ handleCamera: {
 				if (group.player && group.player.inGliderCamera){
 					thread coop_stopGliderCamera
 				}
-				local.cam delete	
 				local.cam waitthread game.replace::delete   //[202] Smithy - delete isn't faster than remove. they all call the same function internally lol... so lets wait until thinks have finished
 				local.i = 0 								//[202] Smithy - gliderCamera.size will change, so, to stop someone being delayed by an extra frame, start again
 				continue
@@ -881,7 +851,7 @@ coop_handleDeath:{
 	}
 }end
 
-//[202] Smithy - spawn a camera for a player and set it up in glider
+//[202] Smithy - stop the glider scene spawn handler
 //============================================================================
 coop_stopGliderSpawnManager:{
 //============================================================================
@@ -910,9 +880,23 @@ coop_startGliderCamera:{
 //============================================================================	
 	if (!level.gliderRideOver && group.player.gliderCamera && !group.player.inGliderCamera){
 		group.player.inGliderCamera = game.true
-		local.camerause = spawn trigger_camerause target group.player.gliderCamera
+		
+		//[202] Smithy - fix players only watching one camera.
+		//bug happened because i was passing in camera entity to 'target', which would translate to the targetname string 'gliderCamera'
+		//and as all cameras have the same targetname, it was just selecting the first in the targetname array (thus, first player's camera)
+		//now i temporarily rename camera to that of the targetname + player entnum then set that as the target. 
+		//this should fix it.		
+		println "cam fix yarppp"
+		local.name = ("gliderCamera_" + group.player.entnum)
+		local.cam = group.player.gliderCamera
+		local.cam targetname local.name
+		local.camerause = spawn trigger_camerause target local.name
+		
 		local.camerause doUse group.player
 		local.camerause delete
+		
+		//[202] Smithy - set targetname back to original so it gets added back to the array
+		local.cam targetname "gliderCamera"
 	}
 }end
 
@@ -922,9 +906,19 @@ coop_stopGliderCamera:{
 //============================================================================	
 	if (!level.gliderRideOver && group.player.gliderCamera && group.player.inGliderCamera){
 		group.player.inGliderCamera = game.false
+		
+		//[202] Smithy
+		local.name = ("gliderCamera_" + group.player.entnum)
+		local.cam = group.player.gliderCamera
+		local.cam targetname local.name
+		local.camerause = spawn trigger_camerause target local.name
+		
 		local.camerause = spawn trigger_camerause target group.player.gliderCamera
 		local.camerause doUse group.player
 		local.camerause delete
+		
+		//[202] Smithy
+		local.cam targetname "gliderCamera"
 	}
 }end
 
