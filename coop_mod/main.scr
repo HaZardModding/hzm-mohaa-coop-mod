@@ -153,6 +153,9 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 
 	//local.player.flags["coop_team"] = local.player.dmteam //[200] Smithy - we don't need to track if we know allies is what will make us active
 	waitthread resetSpawn local.player
+	
+	//[202] chrissstrahl - reset last selected spawnlocation
+	local.player.flags["coop_spawnlocAlt"] = NIL
 
 	thread global/throbtext.scr::throbtext "Only allies are allowed in Coop!" 5
 
@@ -430,7 +433,14 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 		error ("coop_mod/main.scr::playerPlaceAtSpawn - does not support var type: "+local.typename) 1000
 	}
 
-	if( local.player == NULL){ end }
+	if!(local.player){ end }
+	
+	//[202] chrissstrahl - this allowes a player to spawn at a different spawnlocation - used for player.scr::preventSpawnStuck
+	if(local.player.flags["coop_spawnlocAltActive"]){
+		local.i = local.player.flags["coop_spawnlocAlt"]
+		local.player.flags["coop_spawnlocAltActive"] = NIL
+		
+	}
 
 	if( local.player.flags["coop_playerTankExit"] != NIL && $coop_tankExit != NULL){
 		local.player origin ( $coop_tankExit.origin + (0 0 150) )
@@ -441,7 +451,10 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 	}
 	else if(level.flags["coop_spawn"+local.i+"origin"] != NIL ){
 		if( (local.player.flags["coop_lastRespawn"] + 1.5) < level.time){
-			local.player origin	level.flags["coop_spawn"+local.i+"origin"]
+			//[202] chrissstrahl - remember last spawn location
+			local.spawnNewOrigin = level.flags["coop_spawn"+local.i+"origin"]
+			local.player.flags["coop_spawnlocPreviouse"] = local.spawnNewOrigin
+			local.player origin	local.spawnNewOrigin
 
 			if(level.flags["coop_spawn"+local.i+"angles"] != NIL){
 				//need to call this delayed or it will not work most of the time in mp
@@ -453,7 +466,7 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 		}
 	}
 	//make sure players don't get stuck even if there are no valid spawns
-	thread playerMakeSolidAsap local.i
+	thread playerMakeSolidAsap local.player
 }end
 
 //checks if objects are touching

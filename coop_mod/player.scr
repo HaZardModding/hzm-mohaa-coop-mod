@@ -34,7 +34,7 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	//[202] chrissstrahl - handle players
 	while(1){
 		//[202] chrissstrahl - if server is empty wait
-		if ($player.size == 0){
+		if !($player){
 			waitframe
 			continue
 		}
@@ -281,7 +281,7 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 				//MATCHING PLAYER NAME
 				for (local.i = 1;local.i <= $player.size;local.i++){
 					local.playerOther =  $player[local.i]
-					if(local.playerOther == local.player){ continue } //disabled during testing
+					if(local.playerOther == local.player){ continue }
 					
 					//a player with a matching or similar name was found - move player there
 					if( waitthread coop_mod/main.scr::containsText local.playerOther.netname local.extract ){
@@ -386,6 +386,9 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 			//println("manageSpectator::::::::::::")
 			waitthread manageSetup local.player
 		}
+		
+		//[202] chrissstrahl - reset last selected spawnlocation
+		local.player.flags["coop_spawnlocAlt"] = NIL
 	
 		//Notify scripts instantly this player is no longer valid
 		local.player.flags["coop_isActive"] = -1
@@ -510,11 +513,64 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	//[202] chrissstrahl - implement script fov
 	thread manageFovSet local.player (int(string(local.player.flags["coop_fov"])))
 	
+	//[202] chrissstrahl - prevent player getting stuck at spawn
+	thread preventSpawnStuck local.player
+	
 	//PLAYER READY
 	//[202] chrissstrahl	
 	//a player has joined a team and picked a weapon
 	//notify other scripts that the mission can now start
 	level.coop_playerReady = 1
+}end
+
+//[202] chrissstrahl - prevent player getting stuck at spawn
+//=========================================================================
+preventSpawnStuck local.player:{
+//=========================================================================
+	local.time = 0
+	local.lastView = 0
+	local.lastViewSame = 0
+	while( local.player && local.player.health && local.player.dmteam != "spectator" && vector_length(local.player.origin - local.player.flags["coop_spawnlocPreviouse"]) < 100 ){
+		wait 1
+		local.time++
+		
+		//if player hasn't moved the camera for more than 7 secounds assume he is afk
+		if(local.player.viewangles[1] == local.lastView){
+			local.lastViewSame++
+			if(local.lastViewSame > 7){
+				local.lastViewSame = 0
+				local.time = 0
+				continue
+			}
+		}
+		local.lastView = local.player.viewangles[1]
+		
+		if(local.time > 15 ){ //9sec
+			local.player iprint "If you are stuck, press use to switch to a different spawnlocation" 1
+			while(local.player && local.player.health && local.player.dmteam != "spectator" && vector_length(local.player.origin - local.player.flags["coop_spawnlocPreviouse"]) < 100){
+				waitframe
+				if(local.player.useheld){
+					local.player iprint "Moved you to a different spawnlocation" 1
+					
+					local.player.flags["coop_spawnlocAltActive"] = 1
+					local.alternativespawn = local.player.flags["coop_spawnlocAlt"]
+					if!(local.alternativespawn){
+						local.alternativespawn = thread game.main::getPlayerId local.player
+					}
+					local.alternativespawn++
+					if(local.alternativespawn > 8){
+						local.alternativespawn = 1
+					}
+					
+					local.player.flags["coop_spawnlocAlt"] = local.alternativespawn
+					
+					waitthread game.main::playerPlaceAtSpawn local.player
+					thread preventSpawnStuck local.player
+					end
+				}
+			}
+		}
+	}
 }end
 
 //alive respawning player handling
@@ -578,6 +634,9 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	//println("manageDead")
 	local.player.flags["coop_iAmTruelyActive"] = 0
 	if(	local.player.flags["coop_isActive"] != -2 ){
+		//[202] chrissstrahl - reset last selected spawnlocation
+		local.player.flags["coop_spawnlocAlt"] = NIL
+	
 		//[202] chrissstrahl - implement script fov
 		thread manageFovSet local.player (int(string(local.player.flags["coop_fov"])))
 	
