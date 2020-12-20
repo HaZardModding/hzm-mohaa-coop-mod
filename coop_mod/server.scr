@@ -158,14 +158,45 @@ if(level.cMTE_coop_server){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 updateServer:{
 //=========================================================================
 if(level.cMTE_coop_server){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread server/updateServer->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
+	local.serverWasPopulated=0
 	updateServer_start:
 	while($player){
 		wait 1
 		waitthread checkForVote
 		waitthread checkScoreboard
+		local.serverWasPopulated = 1
 	}
+	
+	//[202] chrisstrahl - kills server after players left
+	if(local.serverWasPopulated){
+		thread rebootServer
+	}
+	
 	level waittill playerspawn
+	
 	goto updateServer_start
+}end
+
+
+//[202] chrissstrahl - ends server after some time if coop_reboot is set
+//this way our test server can reboot and save the logfile
+//this prevents the logfiles from eggting to big if there are errors
+//occuring once the players left. The logs are archived.
+//=========================================================================
+rebootServer:{
+//=========================================================================
+	local.rebootTime = int(getCvar("coop_reboot"))
+	if!(local.rebootTime){ end }
+	
+	local.timeWaiting=1
+	while(local.rebootTime > local.timeWaiting){
+		wait 1
+		local.timeWaiting++
+		if($player){ end }
+	}
+	println("Server shutting down after "+local.timeWaiting+" sec of being empty.")
+	waitframe
+	setCvar "sv_killserver" "1"
 }end
 
 //[200] chrissstrahl - checks if something changed that needs to be shown in the scoreboard
