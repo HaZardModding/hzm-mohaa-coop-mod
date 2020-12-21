@@ -33,7 +33,7 @@ AIdisable: {
 	for(local.i = 1; local.i < $ai_alarm.size; local.i++) {
 		$ai_alarm[local.i] ai_off
 	}
-}End
+}end
 
 //============================================================
 DoIntro: {
@@ -61,7 +61,7 @@ DoIntro: {
 
 	//call to briefing dialogue
 	thread doBriefing
-	thread global/MaintainCamera.scr::StartMaintainCamera $starttruck
+	//thread global/MaintainCamera.scr::StartMaintainCamera $starttruck //[202] Smithy - we do our own camera stuff now	
 	thread handleTruckGag
 		
 	//wait until the briefing is done before we continue
@@ -130,7 +130,7 @@ DontBeCaught: {
 	for(local.i = 1; local.i <= $deleteguy2.size; local.i++) {
 		$deleteguy2[local.i] dontdropweapons
 	}
-}End
+}end
 
 //============================================================
 IfPullGunFail: {
@@ -166,7 +166,7 @@ FAILEDMISSION: {
 
 	//[202] chrissstrahl
 	thread coop_mod/replace.scr::missionfailed
-}End
+}end
 
 //============================================================
 DeleteGuy1: {
@@ -176,7 +176,7 @@ DeleteGuy1: {
 	thread global/EntityCleanup.scr::EntityCleanup "t375_passenger" 1
 	thread global/EntityCleanup.scr::EntityCleanup "deleteguy1" 1
 	thread global/EntityCleanup.scr::EntityCleanup "1stgateguard" 1
-}End
+}end
 
 //[202] chrissstrahl - do not let player wait during coop
 //============================================================
@@ -260,7 +260,7 @@ GateGuardDialogue: {
 	//$spy waitthread global/LoopAnim.scr::LoopAnimStop
     //$spy anim jeep_idle_drive //00A004_driversitstill
 	$mrinvisible2 remove
-}End
+}end
 
 //============================================================
 KillPlayerIfFailPapers: {
@@ -298,7 +298,7 @@ keepAskingtillSeePapers: {
 		$1stgateguard waittill animdone
 		wait 10
 	}
-}End
+}end
 
 //============================================================
 HACK: {
@@ -307,7 +307,7 @@ HACK: {
 	if(level.GatePapersAccepted != 1) {
 		level.GatePapersAccepted = 1
 	}
-}End
+}end
 
 //[202] Smithy - this is fine
 //============================================================
@@ -346,7 +346,7 @@ AIenable: {
 	for(local.i = 1; local.i < $ai_alarm.size; local.i++) {
 		$ai_alarm[local.i] ai_on
 	}
-}End
+}end
 
 //============================================================
 giveDisguise: {
@@ -443,9 +443,154 @@ handlePlayer: {
 			local.player = $player[local.i]
 			local.player nodamage
 			local.player notsolid
+			//local.player physics_off
 		}
-		exec coop_mod/replace.scr::glue level.opelpassengerseat
-		exec coop_mod/replace.scr::viewangles (0 180 0)
+		thread coop_mod/replace.scr::physics_off
+		thread coop_mod/replace.scr::glue level.opelpassengerseat
+		thread coop_mod/replace.scr::viewangles (0 180 0)
+		thread coop_startTruckSpawnManager //[202] Smithy
+	}
+}end
+
+//[202] Smithy
+//fixes players spawning in truck as solid thus being blocked
+//and killed
+//============================================================
+coop_startTruckSpawnManager:{
+//============================================================
+	if (level.thread["coop_startTruckSpawnManager"]){ end }
+	
+	level.thread["coop_startTruckSpawnManager"] = local
+
+	//level.cameraModel = spawn models/miscobj/cameranull.tik
+	//level.cameraModel notsolid
+	//level.cameraModel physics_off
+	//level.cameraModel angles $starttruck.angles
+	//level.cameraModel.origin = level.opelpassengerseat.origin
+	//level.cameraModel glue level.opelpassengerseat
+	
+	//[202] Smithy - spawn any cameras we need for players that may have spawned before the handler started
+	for (local.i = 1; local.i <= $player.size; local.i++){
+		group.player = $player[local.i]
+		if (!group.player.truckCamera){
+			println("ADDING PLAYER TO CAM (coop_startTruckSpawnManager)")
+			thread coop_spawnTruckCamera
+		}
+	}
+	
+	waitframe
+	thread coop_handleTruckCameras
+	
+	while (1){
+		level waittill playerspawn
+		group.player = parm.other
+		if (!group.player.isSpectator && !level.RideOver){				
+			thread coop_spawnTruckCamera
+			group.player notsolid
+			group.player nodamage
+		}
+	}
+}end
+
+//[202] Smithy
+//============================================================
+coop_handleTruckCameras:{
+//============================================================
+	local.oldJeepAngles = $starttruck.angles
+	while (!level.RideOver) {
+		if ($truckCamera){
+			for (local.i = 1; local.i <= $truckCamera.size; local.i++){
+				local.cam = $truckCamera[local.i]
+				group.player = local.cam.player
+				
+				if (isAlive group.player && !group.player.isSpectator){
+					if (!group.player.inTruckCamera){
+						thread coop_startTruckCamera					
+					}			
+				}else{
+					if (group.player && group.player.inTruckCamera){
+						thread coop_stopTruckCamera
+					}
+					local.cam waitthread game.replace::delete
+					local.i = 0
+					continue
+				}
+				local.deltaAngles = $starttruck.angles - local.oldJeepAngles
+				local.cam.angles = group.player.viewangles + local.deltaAngles		
+			}			
+		}
+		local.oldJeepAngles = $starttruck.angles
+		waitframe
+	}
+}end
+
+//[202] Smithy
+//============================================================
+coop_stopTruckSpawnManager:{
+//============================================================
+	if (level.thread["coop_startTruckSpawnManager"]){ 
+		level.thread["coop_startTruckSpawnManager"] delete
+	}
+	if ($truckCamera){
+		$truckCamera delete
+	}
+	if (level.cameraModel){
+		level.cameraModel delete
+	}
+}end
+
+//[202] Smithy - spawn a camera for a player and set it up in truck
+//============================================================================
+coop_spawnTruckCamera:
+//============================================================================	
+	if (!level.RideOver && !group.player.truckCamera){
+		local.cam = spawn Camera targetname truckCamera 	//give them all the same name so they are handled in the targetname array
+		local.cam showquakes 1
+		local.cam.origin = level.opelpassengerseat.origin + (0 0 80)
+		local.cam bind level.opelpassengerseat
+		local.cam.player = group.player
+		group.player.truckCamera = local.cam
+		group.player.oldViewAngles = group.player.viewangles		
+	}
+end
+
+//[202] Smithy - make them look through their truck camera
+//============================================================================
+coop_startTruckCamera:{
+//============================================================================	
+	if (!level.RideOver && group.player.truckCamera && !group.player.inTruckCamera){
+		group.player.inTruckCamera = game.true
+			
+		local.name = ("truckCamera_" + group.player.entnum)
+		local.cam = group.player.truckCamera
+		local.cam targetname local.name
+		
+		local.camerause = spawn trigger_camerause target local.name
+		local.camerause doUse group.player
+		local.camerause delete
+		
+		//[202] Smithy - set targetname back to original so it gets added back to the array
+		local.cam targetname "truckCamera"
+	}
+}end
+
+//[202] Smithy - make them look through their truck camera
+//============================================================================
+coop_stopTruckCamera:{
+//============================================================================	
+	if (!level.RideOver && group.player.truckCamera && group.player.inTruckCamera){
+		group.player.inTruckCamera = game.false
+			
+		local.name = ("truckCamera_" + group.player.entnum)
+		local.cam = group.player.truckCamera
+		local.cam targetname local.name
+		
+		local.camerause = spawn trigger_camerause target local.name	
+		local.camerause doUse group.player
+		local.camerause delete
+		
+		//[202] Smithy - set targetname back to original so it gets added back to the array
+		local.cam targetname "truckCamera"
 	}
 }end
 
@@ -529,6 +674,9 @@ startTruckOptions: {	//self refers to $starttruck
 //============================================================
 PlayerExitVehicle: {
 //============================================================
+	cueplayer
+	thread coop_stopTruckSpawnManager //[202] Smithy
+	
 	//[202] chrissstrahl - slow down for testing
 	thread coop_mod/developer.scr::timescale 1
 	
@@ -560,7 +708,7 @@ PlayerExitVehicle: {
 		$player takedamage
 		$player.origin = local.exitpos
 		$player glue local.playerspot 0
-	}else{
+	}else{		
 		exec coop_mod/replace.scr::unglue local.exitpos NIL
 		exec coop_mod/replace.scr::glue local.playerspot 0
 	}
