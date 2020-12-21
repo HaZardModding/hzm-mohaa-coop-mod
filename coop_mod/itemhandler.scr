@@ -756,13 +756,45 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 	thread giveWeaponLoadout !(level.coop_retainInventory && waitthread playerHasInventory group.player)
 }end
 
+//[202] Smithy - improved to swap to previous uniform
 //=========================================================================
 takeUniformFromPlayer local.player:{
 //=========================================================================
 if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread itemhandler/takeUniformFromPlayer->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-	local.player stufftext "dm_playermodel american_army"
-	local.player.model = "models/player/american_army.tik"
+
+	if (local.player.flags["coop_hasEnemyUniform"]){
+		if (local.player.flags["coop_alliedUniform"]){
+			local.uniform = local.player.flags["coop_alliedUniform"]
+			local.model = local.player.flags["coop_alliedModel"]
+		}else{
+			local.uniform = "american_army"
+			local.model = "models/player/american_army.tik"
+		}
+		local.player.flags["coop_hasEnemyUniform"] = game.false
+		local.player stufftext ("dm_playermodel " + local.uniform)
+		local.player.model = local.model
+		end
+	}else{
+		local.uniform = waitthread getPlayerUniform local.player
+		local.player stufftext ("dm_playermodel " + local.uniform)
+	}
+		
+	if (waitthread playHasEnemyUniform local.player local.uniform){ //set a default uniform if they somehow manage to have an exis one.
+		println "PLAYER HAS ENEMY UNIFORM - NOT ALLOWED!"
+		local.uniform = "american_army"
+		local.model = "models/player/american_army.tik"
+		local.player stufftext ("dm_playermodel " + local.uniform)
+		local.player.model = local.model
+	}
 }end
+
+//[202] Smithy
+//=========================================================================
+playHasEnemyUniform local.player local.uniform:{
+//=========================================================================
+	local.isGerman = waitthread game.main::containsText local.uniform "german"
+	local.isItalian = waitthread game.main::containsText local.uniform "_AX_"
+}end(local.isGerman || local.isItalian)
 
 //=========================================================================
 giveUniformToPlayer local.player:{
@@ -773,10 +805,34 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 	}else{
 		local.uniform = level.coop_disguiseUniform
 	}
-
+	
+	//[202] Smithy
+	local.player.flags["coop_hasEnemyUniform"] = game.true
+	if (!local.player.flags["coop_alliedUniform"]){
+		local.player.flags["coop_alliedModel"] = local.player.model
+		local.player.flags["coop_alliedUniform"] = waitthread getPlayerUniform local.player
+	}
+		
 	local.player stufftext ("dm_playermodel " + local.uniform)
 	local.player.model = ("models/player/" + local.uniform + ".tik")
 }end
+
+//=========================================================================
+getPlayerUniform local.player:{
+//=========================================================================
+	local.uniform = ""
+	local.model = local.player.model
+	local.s = 0
+	for (local.i = 0; local.i <= local.model.size; local.i++){
+		if (local.model[local.i] == "/") local.s++
+		if (local.s == 2){	
+			for (local.j = local.i + 1; local.j <= local.model.size; local.j++){							
+				if (local.model[local.j] == ".") end(local.uniform)
+				local.uniform += local.model[local.j]
+			}	
+		}	
+	}
+}end(local.uniform)
 
 //gives all players the german officer's uniform as their player model
 //also turns on uniforms on spawn
