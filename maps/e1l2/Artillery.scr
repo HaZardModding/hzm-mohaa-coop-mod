@@ -19,8 +19,19 @@ InitArtillery:
 	$artillery2 thread GunOrExplosive $artillery2charge
 	$artillery3 thread GunOrExplosive $artillery3charge
 
-	$sniperrifle setthread SniperRifle
-	$sniperrifle.flags["coop_itemRespawnTime"] = -1 //[200] Smithy - don't respawn this gun
+	//$sniperrifle setthread SniperRifle
+	//$sniperrifle.flags["coop_itemRespawnTime"] = -1 //[200] Smithy - don't respawn this gun
+	
+	//[202][hotfix] Smithy - use script_model and trigger because actual weapon pickup will mess with the parm.other inventory
+	local.sniper = spawn script_model model $sniperrifle.model
+	local.sniper.origin = $sniperrifle.origin
+	local.sniper.angles = $sniperrifle.angles	
+	local.trigger = waitthread game.replace::cloneBrushObject $sniperrifle "trigger_useonce"
+	local.trigger.gun = local.sniper
+	local.trigger.origin = $sniperrifle.origin
+	local.trigger setthread SniperRifle
+	$sniperrifle delete
+	
 	thread artilleryStopOnProximity
 	
 	//initialize the landmines
@@ -285,6 +296,7 @@ SniperRifle:{
 //iprintlnbold_noloc("DEV: Sniper")
 	//chrissstrahl - coop compatible
 	local.model = self.model
+	local.sniper = self.gun //[202][hotfix] Smithy - the sniper model
 	if(level.gametype == 0){
 		$player weapon local.model
 	}else{
@@ -294,6 +306,7 @@ SniperRifle:{
 		iprintlnbold_noloc "You have acquired the KAR98 Sniper Rifle"
 	}
 	self remove
+	local.sniper remove //[202][hotfix] Smithy
 	
 	//waitframe //chrissstrahl - we need to wait a moment in mp for the weapon to be accsessible //[200] Smithy - the code below is for sp
 	if(level.gametype == 0){	
@@ -409,8 +422,8 @@ coop_trackUser local.player local.entturret local.entturret2:{
 GunOrExplosive local.charge:
 //=========================================================================
 {
-	//[200] chrissstrahl - debugme fixme
-	iprintlnbold_noloc("GunOrExplosive: "+local.charge)
+	//[200] chrissstrahl - debugme fixme //@chrissstrahl is it still broken?
+	//iprintlnbold_noloc("GunOrExplosive: "+local.charge)
 	
 	
 	//[200] chrissstrahl - moved up here, before coop func is started
@@ -600,13 +613,13 @@ coop_handleArtillery:{
 			if (vector_length(local.originPlayer - self.charge.origin) < 60){
 				self.explosiveset = 1
 				self.charge doUse local.player
-				iprintlnbold_noloc("Charge set!")
+				//iprintlnbold_noloc("Charge set!")
 				self waitthread coop_handleArtillery_playerExit local.player
 				end
 			}
 		//use turret
 			else{
-				iprintlnbold_noloc("Using hillary set!")
+				//iprintlnbold_noloc("Using hillary set!")
 				self unlock
 				self.turret unlock
 				self doUse local.player
@@ -620,14 +633,14 @@ coop_handleArtillery:{
 						local.player.flags["coop_isActive"] == 1 && vector_length (local.player.origin - self.origin) < 200)
 				{
 					if(local.player.useheld){
-						iprintlnbold_noloc("use held! break")
+						//iprintlnbold_noloc("use held! break")
 						break
 					}
 					waitframe
 				}
 				
 				//exit player
-				iprintlnbold_noloc("exiting")
+				//iprintlnbold_noloc("exiting")
 				self waitthread coop_handleArtillery_playerExit local.player
 			}
 		}
@@ -646,7 +659,7 @@ coop_handleArtillery_playerExit local.player:{
 	self.turret unlock
 	//unlock player from turret only if we really need to, or we can get a player stuck in a loop untill they kill them self
 	if(local.player != NIL && local.player != NULL && local.player.flags["coop_usingTurret"] != NIL && local.player.flags["coop_usingTurret"] == 1){
-		iprintlnbold_noloc("exiting auto-use")
+		//iprintlnbold_noloc("exiting auto-use")
 		self doUse local.player
 		local.player.flags["coop_usingTurret"] = 0
 		waitframe
@@ -666,7 +679,7 @@ varcheck:{
 		if(self.explosiveset != local.laststate){
 			local.laststate = self.explosiveset
 			println("changed self.explosiveset: "+self.explosiveset)
-			iprintlnbold_noloc("changed self.explosiveset: "+self.explosiveset)
+			//iprintlnbold_noloc("changed self.explosiveset: "+self.explosiveset)
 		}
 		waitframe
 	}
