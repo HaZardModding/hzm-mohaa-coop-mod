@@ -419,25 +419,70 @@ coop_trackUser local.player local.entturret local.entturret2:{
 }end
 
 //=========================================================================
+HoldChargePlace local.turret:
+//=========================================================================
+{
+	self attach local.turret recoil 1 ( -30 14 0 )
+}end
+
+//=========================================================================
+spawn_fx local.fx local.time:
+//=========================================================================
+{
+	local.temp = spawn script_model model local.fx
+	local.temp notsolid
+	local.temp.origin = self.target.origin
+	local.temp anim start
+	local.temp notsolid
+	wait local.time
+	local.temp remove
+}end
+
+//	Since we can't accurately represent the collision when the turret is pointing up,
+//  we re-center the pitch of the turret so that the collision will line up correctly.
+//=========================================================================
+CenterTurret:
+//=========================================================================
+{
+	//	dprintln "Centering turret:" self.targetname
+	if ( self.auto_center ){
+		self.auto_center delete
+		self.auto_center = NULL
+	}
+
+	local.vF 	= self.forwardvector
+	local.vF[2] = 0
+	local.o  	= self.origin
+	local.o[2] += 20
+	local.o  	= local.o + (local.vF * 100)
+
+	self.auto_center = spawn info_notnull origin local.o
+
+	if ( self.auto_center ){
+		self setaimtarget self.auto_center
+	}
+}end
+
+//=========================================================================
 GunOrExplosive local.charge:
 //=========================================================================
 {
-	//[200] chrissstrahl - debugme fixme //@chrissstrahl is it still broken?
-	//iprintlnbold_noloc("GunOrExplosive: "+local.charge)
-	
+	if(level.gametype != 0){
+		thread coop_GunOrExplosive //[202][hotfix] Smithy - use this version now
+		end
+	}		
 	
 	//[200] chrissstrahl - moved up here, before coop func is started
 	self.helpactiveturret = 0
 	self.helpactiveexplosive = 0
 	self.playerinturret = 0
-//	local.charge setusable 0
 	self.explosiveset = 0
 	
 	//chrissstrahl - handle seperate for coop
-	if(level.gametype != 0){
-		self thread coop_handleArtillery
-		end
-	}
+	//if(level.gametype != 0){
+	//	self thread coop_handleArtillery
+	//	end
+	//}
 
 	// center our turret by default...
 	self.turret thread CenterTurret
@@ -527,51 +572,145 @@ GunOrExplosive local.charge:
 	}
 }end
 
-//=========================================================================
-HoldChargePlace local.turret:
-//=========================================================================
-{
-	self attach local.turret recoil 1 ( -30 14 0 )
-}end
+//[202][hotfix] Smithy
+//============================================================================
+coop_GunOrExplosive: {
+//============================================================================
+	self.helpactiveturret = 0
+	self.helpactiveexplosive = 0
+	self.playerinturret = 0
+	self.explosiveset = 0
+	
+	self.turret thread CenterTurret
+	
+	while (self){
+		group.player = waitthread coop_mod/replace.scr::player_closestTo self
+		
+		if (!group.player){
+			wait 1
+			continue
+		}
+		
+		local.gundist = vector_length(group.player.origin - self.origin)
+		local.explosivedist = vector_length(group.player.origin - self.charge.origin)
+		local.canuse = self canuse group.player
 
-//=========================================================================
-spawn_fx local.fx local.time:
-//=========================================================================
-{
-	local.temp = spawn script_model model local.fx
-	local.temp notsolid
-	local.temp.origin = self.target.origin
-	local.temp anim start
-	local.temp notsolid
-	wait local.time
-	local.temp remove
-}end
-
-//	Since we can't accurately represent the collision when the turret is pointing up,
-//  we re-center the pitch of the turret so that the collision will line up correctly.
-//=========================================================================
-CenterTurret:
-//=========================================================================
-{
-	//	dprintln "Centering turret:" self.targetname
-	if ( self.auto_center ){
-		self.auto_center delete
-		self.auto_center = NULL
+		if (local.gundist < 200 && self.explosiveset == 0){	
+			if (self.playerinturret == 0){
+				if (local.canuse){
+					if (self.helpactiveturret == 0) {
+						self.helpactiveexplosive = 0
+						self.helpactiveturret = 1
+						//local.usekey = getboundkey1 "+use"					
+						local.msg = (loc_convert_string "Hold ") + "USE" + (loc_convert_string " to use the cannon.")
+						thread game.main::printInfo group.player local.msg 1
+					}
+				}else if (local.explosivedist < 100){
+					if (self.helpactiveexplosive == 0) {
+						self.helpactiveturret = 0
+						self.helpactiveexplosive = 1
+						//local.usekey = getboundkey1 "+use"
+						local.msg = (loc_convert_string "Hold ") + "USE" + (loc_convert_string " to set the explosive.")
+						thread game.main::printInfo group.player local.msg 1
+					}
+				}else{
+					thread global/throbtext.scr::throbtext_off
+					self.helpactiveturret = 0
+					self.helpactiveexplosive = 0
+				}
+			}			
+			if (group.player.useheld) {
+				//println "player pressed use on this turret!"
+				if (self.helpactiveexplosive == 1){
+					self.explosiveset = 1
+					self.charge doUse
+					end
+				}else if (self.helpactiveturret == 1){
+					self.helpactiveturret = 0
+					self.playerinturret = 1
+					thread coop_turretDoUse group.player
+					
+					// wait a bit longer until user can get off
+					//added it to a loop so player can't switch to spec and back before time is up
+					local.waittime = level.time + 2
+					while (level.time < local.waittime){
+						wait .1
+						if (!self){ end }
+						//check if player has gone
+						if (!isAlive group.player || group.player.dmteam != "allies"){
+							self.playerinturret = 0
+							//println "player no longer in this turret - premature!"
+						
+							//we need this, otherwise turret gets stuck in 'use' mode and kicks player off instantly on next turn
+							thread coop_turretDoUse $world
+						
+							wait 1
+						}
+					}
+					
+					if (!self.playerinturret){
+						continue
+					}				
+					
+					//wait until player leaves turret
+					waitthread coop_waittillTurretEmpty
+					if (!self){ end }
+					
+					//println "player no longer in this turret!"
+										
+					//no point waiting an extra .1 of a second below
+					continue					
+				}
+			}
+		} else {
+			if (self.helpactiveturret == 1 || self.helpactiveexplosive == 1) {
+				thread global/throbtext.scr::throbtext_off
+				self.helpactiveturret = 0
+				self.helpactiveexplosive = 0
+			}
+		}
+		wait 0.1 //doesn't have to be per frame, so lets slow this down to save cpu cycles in mission
 	}
-
-	local.vF 	= self.forwardvector
-	local.vF[2] = 0
-	local.o  	= self.origin
-	local.o[2] += 20
-	local.o  	= local.o + (local.vF * 100)
-
-	self.auto_center = spawn info_notnull origin local.o
-
-	if ( self.auto_center ){
-		self setaimtarget self.auto_center
-	}
 }end
 
+//[202][hotfix] Smithy - wait until the player leaves turret for whatever reason
+//============================================================================
+coop_waittillTurretEmpty:{
+//============================================================================
+	//println "coop_waittillTurretEmpty - start"
+
+	while (self && isAlive group.player && group.player.dmteam == "allies" && !group.player.useheld){
+		wait .1
+	}
+	
+	if (!self){ end }
+	
+	//println "coop_waittillTurretEmpty - turret empty!"
+	
+	self.playerinturret = 0
+	
+	if (isAlive group.player && group.player.dmteam == "allies"){	
+		thread coop_turretDoUse group.player					
+	}else{
+		thread coop_turretDoUse $world //so 'use' state doesn't get stuck
+	}
+	self.turret thread CenterTurret
+	wait 1
+}end
+
+//[202][hotfix] Smithy
+//============================================================================
+coop_turretDoUse local.ent:{
+//============================================================================
+	self unlock
+	self.turret unlock
+	self doUse local.ent
+	self lock
+	self.turret lock		
+}end
+
+/* [202][hotfix]Smithy - use different (but very similar) system from e2l1
+// it has some fixes like stuck use states and premature player state changes
 //chrissstrahl - this manages the Hillery for coop
 //=========================================================================
 coop_handleArtillery:{
@@ -623,13 +762,13 @@ coop_handleArtillery:{
 				self unlock
 				self.turret unlock
 				self doUse local.player
-				local.player.flags["coop_usingTurret"] = 1
+				local.player.flags["coop_usingTurret"] = game.true
 				self lock
 				self.turret lock
 				//have some delay here so player does not exit right away when still pressing button
 				wait 0.25
 				//[200] chrissstrahl - added check for NULL self
-				while(	self != NULL && local.player != NULL && local.player.health > 0 && local.player.dmteam != "spectator" &&
+				while (self && isAlive local.player && !local.player.isSpectator &&
 						local.player.flags["coop_isActive"] == 1 && vector_length (local.player.origin - self.origin) < 200)
 				{
 					if(local.player.useheld){
@@ -649,7 +788,6 @@ coop_handleArtillery:{
 	}
 }end
 
-
 //chrissstrahl - this manages the player leaving Hillery
 //=========================================================================
 coop_handleArtillery_playerExit local.player:{
@@ -658,10 +796,10 @@ coop_handleArtillery_playerExit local.player:{
 	self unlock
 	self.turret unlock
 	//unlock player from turret only if we really need to, or we can get a player stuck in a loop untill they kill them self
-	if(local.player != NIL && local.player != NULL && local.player.flags["coop_usingTurret"] != NIL && local.player.flags["coop_usingTurret"] == 1){
+	if(local.player && local.player.flags["coop_usingTurret"]){
 		//iprintlnbold_noloc("exiting auto-use")
 		self doUse local.player
-		local.player.flags["coop_usingTurret"] = 0
+		local.player.flags["coop_usingTurret"] = game.false
 		waitframe
 	}
 	self lock
@@ -684,4 +822,5 @@ varcheck:{
 		waitframe
 	}
 }end
+*/
 

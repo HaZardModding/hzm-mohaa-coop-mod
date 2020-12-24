@@ -199,8 +199,9 @@ playerUseBohlerThread:
 //=========================================================================
 {
 	//chrissstrahl - handle it for coop in seperate func
-	if(level.gametype != 0){
-		self thread coop_playerUseBohlerThread
+	if(level.gametype){
+		//self thread coop_playerUseBohlerThread
+		thread coop_playerUseBohlerThread_V2 //[202][hotfix] Smithy
 		end
 	}
 	
@@ -264,6 +265,98 @@ playerUseBohlerThread:
 	}
 }end
 
+//[202][hotfix] Smithy
+//=========================================================================
+coop_playerUseBohlerThread_V2:{
+//=========================================================================
+	self lock
+	local.backward  = -1 * angles_toforward self.angles 
+	while (self) {
+		while (1){
+			if (!self){ end }
+			
+			group.player = waitthread coop_mod/replace.scr::player_closestTo self
+		
+			if (!group.player){
+				wait 1
+				continue
+			}
+			
+			if !(vector_length(group.player.origin - self.origin) < 200){
+				wait .1
+				continue
+			}
+			
+			if (group.player.useheld){
+				local.vObjDir = vector_subtract group.player.origin self.origin
+				local.vObjDir = vector_normalize local.vObjDir
+				local.dot 	  = vector_dot local.vObjDir local.backward					
+				if (local.dot > .707){
+					break
+				}
+			}
+			wait .1
+		}			
+		
+		println "player in turret!"
+		
+		self.exitAngles = group.player.viewangles
+		thread coop_turretDoUse group.player
+		self.playerinturret = game.true
+		
+		// wait a bit longer until user can get off
+		local.waittime = level.time + 1
+		while (level.time < local.waittime){
+			wait .1
+			if (!self){ end }
+			if (!isAlive group.player || group.player.dmteam != "allies"){
+				println "player no longer in this turret - premature!"		
+				self.playerinturret = game.false
+				thread coop_turretDoUse $world 				//we need this, otherwise turret gets stuck in 'use' mode and kicks player off instantly on next turn
+				wait 1
+			}
+		}										
+		if (self.playerinturret){
+			waitthread coop_waittillTurretEmpty	
+		}							
+	}
+}end
+
+//[202][hotfix] Smithy - wait until the player leaves turret for whatever reason
+//============================================================================
+coop_waittillTurretEmpty:{
+//============================================================================
+	println "coop_waittillTurretEmpty - start"
+
+	while (self && isAlive group.player && group.player.dmteam == "allies" && !group.player.useheld){
+		wait .1
+	}
+	
+	println "coop_waittillTurretEmpty - now empty!"
+	
+	if (!self){ end }
+	
+	self.playerinturret = game.false
+		
+	if (isAlive group.player && group.player.dmteam == "allies"){	
+		thread coop_turretDoUse group.player		
+		group.player.viewangles = self.exitAngles			
+	}else{
+		thread coop_turretDoUse $world //so 'use' state doesn't get stuck
+	}
+	wait .25
+}end
+
+//[202][hotfix] Smithy
+//============================================================================
+coop_turretDoUse local.ent:{
+//============================================================================
+	self unlock
+	self doUse local.ent
+	self lock	
+}end
+
+/*
 //chrissstrahl - this manages the bohler stuff for coop
 //=========================================================================
 coop_playerUseBohlerThread:{
@@ -346,4 +439,4 @@ coop_playerUseBohlerThread_playerExit local.player local.viewangle:{
 	self lock
 }end
 
-
+*/
