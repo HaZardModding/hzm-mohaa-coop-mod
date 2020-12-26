@@ -1333,13 +1333,10 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 
 //GLUE
 //=========================================================================
-glue local.entity local.angle:{
+glue local.entity local.angle local.hide:{
 //=========================================================================
 if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread replace/glue->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-	if( level.gametype == 0 ){
-		//$player notsolid
-		//$player hide
-		//$player physics_off
+	if (level.gametype == 0){
 		if(local.angle == NIL){
 			$player glue local.entity
 		}else{
@@ -1347,8 +1344,11 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 		}
 		end
 	}
+	
+	if (local.hide == NIL){ local.hide = game.true }
+	
 	//handle multiplayer
-	thread glueHandle local.entity local.angle
+	thread glueHandle local.entity local.angle local.hide
 }end
 
 //optimize glue so that it glues player only one
@@ -1360,7 +1360,7 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 //[200] Smithy - re-written again - no loop needed now. no entity flags. etc...
 //and uses entnums instead of array index
 //=========================================================================
-glueHandle local.glueTo local.angle:{
+glueHandle local.glueTo local.angle local.hide:{
 //=========================================================================
 if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread replace/glueHandle->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
 	level.coop_playerGlue = 1
@@ -1374,13 +1374,11 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 	}else{
 		level.coop_playerGlueIndividual = 0
 	}
-	if ($player){ //[200] Smithy - NULL check should be outside loop
-		for (local.i = 1;local.i <= $player.size;local.i++){
-			local.player =  $player[local.i]
-			if (isAlive local.player && local.player.dmteam != "spectator"){
-				thread coop_mod/main.scr::playerGlue local.player
-			}	
-		}
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if (isAlive local.player && local.player.dmteam != "spectator"){
+			thread coop_mod/main.scr::playerGlue local.player NIL local.hide
+		}	
 	}
 }end
 
@@ -2299,7 +2297,7 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 		}
 
 		//check if he already has this weapon (this is why we have extra waits up above, so we can be sure it is found in their inv)
-		if (waitthread coop_mod/itemhandler.scr::playerHasWeapon local.player local.weapon){
+		if (waitthread game.item::playerHasWeapon local.player local.weapon){
 			println "(coop_mod/replace.scr::givePlayerWeapon): " local.player.netname " already has a " local.weapon
 			if (local.use == "one" && local.playerToUse && local.player == local.playerToUse){
 				local.playerToUse = NULL //ok, no weapon found on him, so he shouldn't use it
@@ -2308,19 +2306,19 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 		}
 
 		//local.addToLoadout = game.true
-		local.player waitthread coop_mod/itemhandler.scr::givePlayerWeapon local.weapon
+		local.player waitthread game.item::givePlayerWeapon local.weapon
 
-		if (local.use == "all" || !(thread coop_mod/itemhandler.scr::returnActiveWeapon local.player) && local.player.flags["coop_takenActiveWeapon"]){
-			local.player thread coop_mod/itemhandler.scr::usePlayerWeapon local.weapon local.wait //for 'multithreaded' delays
+		if (local.use == "all" || !(waitthread game.item::returnActiveWeapon local.player) && local.player.flags["coop_takenActiveWeapon"]){
+			local.player thread game.item::usePlayerWeapon local.weapon local.wait //for 'multithreaded' delays
 		}
 	}
 	if (local.use == "one"){
 		if (local.playerToUse && local.playerToUse.classname && local.playerToUse.classname == "Player" && local.playerToUse.dmteam != "spectator"){
-			local.playerToUse thread coop_mod/itemhandler.scr::usePlayerWeapon local.weapon local.wait
+			local.playerToUse thread game.item::usePlayerWeapon local.weapon local.wait
 		}
 	}
 	//if (local.addToLoadout){
-		thread coop_mod/itemhandler.scr::addWeaponToLoadout local.weapon
+		thread game.item::addWeaponToLoadout local.weapon
 	//}
 }end
 
@@ -2337,9 +2335,9 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 
 	for (local.i = 1; local.i <= $player.size; local.i++){
 		local.player = $player[local.i]
-		local.player thread coop_mod/itemhandler.scr::takePlayerWeapon local.weapon
+		local.player thread game.item::takePlayerWeapon local.weapon
 	}
-	thread coop_mod/itemhandler.scr::removeWeaponFromLoadout local.weapon
+	thread game.item::removeWeaponFromLoadout local.weapon
 }end
 
 //[201] Smithy - used to replace triggers with another (or just copy triggers as many times as you want).

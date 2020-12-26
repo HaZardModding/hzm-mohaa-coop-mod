@@ -588,7 +588,7 @@ friendlythinkstart:
 				// auto-arrange the guys to have them follow each other...
 				if ( level.friendly_auto_arrange==1 )
 				{
-					if (!(isalive self.destination) || !(self.destination))
+					if (!(isalive self.destination) || !(self.destination) && self.beacon != "Player")
 					{
 						if !(isalive self.destination)
 							println ("1made destination player, destination was " + self.destination)
@@ -623,15 +623,23 @@ friendlythinkstart:
 
 				local.movethread = -1
 				
-				//[202] chrissstrahl - make sure there is a player before we continue
-				//@smithy - can you check if that works in singleplayer as well ?
-				while(!(level.coop_player) || !($player)){
+				//[202][hotfix] Smithy
+				while ($player.size == 0){
 					wait 2
 				}
-				self.destination = level.coop_player
-				self.tether = level.coop_player
-				thread game.main::managePlayerToFollow //[202] Smithy - removed .scr from game.main, was spamming maps like mad
-			
+				
+				//[202][hotfix] Smithy
+				if (self.destination && self.beacon && self.destination.classname != "Player"){
+					self.beacon = NIl
+				}				
+
+				//[202][hotfix] Smithy
+				if (self.beacon == "Player"){					
+					self.destination = level.coop_player
+					self.tether = level.coop_player
+					thread game.main::managePlayerToFollow
+				}
+				
 				//[202] chrissstrahl - added check for self.destination
 				if (self.destination && vector_length (self.destination.origin - self.origin) > self.distance + local.friendrange) 
 				{
