@@ -65,9 +65,9 @@ main:{ // MACKEY MAY HAVE BEEN HERE, YOU BE THE JUDGE
 		level.friendly1 nodamage
 		//rescue jury
 		//exec coop_mod/replace.scr::spawnclip (1270 2220 100) ( -50 -50 0) (50 50 120) coop_clipExplosives 0.5 90 "You need to be accompanied by the SAS Agent, to continue here." level.friendly1 250
-		exec coop_mod/replace.scr::spawnclip (2205 3222 110) ( -50 -50 0) (50 50 120) coop_clipExplosives 0.5 90 "You need to be accompanied by the SAS Agent, to rescue the hostage." level.friendly1 250
+		exec coop_mod/replace.scr::spawnclip (2205 3222 110) ( -50 -50 0) (50 50 120) coop_clipExplosives 0.5 90 "You need to be accompanied by the SAS Agent to rescue the hostage." level.friendly1 250
 		//get explosives
-		exec coop_mod/replace.scr::spawnclip (1970 3200 -460) ( -50 -50 0) (50 50 120) coop_clipExplosives 0.7 90 "You need to be accompanied by the SAS Agent, to get explosives." level.friendly1 250
+		exec coop_mod/replace.scr::spawnclip (1970 3200 -460) ( -50 -50 0) (50 50 120) coop_clipExplosives 0.7 90 "You need to be accompanied by the SAS Agent to get explosives." level.friendly1 250
 	}
 	//end chrissstrahl
 
@@ -200,9 +200,9 @@ main:{ // MACKEY MAY HAVE BEEN HERE, YOU BE THE JUDGE
 		}
 		
 		//chrissstrahl - oh my god mackey why the hell would you do something like that ?
-		end
+end
 
-		tempfr:
+tempfr:
 
 		if (isalive level.friendly3){
 			if (level.time > local.lasttime + 5){
@@ -1231,7 +1231,7 @@ flagthread0:
 
 	while ((level.time < level.oldtrucktime) || (level.oldtrucktime == -1))
 	{
-//		if (getcvar(debug) == "1")
+		if (getcvar(debug) == "1")
 			println ("level.time is " + level.time + " and oldtrucktime is " + level.oldtrucktime)
 		wait 0.25
 	}
@@ -2584,28 +2584,38 @@ gotfriend:{
 }end
 
 
+//[202][hotfix] Smithy 
+//improved
+//this will be what is blocking the explosives thread.
 //=========================================================================
 blowdoor:{
 //=========================================================================
 	//chrissstrahl - let us make sure that the players can't spam here
-	if(level.gametype != 0){
-		if( level.flags[explosives] != 1 ){
-			level.varname = "coop_exploMessage"
-			if(parm.other.flags[level.varname] == NIL){ parm.other.flags[level.varname] = 0}
-			parm.other.flags[level.varname]++
-			if(parm.other.flags[level.varname] > 3){
-				end
-			}	
-		}
-		else{
-			if(	vector_length(self.origin - level.friendly1.origin) > 270 ){
-				level.varname = "coop_sasMessage"
-				if(parm.other.flags[level.varname] == NIL){ parm.other.flags[level.varname] = 0}
-				parm.other.flags[level.varname]++
-				if(parm.other.flags[level.varname] > 3){
-					end
-				}
-				iprintlnbold_noloc ("You need to be accompanied by the SAS Agent, to blow up the gate.")
+	//[202][hotfix] Smithy - if we make it for the player doing the triggering, then they can spam as much as they want.
+	local.player = parm.other
+	
+	if(level.gametype){
+		if (!level.flags[explosives]){
+			//[202][hotfix] Smithy - huh? there is no message here, so why is this code here?
+			//level.varname = "coop_exploMessage"
+			//if(parm.other.flags[level.varname] == NIL){ parm.other.flags[level.varname] = 0}
+			//parm.other.flags[level.varname]++
+			//if(parm.other.flags[level.varname] > 3){
+			//	end
+			//}	
+			waitthread coop_printHintMessage local.player "You have no explosives." //[202][hotfix] Smithy
+			end
+		}else{
+			if (vector_length(self.origin - level.friendly1.origin) > 900){ //[202][hotfix] Smithy - increase radius - original: 270
+				//[202][hotfix] Smithy
+				//level.varname = "coop_sasMessage"
+				//if(parm.other.flags[level.varname] == NIL){ parm.other.flags[level.varname] = 0}
+				//parm.other.flags[level.varname]++
+				//if(parm.other.flags[level.varname] > 3){
+				//	end
+				//}
+				//iprintlnbold_noloc ("You need to be accompanied by the SAS Agent to blow up the gate.")
+				waitthread coop_printHintMessage local.player "You need to be accompanied by the SAS Agent to blow up the gate." //[202][hotfix] Smithy
 				end
 			}
 		}
@@ -2618,17 +2628,40 @@ blowdoor:{
 //=========================================================================
 blowflak:{
 //=========================================================================
-	if(	vector_length(self.origin - level.friendly1.origin) > 650 ){
+	local.player = parm.other
+	
+	if (vector_length(self.origin - level.friendly1.origin) > 900){ //[202][hotfix] Smithy - increase radius - original: 650
+		/* //[202][hotfix] Smithy
 		level.varname = "coop_flakMessage"
 		if(parm.other.flags[level.varname] == NIL){ parm.other.flags[level.varname] = 0}
 		parm.other.flags[level.varname]++
 		if(parm.other.flags[level.varname] > 3){
 			end
-		}
+		}	
 		iprintlnbold_noloc ("You need to be accompanied by the SAS Agent, to blow up the flak.")
+		*/
+		waitthread coop_printHintMessage local.player "You need to be accompanied by the SAS Agent to blow up the flak." //[202][hotfix] Smithy
 		end
 	}
 	thread explosives 101
+}end
+
+//[202][hotfix] Smithy
+//=========================================================================
+coop_printHintMessage local.player local.msg local.delay:{
+//=========================================================================
+	if (local.player.flags["coop_hintTime"][local.msg] == NIL){
+		local.player.flags["coop_hintTime"][local.msg] = level.time - 1
+	}
+	
+	if (local.delay == NIL){
+		local.delay = 1.5
+	}
+		
+	if (level.time >= local.player.flags["coop_hintTime"][local.msg]){
+		local.player.flags["coop_hintTime"][local.msg] = level.time + local.delay
+		local.player iprint local.msg 1
+	}
 }end
 
 //=========================================================================
@@ -2799,10 +2832,10 @@ explosives local.set:{
 					thread fillused 740
 				}
 			}
-		}
-		else{
+		}else{
 			//chrissstrahl make sure only the player using it gets the message
-			local.player = exec coop_mod/replace.scr::player_closestTo self
+			//[202][hotfix] Smithy - keep this for sp, but this wasn't good for mp
+			local.player = exec coop_mod/replace.scr::player_closestTo self //not necessarily the closest in mp...
 			local.player iprint "You have no explosives." 1
 		}
 	}
