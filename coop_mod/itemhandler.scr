@@ -136,7 +136,7 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 		group.ammotype 						= local.ammotype
 	}
 
-	thread getItemWorldProperties
+	waitthread getItemWorldProperties
 
 	//player weapons we spawn in
 	if (group.item.flags["coop_playerNewWeapon"]){
@@ -218,11 +218,14 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 		while (group.item){
 			group.item waittill trigger 								//wait here until the weapon has been triggered
 			local.player = parm.other
-
-			thread getItemWorldProperties 								//grab latest properties
+			
+			waitthread getItemWorldProperties  							//grab latest properties
+			
+			local.isCarryingClass = waitthread isCarryingAmmoType local.player group.ammotype //[202][hotfix] Smithy - grab this for future use
+											
 			wait game.ms
 
-			if ((!local.player || local.player.classname != "Player") && group.item){ continue }
+			if ((!local.player || local.player.classname != "Player") && group.item){ continue }		
 
 			if (!group.pickupEvent){ 										//a pickup event wasn't found. this means this weapon WAS NOT picked up
 				if (!group.item){
@@ -230,7 +233,7 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 					if (group.droppedItemLifeThread){ group.droppedItemLifeThread end }
 					end
 				}
-				if (waitthread isCarryingAmmoType local.player group.ammotype){ //ok, no pickup found, check that he doesn't just have full ammo
+				if (local.isCarryingClass){ //ok, no pickup found, check that he doesn't just have full ammo
 					continue
 				}
 
@@ -238,7 +241,7 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 					continue
 				}
 
-				thread getItemWorldProperties 								//grab latest properties
+				waitthread getItemWorldProperties 							//grab latest properties
 
 				//ok, it wasn't picked up and he doesn't have full ammo... must be a new weapon. lets hack it in.
 				waitthread coop_mod/main.scr::changeGameType 0 0
@@ -254,10 +257,7 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 					}
 					break
 				}else{
-					//on the off chance we can't deal with the weapon, print info and stop the handlers
 					println "(itemhandler.scr::handleWeaponPickup) *ERROR*: Weapon " group.item " with model " group.model " cannot be picked up by " local.player.netname
-					//if (group.pickupEventThread){ group.pickupEventThread end }
-					//end //i dont think we should end here as other players may be able to use this even if we cant
 				}
 			}else{
 				//pickup event found straight away. hallelujah.
@@ -268,9 +268,7 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 				break
 			}
 		}
-
-		//ok, needs to be here... duh
-		//local.player.flags["coop_inventoryAmmo"][group.ammotype] = game.true
+		
 		thread addWeaponToInventory local.player group.model "pickup" group.ammotype //it's a pickup so check for ammo types
 
 		if (group.pickupEventThread){ group.pickupEventThread end }
@@ -308,7 +306,6 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 
 		if (group.type == "Weapon"){
 			group.pickupEvent = game.true 											//flag pickup event to check in handleWeaponPickup
-			//local.player.flags["coop_inventoryAmmo"][group.ammotype] = game.true 	//flag that the player now has this ammotype in his inventory
 			if (group.item){
 				group.item notdroppable
 			}
@@ -355,11 +352,9 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 
 	group.droppedItemLifeThread = local
 
-	wait (int(getcvar "g_droppeditemlife")) 		//this cvar is set to 30 seconds by default.
-	if (!group.item){
-		//if (group.pickupEventThread) 	{ group.pickupEventThread end }
-		//if (group.pickupHandlerThread) 	{ group.pickupHandlerThread end }
-	}else if(group.item.flags["coop_droppedItem"]){	//these are our script items that drop
+	wait (int(getcvar "g_droppeditemlife")) 				//this cvar is set to 30 seconds by default.
+
+	if(group.item && group.item.flags["coop_droppedItem"]){	//these are our script items that drop
 		group.item remove
 	}
 	if (group.physObject){
@@ -431,7 +426,6 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 	group.item.flags["coop_respawnedItem"] 	= game.true 			//dont reprocess this item
 	group.item angles 						group.angles
 	group.item scale 						group.scale
-	//group.item angle 						group.angle
 	group.item origin 						group.origin
 	group.item set_respawn 0
 }end
@@ -619,17 +613,6 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 	group.velocity[2] 	= (group.velocity[2] * 0.5) + 100
 }end
 
-//checks to see if the player is carrying this ammotype.
-//(can be used externally)
-/* defunct - coop_inventoryAmmo is now defunct too...
-//=====================================================================
-isCarryingAmmoType local.player local.aType:{
-//=====================================================================
-if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread itemhandler/isCarryingAmmoType->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-	local.aType = local.player.flags["coop_inventoryAmmo"][local.aType]
-}end (local.aType != game.false)
-*/
-
 //check if this weapon is forced on player
 //=====================================================================
 isWeaponAllowed local.player local.item:{
@@ -781,7 +764,7 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 	}
 	*/
 		
-	//if (waitthread playHasEnemyUniform local.player local.uniform){ //set a default uniform if they somehow manage to have an exis one.
+	//if (waitthread playerHasEnemyUniform local.player local.uniform){ //set a default uniform if they somehow manage to have an exis one.
 	//	println "PLAYER HAS ENEMY UNIFORM - NOT ALLOWED!"
 		local.uniform = "american_army"
 		local.model = "models/player/american_army.tik"
@@ -792,7 +775,7 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 
 //[202] Smithy
 //=========================================================================
-playHasEnemyUniform local.player local.uniform:{
+playerHasEnemyUniform local.player local.uniform:{
 //=========================================================================
 	local.isGerman = waitthread game.main::containsText local.uniform "german"
 	local.isItalian = waitthread game.main::containsText local.uniform "_AX_"
@@ -1110,7 +1093,6 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 	group.invTargetname = ("player" + group.player.entnum + "Inventory") 	//e.g. player0Inventory
 
 	if (local.default){
-		//thread resetPlayerAmmo group.player
 		thread resetPlayerWeapons group.player
 	}
 	//spawn them in first and flag them as playerWeapon
@@ -1131,9 +1113,7 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 	group.weapons hide
 	group.weapons notsolid
 	group.weapons nottriggerable
-
 	
-
 	//improve spawning when in disguise mission! 
 	if (group.player.has_disguise){ 
 		thread setIsDisguised group.player game.true //set initial disguise to true	
@@ -1292,8 +1272,6 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 
 	local.model = waitthread makeWeaponStringValid local.model
 
-	//println local.model
-
 	if (waitthread notStartGrenade local.model){
 		local.ammoType = waitthread getAmmoType local.model
 	}
@@ -1309,8 +1287,7 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 		}
 	}
 	local.weaponIndex = (local.player.flags["coop_inventoryWeapons"].size + 1)
-	local.player.flags["coop_inventoryWeapons"][local.weaponIndex] = local.model
-	
+	local.player.flags["coop_inventoryWeapons"][local.weaponIndex] = local.model	
 }end
 
 //new, more robust version
@@ -1323,7 +1300,6 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 			local.weap = local.player.flags["coop_inventoryWeapons"][local.i]
 			if (waitthread notStartGrenade local.weap){
 				if ((waitthread getAmmoType local.weap) == local.ammoType){
-					//println local.weap " is weap type of " local.ammoType
  					end(game.true)
 				}
 			}
@@ -1525,25 +1501,6 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 	local.player.flags["coop_inventoryWeapons"][1]	= NIL
 }end
 
-//initialises/resets all the ammo inventory flags for a player.
-//these are booleans to tell us if a player is carrying this ammotype or not.
-//=========================================================================
-resetPlayerAmmo local.player:{
-//=========================================================================
-if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread itemhandler/resetPlayerAmmo->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-	if (!local.player || local.player.classname != "Player"){ end }
-	/*
-	local.player.flags["coop_inventoryAmmo"]["pistol"] 		= game.false
-	local.player.flags["coop_inventoryAmmo"]["mg"] 			= game.false
-	local.player.flags["coop_inventoryAmmo"]["heavy"] 		= game.false
-	local.player.flags["coop_inventoryAmmo"]["smg"] 		= game.false
-	local.player.flags["coop_inventoryAmmo"]["rifle"] 		= game.false
-	local.player.flags["coop_inventoryAmmo"]["shotgun"] 	= game.false
-	local.player.flags["coop_inventoryAmmo"]["grenade"] 	= game.false
-	local.player.flags["coop_inventoryAmmo"]["agrenade"] 	= game.false
-	*/
-}end
-
 //makes grenades work when picking them up by turning them into an AmmoEntity.
 //they now provide grenade ammo. but more specifically, their particular grenade ammo
 //(internal use only)
@@ -1594,7 +1551,6 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 		local.granate.scale 	= group.scale
 
 		if (local.velocity != (0 0 0)){
-			//iprintlnbold_noloc(group.model + " is being dropped!")
 			local.granate glue local.item
 			local.granate.flags["coop_droppedItem"] = game.true
 			local.item hide
@@ -1697,7 +1653,7 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 broadcastSound local.entity local.event local.radius:{
 //=========================================================================
 if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread itemhandler/broadcastSound->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-	//iprintlnbold_noloc("broadcasting sound")
+
 	local.entity ai_event local.event local.radius
 
 	/*
@@ -1804,8 +1760,6 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 		local.player.flags["coop_takenActiveWeapon"] = game.true
 	}
 
-	//local.player.flags["coop_inventoryAmmo"][(waitthread getAmmoType local.model)] = game.true
-
 	local.player take local.model
 
 	//take the weapon from everyone's inventories and default loadout so current and future players will not have this
@@ -1844,13 +1798,13 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 		local.item remove    //stop any potential memory leaks
 		end 
 	}
-
+	
 	local.item triggerable
 	waitthread coop_mod/main.scr::changeGameType 0 0
 	local.item triggereffect local.player
 	waitthread coop_mod/main.scr::changeGameType 2 0
 
-	 //give the weapon to everyone's inventories and default loadout so current and future players will have this
+	//give the weapon to everyone's inventories and default loadout so current and future players will have this
 	//thread addWeaponToEveryone local.model
 	if (waitthread playerHasInventory local.player){
 		thread addWeaponToInventory local.player local.model
