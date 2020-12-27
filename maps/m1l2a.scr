@@ -136,7 +136,7 @@ main:{ // MACKEY MAY HAVE BEEN HERE, YOU BE THE JUDGE
 //	$health1 notsolid
 //	$health2 notsolid
 
-		$endtrigger thread endtrigger		
+		//$endtrigger thread endtrigger //[202][hotfix] Smithy 		
 
 		level.usedrange = 2
 
@@ -1239,6 +1239,7 @@ flagthread0:
 
 	
 	self.friendtype = 4
+	self turnto NULL //[202][hotfix] Smithy - fix him trying to look at the spotlight every time he stops walking. looks horrible lol.
 	self exec coop_mod/replace.scr::lookat //chrissstrahl - coop mod compatible
 //	self tether $player
 //	self leash self.leashvalue
@@ -1277,14 +1278,12 @@ canteen:{
 	self exec coop_mod/replace.scr::unholster //chrissstrahl - fix holster bug
 }end
 
+//[202][hotfix] Smithy - now check if they destroyed too
 checkspotlights:
-	if (level.spotlight[1].spotterdeath == 1)
-		end 1
-	if (level.spotlight[2].spotterdeath == 1)
-		end 1
-	if (level.spotlight[3].spotterdeath == 1)
-		end 1
-
+	for (local.i = 1; local.i < 4; local.i++){
+		if (level.spotlight[local.i].spotterdeath || level.spotlight[local.i].destroyed)
+			end(game.true)
+	}
 end -1
 
 flagthread1:
@@ -1298,6 +1297,7 @@ flagthread1:
 		self say dfr_m1l2_add04  // Great, well we might as well just go in the front door now.
 		thread PUREfillused 330
 //		thread flagthread-1
+		self turnto NULL //[202][hotfix] Smithy - fix him trying to look at the spotlight every time he stops walking. looks horrible lol.
 		end
 	}
 	println "01"
@@ -1310,6 +1310,7 @@ flagthread1:
 		thread PUREfillused 330
 		self.friendtype = 4
 		self.avoidplayer = 1
+		self turnto NULL //[202][hotfix] Smithy - fix him trying to look at the spotlight every time he stops walking. looks horrible lol.
 		end
 	}
 	
@@ -1321,6 +1322,7 @@ flagthread1:
 		thread PUREfillused 330
 		self.friendtype = 4
 		self.avoidplayer = 1
+		self turnto NULL //[202][hotfix] Smithy - fix him trying to look at the spotlight every time he stops walking. looks horrible lol.
 		end
 	}
 
@@ -1358,6 +1360,7 @@ flagthread1:
 		self.friendtype = 4
 		self.avoidplayer = 1
 		println "DEV: Front door approach 1"
+		self turnto NULL //[202][hotfix] Smithy - fix him trying to look at the spotlight every time he stops walking. looks horrible lol.
 		end
 	}
 
@@ -1373,6 +1376,7 @@ flagthread1:
 		self.friendtype = 4
 		self.avoidplayer = 1
 		println "DEV: Front door approach 2"
+		self turnto NULL //[202][hotfix] Smithy - fix him trying to look at the spotlight every time he stops walking. looks horrible lol.
 		end
 	}
 	if !(isalive self)
@@ -1397,6 +1401,7 @@ flagthread1:
 		self.friendtype = 4
 		self.avoidplayer = 1
 		println "DEV: Front door approach 3"
+		self turnto NULL //[202][hotfix] Smithy - fix him trying to look at the spotlight every time he stops walking. looks horrible lol.
 		end
 	}
 
@@ -1429,6 +1434,7 @@ flagthread1:
 		thread PUREfillused 330
 		self.friendtype = 4
 		self.avoidplayer = 1
+		self turnto NULL //[202][hotfix] Smithy - fix him trying to look at the spotlight every time he stops walking. looks horrible lol.
 		end
 	}
 
@@ -1437,7 +1443,8 @@ flagthread1:
 	thread fillused 260
 	self waittill movedone
 
-
+	self turnto NULL //[202][hotfix] Smithy - fix him trying to look at the spotlight every time he stops walking. looks horrible lol.
+	
 	if ((thread checkspotlights == 1) || (level.spotplayer[1] == 1))
 	{
 		self say dfr_m1l2_add04  // Great, well we might as well just go in the front door now.
@@ -1531,12 +1538,12 @@ flagthread6:
 //	self.friendtype = 1
 //	level.flags[playerchoice] = 0
 	if (level.flags[playerchoice] == -1)
-	
-	
-	//if (vector_length (self.origin - $player.origin) > 800) //chrissstrahl
-	if !(exec coop_mod/replace.scr::withinDistanceOf self 800){ //chrissstrahl - coop compatible //[200] chrissstrahl - fixed bad type parameter 1
-		level.flags[playerchoice] = 2
-		println "distance chose 2"
+	{
+		//if (vector_length (self.origin - $player.origin) > 800) //chrissstrahl
+		if !(exec coop_mod/replace.scr::withinDistanceOf self 800){ //chrissstrahl - coop compatible //[200] chrissstrahl - fixed bad type parameter 1
+			level.flags[playerchoice] = 2
+			println "distance chose 2"
+		}
 	}
 
 //	self.friendtype = -1
@@ -1546,7 +1553,7 @@ flagthread6:
 	thread printused 565
 
 	if (getcvar(debug) == "1")
-	println ("========= playerchoice is " + level.flags[playerchoice])
+		println ("========= playerchoice is " + level.flags[playerchoice])
 	
 	while (level.flags[playerchoice] == -1){
 		waitframe
@@ -1569,6 +1576,10 @@ flagthread6:
 			println "playerchoice 2 is a go"
 //			self.friendtype = 4
 	}
+	
+	//[202][hotfix] Smithy - delete them here instead
+	$decision1 delete
+	$decision2 delete
 
 end
 
@@ -1668,7 +1679,8 @@ flagthread7:
 		self say dfr_m1l2_133m_1 // We have to recover the explosives they took from me.
 		self waittill saydone
 
-
+		self turnto NULL //[202][hotfix] Smithy - fix him trying to look at the player every time he stops walking. looks horrible lol.
+		
 		thread newobjective
 	//	waitthread global/objectives.scr::add_objectives 1 2 "Find and Rescue the SAS Agent." level.friendly1.origin
 		waitthread global/objectives.scr::add_objectives 2 3 "Follow the SAS Agent." $osspapers.origin
@@ -1780,7 +1792,8 @@ flagthread9:{
 	wait 0.5
 	self runto $avoidflak
 	self waittill movedone
-	level.friendly1.friendtype = 4
+	//level.friendly1.friendtype = 4 //[202][hotfix] Smithy
+	thread endtrigger  //[202][hotfix] Smithy - end on this point now
 }end
 
 //[200] chrissstrahl - info
@@ -1805,8 +1818,8 @@ flagthread10:{
 		
 	level.flags[choice] = 2
 
-	$decision1 delete
-	$decision2 delete
+	//$decision1 delete
+	//$decision2 delete
 	
 	//[200] chrissstrahl - i have no fucking idea how the fuck this fuck is meant to work
 	//so i have the fuck decided that this fuck should the fuck wait until the fucking player
@@ -1851,6 +1864,8 @@ flagthread11:
 		wait 1
 	}
 	self.friendtype = 4
+	
+	self turnto NULL //[202][hotfix] Smithy - fix him trying to look at the flaks every time he stops walking. looks horrible lol.
 
 	/*
 
@@ -2118,6 +2133,9 @@ flagthread18:{
 	}
 
 	level.friendly1.friendtype = 4
+	
+	wait 2.5	
+	self turnto NULL //[202][hotfix] Smithy - fix him trying to look at the vent every time he stops walking. looks horrible lol.
 }end
 
 //=========================================================================
@@ -2335,7 +2353,8 @@ flagthread19old:{
 	self.friendtype = 4
 }end
 
-
+//[202][hotfix] Smithy - only check for the player that is being followed
+//print hint to let players know how to get agent to come here...
 //=========================================================================
 friendchoice:{
 //=========================================================================
@@ -2343,15 +2362,43 @@ friendchoice:{
 		end
 	}
 
+	local.triggeringPlayer = parm.other
+		
+	local.followedPlayer = level.friendly1.flags["coop_followedPlayer"]
+	
+	if (!local.followedPlayer){
+		end
+	}
+		
+	if (local.followedPlayer != local.triggeringPlayer){
+		waitthread coop_printHintMessage local.triggeringPlayer "The player leading the SAS Agent needs to come here if you want to save the prisoner." 5
+		end 
+	}
+	
+	waitthread coop_printHintMessage local.triggeringPlayer "Go to the SAS agent if you want him to follow you here to save the prisoner." 5
+
 	level.flags[playerchoice] = 1
 	println "player chose 1 (friendchoice)"
 }end
 
+//[202][hotfix] Smithy - only check for the player that is being followed
 //=========================================================================
 friendchoice2:{
 //=========================================================================
 	if (level.flags[explosives] != 1){
 		end
+	}
+	
+	local.triggeringPlayer = parm.other
+		
+	local.followedPlayer = level.friendly1.flags["coop_followedPlayer"]
+	
+	if (!local.followedPlayer){
+		end
+	}
+		
+	if (local.followedPlayer != local.triggeringPlayer){
+		end 
 	}
 
 	level.flags[playerchoice] = 2
@@ -3376,20 +3423,26 @@ chairhealth local.thread:{
 	level.prisonerReadyGrilloCanLeadAgain = 1
 }end
 
+//[202][hotfix] Smithy - ending is a bit buggy. lets make it happen next to 
+//flaks instead. we can always see what the actual cause at some point.
 //=========================================================================
 endtrigger:{
 //=========================================================================
-	self waittill trigger
+	//self waittill trigger //[202][hotfix] Smithy
 
+	/*//[202][hotfix] Smithy - ending is a bit buggy, quick fix
 	while ((level.flags[papers] == 0) || (level.flags[flak] == 0) || (level.flags[door] == 0) || (level.flags[prisoner] == 0) || (level.flags[friendlyflak] == 0)){
 		println ("Needed to complete: papers: " + level.flags[papers] + " flak: " + level.flags[flak] + " door: " + level.flags[door] + " prisoner: " + level.flags[prisoner] + " friendlyflak: " + level.flags[friendlyflak])
 		wait 2
 	}
+	*/
 
 	//while !(self istouching $player){						//chrissstrahl
+	/* //[202][hotfix] Smithy - ending is a bit buggy, quick fix
 	while !(exec coop_mod/replace.scr::istouching self){	//chrissstrahl - made coop compatible
 		wait 1
 	}
+	*/
 
 	level.friendly1.friendtype = -1
 	level.friendly1.distance = 180
