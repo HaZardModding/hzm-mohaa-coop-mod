@@ -29,7 +29,7 @@ if(level.cMTE_coop_aihandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 
 	//make sure main.scr has loaded
 	waitthread coop_mod/main.scr::waitForMainScript
-	if (self == NULL){ end }
+	if (!self){ end }
 
 	//[200] Smithy - adds maps we don't want to use the custom pain handler on
 	if (!level.coop_painHandlerExclusionInit){
@@ -42,7 +42,7 @@ if(level.cMTE_coop_aihandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 	}
 
 	wait game.ms // so entities have properly initialised
-	if (self == NULL){ end }
+	if (!self){ end }
 
 	thread local.thread
 
@@ -54,7 +54,7 @@ if(level.cMTE_coop_aihandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 actorHandler:{
 //=========================================================================
 if(level.cMTE_coop_aihandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread aihandler/actorHandler->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-	if(!isAlive self){ end }	
+	if (!isAlive self){ end }	
 
 	group.team = self.team
 
@@ -67,12 +67,18 @@ if(level.cMTE_coop_aihandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 	self.flags["coop_actorNoticeScale"] 		= self.noticescale
 	*/
 
-	if(level.coop_actorPainHandler){ 	//replace painhandler with our own
+	if (level.coop_actorPainHandler){ 	//replace painhandler with our own
 		thread initialisePainVars
+	}
+	
+	//[202][hotfix] Smithy - allow us to determine if maps should force weapon drops from actors upon death
+	//this is needed because the BT maps often have actors with dontdropweapons set on them individually.
+	if (level.coop_forceDropWeapons){ 
+		self forcedropweapon
 	}
 
 	//[200] Smithy - new func
-	if(level.coop_aaMap == 1){ 			// restore any properties that are AA specific
+	if (level.coop_aaMap){ 				// restore any properties that are AA specific
 		thread restoreAAProperties
 	}
 	thread restoreSPProperties 			// restore any properties that are SP specific
@@ -92,7 +98,7 @@ if(level.cMTE_coop_aihandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 	thread addKillToPlayer
 	thread removeActorFromArray
 
-	if (self == NULL){ end }
+	if (!self){ end }
 
 	thread coop_mod/itemhandler.scr::enableWeapon 		//[200] Smithy - make it so their weapon can now be triggered (thus picked up)
 
@@ -266,7 +272,7 @@ if(level.cMTE_coop_aihandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 	}
 
 	//[200] Smithy - don't do certain actors that use their own health systems
-	if (self.targetname == "friendly" || self.friendtype){
+	if (self.targetname == "friendly" || self.friendtype != NIL){
 		self.flags["coop_actorStopPainHandler"] = game.true
 		end
 	}
@@ -325,7 +331,7 @@ if(level.cMTE_coop_aihandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 
 	self health 5000 				//restore safe health
 
-	if(thread friendlyFireCheck){ 	//check if we should ignore pain or not
+	if(waitthread friendlyFireCheck){ 	//check if we should ignore pain or not
 		end
 	}
 
@@ -347,18 +353,16 @@ if(level.cMTE_coop_aihandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 		error ("coop_mod/aihandler.scr::friendlyFireCheck - never call this func from outside aihandler.scr")
 		end
 	}
-
-	if(	self.fact.attacker.team == self.team &&
-	 	self.fact.attacker != self &&
-	 	self.fact.inflictor.classname != "BarrelObject" ||
-	 	(self.fact.attacker.classname == "Player" && self.team == "american")){
-
+	
+	if (self.fact.attacker.classname == "Player" && self.team == "american"){
+		println self " was hurt by player: ignoring pain"
+		end(game.true)
+	}else if(self.fact.attacker.team == self.team && self.fact.attacker != self && self.fact.inflictor.classname != "BarrelObject"){
 		println self " was hurt by teammate: ignoring pain"
 		end(game.true)
 	}else if(self.fact.attacker == self){
 		//println self " was hurt by himself. don't ignore pain!"
 	}
-
 }end(game.false)
 
 //actually do pain calculations (internal use only)
