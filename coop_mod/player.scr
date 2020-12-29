@@ -35,6 +35,7 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	while(1){
 		//[202] chrissstrahl - if server is empty wait
 		if !($player){
+			local.prevPlayerCount = 0
 			waitframe
 			continue
 		}
@@ -106,7 +107,7 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 		
 		//[202] Smithy - moved here and done in one //[200] chrissstrahl - used for LMS to detect when a player leaves
 		local.playerCount = $player.size
-		
+
 		//[200] chrissstrahl - call player changed func if number of players changed
 		if(local.prevPlayerCount != local.playerCount){
 			waitthread coop_mod/main.scr::playerCountChanged local.prevPlayerCount local.playerCount
@@ -876,11 +877,45 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	end(level.coop_clientZero != NULL)
 }
 
-//[202] Smithy - make a player reconnect to server
-//we can use this to fix player 0 issue
+//[202] Smithy - make a player reconnect to server if player 0 has gone.
+//[202][hotfix] Smithy - fully implemented this function
+//This is a nasty way to fix AI not responding, but it'll have to do for now.
 //=========================================================================
 reconnectPlayer local.player:{
 //=========================================================================
 if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread player/reconnectPlayer->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-	local.player stufftext "disconnect; wait 1; reconnect" //needs work, dont use yet
+	if (level.coop_reconnectingPlayerZero){ end }
+	level.coop_reconnectingPlayerZero = game.true
+	
+	local.netname = local.player.netname
+	
+	local.j = 8;	
+	for (local.i = 1; local.player && !thread isClientZeroActive && local.i <= 8; local.i++){
+		thread global/throbtext.scr::throbtext ("Player 0 is not in the game. Reconnecting " + local.player.netname + " in " + local.j + " seconds.")
+		wait 1
+		thread global/throbtext.scr::throbtext_off
+		waitframe
+		local.j--
+		println "reconnectPlayer: waited " local.i " seconds for player 0 to join."
+	}
+	thread global/throbtext.scr::throbtext_off
+	if (!thread isClientZeroActive){
+		if (local.player){		
+			println "reconnectPlayer: reconnecting " local.player.netname
+			local.player stufftext "disconnect; wait 1; reconnect"
+		}else{
+			if ($player.size > 0){
+				println "reconnectPlayer: " local.netname " left before we could reconnect him. Reconnecting " $player[1].netname " instead!"		
+				level.coop_reconnectingPlayerZero = game.false
+				thread reconnectPlayer $player[1]
+				end
+			}
+		}
+	}else{
+		println "reconnectPlayer: player 0 joined before we reconnected a player! woohoo!"
+		if ($player.size > 1){ //only do this if we have more than just player 0 in the server.			
+			thread global/throbtext.scr::throbtext ("Thanks, " + level.coop_clientZero.netname + ". You saved someone from being reconnected!")
+		}
+	}
+	level.coop_reconnectingPlayerZero = game.false
 }end
