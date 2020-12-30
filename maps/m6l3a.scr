@@ -85,12 +85,14 @@ main:{
 	
 	//chrissstrahl - overwrite during development, to make testing easier
 	//who ever came up with the fucktardish idea to make it this hard should be shot
+	/*
 	if(level.gametype == 0){
 		level.scene2_spawntower1_population = 0	//change this to alter gameplay balance
 		level.scene2_spawntower2_population = 0	//change this to alter gameplay balance
 		level.scene2_spawntower3_population = 0	//change this to alter gameplay balance
 		level.scene2_spawntower4_population = 0	//change this to alter gameplay balance
 	}
+	*/
 
 	exec global/loadout.scr maps/m6l3a.scr
 
@@ -293,7 +295,7 @@ $objective1_fireball7 anim stop
 	
 	//[202] chrissstrahl - update spawnpoints ince a player has joined
 	if(level.gametype != 0){
-		waitthread coop_updateSpawningInTrain
+		thread coop_updateSpawningInTrain
 	}
 	
 	waitthread global/items.scr::add_item "explosives" nomessage
@@ -369,7 +371,7 @@ level.daniels.accuracy = 15
 
 	//*** OPEN THE MAIN DOORS
 	thread scene1_opendoors
-	println "OPENDOORS"
+	//println "OPENDOORS"
 
 //*** SETUP NOTES
 
@@ -392,7 +394,7 @@ level.daniels.accuracy = 15
 */
 
 	//*** CONFIRM PROGRAM INITIALIZATION 
-	println "STEVEFU: MARKER 1" 
+	//println "STEVEFU: MARKER 1" 
 
 	//*** INITIALIZE OBJECTIVES
 	waitthread global/objectives.scr::add_objectives 1 2 "Snipe the tower guards. Keep losses at a minimum. Do not lose more than 9 members of the assault team across the two boxcars." $player.origin
@@ -425,6 +427,10 @@ level.daniels.accuracy = 15
 	//	$scene1_captain notsolid
 	$scene1_captain exec global/disable_ai.scr
 	$scene1_captain nodamage
+	
+	//[202][hotfix] Smithy - players get bored. when players get bored, they get itchy. What gets itchy first? The fingers on their triggers. Go figure.
+	level.anderson nodamage
+	level.bueller nodamage
 
 	$scene1_captain exec global/turnto.scr $train_boxcars_door
 	level.anderson exec global/turnto.scr $train_boxcars_door
@@ -538,8 +544,8 @@ scene1_trainmove:{
 			local.stepspeed = local.stagedownspeed2
 		}
 
-		println "TRAINSPEED IS " local.trainspeed		
-		println "CURRENT NODE IS " local.i
+		//println "TRAINSPEED IS " local.trainspeed		
+		//println "CURRENT NODE IS " local.i
 
 		$solid_train_engine moveto $("trainnode" + local.i).origin
 		$solid_train_engine speed local.trainspeed
@@ -632,6 +638,10 @@ scene2:{
 	//*** Release everyone from their starting positions after Captain kills the one Platformguy 
 	wait 2.5
 	thread scene2_platform_egress
+	
+	//[202][hotfix] Smithy - If they die, they die.
+	level.anderson takedamage
+	level.bueller takedamage
 
 	//*** Start the combat soundtrack
 	forcemusic aux1
@@ -1113,10 +1123,10 @@ scene2_alliedspawn_control:{
 				$(local.scene2_alliedspawn_ai_name) thread scene2_alliedspawn_navigate 	//call navigation thread 
 
 				level.scene2_alliedspawn_teamvalue ++						//track the total population
-				println ("SPAWNING PERSON NUMBER " + level.scene2_alliedspawn_currentalive)
+				//println ("SPAWNING PERSON NUMBER " + level.scene2_alliedspawn_currentalive)
 			}	
 			level.scene2_alliedspawn_currentalive --
-			println ("CURRENTALIVE IS " + level.scene2_alliedspawn_currentalive)
+			//println ("CURRENTALIVE IS " + level.scene2_alliedspawn_currentalive)
 		}
 		wait level.scene2_alliedspawn_loopwaittime			//every local.loopwaittime seconds, repeat the while loop	
 	}
@@ -1129,7 +1139,7 @@ scene2_alliedspawn_death:{
 	self waittill death
 	self.targetname = ""
 	level.scene2_alliedspawn_currentalive --
-	println level.scene2_alliedspawn_currentalive
+	//println level.scene2_alliedspawn_currentalive
 	level.scene2_alliedspawn_teamdeaths ++
 }end
 
@@ -1143,8 +1153,8 @@ scene2_alliedspawn_navigate:{
 
 	local.scene2_ai_waypointname = "scene2_allied_waypoint" + level.scene2_ai_waypointnumber
 	
-	println ("THE WAYPOINTNUMBER IS " + level.scene2_ai_waypointnumber)
-	println ("THE WAYPOINTNAME IS " + local.scene2_ai_waypointname)
+	//println ("THE WAYPOINTNUMBER IS " + level.scene2_ai_waypointnumber)
+	//println ("THE WAYPOINTNAME IS " + local.scene2_ai_waypointname)
 
 	//*** Run the NPC to the destination point
 	self thread scene2_alliedspawn_run local.scene2_ai_waypointname 
@@ -1646,7 +1656,7 @@ scene4:{
 
 	//*** Remove the final gates
 	$traindoors_final remove
-	println "!!!!!!!!!!!!!!!!!!!!!!!!REMOVED FINAL TRAIN DOORS"
+	//println "!!!!!!!!!!!!!!!!!!!!!!!!REMOVED FINAL TRAIN DOORS"
 
 	//*** Magically teleport the train (it was moved while the player was indoors, yeah!) to a final position at about warp 10
 	$solid_train_engine moveto $trainnode_final.origin
@@ -1654,7 +1664,7 @@ scene4:{
 	$solid_train_engine waitmove
 	//$solid_train_engine.origin = $trainnode_final.origin
 
-	println "!!!!!!!!!!!!!!!!!!!!!!!!MOVED TRAIN"
+	//println "!!!!!!!!!!!!!!!!!!!!!!!!MOVED TRAIN"
 
 	//***	Close the cargo hold doors
 	$scene3_hangardoor1 moveSouth 128
@@ -1719,6 +1729,15 @@ scene4_mg_escape local.escapetrigger local.escapenode:{
 //============================================================================
 scene4_jailswitch_activate:{
 //============================================================================
+	local.player = parm.other
+	spawn Actor targetname TheKeymaker
+	$TheKeymaker hide
+	$TheKeymaker notsolid
+	$TheKeymaker nodamage
+	$TheKeymaker threatbias ignoreme
+	$TheKeymaker ai_off
+	$TheKeymaker origin local.player.origin
+
 	$scene4_master_jailswitch playsound throw_switch
 
 	//*** If the two mg42 guys are still going at it, kill them now (they must have been killed by the Allied troops outside!)
@@ -1740,60 +1759,67 @@ scene4_jailswitch_activate:{
 	$scene4_master_jailswitch rotateZdown 100
 	$scene4_master_jailswitch waitmove
 
+	//[202][hotfix] Smithy - now uses $TheKeymaker instead of $world to open the doors.
+	
 	//*** Open all the doors in the main cellbloc
 	//$scene4_prisondoor1a open $player //chrissstrahl
-	$scene4_prisondoor1a open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor1a open $TheKeymaker //chrissstrahl - made coop compatible //[202][hotfix] Smithy - $world can make them go in wrong direction. they disappear completely.
 	$scene4_prisondoor1a playsound door_vault_open
 
 	//$scene4_prisondoor1b open $player //chrissstrahl
-	$scene4_prisondoor1b open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor1b open $TheKeymaker //chrissstrahl - made coop compatible //[202][hotfix] Smithy - $world can make them go in wrong direction. they disappear completely.
 	$scene4_prisondoor1b playsound door_vault_open
 	wait 0.5
 
 	//$scene4_prisondoor2a open $player //chrissstrahl
-	$scene4_prisondoor2a open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor2a open $TheKeymaker //chrissstrahl - made coop compatible //[202][hotfix] Smithy - $world can make them go in wrong direction. they disappear completely.
 	$scene4_prisondoor2a playsound door_vault_open
 
 	//$scene4_prisondoor2b open $player //chrissstrahl
-	$scene4_prisondoor2b open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor2b open $TheKeymaker //chrissstrahl - made coop compatible //[202][hotfix] Smithy - $world can make them go in wrong direction. they disappear completely.
 	$scene4_prisondoor2b playsound door_vault_open
 	wait 0.5
 
 	//$scene4_prisondoor3a open $player //chrissstrahl
-	$scene4_prisondoor3a open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor3a open $TheKeymaker //chrissstrahl - made coop compatible //[202][hotfix] Smithy - $world can make them go in wrong direction. they disappear completely.
 	$scene4_prisondoor3a playsound door_vault_open
 
 	//$scene4_prisondoor3b open $player //chrissstrahl
-	$scene4_prisondoor3b open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor3b open $TheKeymaker //chrissstrahl - made coop compatible //[202][hotfix] Smithy - $world can make them go in wrong direction. they disappear completely.
 	$scene4_prisondoor3b playsound door_vault_open
 	wait 0.5
 
 	//$scene4_prisondoor4a open $player //chrissstrahl
-	$scene4_prisondoor4a open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor4a open $TheKeymaker //chrissstrahl - made coop compatible //[202][hotfix] Smithy - $world can make them go in wrong direction. they disappear completely.
 	$scene4_prisondoor4a playsound door_vault_open
 
 	//$scene4_prisondoor4b open $player //chrissstrahl
-	$scene4_prisondoor4b open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor4b open $TheKeymaker //chrissstrahl - made coop compatible //[202][hotfix] Smithy - $world can make them go in wrong direction. they disappear completely.
 	$scene4_prisondoor4b playsound door_vault_open
 	wait 0.5
 
 	//$scene4_prisondoor5a open $player //chrissstrahl
-	$scene4_prisondoor5a open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor5a open $TheKeymaker //chrissstrahl - made coop compatible //[202][hotfix] Smithy - $world can make them go in wrong direction. they disappear completely.
 	$scene4_prisondoor5a playsound door_vault_open
 
 	//$scene4_prisondoor5b open $player //chrissstrahl
-	$scene4_prisondoor5b open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor5b open $TheKeymaker //chrissstrahl - made coop compatible //[202][hotfix] Smithy - $world can make them go in wrong direction. they disappear completely.
 	$scene4_prisondoor5b playsound door_vault_open
 	wait 0.5
 
 	//$scene4_prisondoor6a open $player //chrissstrahl
-	$scene4_prisondoor6a open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor6a open $TheKeymaker //chrissstrahl - made coop compatible //[202][hotfix] Smithy - $world can make them go in wrong direction. they disappear completely.
 	$scene4_prisondoor6a playsound door_vault_open
 
 	//$scene4_prisondoor6b open $player //chrissstrahl
-	$scene4_prisondoor6b open $world //chrissstrahl - made coop compatible
+	$scene4_prisondoor6b open $TheKeymaker //chrissstrahl - made coop compatible //[202][hotfix] Smithy - $world can make them go in wrong direction. they disappear completely.
 	$scene4_prisondoor6b playsound door_vault_open
 
+	//[202][hotfix] Smithy - bye, Keymaker, thanks for your service. 
+	//You won't be shot by Agent Smith(y) just yet!
+	//Let's do a rare immediateremove on him, because he's just that special <3.
+	$TheKeymaker immediateremove
+	
 	//***	Arm the scripted sequence of POWs making a run for it 
 	thread scene4_pow_sequence
 }end
@@ -1883,9 +1909,9 @@ scene4_pow_sequence:{
 		local.orgname = ("scene4_pow_spawn" + local.i)		//create the name of the script_origin already in the map
 		local.org1 = $(local.orgname).origin				//grab the origin of the script_origin already in the map
 
-		println local.orgname
-		println local.prisonername
-		println local.org1
+		//println local.orgname
+		//println local.prisonername
+		//println local.org1
 
 		local.ent =	spawn human/1st-ranger_private_prisoner
 		local.ent.origin = local.org1						//place the guy in the correct spot						
@@ -1924,6 +1950,12 @@ scene4_captain_sequence_init:{
 	$scene4_redshirt1 exec global/disable_ai.scr
 	$scene4_redshirt2 exec global/disable_ai.scr
 	$scene4_redshirt3 exec global/disable_ai.scr
+	
+	//[202][hotfix] Smithy - stop any surviving snipers shooting at them while they stand around like idiots...
+	$scene1_captain threatbias ignoreme
+	$scene4_redshirt1 threatbias ignoreme
+	$scene4_redshirt2 threatbias ignoreme
+	$scene4_redshirt3 threatbias ignoreme
 
 	//*** Activate the Captain speech scripted sequence 
 	thread scene4_captain_sequence
@@ -2912,8 +2944,8 @@ scene7_missioncomplete:{
 	//*** Check to see if only 4 Rangers died in the counter and if deathlimit_medal or less, give out the medal
 	if (level.scene2_alliedspawn_teamdeaths <= level.scene2_alliedspawn_teamdeathlimit_medal){
 		setcvar g_medal0 "1"
-		println level.scene2_alliedspawn_teamdeaths level.scene2_alliedspawn_teamdeathlimit_medal
-		println "YOU GOT A MEDAL! YOU ARE A MASTER SNIPER!"
+		//println level.scene2_alliedspawn_teamdeaths level.scene2_alliedspawn_teamdeathlimit_medal
+		//println "YOU GOT A MEDAL! YOU ARE A MASTER SNIPER!"
 	}
 	exec global/missioncomplete.scr m6l3b 1
 }end
