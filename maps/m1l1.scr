@@ -622,9 +622,6 @@ dostuff:{
 //=========================================================================
 // huh
 
-	thread coop_stopPlayerTruckSpawnManager
-	thread coop_stopPlayerTruckView
-
 	if (level.glueplayer == 1){
 		$clippy notsolid
 		
@@ -632,35 +629,33 @@ dostuff:{
 		$introtruck playsound tailgate
 		
 		//chrissstrahl - make coop compatible
-		exec coop_mod/replace.scr::show		
-		exec coop_mod/replace.scr::unglue
+		thread coop_mod/replace.scr::show		
+		thread coop_mod/replace.scr::unglue
+		thread coop_mod/replace.scr::physics_on
 		
 		//chrissstrahl - spawn/place players inside truck //viewpos -50z
-		if( level.gametype == 0 ){
+		if (!level.gametype){
 			$player forcelegsstate CROUCH_IDLE
 			$player origin $player.origin
 			$player face (0 1 0)		
-		}
-		else{
+		}else{
 			//chrissstrahl - create spawnpoints for coop
 			waitthread coop_mod/spawnlocations.scr::m1l1_update1
 			//chrissstrahl - move player to spawn before unglue
 			for (local.i = 1;local.i <= $player.size;local.i++){
 				local.player = $player[local.i]
-				if( local.player != NULL && local.player.dmteam != "spectator" && local.player.health > 0 ){
+				if (!local.player.isSpectator){
 					local.player forcelegsstate CROUCH_IDLE
 					local.player origin level.flags["coop_spawn"+local.i+"origin"]
 					local.player face level.flags["coop_spawn"+local.i+"angles"]
-					local.player show
+					local.player solid
 					thread coop_playerJustSpawned local.i
 				}
 			}
-			exec coop_mod/replace.scr::show		//chrissstrahl - make coop compatible
-			exec coop_mod/replace.scr::unglue	//chrissstrahl - make coop compatible
+			//exec coop_mod/replace.scr::show		//chrissstrahl - make coop compatible //[202][hotfix] Smithy - why is this done here and above?
+			//exec coop_mod/replace.scr::unglue		//chrissstrahl - make coop compatible
 		}
 	}
-	
-
 
 	//chrissstrahl - make sure message works in mp right
 	if( level.gametype == 0 ){
@@ -873,6 +868,12 @@ lanternoff:{
 scenestart:{
 //=========================================================================
 //	self waittill animdone
+	
+	//[202][hotfix] Smithy
+	//thread coop_mod/replace.scr::glue $truckorg 0
+	
+	thread coop_playerTruckSpawnManager
+
 	level.flags[ride] = driving
 	thread lantern
 	wait 2
@@ -887,8 +888,11 @@ scenestart:{
 	wait 2
 	
 	level.actor1 say dfr_m1l1_add02
-	thread lanternoff
+	thread lanternoff		
 	wait 8.5
+	
+	//[202][hotfix] Smithy
+	thread coop_stopPlayerTruckSpawnManager
 
 
 	//local.o = ( -2128 -3532 31 ) //chrissstrahl - -2130 -3538 31 good pos - this stitt took hours to adjust
@@ -1381,59 +1385,98 @@ coop_playerTruckSpawnManager:{
 	
 	spawn script_origin targetname "coop_viewOrigin"
 	//println ("origin is: " + level.intropath gettagposition "tag_camera")
-	$coop_viewOrigin.origin = $introtruck.origin
+	$coop_viewOrigin.origin = $coop_truckOrigin.origin
 	$coop_viewOrigin bind $coop_truckOrigin
+	
+	thread coop_mod/replace.scr::physics_off
 	
 	waitthread coop_startPlayerTruckViews
 	
 	while (1){
 		level waittill playerspawn
-		println $coop_truckOrigin.origin
 		group.player = parm.other
-		group.player nodamage
-		group.player notsolid
+		group.player hide
 		if (!group.player.isSpectator){
-			thread coop_playerTruckView
+			if (group.player.truckCamera){			
+				group.player.truckCamera delete
+				group.player.truckCamera = NULL
+			}
+			thread coop_spawnTruckCamera
+			thread coop_startTruckCamera
 		}
-	} 
-
+		wait 1
+		//println "******************** cam is: " group.player.truckCamera
+	}
 }end
 
 //[202][hotfix] Smithy
 //=========================================================================
-coop_playerTruckView:{
+coop_spawnTruckCamera:{
 //=========================================================================
-	if (!group.player.truckturret){
-		group.player.truckturret = spawn models/statweapons/m1l1truckride.tik
-		group.player.truckturret notsolid
-		//group.player.truckturret hide
-		group.player.truckturret bind $coop_viewOrigin
-		group.player.truckturret.targetname = "truckTurret"
-	}else{
-		thread coop_useTurret //twice so we detach before re-attaching
-	}	
-	thread coop_useTurret
-	group.player.truckturret.viewangles = (0 180 0)
-	group.player.truckturret.origin = $coop_viewOrigin.origin + ( -25 20 110)
+	if (!group.player.truckCamera){
+		//println "GOING TO TRUCK ORIGIN"
+		group.player.truckCamera = spawn Camera //models/statweapons/m1l1truckride.tik
+		group.player.truckCamera.origin = $coop_viewOrigin.origin + ( -25 20 110)
+		group.player.truckCamera bind $coop_viewOrigin
+		group.player.truckCamera.targetname = "truckCamera"
+		group.player.truckCamera.player = group.player
+	}
 }end
 
-//[202][hotfix] Smithy
-//========================================================================
-coop_useTurret:{
-//========================================================================
-	group.player.truckturret setPlayerUsable 1
-	group.player.truckturret doUse group.player
-	group.player.truckturret setPlayerUsable 0
-	//println "player set to truck view " group.player.truckturret group.player.truckturret.size
+//[202][hotfix] Smithy - make them look through their truck camera
+//============================================================================
+coop_startTruckCamera:{
+//============================================================================	
+	if (group.player.truckCamera && !group.player.inTruckCamera){
+		group.player.inTruckCamera = game.true
+				
+		local.name = ("truckCamera_" + group.player.entnum)
+		local.cam = group.player.truckCamera
+		local.cam targetname local.name
+		
+		local.camerause = spawn trigger_camerause target local.name	
+		local.camerause doUse group.player
+		local.camerause delete
+		
+		local.cam targetname "truckCamera"
+		
+		//println "********************* *************** *********** player set to truck view"
+		//println group.player.origin
+		//println local.cam.origin
+	}
+}end
+
+//[202][hotfix] Smithy - stop them looking through their truck camera
+//============================================================================
+coop_stopTruckCamera:{
+//============================================================================	
+	if (group.player.inTruckCamera){
+		group.player.inTruckCamera = game.false
+		
+		//[202] Smithy
+		local.name = ("truckCamera_" + group.player.entnum)
+		local.cam = group.player.truckCamera
+		local.cam targetname local.name
+		
+		local.camerause = spawn trigger_camerause target local.name
+		local.camerause doUse group.player
+		local.camerause delete
+		
+		//[202] Smithy
+		local.cam targetname "truckCamera"
+		
+		//println "*********************** NOT IN CAM ANYMORE"
+	}
 }end
 
 //[202][hotfix] Smithy
 //=========================================================================
 coop_stopPlayerTruckSpawnManager:{
-//=========================================================================
+//=========================================================================	
 	if (level.thread["coop_playerTruckSpawnManager"]){ 
 		level.thread["coop_playerTruckSpawnManager"] delete 
 	}
+	thread coop_stopPlayerTruckViews
 }end
 
 //[202][hotfix] Smithy
@@ -1443,36 +1486,51 @@ coop_startPlayerTruckViews:{
 	for (local.i = 1; local.i <= $player.size; local.i++){
 		group.player = $player[local.i]
 		if (!group.player.isSpectator){
-			waitthread coop_playerTruckView
+			waitthread coop_spawnTruckCamera
+			waitthread coop_startTruckCamera
 		}
 	}
 }end
 
 //[202][hotfix] Smithy
 //=========================================================================
-coop_stopPlayerTruckView:{
+coop_stopPlayerTruckViews:{
 //=========================================================================
 	for (local.i = 1; local.i <= $player.size; local.i++){
 		group.player = $player[local.i]	
-		group.player takedamage
-		if (!group.player.isSpectator && group.player.truckturret){			
-			waitthread coop_useTurret			
-			group.player solid
+		//group.player takedamage
+		if (!group.player.isSpectator && group.player.inTruckCamera){	
+			println "coop_stopPlayerTruckViews stop"		
+			waitthread coop_stopTruckCamera			
+			//group.player solid
 		}
 	}
-	//println "TRUCK TURRETS: " $truckTurret.size
-	if ($truckTurret){
-		$truckTurret delete
+	if ($truckCamera){
+		$truckCamera delete
 	}
+	
+	cueplayer
 }end
 
 //[202][hotfix] Smithy
 //=========================================================================
-coop_maintainTurretAngles local.angles:{
+coop_maintainCameraAngles local.angles:{
 //=========================================================================	
-	for (local.i = 1; local.i <= $truckTurret.size; local.i++){
-		$truckTurret[local.i].viewangles = $truckTurret[local.i].viewangles - local.angles
-		$truckTurret[local.i].angles = (0 0 0)
+	for (local.i = 1; local.i <= $truckCamera.size; local.i++){
+		local.camera = $truckCamera[local.i]
+		group.player = local.camera.player		
+		if (group.player){
+			//println "PLAYER IN SPEC? " group.player.isSpectator
+			if (!group.player.isSpectator){
+				local.camera.angles = group.player.viewangles + local.angles
+			}else{
+				//println "coop_maintainCameraAngles stop"
+				thread coop_stopTruckCamera //detach
+				local.camera waitthread game.replace::delete
+				local.i = 0 								
+				continue
+			}	
+		}
 	}
 }end
 
@@ -1496,13 +1554,13 @@ playerstuck:{
 		//$player notsolid
 		//$player physics_off
 		//$player glue $truckorg 0
-		exec coop_mod/replace.scr::glue $truckorg 0
+		exec coop_mod/replace.scr::glue $truckorg 0 //[202][hotfix] Smithy
 		
 		local.turret.viewangles = (0 180 0)
 	}
 	
 	//[202][hotfix] Smithy
-	thread coop_playerTruckSpawnManager
+	//thread coop_playerTruckSpawnManager
 
 	local.oldangles = level.intropath gettagangles "tag_camera"
 //	local.camera glue $truckorg
@@ -1564,7 +1622,7 @@ playerstuck:{
 			$truckorg.angles = local.a
 //			$player.viewangles = $player.viewangles - (local.oldangles - local.a)
 			local.turret.viewangles = local.turret.viewangles - (local.oldangles - local.a)
-			waitthread coop_maintainTurretAngles (local.oldangles - local.a)
+			waitthread coop_maintainCameraAngles (local.oldangles - local.a)
 			local.oldangles = local.a
 			local.turret.angles = ( 0 0 0 )
 		}
