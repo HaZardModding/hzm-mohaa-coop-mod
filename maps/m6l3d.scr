@@ -166,9 +166,6 @@ gasmasksounds:{
 //============================================================================
 coop_gasmaskSounds:{
 //============================================================================
-//[200] chrissstrahl - gasmask is suppsed to not be active on this level, so I have been told
-end
-
 	local.twothirdshealth = ((level.coop_health / 3.0) * 2.0)
 	local.onethirdshealth = (level.coop_health / 3.0)
 	local.currentsound = 0
@@ -483,8 +480,10 @@ german_geek_freaks:{
 		thread fogramp 1600 .035
 		thread gas_all
 		$german_geek say den_M6L3_637f //"You fools! Look the gas!" maps "m dm obj"
-		$german_geek waittill saydone
+		//$german_geek thread game.replace::say_wait den_M6L3_637f //[202][hotfix] Smithy - stop callback error pausing thread
+		$german_geek waittill saydone		
 		$german_geek say den_M6L3_638r //"Get away from the vapors!" maps "m dm obj"
+		//$german_geek thread game.replace::say_wait den_M6L3_638r //[202][hotfix] Smithy - stop callback error pausing thread
 		$german_geek exec global/runto.scr $geek_spot2
 		wait .2
 
@@ -505,7 +504,7 @@ german_geek_freaks:{
 gassy_death:{
 //============================================================================
 	local.death = randomint(3)
-
+	
 	if (local.death == 0){
 		self exec global/setdeathanim.scr "death_frontchoke"
 	}else if (local.death == 1){
@@ -516,7 +515,9 @@ gassy_death:{
 		self exec global/setdeathanim.scr "death_choke"	
 	}
 
-	self exec global/bullethit.scr (0 0 50) 2000 0 1	
+	//[202][hotfix] Smithy - as they have more health due to pain handler, bump it up from 2000 to 150000 and also do it on their head (location of 5 instead of 1)
+	self.flags["coop_actorStopPainHandler"] = game.true
+	self exec global/bullethit.scr (0 0 50) 150000 0 5	
 }end
 
 //============================================================================
@@ -579,6 +580,7 @@ gas_all:{
 //============================================================================
 	for (local.i = 1;local.i <= level.gassed;local.i++){
 		if ($("sancho" + local.i)){
+			$("sancho" + local.i).flags["coop_actorStopPainHandler"] = game.true //[202][hotfix] Smithy
 			$("sancho" + local.i) thread gassy_death
 		}
 	}
