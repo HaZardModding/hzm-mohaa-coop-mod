@@ -1,9 +1,21 @@
+//[202][hotfix] chrissstrahl - added hzm coop mod logo
+resource
+Widget
+{
+	name "coop_startServerLogo"
+	rect 190 130 256 256
+	fgcolor 1.00 1.00 1.00 1.00
+	bgcolor 0.50 0.50 0.50 0.00
+	borderstyle "NONE"
+	shader "textures/mohmenu/coop/hzm_coop_mod_logo"
+}
+
 resource
 Label
 {
 	title "1. Select a Mission\n2. Select a Map\n3. Click Apply"
 	name "coop_startMapSelect"
-	rect 50 200 300 100
+	rect 50 200 400 300
 	fgcolor 1.00 1.00 1.00 1.00
 	bgcolor 0.50 0.50 0.50 0.00
 	borderstyle "NONE"
