@@ -198,21 +198,21 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 				//NORANGE/////////////////
 				if( local.range == NIL ){
 					if( local.ent cansee local.player local.fov ){
-iprintlnbold_noloc ( "can see" )
+//iprintlnbold_noloc ( "can see" )
 						end 1
 					}
 				}
 				//RANGE/////////////////
 				else{
 					if( local.ent cansee local.player local.fov local.range ){
-iprintlnbold_noloc ( "can see" )
+//iprintlnbold_noloc ( "can see" )
 						end 1
 					}
 				}
 			}
 		}
 	}
-iprintlnbold_noloc ( "DEV: can not see" )
+//iprintlnbold_noloc ( "DEV: can not see" )
 }end 0
 
 //=========================================================================
@@ -1054,12 +1054,15 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 	if(level.coop_playerItem4 == local.item ){ level.coop_playerItem4 = NIL }
 }end
 
+//[202][hotfix] Smithy - added noWeapon param
 //=========================================================================
-takeAll:{
+takeAll local.noWeapon:{
 //=========================================================================
 if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread replace/takeAll->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
 //takes all weapons and items from the players
-	level.coop_noWeapon = 1
+	if (local.noWeapon){
+		level.coop_noWeapon = game.true
+	}	
 	for (local.i = 1;local.i <= $player.size;local.i++){
 		local.player = $player[local.i]
 		local.player takeall
@@ -2219,7 +2222,7 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 	while(!waitthread withinDistance ( local.origin ) local.distance ){
 		waitframe
 	}
-	iprintlnbold_noloc("DEV: distance:"+vector_length(local.origin-$player.origin))
+	//iprintlnbold_noloc("DEV: distance:"+vector_length(local.origin-$player.origin))
 }end
 
 //grabs the hand tag origin of every player
@@ -2286,13 +2289,16 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 	wait game.ms //[202] Smithy - as it takes some time for them to be added to their loadout
 	wait game.ms //[202] Smithy - as it takes some time for them to be added to their loadout x2
 	
-	if (!$player || !local.weapon){ end }
+	//[202][hotfix] Smithy
+	level.coop_noWeapon = game.false
+	
+	if (!local.weapon){ end }
 	if (local.use == NIL){ local.use = "none"}
 
 	for (local.i = 1; local.i <= $player.size; local.i++){
 		local.player = $player[local.i]
 
-		if (local.player.dmteam == "spectator" || !isAlive local.player){
+		if (!isAlive local.player || local.player.isSpectator || !local.player.flags["coop_isActive"]){
 			continue
 		}
 
@@ -2331,7 +2337,8 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 		$player take local.weapon
 		end
 	}
-	if (!$player || !local.weapon){ end }
+
+	if (!local.weapon){ end }
 
 	for (local.i = 1; local.i <= $player.size; local.i++){
 		local.player = $player[local.i]

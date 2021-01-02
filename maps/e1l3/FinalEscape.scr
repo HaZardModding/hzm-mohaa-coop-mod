@@ -103,7 +103,7 @@ doWork:
 	}
 	else{
 		wait 1
-	}
+	}	
 
 	$Claus thread clausRuns
 	thread lockRoofDoor
@@ -438,6 +438,8 @@ clausEscapeRoute:
 		thread coop_mod/replace.scr::threatbias ignoreme
 	}
 	*/
+	
+	//iprintlnbold_noloc "********************* clausEscapeRoute HIT FOR COOP_SAVE !!!!! !!!! !!!!!"
 
 	//chrissstrahl - development time saver
 	if(level.coop_skipThisKlausGino == NIL){
@@ -680,12 +682,23 @@ getUniform:
 	//chrissstrahl - coop handle
 	else{
 		//take all weapons
-		thread coop_mod/replace.scr::takeAll
+		//[202][hotfix] Smithy
+		if (!level.coop_e1l3Save){
+			thread game.replace::takePlayerWeapon models/weapons/m1_garand.tik
+			thread game.replace::takePlayerWeapon models/weapons/it_w_beretta.tik
+			thread game.replace::takePlayerWeapon models/weapons/it_w_bomba.tik
+			thread game.replace::takePlayerWeapon models/weapons/steilhandgranate.tik
+			thread game.replace::takePlayerWeapon models/weapons/m2frag_grenade.tik
+			thread game.replace::takePlayerWeapon models/weapons/m2frag_grenade_sp_start.tik
+			thread game.replace::ammo "grenade" 0
+			thread game.replace::ammo "agrenade" 0
 				
-		//[200] Smithy - give them the weapons
-		waitframe
-		thread coop_mod/replace.scr::givePlayerWeapon "weapons/silencedpistol.tik" NIL "all" 0.5 //[200] Smithy - give current and future players the pistol and use it
-		thread coop_mod/replace.scr::ammo "pistol" 16
+			//[200] Smithy - give them the weapons
+			//waitframe
+			//iprintlnbold_noloc "********************* weapons/silencedpistol.tik HIT FOR COOP_SAVE !!!!! !!!! !!!!!"
+			thread coop_mod/replace.scr::givePlayerWeapon "weapons/silencedpistol.tik" NIL "all" 0.5 //[200] Smithy - give current and future players the pistol and use it
+			thread coop_mod/replace.scr::ammo "pistol" 16
+		}
 
 		//force papers to inventory
 		//level.coop_forcePrimary = "models/items/papers.tik" //[200] Smithy - not needed now
@@ -899,13 +912,12 @@ truckGuard2:
 		level.playerHasDisguise = 1
 	}
 
+	self hearing 0
 	self sound_awareness 100
 	self lookat $Claus
 
 	// ask the player for papers
 	//$askPlayerForPapers waittill trigger
-	self exec coop_mod/replace.scr::lookat //chrissstrahl
-	self exec coop_mod/replace.scr::turnto //chrissstrahl
 	self disguise_level 1
 	self disguise_period 20
 	local.disguise_range = 300
@@ -913,6 +925,34 @@ truckGuard2:
 	self type_attack alarm
 	self type_disguise sentry
 	self disguise_accept_thread papersaccepted
+	self.no_idle = game.true
+	
+	//[202][hotfix] Smithy - start
+	//self lookat self.enemy
+	//self.blendtime = 0.50
+	self setmotionanim (self.weapongroup + "_stand_alert_legs")
+	self setupperanim ("den_actor_alert_" + self.voicetype)
+	self waittill upperanimdone
+		
+	waitthread coop_mod/replace.scr::waitWithinDistance self.origin 300
+	
+	self.no_idle = game.false
+	
+	//iprintlnbold_noloc("DOING ANIM")
+	//println "DOING ANIM"
+	//if (!self){ end }
+	self exec coop_mod/replace.scr::lookat //chrissstrahl
+	self exec coop_mod/replace.scr::turnto //chrissstrahl
+	self hearing 100
+	
+	if (self.enemy){	
+		self setmotionanim A_13_germdial4
+		self waittill flaggedanimdone
+		self lookat self.enemy
+	}
+	
+	//[202][hotfix] Smithy - end
+
 
 	//chrissstrahl - handle in coop
 	//if(level.gametype != 0){ //[200] Smithy
@@ -948,8 +988,10 @@ truckGuard2:
 
 		self thread papersaccepted*/
 	//}else{
-
-		$playerProducedPapers waittill trigger //[200] Smithy - we use this whether in mp or sp, as disguise_accept_thread will trigger now we use normal disguise behaviour 
+		if ($playerProducedPapers){
+			$playerProducedPapers waittill trigger //[200] Smithy - we use this whether in mp or sp, as disguise_accept_thread will trigger now we use normal disguise behaviour 
+		}
+		
 	//}
 	wait 3
 
