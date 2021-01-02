@@ -400,7 +400,7 @@ DoIntro:
 	
 	//chrissstrahl - debug test, do not run this code during debug
 	if( level.coop_debugLevel == NIL ){
-		thread global/MaintainCamera.scr::StartMaintainCamera $jeep
+		//thread global/MaintainCamera.scr::StartMaintainCamera $jeep //[202][hotfix] Smithy
 	}
 
 	local.person = spawn script_model model models/human/allied_uk_capt-paratrooper.tik origin $($jeeppath.target).origin "targetname" "mrinvisible2"
@@ -437,7 +437,7 @@ DoIntro:
 		// stagger how far away they keep from their destinations
 		//$infantry[local.i].distance		= 90
 		// setup the friendlies to follow the player...
-		$infantry[local.i]   thread global/friendly.scr::friendlythink
+		$infantry[local.i] thread global/friendly.scr::friendlythink
 	}
 	
 	$tank2 thread aimAtNothingYou
@@ -742,6 +742,8 @@ End
 // local.guys are the guys following the tank
 // local.path is the first node in the path the tank is driving
 InfantryFollowingBehind local.path local.guytofollow local.scale local.wait:
+
+	println "*********************InfantryFollowingBehind***********************"
 	
 	if(local.wait == NIL)
 		local.wait = 3.0
@@ -785,7 +787,7 @@ PlayerOnJeep:
 //	local.tankseat attach $jeep driver 1 ( -50 -20 -40 )
 //	$player glue local.tankseat
 	
-	local.tankseat = spawn script_origin 
+	local.tankseat = spawn script_origin targetname jeepseat //[202][hotfix] Smithy - give it a targetname
 	local.tankseat attach $jeep passenger1 1 ( 0 0 -50 )
 	//chrissstrahl - keep for singleplayer
 	if(level.gametype == 0){
@@ -799,9 +801,167 @@ PlayerOnJeep:
 			level.coop_playerGlue = 1
 			exec coop_mod/replace.scr::hide	
 			exec coop_mod/replace.scr::glue local.tankseat 0
+			thread coop_startJeepSpawnManager
 		}
 	}
 end
+
+//[202][hotfix] Smithy
+//============================================================================
+coop_startJeepSpawnManager:{
+//============================================================================	
+	if (level.thread["coop_startJeepSpawnManager"]){ end }
+	
+	level.thread["coop_startJeepSpawnManager"] = local
+	
+	iprintlnbold_noloc("starting coop_startJeepSpawnManager")
+		
+	if ($jeepCamera){
+		$jeepCamera delete //start the number of cams at 0
+	}
+	
+	//spawn any cameras we need for players that may have spawned before the handler started
+	waitthread coop_startJeepCameras
+	thread coop_maintainJeepCameras
+	
+	//the main spawn handler during the scene
+	while (1){
+		level waittill playerspawn
+		println("ADDING PLAYER TO CAM (playerspawn)")
+		group.player = parm.other
+		
+		group.player hide
+		group.player notsolid	
+		//group.player.viewangles = $jeep.angles
+		//group.player.viewangles += ( 0 18 0 )	
+		
+		if (!group.player.isSpectator){ 				
+			thread coop_spawnJeepCamera
+			thread coop_startJeepCamera
+		}
+	}	
+}end
+
+//[202][hotfix] Smithy - stop the jeep scene spawn handler
+//============================================================================
+coop_stopJeepSpawnManager:{
+//============================================================================
+	if (level.thread["coop_startJeepSpawnManager"]){ level.thread["coop_startJeepSpawnManager"] delete }		
+	if (level.thread["coop_maintainJeepCameras"]){ level.thread["coop_maintainJeepCameras"] delete }
+	thread coop_stopJeepCameras
+}end
+
+//============================================================================
+coop_startJeepCameras:{
+//============================================================================
+	for (local.i = 1; local.i <= $player.size; local.i++){
+		group.player = $player[local.i]
+		if (!group.player.jeepCamera){
+			println("ADDING PLAYER TO CAM (coop_startJeepSpawnManager)")
+			thread coop_spawnJeepCamera
+			thread coop_startJeepCamera
+		}
+	}
+}end
+
+//============================================================================
+coop_stopJeepCameras:{
+//============================================================================
+	cueplayer
+	$jeepCamera delete
+}end
+
+//[202][hotfix] Smithy - spawn a camera for a player and set it up in jeep
+//============================================================================
+coop_spawnJeepCamera:
+//============================================================================	
+	if (!group.player.jeepCamera){
+		local.cam = spawn Camera targetname jeepCamera 	//give them all the same name so they are handled in the targetname array
+		local.cam showquakes 1
+		local.cam.origin = $jeepseat.origin + (0 0 85)
+		local.cam bind $jeep
+		local.cam.player = group.player
+		group.player.jeepCamera = local.cam
+		group.player.oldViewAngles = group.player.viewangles		
+	}
+end
+
+//[202][hotfix] Smithy - make them look through their jeep camera
+//============================================================================
+coop_startJeepCamera:{
+//============================================================================	
+	if (group.player.jeepCamera && !group.player.inJeepCamera){
+		group.player.inJeepCamera = game.true
+			
+		local.name = ("jeepCamera_" + group.player.entnum)
+		local.cam = group.player.jeepCamera
+		local.cam targetname local.name
+		local.cam.angles = $jeep gettagangles driver_seat
+		
+		local.camerause = spawn trigger_camerause target local.name	
+		local.camerause doUse group.player
+		local.camerause delete
+		
+		//[202] Smithy - set targetname back to original so it gets added back to the array
+		local.cam targetname "jeepCamera"
+	}
+}end
+
+//[202][hotfix] Smithy - make them look through their jeep camera
+//============================================================================
+coop_stopJeepCamera:{
+//============================================================================	
+	if (group.player.jeepCamera && group.player.inJeepCamera){
+		group.player.inJeepCamera = game.false
+			
+		local.name = ("jeepCamera_" + group.player.entnum)
+		local.cam = group.player.jeepCamera
+		local.cam targetname local.name
+		
+		local.camerause = spawn trigger_camerause target local.name	
+		local.camerause doUse group.player
+		local.camerause delete
+		
+		//[202] Smithy - set targetname back to original so it gets added back to the array
+		local.cam targetname "jeepCamera"
+	}
+}end
+
+//[202][hotfix] Smithy
+//=========================================================================
+coop_maintainJeepCameras:{
+//=========================================================================
+	if (level.thread["coop_maintainJeepCameras"]){ end }
+	level.thread["coop_maintainJeepCameras"] = local
+		
+	while (1) {
+		//loop over all cameras
+		for (local.i = 1; local.i <= $jeepCamera.size; local.i++){
+			local.cam = $jeepCamera[local.i]
+			group.player = local.cam.player
+
+			
+			if (isAlive group.player && !group.player.isSpectator){
+				if (!group.player.inJeepCamera){
+					//println "STARTING JEEP CAM"
+					thread coop_startJeepCamera					
+				}			
+			}else{
+				if (group.player && group.player.inJeepCamera){
+					thread coop_stopJeepCamera
+				}
+				local.cam waitthread game.replace::delete
+				local.i = 0 								
+				continue
+			}
+			
+			//handle his camera view
+			local.deltaAngles = group.player.viewangles - group.player.oldViewAngles
+			local.cam.angles = $jeepseat.angles + local.deltaAngles			
+		}
+		waitframe
+	}
+}end
 
 //---------------------------
 goTanksGo:
@@ -882,7 +1042,6 @@ ReplaceMg42guy:
 			End
 			
 		local.whatever = spawn local.model origin ( -6386 -5177 773)
-		waitframe //[200] chrissstrahl - added to make sure the object is spawned fully before it is accsessed
 		$firstmg42.target = local.whatever
 		local.whatever exec global/disable_ai.scr
 		local.whatever runto local.origin
@@ -1144,6 +1303,9 @@ end
 //---------------------------
 playerExitTank:
 //---------------------------
+
+	thread coop_stopJeepSpawnManager //[202][hotfix] Smithy
+
 	local.hackedOffset = (0 -100 0)
 	local.driveEnterPos = $jeep gettagposition "driver_enter"	
 	local.exitpos = local.driveEnterPos + local.hackedOffset
@@ -1194,9 +1356,8 @@ playerExitTank:
 		$player physics_on
 	}
 
-	thread IfPlayerRetreatEndMission
-	
-	thread global/MaintainCamera.scr::StopMaintainCamera
+	thread IfPlayerRetreatEndMission	
+	//thread global/MaintainCamera.scr::StopMaintainCamera
 end
 
 //---------------------------
