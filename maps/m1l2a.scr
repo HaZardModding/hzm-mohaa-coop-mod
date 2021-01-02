@@ -2371,14 +2371,37 @@ friendchoice:{
 	}
 		
 	if (local.followedPlayer != local.triggeringPlayer){
-		waitthread coop_printHintMessage local.triggeringPlayer "The player leading the SAS Agent needs to come here if you want to save the prisoner." 5
+		waitthread coop_printHintMessage local.triggeringPlayer "The player leading Grillo needs to come here if you want to save the prisoner." 5
 		end 
 	}
 	
-	waitthread coop_printHintMessage local.triggeringPlayer "Go to the SAS agent if you want him to follow you here to save the prisoner." 5
+	waitthread coop_printHintMessage local.triggeringPlayer "Grillo is on his way to you." 5
+	
+	thread coop_forceGrilloToFollow local.triggeringPlayer
 
 	level.flags[playerchoice] = 1
 	println "player chose 1 (friendchoice)"
+}end
+
+//[202][hotfix] Smithy - ok, force him to do something
+//=========================================================================
+coop_forceGrilloToFollow local.player:{
+//=========================================================================
+	if (level.thread["coop_forceGrilloToFollow"]){ end }
+	level.thread["coop_forceGrilloToFollow"] = local
+	local.friendtype = level.friendly1.friendtype
+	local.movedoneradius = level.friendly1.movedoneradius
+	
+	println "friendtype IS: " local.friendtype
+	println "MOVEDONERADIUS IS: " local.movedoneradius
+	
+	
+	level.friendly1.friendtype = -1
+	level.friendly1 runto local.player
+	level.friendly1.movedoneradius = 100
+	level.friendly1 waittill movedone
+	level.friendly1.friendtype = local.friendtype
+	level.friendly1.movedoneradius = local.movedoneradius
 }end
 
 //[202][hotfix] Smithy - only check for the player that is being followed
@@ -2416,11 +2439,24 @@ runtoset local.set:{
 	}
 }end
 
+//[202][hotfix] Smithy - only check for the player that is being followed
 //=========================================================================
 friendchoice3:{
 //=========================================================================
 	if (level.flags[explosives] == 0){
 		end
+	}
+	
+	local.triggeringPlayer = parm.other
+		
+	local.followedPlayer = level.friendly1.flags["coop_followedPlayer"]
+	
+	if (!local.followedPlayer){
+		end
+	}
+		
+	if (local.followedPlayer != local.triggeringPlayer){
+		end 
 	}
 
 	if (self.waiting == NIL){
