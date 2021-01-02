@@ -763,19 +763,34 @@ spawnset local.set local.enemyname local.get_there:
 end
 
 spawn local.set local.pause local.thread local.off local.group local.enemyname local.get_there:
+	
+	//[202][hotfix] Smithy - dont run thread more than once for this set at same time
+	if (level.thread["ai.scr::spawn"][local.set]){
+		println "(ai.scr::spawn): multiple threads for set " local.set ". Terminating thread!"
+		end
+	}
+	level.thread["ai.scr::spawn"][local.set] = local
 
+	if (level.coop_mapname == "e1l1"){ //[202][hotfix] Smithy
+		println ("(ai.scr::spawn) " + level.time + ": running ai.scr::spawn script for " + self + " with set " + local.set)
+		//println level.time ": " local.set " " local.pause " " local.thread " " local.off " " local.group " " local.enemyname " " local.get_there
+	}
+	
 	//[202] Smithy - only do this once for spawner triggers
+	/*
 	local.trigger = self
 	if (local.trigger && local.trigger.flags["coop_enemySpawnerTrigger"]){ 
 		if (local.trigger.flags["coop_spawnTriggerActivated"]){
-			println "(ai.scr::spawn): multiple threads for single spawner trigger - terminating this thread!"
-			end
+
 		}		
 		local.trigger.flags["coop_spawnTriggerActivated"] = game.true
 	}
+	*/
 
-	if (game.medic != NIL)
+	if (game.medic != NIL){
+		level.thread["ai.scr::spawn"][local.set] = NIL //[202][hotfix] Smithy
 		end
+	}
 
 	if ( local.get_there==NIL )
 		local.get_there = 0
@@ -789,8 +804,12 @@ spawn local.set local.pause local.thread local.off local.group local.enemyname l
 	local.nSpawned = 0
 	
 	local.enemyspawners = level.enemyspawners //[202] Smithy - store locally, just in case this count is being changed and causes loop to run longer and cause command overflow
+	
+	if (level.coop_mapname == "e1l1"){ //[202][hotfix] Smithy
+		println ("(ai.scr::spawn) " + level.time + ": looping over " + local.enemyspawners + " spawners for " + self + " with set " + local.set)
+	}
 
-	for (local.i =1; local.i < local.enemyspawners + 1; local.i++) //[202] Smithy - use local count instead
+	for (local.i = 1; local.i < local.enemyspawners + 1; local.i++) //[202] Smithy - use local count instead
 	{
 		local.num = 0
 
@@ -884,7 +903,7 @@ spawn local.set local.pause local.thread local.off local.group local.enemyname l
 	}
 
 //	println "spawn count: " local.nSpawned " for set #" local.set
-
+	level.thread["ai.scr::spawn"][local.set] = NIL //[202][hotfix] Smithy
 end
 
 //[200] chrissstrahl - made coop compatible
@@ -973,6 +992,11 @@ enemyspawnertrigger:{
 				if (getcvar(debug) == "1"){
 					println (parm.other + " set off the trigger")
 				}
+				
+				if (level.coop_mapname == "e1l1"){
+					println ("(ai.scr::spawn) " + level.time + ": " + parm.other + " set off " + self.targetname + " with set " + self.set) //[202][hotfix] Smithy - enable print for debugging overflow issue on e1l1
+				}
+		
 				/* keep for reference
 				for (local.y=1;local.y<level.enemyspawnertriggers+1;local.y++){
 					if ((level.enemyspawnertrigger[local.y]) && (level.enemyspawnertrigger[local.y].set == self.set) && (level.enemyspawnertrigger[local.y] != self)){
@@ -986,6 +1010,9 @@ enemyspawnertrigger:{
 							if(level.enemyspawnertrigger[local.y].set == self.set){
 								if(level.enemyspawnertrigger[local.y] != self){
 									level.enemyspawnertrigger[local.y] delete
+									if (level.coop_mapname == "e1l1"){  //[202][hotfix] Smithy - enable print for debugging overflow issue on e1l1
+										println ("(ai.scr::spawn) " + level.time + ": deleting extra " + level.enemyspawnertrigger[local.y].targetname + " with set " + level.enemyspawnertrigger[local.y].set)
+									}
 								}
 							}
 						}
@@ -998,16 +1025,22 @@ enemyspawnertrigger:{
 			wait 0.5
 		}
 	}else{
-		println ("origin " + self.origin)
+		//println ("origin " + self.origin)
 		self waittill trigger
 		
-		if (getcvar(debug) == "1"){
-			println (parm.other + " set off the triggerB")
+		if (level.coop_mapname == "e1l1"){
+		//if (getcvar(debug) == "1"){			
+				println ("(ai.scr::spawn) " + level.time + ": " + parm.other + " set off " + self.targetname + " with set " + self.set) //[202][hotfix] Smithy - enable print for debugging overflow issue on e1l1
+		//}
 		}
 
 		for (local.i=1;local.i<level.enemyspawnertriggers+1;local.i++){
 			if ((level.enemyspawnertrigger[local.i]) && (level.enemyspawnertrigger[local.i].set == self.set) && (level.enemyspawnertrigger[local.i] != self)){
 				level.enemyspawnertrigger[local.i] delete
+				if (level.coop_mapname == "e1l1"){
+					println ("(ai.scr::spawn) " + level.time + ": deleting extra " + level.enemyspawnertrigger[local.i].targetname + " with set " + level.enemyspawnertrigger[local.i].set)
+				}
+				
 			}
 		}
 
@@ -1017,6 +1050,9 @@ enemyspawnertrigger:{
 	if (self.thread){
 		self thread level.script::self.thread
 //		println ("TRIGGER RAN THREAD " + self.thread)
+	}
+	if (level.coop_mapname == "e1l1"){
+		println ("(ai.scr::spawn) " + level.time + ": deleting main " + self.targetname + " with set " + self.set) //[202][hotfix] Smithy - enable print for debugging overflow issue on e1l1
 	}
 	self delete
 }end
