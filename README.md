@@ -27,7 +27,7 @@ Language. Please try the following Keys while you are in the main Menu of
 the game: ^ , °, ², ³, @, <, ~ or '
  
 # Discord
-[![Discord Banner 1](https://discordapp.com/api/guilds/509441602222030848/widget.png?style=banner2)](https://discord.gg/jse9daX)
+[![Discord Banner 1](https://discordapp.com/api/guilds/509441602222030848/widget.png?style=banner2)](https://discord.gg/7ZhHeu4)
 
 # Links
 http://HaZardModding.com
