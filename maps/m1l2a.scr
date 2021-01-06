@@ -200,6 +200,19 @@ main:{ // MACKEY MAY HAVE BEEN HERE, YOU BE THE JUDGE
 		}
 		
 		//chrissstrahl - oh my god mackey why the hell would you do something like that ?
+		
+		wait 4
+		local.tester = spawn human/German_afrika_private
+		local.tester notsolid
+		local.tester.enableEnemy = 0
+		local.tester origin ( 6704 -4296 56 )
+		wait 2
+		
+		local.tester runto ( 6448 -4032 64 )
+		wait .5
+		local.tester runto NULL
+		wait .2
+		local.tester runto ( 6448 -4032 64 )
 end
 
 tempfr:
@@ -1763,16 +1776,29 @@ end
 //============================================================
 flagthread9:{
 //============================================================
+
+	if (level.flags["flagthread9"]){ //[202][hotfix] Smithy
+		end
+	}
+	level.flags["flagthread9"] = game.true //[202][hotfix] Smithy
+	
+	if (level.thread["coop_forceGrilloToFollow"]){ //[202][hotfix] Smithy
+		level.thread["coop_forceGrilloToFollow"] delete
+	}
+
+	println "***************************** flagthread9"
 	level.friendly1.friendtype = -1
 	level.flags[friendlyflak] = 1
 	
 	if (level.flags[flak] == 0){
+		println "***************************** dfr_M1L2_138m_2"
 		self say dfr_M1L2_138m_2 // We need to destroy these flak88s, I'll take care of this one.
 		self waittill saydone
 		wait 0.25
 	}
 	
 	if (level.flags[flak] == 0){
+		println "***************************** dfr_M1L2_139m_2"
 		//self say dfr_M1L2_139m_2 // You get that one
 		self thread coop_mod/replace.scr::say_wait "dfr_M1L2_139m_2" //[200] Smithy - coop compatible
 		self waittill saydone
@@ -1781,6 +1807,8 @@ flagthread9:{
 	while (level.flags[flak] == 0){
 		wait 0.1
 	}
+	
+	println "***************************** level.flags[flak] == 0"
 
 	wait 0.5
 	local.ent = spawn script_origin
@@ -1790,8 +1818,14 @@ flagthread9:{
 		println "setting explosives on 102"
 	}
 	wait 0.5
+	
+	println "***************************** runto $avoidflak"
+	
 	self runto $avoidflak
 	self waittill movedone
+	
+	println "***************************** movedone"
+	
 	//level.friendly1.friendtype = 4 //[202][hotfix] Smithy
 	thread endtrigger  //[202][hotfix] Smithy - end on this point now
 }end
@@ -2375,9 +2409,8 @@ friendchoice:{
 		end 
 	}
 	
-	waitthread coop_printHintMessage local.triggeringPlayer "Grillo is on his way to you." 5
-	
 	thread coop_forceGrilloToFollow local.triggeringPlayer
+	waitthread coop_printHintMessage local.triggeringPlayer "Grillo is on his way to you." 5
 
 	level.flags[playerchoice] = 1
 	println "player chose 1 (friendchoice)"
@@ -2385,23 +2418,53 @@ friendchoice:{
 
 //[202][hotfix] Smithy - ok, force him to do something
 //=========================================================================
-coop_forceGrilloToFollow local.player:{
+coop_forceGrilloToFollow local.object local.tries:{
 //=========================================================================
 	if (level.thread["coop_forceGrilloToFollow"]){ end }
 	level.thread["coop_forceGrilloToFollow"] = local
+	
+	if (!local.object){
+		println "coop_forceGrilloToFollow object was " local.object
+		end
+	}
+	
+	if (local.tries == NIL){
+		local.tries = 5
+	}
+	
 	local.friendtype = level.friendly1.friendtype
 	local.movedoneradius = level.friendly1.movedoneradius
 	
 	println "friendtype IS: " local.friendtype
 	println "MOVEDONERADIUS IS: " local.movedoneradius
 	
-	
 	level.friendly1.friendtype = -1
-	level.friendly1 runto local.player
-	level.friendly1.movedoneradius = 100
-	level.friendly1 waittill movedone
-	level.friendly1.friendtype = local.friendtype
+	wait .5
+	//make sure he stops doing what he's doing
+	level.friendly1 runto NULL   
+	//level.friendly1 exec global/stand.scr
+	wait 1	
+	level.friendly1.movedoneradius = 200
+	for (local.i = 0; local.i < local.tries && local.object; local.i++){
+		println "RUNNNNNINGGG TO " local.object
+		if (local.object.classname == "Player" && local.object.isSpectator){
+			println "1. HE DIDNT GET TO " local.object
+			break
+		}		
+		level.friendly1 runto local.object
+		level.friendly1 waittill movedone
+		if (local.object && !local.object.isSpectator){
+			if (vector_length(local.object.origin - level.friendly1.origin) <= (level.friendly1.movedoneradius + 50)){
+				println "HE GOT TO " local.object
+				break
+			}else{
+				println "2. HE DIDNT GET TO " local.object
+			}
+		}					
+		wait 2
+	}
 	level.friendly1.movedoneradius = local.movedoneradius
+	level.friendly1.friendtype = local.friendtype
 }end
 
 //[202][hotfix] Smithy - only check for the player that is being followed
@@ -2713,7 +2776,7 @@ blowflak:{
 //=========================================================================
 	local.player = parm.other
 	
-	if (vector_length(self.origin - level.friendly1.origin) > 900){ //[202][hotfix] Smithy - increase radius - original: 650
+	if (vector_length(self.origin - level.friendly1.origin) > 659){ //[202][hotfix] Smithy - increase radius - original: 650
 		/* //[202][hotfix] Smithy
 		level.varname = "coop_flakMessage"
 		if(parm.other.flags[level.varname] == NIL){ parm.other.flags[level.varname] = 0}
@@ -2724,6 +2787,11 @@ blowflak:{
 		iprintlnbold_noloc ("You need to be accompanied by the SAS Agent, to blow up the flak.")
 		*/
 		waitthread coop_printHintMessage local.player "You need to be accompanied by the SAS Agent to blow up the flak." //[202][hotfix] Smithy
+		end
+	}
+	
+	if (level.friendly1.thinkstate == "attack"){
+		waitthread coop_printHintMessage local.player "Grillo needs to be outside of combat to blow up the flak." //[202][hotfix] Smithy
 		end
 	}
 	thread explosives 101
@@ -2754,9 +2822,9 @@ avoidflak:{
 		level.friendly1.friendtype = -1
 		wait 1
 		level.friendly1 runto $avoidflak
-		if (getcvar(debug) == "1"){
+		//if (getcvar(debug) == "1"){
 			println "friendly is running to avoid flak"
-		}
+		//}
 		level.friendly1 waittill movedone
 		wait 2
 		level.friendly1.friendtype = 4
@@ -2901,15 +2969,22 @@ explosives local.set:{
 				$flak88a hide
 				$flak88a_d show
 				level.flags[friendlyflak] = 2
+				
+				
 			}
 
-			if (local.set == 101){
+			if (local.set == 101){ //first flak bombed by player
+				
+				thread coop_endingFailsafe //[202][hotfix] Smithy - failsafe
+				
 				thread lockdown 750
 				$flak88b playsound explode_flak88
 				$flak88b hide
 				$flak88b_d show
 				if (level.flags[friendlyflak] == 0){
+					println "************************* explosives waittill movedone"
 					level.friendly1 waittill movedone
+					println "************************* explosives friendtype = 4"
 					level.friendly1.friendtype = 4
 		
 					thread fillused 740
@@ -2923,6 +2998,35 @@ explosives local.set:{
 		}
 	}
 }end
+
+//[202][hotfix] Smithy
+//FORCE THE SCENE. WE WILL END THIS LEVEL!!!!!!!!!!!!
+//=========================================================================
+coop_endingFailsafe:{
+//=========================================================================
+	println "********** WAITING IN coop_endingFailsafe"
+	for (local.i = 1; !level.flags["flagthread9"] && local.i <= 30; local.i++){
+		wait 1
+	}
+	println "********** FINISHED WAITING IN coop_endingFailsafe"
+	if (!level.flags["flagthread9"]){		 
+		println "********** GRILLO RUNNING TO FLAK coop_endingFailsafe"
+		waitthread coop_forceGrilloToFollow (waitthread coop_findFriendlyNode 760) //find node next to Grillo's flak
+		println "********** FINISHED RUNNING TO FLAK coop_endingFailsafe"
+		thread flagthread9 //FORCE THIS FUCKING SCENE. I hate Mackey.		
+	}
+}end
+
+//=========================================================================
+coop_findFriendlyNode local.set:{
+//=========================================================================
+	for (local.i = 1; local.i <= $friendlynode.size; local.i++){
+		local.node = $friendlynode[local.i]
+		if (local.node.set == local.set){
+			end(local.node)
+		}
+	}	
+}end(NULL)
 
 //=========================================================================
 stage2:{
