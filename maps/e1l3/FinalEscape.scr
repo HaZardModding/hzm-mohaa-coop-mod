@@ -357,8 +357,11 @@ clausRuns:
 		level.clausToldAboutUniform = 1
 	}
 
+	iprintlnbold_noloc("$playerChangingClothes waittill trigger")
 	// wait for the player to start changing
 	$playerChangingClothes waittill trigger
+	
+	iprintlnbold_noloc("$playerChangingClothes triggered")
 
 	// claus changes into the uniform
 	spawn models/human/sc_al_us_claus_disguised.tik targetname Claus2
@@ -411,12 +414,24 @@ clausEscapeRoute:
 			wait 2
 		}
 	}
+	
+	iprintlnbold_noloc("clausEscapeRoute waitForPlayer finished")
 
 	self exec coop_mod/replace.scr::turnto //chrissstrahl
 	self exec coop_mod/replace.scr::lookat //chrissstrahl
 	self avoidplayer 0
+	
 
-	$playerFullyDisguised waittill trigger
+	if (!level.event["playerFullyDisguised"]){
+		waitthread game.waittill "playerFullyDisguised"
+		wait .5
+	}
+
+	//if ($playerFullyDisguised){
+	//	$playerFullyDisguised waittill trigger
+	//}
+	
+	iprintlnbold_noloc("$playerFullyDisguised triggered")
 
 	/* moved down
 	//chrissstrahl - coop wait for a player if the map was loaded via token
@@ -464,7 +479,7 @@ clausEscapeRoute:
 
     // This is causing a console error and there are no references
     // to this trigger anywhere in the scripts!?
-	$playerHolsterTrigger waittill trigger
+	//$playerHolsterTrigger waittill trigger
 
 	//chrissstrahl - development time saver
 	if(level.coop_skipThisKlausGino == NIL){
@@ -715,8 +730,15 @@ getUniform:
 		//thread coop_mod/replace.scr::threatbias ignoreme //[200] Smithy - not needed now
 	}
 	wait 1
+		
+	thread game.event playerFullyDisguised
+	level.event["playerFullyDisguised"] = game.true
 	
-	if ($playerFullyDisguised){ trigger $playerFullyDisguised } //[200] Smithy
+	iprintlnbold_noloc("playerFullyDisguised done")
+	
+	//if ($playerFullyDisguised){ trigger $playerFullyDisguised } //[200] Smithy
+	
+	//iprintlnbold_noloc("playerFullyDisguised waittill hit")
 	
 	//chrissstrahl - keep for sp
 	if(level.gametype == 0){
