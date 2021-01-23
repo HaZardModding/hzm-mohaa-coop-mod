@@ -244,6 +244,7 @@ level waittill prespawn
 	//chrissstrahl
 	// glue the player to the higgins boat
 	exec coop_mod/replace.scr::glue $higgins1_playerspot 0	//chrissstrahl - coop replacment
+	thread coop_startBoatSpawnManager //[202][hotfix] Smithy
 
 	$higgins1_playerspot movedown 32
 	$higgins1_playerspot move
@@ -2503,6 +2504,8 @@ higgins1_opening_sequence:{
 		$player ammo agrenade 4
 		$player useweaponclass smg
 	}
+	
+	thread coop_stopBoatSpawnManager //[202][hotfix] Smithy
 
 	// start the player pusher
 	$higgins1_clip_player time 3
@@ -8167,4 +8170,160 @@ coop_playerJustSpawned:{
 	local.player = parm.other
 	if(local.player == NULL || local.player == $world){ end }
 	local.player.flags["coverRespawnManageTime"] = level.time
+}end
+
+//[202][hotfix] Smithy
+//============================================================================
+coop_startBoatSpawnManager:{
+//============================================================================	
+	if (level.thread["coop_startBoatSpawnManager"]){ end }
+	
+	level.thread["coop_startBoatSpawnManager"] = local
+	
+	//iprintlnbold_noloc("starting coop_startBoatSpawnManager")
+		
+	if ($boatCamera){
+		$boatCamera delete //start the number of cams at 0
+	}
+	
+	//spawn any cameras we need for players that may have spawned before the handler started
+	waitthread coop_startBoatCameras
+	thread coop_maintainBoatCameras
+	
+	//the main spawn handler during the scene
+	while (1){
+		level waittill playerspawn
+		println("ADDING PLAYER TO CAM (playerspawn)")
+		group.player = parm.other
+		
+		group.player hide
+		group.player notsolid	
+		//group.player.viewangles = $boat.angles
+		//group.player.viewangles += ( 0 18 0 )	
+		
+		if (!group.player.isSpectator){ 				
+			thread coop_spawnBoatCamera
+			thread coop_startBoatCamera
+		}
+	}	
+}end
+
+//[202][hotfix] Smithy - stop the Boat scene spawn handler
+//============================================================================
+coop_stopBoatSpawnManager:{
+//============================================================================
+	if (level.thread["coop_startBoatSpawnManager"]){ level.thread["coop_startBoatSpawnManager"] delete }		
+	if (level.thread["coop_maintainBoatCameras"]){ level.thread["coop_maintainBoatCameras"] delete }
+	thread coop_stopBoatCameras
+}end
+
+//============================================================================
+coop_startBoatCameras:{
+//============================================================================
+	for (local.i = 1; local.i <= $player.size; local.i++){
+		group.player = $player[local.i]
+		if (!group.player.boatCamera){
+			println("ADDING PLAYER TO CAM (coop_startBoatSpawnManager)")
+			thread coop_spawnBoatCamera
+			thread coop_startBoatCamera
+		}
+	}
+}end
+
+//============================================================================
+coop_stopBoatCameras:{
+//============================================================================
+	cueplayer
+	$boatCamera delete
+}end
+
+//[202][hotfix] Smithy - spawn a camera for a player and set it up in Boat
+//============================================================================
+coop_spawnBoatCamera:
+//============================================================================	
+	if (!group.player.boatCamera){
+		local.cam = spawn Camera targetname boatCamera 	//give them all the same name so they are handled in the targetname array
+		local.cam showquakes 1
+		local.cam.origin = $higgins1_playerspot.origin + (0 0 85)
+		local.cam bind $higgins1_playerspot
+		local.cam.player = group.player
+		group.player.boatCamera = local.cam
+		group.player.oldViewAngles = group.player.viewangles		
+	}
+end
+
+//[202][hotfix] Smithy - make them look through their Boat camera
+//============================================================================
+coop_startBoatCamera:{
+//============================================================================	
+	if (group.player.boatCamera && !group.player.inBoatCamera){
+		group.player.inBoatCamera = game.true
+			
+		local.name = ("boatCamera_" + group.player.entnum)
+		local.cam = group.player.boatCamera
+		local.cam targetname local.name
+		//local.cam.angles = $boat gettagangles driver_seat
+		
+		local.camerause = spawn trigger_camerause target local.name	
+		local.camerause doUse group.player
+		local.camerause delete
+		
+		//[202] Smithy - set targetname back to original so it gets added back to the array
+		local.cam targetname "boatCamera"
+	}
+}end
+
+//[202][hotfix] Smithy - make them look through their Boat camera
+//============================================================================
+coop_stopBoatCamera:{
+//============================================================================	
+	if (group.player.boatCamera && group.player.inBoatCamera){
+		group.player.inBoatCamera = game.false
+			
+		local.name = ("boatCamera_" + group.player.entnum)
+		local.cam = group.player.boatCamera
+		local.cam targetname local.name
+		
+		local.camerause = spawn trigger_camerause target local.name	
+		local.camerause doUse group.player
+		local.camerause delete
+		
+		//[202] Smithy - set targetname back to original so it gets added back to the array
+		local.cam targetname "boatCamera"
+	}
+}end
+
+//[202][hotfix] Smithy
+//=========================================================================
+coop_maintainBoatCameras:{
+//=========================================================================
+	if (level.thread["coop_maintainBoatCameras"]){ end }
+	level.thread["coop_maintainBoatCameras"] = local
+		
+	while (1) {
+		//loop over all cameras
+		for (local.i = 1; local.i <= $boatCamera.size; local.i++){
+			local.cam = $boatCamera[local.i]
+			group.player = local.cam.player
+
+			
+			if (isAlive group.player && !group.player.isSpectator){
+				if (!group.player.inBoatCamera){
+					//println "STARTING Boat CAM"
+					thread coop_startBoatCamera					
+				}			
+			}else{
+				if (group.player && group.player.inBoatCamera){
+					thread coop_stopBoatCamera
+				}
+				local.cam waitthread game.replace::delete
+				local.i = 0 								
+				continue
+			}
+			
+			//handle his camera view
+			local.cam.angles = group.player.viewangles		
+		}
+		waitframe
+	}
 }end

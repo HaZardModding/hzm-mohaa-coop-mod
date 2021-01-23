@@ -107,6 +107,8 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 		
 		//[202] Smithy - moved here and done in one //[200] chrissstrahl - used for LMS to detect when a player leaves
 		local.playerCount = $player.size
+		
+		
 
 		//[200] chrissstrahl - call player changed func if number of players changed
 		if(local.prevPlayerCount != local.playerCount){
@@ -177,10 +179,17 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 		//[200] Smithy - as this is a bool, just do it in one line
 		local.player.flags["coop_isHost"] = local.player.entnum == 0
 	}
+	
+	//println "CONNECTED PLAYER ENTNUM IS: " local.player.entnum
+	
+	waitthread reinitialiseData local.player //[202][hotfix] Smithy	
 
 	//[202] Smithy - store client 0
 	if (local.player.entnum == 0){
-		level.coop_clientZero = local.player
+		level.coop_clientZero = local.player	
+		if (level.thread["waitForReconnect"]){ //[202][hotfix] Smithy			
+			level.thread["waitForReconnect"] end			
+		}
 	}
 	
 //RUN OTHER SETUPS
@@ -492,7 +501,7 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	thread coop_mod/main.scr::playerHealth	
 	
 	//GLUE
-	thread coop_mod/main.scr::playerGlue local.player "spawn"	
+	thread coop_mod/main.scr::playerGlue local.player "spawn" game.true //[202][hotfix] Smithy
 	
 	//NO SPEC
 	if(local.player.dmteam == "spectator"){
@@ -865,7 +874,7 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 checkClientZero:{
 //=========================================================================
 if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread player/checkClientZero->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-	if ($player && !waitthread isClientZeroActive){
+	if ($player && !thread isClientZeroActive){
 		thread reconnectPlayer $player[1]
 	}
 }end
@@ -886,7 +895,7 @@ reconnectPlayer local.player:{
 if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread player/reconnectPlayer->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
 	if (level.coop_reconnectingPlayerZero){ end }
 	level.coop_reconnectingPlayerZero = game.true
-	
+
 	local.netname = local.player.netname
 	thread global/throbtext.scr::throbtext_off
 	
@@ -903,8 +912,18 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	if (!thread isClientZeroActive){
 		if (local.player){		
 			println "reconnectPlayer: reconnecting " local.player.netname
-			local.player stufftext "disconnect; wait 1; reconnect"
-			wait 20 //TODO: note to self -> make this a loop... don't have time this second. I was an idiot for not including it in initial commit
+			local.zombietime = getcvar sv_zombietime
+			setcvar sv_zombietime 0 //make sure client goes to CS_FREE state so it can be reused (client info reset, including entity num)
+			local.player stufftext ("disconnect; wait 1000; reconnect")
+			commanddelay 1 setcvar sv_zombietime local.zombietime	
+			waitthread waitForReconnect local.netname				
+			if (!thread isClientZeroActive){
+				if ($player.size > 0){
+					level.coop_reconnectingPlayerZero = game.false
+					thread reconnectPlayer $player[1]
+					end
+				}
+			}
 		}else{
 			if ($player.size > 0){
 				println "reconnectPlayer: " local.netname " left before we could reconnect him. Reconnecting " $player[1].netname " instead!"		
@@ -915,11 +934,37 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 				println "reconnectPlayer: " local.netname " left before we could reconnect him. Server is now empty so do nothing."
 			}
 		}
-	}else{
-		println "reconnectPlayer: player 0 joined before we reconnected a player! woohoo!"
+	}else{		
 		if ($player.size > 1){ //only do this if we have more than just player 0 in the server.			
 			thread global/throbtext.scr::throbtext ("Thanks, " + level.coop_clientZero.netname + ". You saved someone from being reconnected!")
 		}
 	}
 	level.coop_reconnectingPlayerZero = game.false
+	//println "level.coop_reconnectingPlayerZero IS NOW " level.coop_reconnectingPlayerZero
+}end
+
+//[202][hotfix] Smithy 
+//=========================================================================
+waitForReconnect local.netname local.data:{
+//=========================================================================
+	if (level.thread["waitForReconnect"]){ end }
+	level.thread["waitForReconnect"] = local
+	for (local.i = 0; local.i <= 20; local.i++){	//wait 20 seconds as failsafe
+		println "waitForReconnect: waited " local.i " seconds for reconnection"
+		wait 1
+	}				
+}end
+
+//[202][hotfix] Smithy 
+//we can use this to give the player back his stats and whatnot
+//=========================================================================
+reinitialiseData local.player:{
+//=========================================================================
+	if (level.thread["waitForReconnect"]){
+		if (local.player.netname == level.thread["waitForReconnect"].netname){
+			println local.player.netname " reconnected. Giving him his stats back."
+			thread global/throbtext.scr::throbtext_off
+			thread global/throbtext.scr::throbtext (local.player.netname + " has reconnected.")
+		}
+	}
 }end

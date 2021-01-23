@@ -31,6 +31,13 @@ coop_hacks:{
 	if(level.gametype != 0){
 		local.save = getcvar("coop_save")
 		if(local.save == "e1l3_sneakers"){ 
+			
+			level waittill prespawn
+			
+			//[202][hotfix] Smithy
+			thread game.replace::givePlayerWeapon models/weapons/it_w_beretta.tik
+			thread game.replace::givePlayerWeapon models/weapons/mp40.tik
+			
 			//set level scripts
 			level.warpTo = "sneakers"
 			//spawn players at the right spot
@@ -40,12 +47,31 @@ coop_hacks:{
 			thread coop_mod/replace.scr::spawnclip ( 2846 -2240 112 ) ( -20 -128 0 ) ( 20 128 256 ) coop_sneakersSaveClip2 0.65 180 "You can't go back." NIL NIL
 		}
 		else if(local.save == "e1l3_lockPicking"){
+			//some how this does not work, claus is missing and the sequence does not start, so screw this 
 			//some how this does not work, claus is missing and the sequence does not start, so screw this
 			//some how this does not work, claus is missing and the sequence does not start, so screw this
-			//some how this does not work, claus is missing and the sequence does not start, so screw this
+			//[202][hotfix] Smithy - this now works - spawn waits were needed as hacks.scr gets called before prespawn,
+			//thus before entity manipulation is possible, so $Claus wouldn't exist at this point
+			
+			level waittill prespawn //[202][hotfix] Smithy
+			
+			//[202][hotfix] Smithy
+			thread game.replace::givePlayerWeapon models/weapons/it_w_beretta.tik
+			thread game.replace::givePlayerWeapon models/weapons/mp40.tik
+			thread game.replace::ammo "pistol" 64
+			thread game.replace::ammo "smg" 128
 
+			//set level scripts
+			level.warpTo = "lockPicking"
+			//kills players that are outside of the hotel and on the ground floor (player jumped from roof and survived)
+			level.coop_killThread = thread maps/e1l3/RoofJaunt.scr::coop_killPlayerOnGroundOutsideHotel
+			//spawn players at the right spot
+			waitthread coop_mod/spawnlocations.scr::e1l3_lockPicking		
+			 
+			waitthread game.replace::waitForPlayer	//[202][hotfix] Smithy
+			
 			$Claus show
-			$Claus.enableEnemy = 1
+			$Claus.enableEnemy = 0 		//[202][hotfix] Smithy
 			$Claus gun "beretta"
 			$Claus solid
 			$Claus nodamage
@@ -53,23 +79,43 @@ coop_hacks:{
 			$Claus unglue
 			$Claus origin ( -1811 3061 620 )
 			$Claus angles ( 0 55 0 )
-			//$Claus.origin = ( -1811 3061 620 )
-			//$Claus.angles = ( 0 55 0 )
+			$Claus ai_on 				//[202][hotfix] Smithy
+			$Claus threatbias ignoreme	//[202][hotfix] Smithy
 			
-			//set level scripts
-			level.warpTo = "lockPicking"
-			//kills players that are outside of the hotel and on the ground floor (player jumped from roof and survived)
-			level.coop_killThread = thread maps/e1l3/RoofJaunt.scr::coop_killPlayerOnGroundOutsideHotel
-			//spawn players at the right spot
-			waitthread coop_mod/spawnlocations.scr::e1l3_lockPicking
+		
+			level.player_on_roof = 4 								//[202][hotfix] Smithy
+			thread maps/e1l3/RoofJaunt.scr::coop_roofJauntStart 	//[202][hotfix] Smithy
+					
 			//allow players using the ladder
 			$RJLadderBlocker delete
 		}
-		else if(local.save == "e1l3_finalEscape"){
+		else if(local.save == "e1l3_finalEscape"){			
+			
+			level waittill prespawn
+			
+			//println "^~^~^~^~^~^~^~^~~^~^~^~^~^~^~ e1l3_finalEscape HIT!!!!!"
+			
 			//set level scripts
 			level.warpTo = "finalEscape"
 			
 			fadeout .001 0 0 0 1
+
+			//[202][hotfix] Smithy - start
+			level.coop_e1l3Save = game.true 
+			
+			thread game.replace::takePlayerWeapon models/weapons/m1_garand.tik
+			thread game.replace::takePlayerWeapon models/weapons/it_w_beretta.tik
+			thread game.replace::takePlayerWeapon models/weapons/it_w_bomba.tik
+			thread game.replace::takePlayerWeapon models/weapons/steilhandgranate.tik
+			thread game.replace::takePlayerWeapon models/weapons/m2frag_grenade.tik
+			thread game.replace::takePlayerWeapon models/weapons/m2frag_grenade_sp_start.tik
+			thread game.replace::ammo "grenade" 0
+			thread game.replace::ammo "agrenade" 0
+			
+			thread game.replace::givePlayerWeapon models/weapons/silencedpistol.tik
+			thread game.replace::ammo "pistol" 16
+			//[202][hotfix] Smithy - end
+			
 			//spawn players at the right spot
 			waitthread coop_mod/spawnlocations.scr::e1l3_finalEscape
 			//disable triggers killing klaus or messing up otherwise, removing it will kill him - yay, stupid way of coding for the win
@@ -78,14 +124,14 @@ coop_hacks:{
 			//remove items we don't need no more
 			$uniformUseTrigger nottriggerable
 			$papers delete
-			$uniforms delete
+			$uniform delete //[202][hotfix] Smithy	
 			$bar delete //bar locking hotel roof door
 			$bar2 delete //bar locking hotel roof door
 			
 			//force papers to inventory
-			level.coop_forcePrimary = "models/items/papers.tik"
-			level.coop_forceInventory = "models/items/papers.tik"
-			level.coop_forceSecondary = "models/items/papers.tik"
+			//level.coop_forcePrimary = "models/items/papers.tik"
+			//level.coop_forceInventory = "models/items/papers.tik"
+			//level.coop_forceSecondary = "models/items/papers.tik"
 			
 			level.playerHasDisguise = 1
 			level.playerHasPapers = 1
