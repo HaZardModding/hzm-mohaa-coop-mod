@@ -30,7 +30,9 @@ the game: ^ , °, ², ³, @, <, ~ or '
 [![Discord Banner 1](https://discordapp.com/api/guilds/509441602222030848/widget.png?style=banner2)](https://discord.gg/7ZhHeu4)
 
 # Links
-http://HaZardModding.com
-Offical Relases: https://www.moddb.com/mods/hazardmodding-mohaa
+On Twitter: https://twitter.com/HaModding
+Offical Page: http://www.HaZardModding.com
+Offical Relases: https://www.moddb.com/mods/medal-of-honor-coop-hazardmodding
+
 Packscape: https://www.moddb.com/downloads/pak-scape
 7-Zip: https://7-zip.org
