@@ -1,4 +1,5 @@
-# HaZardModding Coop Mod for Medal of Honor Allied Assault War Chest.
+# HaZardModding Coop: Medal of Honor
+A Coop Mof for Medal of Honor Allied Assault War Chest.
 
 HaZardModding adds modern cooperative experience into the games, that don't support it by default.
 This particular modification is developed on and meant to be run with Medal of Honor: Allied Assault War Chest
@@ -26,11 +27,10 @@ Language. Please try the following Keys while you are in the main Menu of
 the game: ^ , °, ², ³, @, <, ~ or '
  
 # Discord
-[![Discord Banner 1](https://discordapp.com/api/guilds/509441602222030848/widget.png?style=banner2)](https://discord.gg/jse9daX)
+[![Discord Banner 1](https://discordapp.com/api/guilds/509441602222030848/widget.png?style=banner2)](https://discord.gg/7ZhHeu4)
 
 # Links
-On Twitter: https://twitter.com/HaModding
-Offical Page: http://www.HaZardModding.com
-Offical Relases: https://www.moddb.com/mods/medal-of-honor-coop-hazardmodding
+http://HaZardModding.com
+Offical Relases: https://www.moddb.com/mods/hazardmodding-mohaa
 Packscape: https://www.moddb.com/downloads/pak-scape
 7-Zip: https://7-zip.org
