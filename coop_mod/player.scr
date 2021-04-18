@@ -70,13 +70,11 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 /////////////////////////////////////////ALIVE
 				if (!local.player.isSpectator && local.player.health > 0){ //[202] Smithy - fixed players being able to respawn anywhere
 					//spawning is event based handled in: main.scr::playerSpawnEvent
-					
-					
 					//waitthread manageAlive local.player local.i
 					
-					//[202][hotfix] chrissstrahl - check also for new cvar that disables respawn warper
-					if( !level.coop_disableSpawnWarper && !level.coop_cvarRespawnDisable && !level.coop_playerGlue){
-						if(	local.player.flags["coop_respawnTime"] == NIL || local.player.flags["coop_respawnTime"] < (level.time + 2) ){
+					//[202][hotfix] chrissstrahl - check also for new cvar that disables respawn warper - fixed time check
+					if( !level.coop_disableSpawnWarper && !level.coop_cvarRespawnDisable && !level.coop_playerGlue ){
+						if(	local.player.flags["coop_respawnTime"] == NIL || local.player.flags["coop_respawnTime"] < (level.time - 2) ){
 							local.player.flags["coop_respawnTime"]		= level.time
 							local.player.flags["coop_respawnOrigin"]	= local.player.origin
 							local.player.flags["coop_respawnAngle"]		= local.player.viewangles[1]
@@ -490,6 +488,8 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	// RESPAWNING /////////////////////////////////////////
 	//place at spawn or respawn, this needs to be done regardless of glueing
 	if(local.player.flags["coop_respawning"] == TRUE){
+		iprintlnbold_noloc("respawning")
+		println("respawning")
 		waitthread coop_mod/player.scr::manageAliveRespawning local.player
 		thread coop_mod/main.scr::startThread ( "maps/"+level.coop_mapname+".scr::coop_playerJustRespawned" ) (local.player)
 	}else{	
@@ -600,7 +600,6 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	//also do not respawn if coop_respawnOrigin flag is set to 0 0 0 or something very close
 	//[202][hotfix] chrissstrahl - added check for cvar disabled respawn warper
 	if( !level.coop_disableSpawnWarper && !level.coop_cvarRespawnDisable && vector_length( local.player.flags["coop_respawnOrigin"] ) > 10){
-		
 		//make player solid as soon as possible (checks if inside other players or friendly)
 		thread coop_mod/main.scr::playerMakeSolidAsap local.player
 		
@@ -628,8 +627,8 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 //alive player handling - used to save location on player
 //called from ::manageAlive if
 // player is not a spectator and has positive health
-// player has flag set: local.player.flags["coop_respawning"] != TRUE
-// if global var level.coop_disableSpawnWarper != TRUE
+// player has flag set: local.player.flags["coop_respawning"] != game.true
+// if global var level.coop_disableSpawnWarper != game.true
 //=========================================================================
 manageAliveSaveLocation local.player:{
 //=========================================================================
@@ -674,6 +673,7 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 		thread coop_mod/main.scr::lmsForceSpectatorHandle local.player
 		
 // REGULAR dead handle
+		local.player.flags["coop_respawnTime"] = -1 //[202][hotfix] chrissstrahl - make sure it will be updated righ away on respawn
 		local.player.flags["coop_isActive"] = -2
 		local.player.flags["coop_justSpawnedDone"] = NIL
 		local.player.flags["coop_respawning"] = TRUE
