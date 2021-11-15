@@ -240,15 +240,6 @@ manageNamechange local.player:{
 if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread player/manageNamechange->"+level.cMTE+"" )}
 	local.playerNetnameFull = local.player.netname
 	
-	//make sure player name is even capable of handling player name
-	local.nameToLong = 0
-	local.datasize = 7
-	local.maxcharsize = (31 - local.datasize)//31=maxchars in name, 8=chars for key+command
-	if(local.playerNetnameFull.size > (31 - local.datasize)){ //length is " ,1data"
-		local.player iprint ("Your Name is to long ("+local.playerNetnameFull.size+") for commands to work in Coop ("+local.maxcharsize+")...") 1
-		local.nameToLong = 1
-	}
-	
 	//check if we can find certain data in name
 	//ADD ONLY COMMANDS - that we want truly to be executable at all times
 	local.command["0"]=" ,0" //coop version
@@ -258,36 +249,41 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	local.command["4"]=" ,stuck" //developer commands
 	
 	//[203] chrissstrahl - extract all data at once and save it on the player
-	//but only is the name is not to long
-	if(!local.nameToLong){
-		local.i=0;
-		local.dataExtracted=0
-		
-		while(local.command[string(local.i)]){
-			local.find = waitthread coop_mod/main.scr::containsText local.playerNetnameFull local.command[string(local.i)] 1
-			if(local.find){
-				//grab data from player name, each at a time
-				local.extractedData = waitthread playerExtract local.playerNetnameFull local.command[string(local.i)]
+	local.i=0;
+	local.dataExtracted=0
+	
+	while(local.command[string(local.i)]){
+		local.find = waitthread coop_mod/main.scr::containsText local.playerNetnameFull local.command[string(local.i)] 1
+		if(local.find){
+			//grab data from player name, each at a time
+			local.extractedData = waitthread playerExtract local.playerNetnameFull local.command[string(local.i)]
+			
+			if(local.extractedData != NIL && local.extractedData != ""){
+				local.dataExtracted=1
+				local.player.flags["coop_extracted"+local.i+""] = string(local.extractedData)
 				
-				if(local.extractedData != NIL && local.extractedData != ""){
-					local.dataExtracted=1
-					local.player.flags["coop_extracted"+local.i+""] = string(local.extractedData)
-					
-					//DEBUG
-					//local.player iprint ("COOPDEBUG: coop_extracted"+local.i+"="+local.extractedData+"") 1				
-				}
+				//DEBUG
+				//local.player iprint ("COOPDEBUG: coop_extracted"+local.i+"="+local.extractedData+"") 1				
 			}
-			else{
-				local.player.flags["coop_extracted"+local.i+""] = NIL
-			}
-			local.i++
 		}
-		
-		//set marker that this player had data set on name
-		if(local.dataExtracted){
-			local.player.flags["coop_extractedData"] = 1
-			thread playerNameCommand local.player
-		}	
+		else{
+			local.player.flags["coop_extracted"+local.i+""] = NIL
+		}
+		local.i++
+	}
+	
+	//set marker that this player had data set on name
+	if(local.dataExtracted){
+		local.player.flags["coop_extractedData"] = 1
+		thread playerNameCommand local.player
+	}
+	//make sure mod is even capable of handling player name, tell player if not
+	else{
+		local.datasize = 7
+		local.maxcharsize = (31 - local.datasize)//31=maxchars in name, 8=chars for key+command
+		if(local.playerNetnameFull.size > (31 - local.datasize)){ //length is " ,1data"
+			local.player iprint ("Your Name is to long ("+local.playerNetnameFull.size+") for commands to work in Coop ("+local.maxcharsize+")...") 1
+		}
 	}
 	
 	//clean name and notify scripts that player name was changed
