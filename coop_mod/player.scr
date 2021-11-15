@@ -96,11 +96,12 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 				
 /////////////////////////////////////////RESTORE FOV IF NAME IS CHANGED
 				//prevent this thread to be executed several times
-				if(	local.player.flags["coop_netname"] != local.player.netname &&
-					level.time > (local.player.flags["coop_netnameChanged"] + (game.frame * 3))
-					/*&& local.player.flags["coop_setupComplete"] == 1*/)
-				{
-					thread manageNamechange local.player
+				//[202][hotfix] chrissstrahl - fix data remaining in name
+				if(	level.time > (local.player.flags["coop_netnameChanged"] + (game.frame * 3))){
+					if(local.player.flags["coop_netname"] != local.player.netname || waitthread coop_mod/main.scr::containsText local.player.netname "," ){
+						println("Coop INFO: name changed or ',' detected")
+						thread manageNamechange local.player
+					}
 				}
 			}
 		}
@@ -270,6 +271,10 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	
 	//only supported datatypes are handled
 	if(local.datatype != NIL){
+		waitthread extractDataFromNetname2 local.player
+		local.player.flags["coop_nameData"+local.datatype+""] = local.dataExtracted
+		
+		
 		local.extract = waitthread extractDataFromNetname local.player local.datatype
 		//println("manageNamechange:2 - NETNAME:"+local.playerNetnameFull+";")
 		//println("manageNamechange:2 - DATATYPE:"+string(local.datatype)+";")
@@ -769,6 +774,61 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	local.player.flags["coop_setupComplete"] = 1
 }end
 
+//[202] [hotfix] chrissstrahl - detect data in name
+//=========================================================================
+extractDataFromNetname2 local.player:{
+//=========================================================================
+if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread player/extractDataFromNetname2->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
+	if(!local.player){ end NULL }
+	
+	//GRAB PLAYER NAME
+	local.fullNetName = string(local.player.netname);
+	
+	//IF NO DATA CAN BE FOUND, EXIT
+	local.nameEnd = waitexec global/strings.scr::instr " ," local.fullNetName
+println(" , Found at: "+local.nameEnd+"")
+	if(local.nameEnd == NIL){ end }
+	
+	//CLEAN PLAYER NAME
+	local.cleanName = ""
+	for(local.current = 0; local.current < local.nameEnd;local.current++){
+		local.cleanName += string(local.fullNetName[local.current])		
+	}
+	local.player.flags["coop_netnameChanged"] = level.time
+	local.player.flags["coop_netname"] = local.cleanName
+	local.player stufftext ("set name "+local.cleanName+"\n") //chrissstrahl - requires set Command to handle spaces
+	
+	//EXTRACT ALL DATA FROM NAME AT ONCE
+	//0=coop installed 1=fov, 2=teleport, 3=developer, ,stuck=developer
+	for(local.commandId = 0;local.commandId<4;local.commandId++ ){
+		local.dataStart = waitthread coop_mod/main.scr::containsText local.fullNetName (" ,"+local.commandId+"") game.true
+		if(local.dataStart){
+		}
+	}
+			
+//explode - kinda, put each occurence of " ," into a array
+//how to make arrays?
+//make sure the commands are put into a array and then read and executed in order
+//so no commands are dropped
+			
+println("data type found: "+local.commandId+"")
+			local.dataExtracted = ""
+			for(){
+				local.currentChar = string(local.fullNetName[local.current])
+				if(	local.currentChar == " " &&
+					local.currentChar == "," &&
+					local.currentChar == "\n"){ break }
+				local.dataExtracted += local.currentChar
+			}
+println("data extracted: "+local.dataExtracted+"")
+			if(local.dataExtracted.size){
+				local.player.flags["coop_nameData"+local.commandId+""] = local.dataExtracted
+			}
+		}
+	}
+}end
+
+
 //[202] chrissstrahl - detect data in name
 //=========================================================================
 extractDataFromNetname local.player local.key:{
@@ -789,11 +849,13 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 		end NIL
 	}
 	
-	//RESTORE PLAYER NAME
+	//RESTORE PLAYER NAME	
 	local.cleanName = ""
 	for(local.current = 0; local.current < local.dataStart;local.current++){
 		local.cleanName += string(local.fullNetName[local.current])
 	}
+	
+	println("extractDataFromNetname: local.cleanName "+local.cleanName+"---")
 	
 	local.player.flags["coop_netnameChanged"] = level.time
 	local.player.flags["coop_netname"] = local.cleanName
