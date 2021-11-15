@@ -99,7 +99,6 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 				//[202][hotfix] chrissstrahl - fix data remaining in name
 				if(	level.time > (local.player.flags["coop_netnameChanged"] + (game.frame * 3))){
 					if(local.player.flags["coop_netname"] != local.player.netname || waitthread coop_mod/main.scr::containsText local.player.netname "," ){
-						println("Coop INFO: name changed or ',' detected")
 						thread manageNamechange local.player
 					}
 				}
@@ -108,8 +107,6 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 		
 		//[202] Smithy - moved here and done in one //[200] chrissstrahl - used for LMS to detect when a player leaves
 		local.playerCount = $player.size
-		
-		
 
 		//[200] chrissstrahl - call player changed func if number of players changed
 		if(local.prevPlayerCount != local.playerCount){
@@ -223,6 +220,9 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 //VARIABLES initialization 
 	local.player.flags["coop_lastRespawn"] = -1
 	local.player.flags["coop_joinedGameAt"] = level.time
+	//[203] chrissstrahl - added vars to set em to a valid inizial value
+	local.player.flags["coop_installed"] = -1
+	local.player.flags["coop_version"] = -1
 	local.player.flags["coop_netnameChanged"] = -1
 	//[202] chrissstrahl - set previouse spawnlocation for spawn stuck prevention or else we get spam
 	local.player.flags["coop_spawnlocPreviouse"] = thread game.main::getPlayerId local.player
@@ -231,136 +231,281 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	local.player spectator
 }end
 
-//[202] chrissstrahl - for changing a player's FOV with a delay based on data from name
+
+//[203] chrissstrahl - upgraded to retrive all data at once then save it on player
+//this is executed from player.scr::manage if a player changes his name
 //=========================================================================
 manageNamechange local.player:{
 //=========================================================================
-if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread player/manageNamechange->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
+if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread player/manageNamechange->"+level.cMTE+"" )}
 	local.playerNetnameFull = local.player.netname
-	local.player.flags["coop_netname"] = local.player.netname 
 	
 	//make sure player name is even capable of handling player name
+	local.nameToLong = 0
 	local.datasize = 7
 	local.maxcharsize = (31 - local.datasize)//31=maxchars in name, 8=chars for key+command
 	if(local.playerNetnameFull.size > (31 - local.datasize)){ //length is " ,1data"
 		local.player iprint ("Your Name is to long ("+local.playerNetnameFull.size+") for commands to work in Coop ("+local.maxcharsize+")...") 1
+		local.nameToLong = 1
 	}
 	
 	//check if we can find certain data in name
 	//ADD ONLY COMMANDS - that we want truly to be executable at all times
-	local.command["0"]=" ,1" //fov NOTE: ,0 is reseved
-	local.command["1"]=" ,2" //teleport
-	local.command["2"]=" ,3" //developer commands
-	local.command["3"]=" ,stuck" //developer commands
-	local.commandNumber=( -1 ) //on purpose out of range
+	local.command["0"]=" ,0" //coop version
+	local.command["1"]=" ,1" //fov NOTE
+	local.command["2"]=" ,2" //teleport
+	local.command["3"]=" ,3" //developer commands
+	local.command["4"]=" ,stuck" //developer commands
 	
-	local.i=0;
-	while(local.command[string(local.i)]){
-		local.find = waitthread coop_mod/main.scr::containsText local.playerNetnameFull local.command[string(local.i)] 1
-		if(local.find){
-			local.commandNumber = local.i
-			break
-		}
-		local.i++
-	}
-
-	//check if datatype is supported
-	local.datatype = local.command[string(local.commandNumber)]
-	
-	//println("manageNamechange:1 - "+local.find+":"+string(local.datatype))
-	
-	//only supported datatypes are handled
-	if(local.datatype != NIL){
-		waitthread extractDataFromNetname2 local.player
-		local.player.flags["coop_nameData"+local.datatype+""] = local.dataExtracted
+	//[203] chrissstrahl - extract all data at once and save it on the player
+	//but only is the name is not to long
+	if(!local.nameToLong){
+		local.i=0;
+		local.dataExtracted=0
 		
-		
-		local.extract = waitthread extractDataFromNetname local.player local.datatype
-		//println("manageNamechange:2 - NETNAME:"+local.playerNetnameFull+";")
-		//println("manageNamechange:2 - DATATYPE:"+string(local.datatype)+";")
-		//println("manageNamechange:2 - Extract:"+string(local.extract)+";")
-		
-		//handle datatypes
-		//fov - is handled below it has to be set with delay
-		
-//datatype teleport///////////////////////////////////////////////////
-//datatype teleport///////////////////////////////////////////////////
-//datatype teleport///////////////////////////////////////////////////
-		if(local.datatype == local.command["1"]){//teleport
-			//iprintlnbold_noloc("TRANSPORT DATA: "+local.extract)
-			//START - player wants to go spawn location
-			if(local.extract == "start"){
-				thread coop_mod/main.scr::playerPlaceAtSpawn local.player
-			}
-			//PLAYERNAME / NUMBER - if it is non of the above check if it is a player name
-			else{
-				local.validPlayerFound = 0
-				//MATCHING PLAYER NAME
-				for (local.i = 1;local.i <= $player.size;local.i++){
-					local.playerOther =  $player[local.i]
-					if(local.playerOther == local.player){ continue }
+		while(local.command[string(local.i)]){
+			local.find = waitthread coop_mod/main.scr::containsText local.playerNetnameFull local.command[string(local.i)] 1
+			if(local.find){
+				//grab data from player name, each at a time
+				local.extractedData = waitthread playerExtract local.playerNetnameFull local.command[string(local.i)]
+				
+				if(local.extractedData != NIL && local.extractedData != ""){
+					local.dataExtracted=1
+					local.player.flags["coop_extracted"+local.i+""] = string(local.extractedData)
 					
-					//a player with a matching or similar name was found - move player there
-					if( waitthread coop_mod/main.scr::containsText local.playerOther.netname local.extract ){
-						local.validPlayerFound = 1
-						local.player origin local.playerOther.origin
-						thread coop_mod/main.scr::playerMakeSolidAsap local.player
-						thread coop_mod/main.scr::playerMakeSolidAsap local.playerOther
-					}
-				}
-				//MATCHING ENTITY NUMBER
-				if(local.validPlayerFound == 0 && int(local.extract) > -1 && int(local.extract) < int(getcvar("sv_maxclients"))){
-					local.playerOther = getentbyentnum( 0 )
-					if( 	local.playerOther != NULL &&
-							local.playerOther != local.player &&
-							local.playerOther.health > 0 &&
-							local.playerOther.health > 0 &&
-							local.playerOther.classname == "player" &&
-							local.playerOther.dmteam != "spectator")
-					{
-						local.validPlayerFound = 1
-						local.player origin local.playerOther.origin
-						thread coop_mod/main.scr::playerMakeSolidAsap local.player
-						thread coop_mod/main.scr::playerMakeSolidAsap local.playerOther
-					}
-				}
-				//NO VALID PLAYER FOUND
-				if(local.validPlayerFound == 0){
-					local.player iprint "No valid player found. Try with different parameter." 1
+					//DEBUG
+					//local.player iprint ("COOPDEBUG: coop_extracted"+local.i+"="+local.extractedData+"") 1				
 				}
 			}
+			else{
+				local.player.flags["coop_extracted"+local.i+""] = NIL
+			}
+			local.i++
 		}
-//datatype dev///////////////////////////////////////////////////
-//datatype dev///////////////////////////////////////////////////
-//datatype dev///////////////////////////////////////////////////
-		else if(local.command["2"] == local.datatype){
-			if(int(getcvar("coop_dev")) <= 0 || !local.player.flags["coop_isHost"] ){ end }
-			local.player thread coop_mod/developer.scr::devcommand local.extract
-		}
-//stuck command///////////////////////////////////////////////////
-//stuck command///////////////////////////////////////////////////
-//stuck command///////////////////////////////////////////////////
-		else if(local.command["3"] == local.datatype){ //,stuck
-			//@chrissstrahl - add handle here that moves player to next spawn each time it is used, start at 1
-		}
-	}else{
-		println("manageNamechange: unsuported data key type for player: "+local.player.netname )
+		
+		//set marker that this player had data set on name
+		if(local.dataExtracted){
+			local.player.flags["coop_extractedData"] = 1
+			thread playerNameCommand local.player
+		}	
 	}
+	
+	//clean name and notify scripts that player name was changed
+	local.cleanName = waitthread playerCleanName local.playerNetnameFull
+	local.player.flags["coop_netname"] = local.cleanName
+	local.player.flags["coop_netnameChanged"] = level.time
+	local.player stufftext ("set name "+local.cleanName+"\n")
 	
 	//every time name is changed fov needs to be set again
 	//we need a delay before this or it will be reset right away
 	waitframe
 	waitframe
-	//only change fov if player was indeed renamed
-	if(local.player){
-		//datatype fov
-		if(local.datatype == local.command["0"] && local.extract != NIL){
-			local.fov = int(local.extract)
-		}else{
-			local.fov = local.player.flags["coop_fov"]
+	thread manageFovSet local.player local.player.flags["coop_fov"]
+}end
+
+//[203] chrissstrahl - extract data from playername using a key
+//keys: " ,0"coopversion " ,1"fov " ,2"teleport " ,3"developer " ,4"stuck
+//=========================================================================
+playerExtract local.playerName local.key:{
+//=========================================================================
+	//check if the data is even there
+	local.find = ""
+	local.findPos=0
+	local.findPos = waitthread coop_mod/main.scr::containsText local.playerName local.key 0
+	if(!local.findPos){ end NIL }
+	
+	//locate start position of key
+	local.findPos = waitthread coop_mod/main.scr::containsText local.playerName local.key 1
+	
+	//make sure there is actually any data attached to key
+	if(local.playerName.size > (local.findPos + local.key.size)){
+		
+		//now return data until string ends or data is terminated
+		for(local.findersKeep=(local.findPos + local.key.size);local.findersKeep<local.playerName.size;local.findersKeep++){
+			
+			//pretty sure this can be done better smithy will know how :) @smithy
+			if(	local.playerName[local.findersKeep] == " " ||
+				local.playerName[local.findersKeep] == "," ||
+				local.playerName[local.findersKeep] == "." ||
+				local.playerName[local.findersKeep] == ":" ||
+				local.playerName[local.findersKeep] == "~" ||
+				local.playerName[local.findersKeep] == "^" ||
+				local.playerName[local.findersKeep] == "&" ||
+				local.playerName[local.findersKeep] == "-" ||
+				local.playerName[local.findersKeep] == "(" ||
+				local.playerName[local.findersKeep] == ")" ||
+				local.playerName[local.findersKeep] == "{" ||
+				local.playerName[local.findersKeep] == "}" ||
+				local.playerName[local.findersKeep] == "°" ||
+				local.playerName[local.findersKeep] == "!" ||
+				local.playerName[local.findersKeep] == "?" ||
+				local.playerName[local.findersKeep] == "=" ||
+				local.playerName[local.findersKeep] == "]" ||
+				local.playerName[local.findersKeep] == "]" ||
+				local.playerName[local.findersKeep] == "_" ||
+				local.playerName[local.findersKeep] == "#" ||
+				local.playerName[local.findersKeep] == "*" ||
+				local.playerName[local.findersKeep] == "§" ||
+				local.playerName[local.findersKeep] == "$" ||
+				local.playerName[local.findersKeep] == "%" ||
+				local.playerName[local.findersKeep] == "'" ||
+				local.playerName[local.findersKeep] == "`" ||
+				local.playerName[local.findersKeep] == "`" ||
+				local.playerName[local.findersKeep] == "/" ||
+				local.playerName[local.findersKeep] == "\\" )
+			{
+				break
+			}
+			local.find += local.playerName[local.findersKeep]
 		}
-		thread manageFovSet local.player local.fov
 	}
+	//make sure we give no data back if there is none
+	else{
+		end NIL
+	}
+	
+	//make sure we give no data back if there is none
+	if(local.find == ""){
+		end NIL
+	}
+	
+}end local.find
+
+//[203] chrissstrahl - cleans the playername
+//=========================================================================
+playerCleanName local.dirtyName:{
+//=========================================================================
+if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread player/playerCleanName->"+level.cMTE+"" )}
+	//check if we can find certain data in name
+	//ADD ONLY COMMANDS - that we want truly to be executable at all times
+	local.command["0"]=" ,0" //coop version
+	local.command["1"]=" ,1" //fov NOTE
+	local.command["2"]=" ,2" //teleport
+	local.command["3"]=" ,3" //developer commands
+	local.command["4"]=" ,stuck" //developer commands
+	
+	local.cleanName = ""
+	local.fullName = string(local.dirtyName);
+	
+	//if name has " ," at any position other than 0 clean the name
+	local.cocksACola = waitthread coop_mod/main.scr::containsText local.fullName " ," 1
+	if(local.cocksACola){
+		for(local.spagetty=0;local.spagetty<=local.cocksACola;local.spagetty++){
+			local.cleanName += local.fullName[local.spagetty]
+		}
+	}
+	//otherwhithe don't bother brother
+	else{
+		local.cleanName = local.fullName
+	}
+}end local.cleanName
+	
+//[203] chrissstrahl - upgraded to retrive all data at once then save it on player
+//From ARRAY INDEX (manageNamechange): 0=fov,1=teleport,2=developercommand,3=stuck
+//=========================================================================
+playerNameCommand local.player:{
+//=========================================================================
+	//	5	//
+	local.command["0"]=" ,0" //coop version
+	local.command["1"]=" ,1" //fov NOTE
+	local.command["2"]=" ,2" //teleport
+	local.command["3"]=" ,3" //developer commands
+	local.command["4"]=" ,stuck" //developer commands
+	
+	local.dataExtract=NIL
+	for(local.arrayIndex=0;local.arrayIndex<	5	;local.arrayIndex++){
+		local.dataExtract = local.player.flags["coop_extracted"+local.arrayIndex+""]
+		if(local.dataExtract != NIL && local.dataExtract != ""){
+			if(local.arrayIndex==0){ thread playerExtractedVersion local.player local.dataExtract }
+			else if(local.arrayIndex==1){ thread playerExtractedFov local.player local.dataExtract }
+			else if(local.arrayIndex==2){ thread playerExtractedTeleport local.player local.dataExtract }
+			else if(local.arrayIndex==3){ thread playerExtractedDeveloper local.player local.dataExtract }
+			else if(local.arrayIndex==4){ thread playerExtractedStuck local.player local.dataExtract }
+		}
+	}
+}end
+
+//[203] chrissstrahl - set player installed coop mod version number based on given data
+//=========================================================================
+playerExtractedVersion local.player local.dataExtract:{
+//=========================================================================
+	//build in protection, so that this can only be done very shortly after spawn
+	//prevents players from version hopping
+	if((local.player.flags["coop_joinedGameAt"] + 1) > level.time){
+		local.player.flags["coop_installed"] = 1
+		local.player.flags["coop_version"] = int(local.dataExtract)
+	}
+}end
+
+//[203] chrissstrahl - set player fov based on given data
+//=========================================================================
+playerExtractedFov local.player local.dataExtract:{
+//=========================================================================
+	local.player.flags["coop_fov"] = int(local.dataExtract)
+}end
+
+//[203] chrissstrahl - make player teleport based on given data
+//=========================================================================
+playerExtractedTeleport local.player local.dataExtract:{
+//=========================================================================
+	//START - player wants to go spawn location
+	if(local.dataExtract == "start"){
+		thread coop_mod/main.scr::playerPlaceAtSpawn local.player
+	}
+	//PLAYERNAME / NUMBER - if it is non of the above check if it is a player name
+	else{
+		local.validPlayerFound = 0
+		//MATCHING PLAYER NAME
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.playerOther =  $player[local.i]
+			if(local.playerOther == local.player){ continue }
+			
+			//a player with a matching or similar name was found - move player there
+			if( waitthread coop_mod/main.scr::containsText local.playerOther.netname local.dataExtract ){
+				local.validPlayerFound = 1
+				local.player origin local.playerOther.origin
+				thread coop_mod/main.scr::playerMakeSolidAsap local.player
+				thread coop_mod/main.scr::playerMakeSolidAsap local.playerOther
+			}
+		}
+		//MATCHING ENTITY NUMBER
+		if(local.validPlayerFound == 0 && int(local.dataExtract) > -1 && int(local.dataExtract) < int(getcvar("sv_maxclients"))){
+			local.playerOther = getentbyentnum( 0 )
+			if( 	local.playerOther != NULL &&
+					local.playerOther != local.player &&
+					local.playerOther.health > 0 &&
+					local.playerOther.health > 0 &&
+					local.playerOther.classname == "player" &&
+					local.playerOther.dmteam != "spectator")
+			{
+				local.validPlayerFound = 1
+				local.player origin local.playerOther.origin
+				thread coop_mod/main.scr::playerMakeSolidAsap local.player
+				thread coop_mod/main.scr::playerMakeSolidAsap local.playerOther
+			}
+		}
+		//NO VALID PLAYER FOUND
+		if(local.validPlayerFound == 0){
+			local.player iprint "No valid player found. Try with different parameter." 1
+		}
+	}
+}end
+	
+//[203] chrissstrahl - execute developer command based on given data
+//=========================================================================
+playerExtractedDeveloper local.player local.dataExtract:{
+//=========================================================================
+	iprintlnbold_noloc("DEVELOPER DATA: "+local.dataExtract+" - check if coop_dev is on")
+	if(int(getcvar("coop_dev")) <= 0 || !local.player.flags["coop_isHost"] ){ end }
+	local.player thread coop_mod/developer.scr::devcommand local.dataExtract
+}end
+
+//[203] chrissstrahl - execute stuck command based on given data
+//=========================================================================
+playerExtractedStuck local.player local.dataExtract:{
+//=========================================================================
+	//@chrissstrahl - add handle here that moves player to next spawn each time it is used, start at 1
+	iprintlnbold_noloc("COOPDEBUG: incolplete command, DEVELOPER please fix - playerExtractedStuck")
 }end
 
 //[200] Smithy - for changing a player's FOV
@@ -377,6 +522,11 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	
 	//println("manageFovSet::::::::::::"+local.fov)
 	//[202] chrissstrahl - update cvars first to prevent resetting the fov
+	//
+	//Cvar used for the coop mod to detect player
+	//desired fov setting set from within menu 
+	//g_m2l1 - vstr append and detect var
+	//g_m2l2 - video options.urc LINKVAR
 	if(local.player){
 		local.player.flags["coop_fov"] = local.fov
 		local.player stufftext ("seta g_m2l2 "+local.fov)
@@ -493,8 +643,6 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	// RESPAWNING /////////////////////////////////////////
 	//place at spawn or respawn, this needs to be done regardless of glueing
 	if(local.player.flags["coop_respawning"] == TRUE){
-		iprintlnbold_noloc("respawning")
-		println("respawning")
 		waitthread coop_mod/player.scr::manageAliveRespawning local.player
 		thread coop_mod/main.scr::startThread ( "maps/"+level.coop_mapname+".scr::coop_playerJustRespawned" ) (local.player)
 	}else{	
@@ -567,7 +715,8 @@ preventSpawnStuck local.player:{
 			local.player iprint "If you are stuck, press use to switch to a different spawnlocation" 1
 			while(local.player && local.player.health && local.player.dmteam != "spectator" && vector_length(local.player.origin - local.player.flags["coop_spawnlocPreviouse"]) < 100){
 				waitframe
-				if(local.player.useheld){
+				//[b610] chrissstrahl - added check for null entity
+				if(local.player && local.player.useheld){
 					local.player iprint "Moved you to a different spawnlocation" 1
 					
 					local.player.flags["coop_spawnlocAltActive"] = 1
@@ -749,7 +898,6 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	}	
 	
 	//DETECT FOV AND MOD VERSION
-	waitthread detectCoopFov local.player
 	waitthread detectCoopMod local.player
 
 	//this is used for playing current music, if the player joins mid-game
@@ -774,149 +922,14 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	local.player.flags["coop_setupComplete"] = 1
 }end
 
-//[202] [hotfix] chrissstrahl - detect data in name
-//=========================================================================
-extractDataFromNetname2 local.player:{
-//=========================================================================
-if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread player/extractDataFromNetname2->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-	if(!local.player){ end NULL }
-	
-	//GRAB PLAYER NAME
-	local.fullNetName = string(local.player.netname);
-	
-	//IF NO DATA CAN BE FOUND, EXIT
-	local.nameEnd = waitexec global/strings.scr::instr " ," local.fullNetName
-println(" , Found at: "+local.nameEnd+"")
-	if(local.nameEnd == NIL){ end }
-	
-	//CLEAN PLAYER NAME
-	local.cleanName = ""
-	for(local.current = 0; local.current < local.nameEnd;local.current++){
-		local.cleanName += string(local.fullNetName[local.current])		
-	}
-	local.player.flags["coop_netnameChanged"] = level.time
-	local.player.flags["coop_netname"] = local.cleanName
-	local.player stufftext ("set name "+local.cleanName+"\n") //chrissstrahl - requires set Command to handle spaces
-	
-	//EXTRACT ALL DATA FROM NAME AT ONCE
-	//0=coop installed 1=fov, 2=teleport, 3=developer, ,stuck=developer
-	for(local.commandId = 0;local.commandId<4;local.commandId++ ){
-		local.dataStart = waitthread coop_mod/main.scr::containsText local.fullNetName (" ,"+local.commandId+"") game.true
-		if(local.dataStart){
-		}
-	}
-			
-//explode - kinda, put each occurence of " ," into a array
-//how to make arrays?
-//make sure the commands are put into a array and then read and executed in order
-//so no commands are dropped
-			
-println("data type found: "+local.commandId+"")
-			local.dataExtracted = ""
-			for(){
-				local.currentChar = string(local.fullNetName[local.current])
-				if(	local.currentChar == " " &&
-					local.currentChar == "," &&
-					local.currentChar == "\n"){ break }
-				local.dataExtracted += local.currentChar
-			}
-println("data extracted: "+local.dataExtracted+"")
-			if(local.dataExtracted.size){
-				local.player.flags["coop_nameData"+local.commandId+""] = local.dataExtracted
-			}
-		}
-	}
-}end
-
-
-//[202] chrissstrahl - detect data in name
-//=========================================================================
-extractDataFromNetname local.player local.key:{
-//=========================================================================
-if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread player/extractDataFromNetname->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-	if(!local.player){ end NULL }
-	
-	local.key = string(local.key)
-
-	//CHECK IF DATA CAN BE FOUND
-	local.fullNetName = string(local.player.netname);
-	local.dataStart = waitthread coop_mod/main.scr::containsText local.fullNetName (local.key) game.true
-	
-	//NO DATA IN NAME, UPDATE VAR and do not rename
-	if(!local.dataStart){
-		local.player.flags["coop_netname"] = local.fullNetName
-		//println("extractDataFromNetname:NIL:")
-		end NIL
-	}
-	
-	//RESTORE PLAYER NAME	
-	local.cleanName = ""
-	for(local.current = 0; local.current < local.dataStart;local.current++){
-		local.cleanName += string(local.fullNetName[local.current])
-	}
-	
-	println("extractDataFromNetname: local.cleanName "+local.cleanName+"---")
-	
-	local.player.flags["coop_netnameChanged"] = level.time
-	local.player.flags["coop_netname"] = local.cleanName
-	local.player stufftext ("set name "+local.cleanName+"\n") //chrissstrahl - this requires the set Command to handle spaces in names
-	//println("extractDataFromNetname clean:"+local.cleanName+":")
-	
-	//EXTRACT DATA FROM NAME - skip WHITHESPACE+COLON
-	local.dataStart += (local.key.size)
-	local.dataExtracted = ""
-	for(local.current = local.dataStart; local.current < local.fullNetName.size;local.current++){
-		local.currentChar = string(local.fullNetName[local.current])
-		if(local.currentChar){
-			local.dataExtracted += string(local.fullNetName[local.current])
-		}
-	}
-	//println("extractDataFromNetname END:"+local.dataExtracted+":")
-}end local.dataExtracted
-
-//[202] chrissstrahl - detect fov in name
-//=========================================================================
-detectCoopFov local.player:{
-//=========================================================================
-if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread player/detectCoopFov->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-	//[200] chrissstrahl - update menu entry
-	local.player stufftext ( "vstr g_m2l1\n" )
-	
-	//detect coop mod version
-	local.waitFrames = (1 * int(getcvar("sv_fps")))
-	while(local.player && local.waitFrames > 0){
-		local.extract = waitthread extractDataFromNetname local.player " ,1" //01=fov,02=teleport
-		if(local.extract != NIL){
-			local.fov = int(local.extract)
-			thread manageFovSet local.player local.fov
-			break
-		}
-		local.waitFrames--
-		waitframe
-	}
-}end
-
 //[202] chrissstrahl - detect coop version
 //=========================================================================
 detectCoopMod local.player:{
 //=========================================================================
 if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread player/detectCoopMod->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
 	//[200] chrissstrahl - used to detect if a player has the coop mod installed
+	local.player stufftext ( "vstr g_m2l1\n" )
 	local.player stufftext ( "exec coop_mod/cfg/detect.cfg\n" )
-	
-	//detect coop mod version
-	//detect coop mod version
-	local.waitFrames = (1 * int(getcvar("sv_fps")))
-	while(local.player && local.waitFrames > 0){
-		local.extract = waitthread extractDataFromNetname local.player " ,0" //00=coop mod
-		if(local.extract != NIL){
-			local.player.flags["coop_installed"] = 1
-			local.player.flags["coop_version"] = int(local.extract)
-			break
-		}
-		local.waitFrames--
-		waitframe
-	}
 }end
 
 //[202] chrissstrahl - force 3rd Person view
