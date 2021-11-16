@@ -170,9 +170,10 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	if(local.player.flags["coop_isActive"] != NIL){
 		end
 	}
-	
-	//println("manageSetup::::::::::::RUNNING")
 	local.player.flags["coop_isActive"] = -3
+	
+	//[203] chrissstrahl - set previouse spawnlocation for spawn stuck prevention or else we get spam
+	local.player.flags["coop_spawnlocPreviouse"] = ( 0 0 0)
 	
 	//[203] chrissstrahl - check for coop mod install
 	thread detectCoop local.player
@@ -231,8 +232,6 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	local.player.flags["coop_installed"] = -1
 	local.player.flags["coop_version"] = -1
 	local.player.flags["coop_netnameChanged"] = -1
-	//[202] chrissstrahl - set previouse spawnlocation for spawn stuck prevention or else we get spam
-	local.player.flags["coop_spawnlocPreviouse"] = thread game.main::getPlayerId local.player
 
 //SPACETAOR - play it save put that thing into spectator
 	local.player spectator
@@ -727,7 +726,11 @@ preventSpawnStuck local.player:{
 	local.lastView = 0
 	local.lastViewSame = 0
 	
-	while( local.player && local.player.health && local.player.dmteam != "spectator" && vector_length(local.player.origin - local.player.flags["coop_spawnlocPreviouse"]) < 100 ){
+	while( 	local.player &&
+			local.player.health &&
+			local.player.dmteam != "spectator" &&
+			vector_length( local.player.origin - local.player.flags["coop_spawnlocPreviouse"]) < 100 )
+	{
 		//if player hasn't moved the camera for more than 7 secounds assume he is afk
 		if(local.player.viewangles[1] == local.lastView){
 			local.lastViewSame++
@@ -741,7 +744,11 @@ preventSpawnStuck local.player:{
 		
 		if(local.time >= local.stuckTime ){
 			local.player iprint "If you are stuck, press use to switch to a different spawnlocation" 1
-			while(local.player && local.player.health && local.player.dmteam != "spectator" && vector_length(local.player.origin - local.player.flags["coop_spawnlocPreviouse"]) < 100){
+			while(	local.player &&
+					local.player.health &&
+					local.player.dmteam != "spectator" &&
+					vector_length(local.player.origin - local.player.flags["coop_spawnlocPreviouse"]) < 100)
+				{
 				waitframe
 				//[203] chrissstrahl - added check for null entity
 				if(local.player && local.player.useheld){
