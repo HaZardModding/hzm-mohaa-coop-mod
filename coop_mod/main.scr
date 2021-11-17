@@ -419,7 +419,12 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 	//detecting a interger as 1 or
 	if(local.i == NIL){ end }
 	
+
+	
 	local.varType = waitthread returnVarType local.i NIL "main::playerPlaceAtSpawn"
+	
+println("playerPlaceAtSpawn 1 start for: "+local.i+" var type is "+local.varType)
+	
 	//entity - fine grab directly
 	if(local.varType == 2){
 		local.player = local.i
@@ -438,19 +443,21 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 
 	if!(local.player){ end }
 	
+println("playerPlaceAtSpawn 2 for: "+local.player.entnum+" ")
+	
 	//[202] chrissstrahl - this allowes a player to spawn at a different spawnlocation - used for player.scr::preventSpawnStuck
 	if(local.player.flags["coop_spawnlocAltActive"]){
 		local.i = local.player.flags["coop_spawnlocAlt"]
 		local.player.flags["coop_spawnlocAltActive"] = NIL
-		
 	}
 
 	if( local.player.flags["coop_playerTankExit"] != NIL && $coop_tankExit != NULL){
 		local.player origin ( $coop_tankExit.origin + (0 0 150) )
 		local.player droptofloor
-		if(local.player.flags["coop_isActive"] == 1){
+		//[203] chrissstrahl - make sure this will be set in any case
+		//if(local.player.flags["coop_isActive"] == 1){
 			local.player.flags["coop_playerTankExit"] = NIL
-		}
+		//}
 	}
 	else if(level.flags["coop_spawn"+local.i+"origin"] != NIL ){
 		if( (local.player.flags["coop_lastRespawn"] + 1.5) < level.time){
@@ -468,6 +475,9 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 			//}
 		}
 	}
+	
+println("playerPlaceAtSpawn 3 for: "+local.player.entnum+" ")
+	
 	//make sure players don't get stuck even if there are no valid spawns
 	thread playerMakeSolidAsap local.player
 }end
@@ -500,6 +510,9 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 	//detecting a single player entity as 0
 	//detecting a interger as 1 or
 	local.varType = waitthread returnVarType local.i NIL "main::playerMakeSolidAsap"
+	
+println("playerMakeSolidAsap 1 for: "+local.i+" "+local.varType+"")
+	
 	//entity - fine grab directly
 	if(local.varType == 2){
 		local.player = local.i
@@ -515,9 +528,14 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 		local.typename = waitthread returnVarTypename(local.varType)
 		error ( "coop_mod/main.scr::playerMakeSolidAsap - does not support var type: "+local.typename ) 1000
 	}
+	
+println("playerMakeSolidAsap 2 for: "+local.player.entnum+" while start")
 
 	//run only once per player
-	if(local.player.flags["coop_makesolid"] != NIL){ end }
+	if(local.player.flags["coop_makesolid"] != NIL){
+println("playerMakeSolidAsap 3 while exit "+local.player.entnum+" coop_makesolid already set")
+		end
+	}
 	
 	local.player.flags["coop_makesolid"] = 1
 	
@@ -526,20 +544,25 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 	
 		if(local.player.health <= 0){
 			local.player.flags["coop_makesolid"] = NIL
+println("playerMakeSolidAsap 4 while exit "+local.player.entnum+" dead")
 			end
 		}
-		if(level.gametype != 0){
-			if(local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1 ){
-				local.player.flags["coop_makesolid"] = NIL
-				end
-			}
+		
+		//[203] chrissstrahl - removed ceck, because player is not quite "ready" when this func is run for the first time || local.player.flags["coop_isActive"] != 1
+		if(level.gametype != 0 && local.player.dmteam == "spectator"){
+			local.player.flags["coop_makesolid"] = NIL
+println("playerMakeSolidAsap 5 while exit "+local.player.entnum+" spectator/inactive")
+println("playerMakeSolidAsap 5 while exit ["+local.player.dmteam+"] - coop_isActive: "+local.player.flags["coop_isActive"])
+			end
 		}
 
 		//[200] chrissstrahl - added notsolid here just to be sure the player is notsolid from the get go
+println("playerMakeSolidAsap 6 while "+local.player.entnum+" notsolid")
 		local.player notsolid
 		
 		//don't do player checks in sp
 		if( level.gametype == 0){
+println("playerMakeSolidAsap 7 while exit "+local.player.entnum+" singleplayer")
 			goto playerMakeSolidAsap_spCheck
 		}
 		
@@ -555,6 +578,7 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 			
 			//check if they are stuck inside each other
 			if(local.player isTouching local.otherPlayer){
+println("playerMakeSolidAsap 8 while "+local.otherPlayer.entnum+" notsolid otherplayer thread")
 				local.otherPlayer notsolid
 				thread playerMakeSolidAsap local.iOther
 				local.touch = 1
@@ -564,11 +588,14 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 		//we needed to have this check against all players
 		//so players get their own check to prevent issues
 		if(local.touch){
+println("playerMakeSolidAsap 9 while exit "+local.player.entnum+" touched")
 			goto playerMakeSolidAsap_touching
 		}
 		
 		//checks that also are done in singeplayer start here
 		playerMakeSolidAsap_spCheck:
+		
+//println("playerMakeSolidAsap check friendly "+local.player.targetname+" ")
 		
 		//check friendlies
 		waitthread playerMakeSolidAsapCheckTouching local.player level.friendly1 1
@@ -580,6 +607,7 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 		
 		//check map specific
 		if(level.coop_levelObstacle[level.coop_mapname]){
+println("playerMakeSolidAsap 10 mapspecific "+local.player.entnum+" coop_levelObstacle")
 			for(local.i=1;local.i <= level.coop_levelObstacle[level.coop_mapname].size;local.i++){
 				local.object = level.coop_levelObstacle[level.coop_mapname][local.i][1]
 				waitthread playerMakeSolidAsapCheckTouching local.player local.object
@@ -593,6 +621,7 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 		}
 		
 		//this code is only executed if player did not touch anything relevant
+println("playerMakeSolidAsap 11 solid and exit for "+local.player.entnum+"")
 		local.player.flags["coop_makesolid"] = NIL
 		local.player solid
 		end
@@ -603,6 +632,7 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 		//println("playerMakeSolidAsap loop")
 		waitframe
 	}
+	println("playerMakeSolidAsap 12 for: "+local.player.entnum+" while end")
 }end
 
 //gives all items to the player
