@@ -4,59 +4,67 @@
 //Contains developer related commands that are needed for proper map testing
 //
 
-//[202] chrissstrahl
+//[203] chrissstrahl - updated and changed
 //commands that are extracted from netname, see player.scr::manageNamechange
 //=========================================================================
 devcommand local.data:{
 //=========================================================================
 if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread developer/devcommand->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
 	if(!local.data){ iprintlnbold_noloc("GO SLEEP! YOU ARE SLIPPING.");end }
-	iprintlnbold_noloc("dev command! :"+local.data)
 	
-//SPAWNLOCATION STUFF//////////////////////// test and create spawn locations
-//SPAWNLOCATION STUFF////////////////////////
-//SPAWNLOCATION STUFF////////////////////////
-	if(waitthread coop_mod/main.scr::containsText local.data "spawn," game.false){
-		local.data = waitthread coop_mod/main.scr::cleanText local.data "spawn,"
-//move player to every spawnloc and wait for him to move - ends once all spawns are tested
-		if(waitthread coop_mod/main.scr::containsText local.data "test" game.false){
-			//iprintlnbold_noloc("test")
-			self thread spawnpoints
-		}
-//spawns markers for every player spawn based on current player pos to show in game if it works
-		else if(waitthread coop_mod/main.scr::containsText local.data "new" game.false){
-			//iprintlnbold_noloc("show markers")
-			self thread spawnmarkers
-		}
-//spawns markers for every player spawn based on current player pos to show in game if it works
-		else if(waitthread coop_mod/main.scr::containsText local.data "try" game.false){
-			//iprintlnbold_noloc("test markers")
-			self thread testmarkers
-		}
-//prints consoleoutput based on current status of spawnmarkers
-		else if(waitthread coop_mod/main.scr::containsText local.data "p," game.false){
-			local.markernames = waitthread coop_mod/main.scr::cleanText local.data "p,"
-			//iprintlnbold_noloc("print markers ("+local.markernames+") into console")
-			self thread printmarkers local.markernames
-		}
+	//show developer menu
+	if(waitthread coop_mod/main.scr::containsText local.data "ui" game.false){
+		self stufftext ("pushmenu coopdev\n")
+		end
 	}
-//SHOW TOUCH//////////////////////// print info of object touched by developer
-//SHOW TOUCH////////////////////////
-//SHOW TOUCH////////////////////////
-	else if(waitthread coop_mod/main.scr::containsText local.data "touch," game.false){
-		self thread showtouch
+
+	local.devCommand["lgn"] = "login"			//log developer in
+	local.devCommand["stst"] = "spawnpoints"	//test if existing spawns are working
+	local.devCommand["sexs"] = "spawnpointsshow"	//test if existing spawns are working
+	
+	local.devCommand["snew"] = "spawnmarkers"	//spawns markers for every player spawn based on current player pos to show if it could work
+	local.devCommand["stry"] = "testmarkers"	//?
+	local.devCommand["sprt"] = "printmarkers"	//prints consoleoutput based on current status of spawnmarkers
+												//used to copy them out of the logfile and put them into spawnlocations.scr
+	local.devCommand["tch"] = "showtouch"		//print info of object touched by developer
+	local.devCommand["ncl"] = "noclip"			//toggels noclip
+	local.devCommand["tht"] = "threatbias"		//toggels threatbias
+	
+	local.devCommand["heal"] = "heal"			//heal self
+	local.devCommand["fhea"] = "healfriendly"	//heal friendly
+	
+	//if the command was found execute it
+	if(local.devCommand[local.data] != NIL){
+		if(local.devCommand[local.data] != "spawnmarkers"){
+			self stufftext ("popmenu 0;cg_3rd_Person 0")
+		}else{
+			self stufftext ("cg_3rd_Person 1")
+		}
+		self thread (local.devCommand[local.data])
+	}else{
+		self iprint ("devcommand unsupported command: "+local.devCommand[local.data]) 1
 	}
-//NOCLIP//////////////////////// toggels noclip
-//NOCLIP////////////////////////
-//NOCLIP////////////////////////
-	else if(waitthread coop_mod/main.scr::containsText local.data "noclip," game.false){
-		self thread noclip
+}end
+
+//[203] chrissstrahl - login developer
+//=========================================================================
+login:{
+//=========================================================================
+if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread developer/login->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
+	if(self.flags["coopDeveloperVerified"] == 1){
+		self iprint ("You are already logged in!") 1 NIL
+		end
 	}
-//THREADBIAS//////////////////////// toggels threatbias
-//THREADBIAS////////////////////////
-//THREADBIAS////////////////////////
-	else if(waitthread coop_mod/main.scr::containsText local.data "threat," game.false){
-		self thread threatbias
+	else if(self.flags["coop_isHost"] == 1){
+		self.flags["coopDeveloperVerified"] = 1
+		self iprint ("You are now logged in!") 1 NIL
+		end
+	}
+	else{		
+		level.momLoginDeveloperIndex = 0;
+		level.developerLoginCode = ""
+		self thread mom/mom.scr::setup "coop_mod/mom_login.scr" NIL coop_login 1
+		self thread mom/mom.scr::momManagePlayer
 	}
 }end
 
@@ -137,29 +145,14 @@ if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 	}
 	
 	self noclip
-	iprintlnbold_noloc ( "developer noclip on (look up to end noclip)" )
 	
-	local.lookinguptime = 0;
-	while( self != NULL ){
-		waitframe
-		//if player is looking up
-		if( self.viewangles[0] < -70 ){
-			local.lookinguptime++
-		}else{
-			local.lookinguptime = 0
-		}
-		//if dead
-		if( self.health <= 0 ){
-			local.lookinguptime = 9999
-		}
-		
-		if( local.lookinguptime > 40 ){
-			self notsolid
-			self noclip
-			thread coop_mod/main.scr::playerMakeSolidAsap self
-			iprintlnbold_noloc ( "developer noclip off" )
-			break
-		}
+	if(self.flags["coopDevNoclip"] != NIL){
+		self.flags["coopDevNoclip"] = NIL
+		self iprint ( "[NOCLIP] off" ) 1 NIL
+		self notsolid
+		thread coop_mod/main.scr::playerMakeSolidAsap self
+	}else{
+		self iprint ( "[NOCLIP] ON" ) 1 NIL
 	}
 }end
 
@@ -175,12 +168,41 @@ if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 		end
 	}
 	
-	iprintlnbold_noloc ( "developer heal" )
-	
+	self iprint ( "[HEAL] You are healed to: "+self.health ) 1 NIL
 	self heal 1
 }end
 
 //MOM related
+//=========================================================================
+healfriendly:{
+//=========================================================================
+if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread developer/healfriendly->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
+	//[200] chrissstrahl - check if developer needs to be on
+	if(thread coop_mod/main.scr::checkCoopDeveloper "Heal friendly command"){ end }
+
+	self iprint ( "[HEAL] You healed your friendlies" ) 1 NIL
+	
+	if(level.friendly1)
+		level.friendly1 heal 1
+		
+	if(level.friendly2)
+		level.friendly2 heal 1
+	
+	if(level.friendly3)
+		level.friendly3 heal 1
+	
+	if(level.friendly4)
+		level.friendly4 heal 1
+	
+	if(level.friendly5)
+		level.friendly5 heal 1
+	
+	if(level.friendly6)
+		level.friendly6 heal 1
+	
+	self heal 1
+}end
+
 //=========================================================================
 spawnpoints:{
 //=========================================================================
@@ -192,13 +214,20 @@ if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 		end
 	}
 	
-	iprintlnbold_noloc ( "developer spawnpoints" )
-	iprintlnbold_noloc ( "!!! MOVE AWAY TO CONTINUE !!!" )
+	if(self.flags["coopDevSpawnpointsTest"] != NIL){
+		self.flags["coopDevSpawnpointsTest"] = NIL
+		end
+	}
+	self.flags["coopDevSpawnpointsTest"] = 1
+	
+	self iprint ( "Test is spawnpoints active for you!" ) 1
 	self nodamage
 	
 	for(local.i=1;local.i<=8;local.i++){
-		if(self == NULL ){	end	}
-		if(self.health <= 0 ){
+		if( self == NULL ){ end }
+		
+		if( self.flags["coopDevSpawnpointsTest"] == NIL  || self.health <= 0 ){
+			self iprint ( "Testing spawnpoints was STOPPED!" ) 1
 			self takedamage
 			end
 		}
@@ -206,24 +235,72 @@ if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 		local.vec = level.flags["coop_spawn"+local.i+"origin"]
 		
 		if(local.vec == NIL){
-			iprintlnbold_noloc ( "coop_spawn"+local.i+"origin was NIL!" )
+			self iprint ( "coop_spawn"+local.i+"origin was NIL!" ) 1
 			continue
 		}
 		
 		self forcelegsstate STAND
 		self tele local.vec
-		self thread coop_mod/main.scr::playerFace level.flags["coop_spawn"+local.i+"angles"]	
+		self thread coop_mod/main.scr::playerFace level.flags["coop_spawn"+local.i+"angles"]
 		
-		while( self != NULL && self.health > 0 && vector_length( local.vec - self.origin) < 100 && local.i<8 && self.dmteam != "spectator"){
+		self iprint ( "You are testing spawnpoint ["+local.i+"]. Move away now!" ) 1
+		
+		while( self != NULL && self.health > 0 &&
+				vector_length( local.vec - self.origin) < 100 &&
+				local.i<8 && self.dmteam != "spectator" &&
+				self.flags["coopDevSpawnpointsTest"] != NIL){
 			waitframe
 		}
 		if(local.i<8){
-			iprintlnbold_noloc ( "Developer check" )
 			wait 1
 		}
 	}
-	iprintlnbold_noloc ( "Developer Test complete" )
+	self iprint ( "Spawnpoint Test complete" ) 1 NIL
 	self takedamage
+}end
+
+//=========================================================================
+spawnpointsshow:{ //
+//=========================================================================
+	self iprint ("TOGGLE spawnpointsshow") 1
+	
+	//remove markers
+	if(level.coopShowExistingSpawnpoints != NIL){
+		for(local.i=1;local.i<=8;local.i++){
+			local.entityMarker = $("coopEMkr"+local.i)
+			if(local.entityMarker){
+				local.entityMarker delete
+			}
+		}
+		level.coopShowExistingSpawnpoints=NIL
+		end
+	}
+	level.coopShowExistingSpawnpoints=1
+	
+	//add markers
+	for(local.i=1;local.i<=8;local.i++){
+		local.vec = level.flags["coop_spawn"+local.i+"origin"]
+		
+		if(!(local.vec)){
+			self iprint ("coop_spawn"+local.i+"origin was EMPTY/NIL") 1
+		}
+		//local.vec_z += 20
+		
+		local.angles = level.flags["coop_spawn"+local.i+"angles"]
+		if(!(local.angles)){
+			self iprint ("a = 0") 1
+			local.angles = level.flags["coop_spawn1angles"]
+			if(!(local.angles)){
+				self iprint ("a = 0") 1
+				local.angles = "( 0 0 0 )"
+			}
+		}
+		
+		//spawn script_model model "models/items/torpedo.tik" origin (local.vec) notsolid 1 targetname ("coopEMkr"+local.i) scale 1 angle -1
+		local.ent = spawn script_model model "models/player/german_Worker.tik" origin (local.vec) notsolid 1 targetname ("coopEMkr"+local.i) scale 1 angles local.angles
+		waitframe
+		local.ent anim "unarmed_stand_walk_fwd"
+	}
 }end
 
 
@@ -251,34 +328,38 @@ if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 	//end touch
 	if(self.flags["coop_momShowTouch"] != NIL){
 		self.flags["coop_momShowTouch"] = NIL
-		iprintlnbold_noloc ( "Show TOUCH OFF" )
+		exec coop_mod/main.scr::printInfo self ( "Show TOUCH OFF" ) 1 NIL
 		end
 	}
 
-	iprintlnbold_noloc ( "Show TOUCH ON" )
+	exec coop_mod/main.scr::printInfo self ("Show TOUCH ON" ) 1 NIL
 	self.flags["coop_momShowTouch"] = 1
 	
 //prints out a message what the player is touching
 //this is used for debugging objects that are hard to find otherwise
-	while(self != NULL){
+	while(self != NULL && self.flags["coop_momShowTouch"] != NIL){
 		local.maxentities = int(getcvar("maxentities"))	
 		//check every entity
+		local.ent = NULL
 		for (local.i = 0; local.i < local.maxentities; local.i++) {
 			local.ent = getentbyentnum local.i
 			//exists and has a model (is a tiki)
-			if ( local.ent != NULL && local.ent.model != NIL && self istouching local.ent){
-				if(local.ent.model.size > 6 ){
-					//filter weapons and player (current weapon and playermodel)
-					if(waitexec coop_mod/main.scr::containsText local.ent.model "weapons/" ||
-						waitexec coop_mod/main.scr::containsText local.ent.model "player/"){
-						//exec coop_mod/main.scr::printInfo $player[1] "touching a weapon" 1 NIL
-					}else{// if(waitexec coop_mod/main.scr::containsText local.ent.model "/"){
-						exec coop_mod/main.scr::printInfo self ("[touching] $"+local.ent.targetname+": "+local.ent.model) 1 NIL
-					}
+			
+			if(local.ent != NULL && self istouching local.ent && local.ent.model != NIL && local.ent.model.size > 6){
+				//filter weapons and player (current weapon and playermodel)
+				if(waitexec coop_mod/main.scr::containsText local.ent.model "weapons/" ||
+					local.ent.entnum == self.entnum){
+					//waitexec coop_mod/main.scr::containsText local.ent.model "player/"){
+					//exec coop_mod/main.scr::printInfo $player[1] "touching a weapon" 1 NIL
+				}else{// if(waitexec coop_mod/main.scr::containsText local.ent.model "/"){
+					local.vec = local.ent.origin
+					local.model = waitexec coop_mod/strings.scr::remove local.ent.model "models/"
+					exec coop_mod/main.scr::printInfo self ("[touching] $"+local.ent.targetname+": "+local.model+" at "+int(local.vec[0])+" "+int(local.vec[1])+" "+int(local.vec[2])) 1 NIL 10
+					local.ent thread dev_blink self 0.5
 				}
 			}
 		}
-		waitframe		
+		wait 1		
 	}
 }end
 
@@ -323,6 +404,9 @@ spawnmarkers:{
 if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread developer/spawnmarkers->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
 	local.maxcombinations = 20
 	local.origin = self.origin
+	local.angles = self.viewangles
+	local.angles[0] = 0
+	local.angles[2] = 0
 	local.devcoopspawnmarkers = self.flag["coop_dev_spawnmarkers"]
 	if(local.devcoopspawnmarkers == NIL || local.devcoopspawnmarkers > local.maxcombinations){
 		self.flag["coop_dev_spawnmarkers"] = 1
@@ -333,51 +417,55 @@ if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 	}
 	
 	//make sure markers are spawned
-	waitthread spawnmarkers_spawn
+	self waitthread spawnmarkers_spawn
+	
+	for(local.i=1;local.i<=8;local.i++){
+		$("coopSMkr"+local.i) angles local.angles
+	}
 	
 	//move markers in +x dir away from player
 	if(local.devcoopspawnmarkers == 1){
-		iprintlnbold_noloc ( "SPAWN CONFIG: +x:1" )
+		self iprint ("SPAWN CONFIG 1: +x" ) 1 NIL
 		local.testorigin = local.origin
 		for(local.i=1;local.i<=8;local.i++){
-			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			$("coopSMkr"+local.i) origin local.testorigin
 			local.testorigin[0] += 40
 		}
 	}
 	//move markers in -x dir away from player
 	else if(local.devcoopspawnmarkers == 2){
-		iprintlnbold_noloc ( "SPAWN CONFIG: -x:2" )
+		self iprint ("SPAWN CONFIG 2: -x" ) 1 NIL
 		local.testorigin = local.origin
 		for(local.i=1;local.i<=8;local.i++){
-			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			$("coopSMkr"+local.i) origin local.testorigin
 			local.testorigin[0] -= 40
 		}
 	}
 	//move markers in +y dir away from player
 	else if(local.devcoopspawnmarkers == 3){
-		iprintlnbold_noloc ( "SPAWN CONFIG: +y:3" )
+		self iprint ("SPAWN CONFIG 3: +y" ) 1 NIL
 		local.testorigin = local.origin
 		for(local.i=1;local.i<=8;local.i++){
-			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			$("coopSMkr"+local.i) origin local.testorigin
 			local.testorigin[1] += 40
 		}
 	}
 	//move markers in -y dir away from player
 	else if(local.devcoopspawnmarkers == 4){
-		iprintlnbold_noloc ( "SPAWN CONFIG: -y:4" )
+		self iprint ("SPAWN CONFIG 4: -y" ) 1 NIL
 		local.testorigin = local.origin
 		for(local.i=1;local.i<=8;local.i++){
-			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			$("coopSMkr"+local.i) origin local.testorigin
 			local.testorigin[1] -= 40
 		}
 	}
 	//move markers in +x dir away from player in 2 rows
 	//Kinda like: ::::
 	else if(local.devcoopspawnmarkers == 5){
-		iprintlnbold_noloc ( "SPAWN CONFIG: +x +y 2-Row:5" )
+		self iprint ("SPAWN CONFIG 5: +x +y 2-Row" ) 1 NIL
 		local.testorigin = local.origin
 		for(local.i=1;local.i<=8;local.i++){
-			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			$("coopSMkr"+local.i) origin local.testorigin
 			local.testorigin[0] += 40
 			if(local.i == 4){
 				local.testorigin = local.origin
@@ -388,10 +476,10 @@ if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 	//move markers in +x dir away from player in 2 rows
 	//Kinda like: ::::
 	else if(local.devcoopspawnmarkers == 6){
-		iprintlnbold_noloc ( "SPAWN CONFIG: +x -y 2-Row:6" )
+		self iprint ("SPAWN CONFIG 6: +x -y 2-Row" ) 1 NIL
 		local.testorigin = local.origin
 		for(local.i=1;local.i<=8;local.i++){
-			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			$("coopSMkr"+local.i) origin local.testorigin
 			local.testorigin[0] += 40
 			if(local.i == 4){
 				local.testorigin = local.origin
@@ -402,10 +490,10 @@ if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 	//move markers in -x dir away from player in 2 rows
 	//Kinda like: ::::
 	else if(local.devcoopspawnmarkers == 7){
-		iprintlnbold_noloc ( "SPAWN CONFIG: -x -y 2-Row:7" )
+		self iprint ("SPAWN CONFIG 7: -x -y 2-Row" ) 1 NIL
 		local.testorigin = local.origin
 		for(local.i=1;local.i<=8;local.i++){
-			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			$("coopSMkr"+local.i) origin local.testorigin
 			local.testorigin[0] -= 40
 			if(local.i == 4){
 				local.testorigin = local.origin
@@ -416,10 +504,10 @@ if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 	//move markers in -x dir away from player in 2 rows
 	//Kinda like: ::::
 	else if(local.devcoopspawnmarkers == 8){
-		iprintlnbold_noloc ( "SPAWN CONFIG: -x +y 2-Row:8" )
+		self iprint ("SPAWN CONFIG 8: -x +y 2-Row" ) 1 NIL
 		local.testorigin = local.origin
 		for(local.i=1;local.i<=8;local.i++){
-			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			$("coopSMkr"+local.i) origin local.testorigin
 			local.testorigin[0] -= 40
 			if(local.i == 4){
 				local.testorigin = local.origin
@@ -429,40 +517,40 @@ if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 	}
 	//move markers in +x +y dir away from player diagonal
 	else if(local.devcoopspawnmarkers == 9){
-		iprintlnbold_noloc ( "SPAWN CONFIG: +x +y Diagonal:9" )
+		self iprint ("SPAWN CONFIG 9: +x +y Diagonal" ) 1 NIL
 		local.testorigin = local.origin
 		for(local.i=1;local.i<=8;local.i++){
-			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			$("coopSMkr"+local.i) origin local.testorigin
 			local.testorigin[0] += 25
 			local.testorigin[1] += 25
 		}
 	}
 	//move markers in -x +y dir away from player diagonal
 	else if(local.devcoopspawnmarkers == 10){
-		iprintlnbold_noloc ( "SPAWN CONFIG: -x +y Diagonal:10" )
+		self iprint ("SPAWN CONFIG 10: -x +y Diagonal" ) 1 NIL
 		local.testorigin = local.origin
 		for(local.i=1;local.i<=8;local.i++){
-			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			$("coopSMkr"+local.i) origin local.testorigin
 			local.testorigin[0] -= 25
 			local.testorigin[1] += 25
 		}
 	}
 	//move markers in -x -y dir away from player diagonal
 	else if(local.devcoopspawnmarkers == 11){
-		iprintlnbold_noloc ( "SPAWN CONFIG: -x -y Diagonal:11" )
+		self iprint ("SPAWN CONFIG 11: -x -y Diagonal" ) 1 NIL
 		local.testorigin = local.origin
 		for(local.i=1;local.i<=8;local.i++){
-			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			$("coopSMkr"+local.i) origin local.testorigin
 			local.testorigin[0] -= 25
 			local.testorigin[1] -= 25
 		}
 	}
 	//move markers in -x +y dir away from player diagonal
 	else if(local.devcoopspawnmarkers == 12){
-		iprintlnbold_noloc ( "SPAWN CONFIG: -x +y Diagonal:12" )
+		self iprint ("SPAWN CONFIG 12: -x +y Diagonal" ) 1 NIL
 		local.testorigin = local.origin
 		for(local.i=1;local.i<=8;local.i++){
-			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			$("coopSMkr"+local.i) origin local.testorigin
 			local.testorigin[0] -= 25
 			local.testorigin[1] += 25
 		}
@@ -470,10 +558,10 @@ if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 	//move markers alternating +x +y dir away from player
 	//Kinda like: ',',',',
 	else if(local.devcoopspawnmarkers == 13){
-		iprintlnbold_noloc ( "SPAWN CONFIG: +x +y alternating:13" )
+		self iprint ("SPAWN CONFIG 13: +x +y alternating" ) 1 NIL
 		local.testorigin = local.origin
 		for(local.i=1;local.i<=8;local.i++){
-			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			$("coopSMkr"+local.i) origin local.testorigin
 			local.testorigin[0] += 40
 			
 			local.powerOfTwo = int(local.i / 2)
@@ -487,10 +575,10 @@ if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 	//move markers alternating -x +y dir away from player
 	//Kinda like: ',',',',
 	else if(local.devcoopspawnmarkers == 14){
-		iprintlnbold_noloc ( "SPAWN CONFIG: -x +y alternating:14" )
+		self iprint ("SPAWN CONFIG 14: -x +y alternating" ) 1 NIL
 		local.testorigin = local.origin
 		for(local.i=1;local.i<=8;local.i++){
-			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			$("coopSMkr"+local.i) origin local.testorigin
 			local.testorigin[0] -= 40
 			
 			local.powerOfTwo = int(local.i / 2)
@@ -504,10 +592,10 @@ if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 	//move markers alternating +y +x dir away from player
 	//Kinda like: ',',',',
 	else if(local.devcoopspawnmarkers == 15){
-		iprintlnbold_noloc ( "SPAWN CONFIG: +y +x alternating:15" )
+		self iprint ("SPAWN CONFIG 15: +y +x alternating" ) 1 NIL
 		local.testorigin = local.origin
 		for(local.i=1;local.i<=8;local.i++){
-			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			$("coopSMkr"+local.i) origin local.testorigin
 			local.testorigin[1] += 40
 			
 			local.powerOfTwo = int(local.i / 2)
@@ -521,10 +609,10 @@ if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 	//move markers alternating -y +x dir away from player
 	//Kinda like: ',',',',
 	else if(local.devcoopspawnmarkers == 16){
-		iprintlnbold_noloc ( "SPAWN CONFIG: -y +x alternating:16" )
+		self iprint ("SPAWN CONFIG 16: -y +x alternating" ) 1 NIL
 		local.testorigin = local.origin
 		for(local.i=1;local.i<=8;local.i++){
-			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			$("coopSMkr"+local.i) origin local.testorigin
 			local.testorigin[1] -= 40
 			
 			local.powerOfTwo = int(local.i / 2)
@@ -537,11 +625,11 @@ if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 	}
 	//move markers +x +y dir away from player in 3 rows
 	else if(local.devcoopspawnmarkers == 17){
-		iprintlnbold_noloc ( "SPAWN CONFIG: +x +y 3rows :17" )
+		self iprint ("SPAWN CONFIG 17: +x +y 3rows" ) 1 NIL
 		local.testorigin = local.origin
 		local.row = 1
 		for(local.i=1;local.i<=8;local.i++){
-			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			$("coopSMkr"+local.i) origin local.testorigin
 			
 			local.testorigin[0] += 40
 			if(local.row == 3){
@@ -554,11 +642,11 @@ if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 	}
 	//move markers +x -y dir away from player in 3 rows
 	else if(local.devcoopspawnmarkers == 18){
-		iprintlnbold_noloc ( "SPAWN CONFIG: +x -y 3rows :18" )
+		self iprint ("SPAWN CONFIG 18: +x -y 3rows" ) 1 NIL
 		local.testorigin = local.origin
 		local.row = 1
 		for(local.i=1;local.i<=8;local.i++){
-			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			$("coopSMkr"+local.i) origin local.testorigin
 			
 			local.testorigin[0] += 40
 			if(local.row == 3){
@@ -571,11 +659,11 @@ if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 	}
 	//move markers -x +y dir away from player in 3 rows
 	else if(local.devcoopspawnmarkers == 19){
-		iprintlnbold_noloc ( "SPAWN CONFIG: -x +y 3rows :19" )
+		self iprint ("SPAWN CONFIG 19: -x +y 3rows" ) 1 NIL
 		local.testorigin = local.origin
 		local.row = 1
 		for(local.i=1;local.i<=8;local.i++){
-			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			$("coopSMkr"+local.i) origin local.testorigin
 			
 			local.testorigin[0] -= 40
 			if(local.row == 3){
@@ -588,11 +676,11 @@ if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 	}
 	//move markers -x -y dir away from player in 3 rows
 	else if(local.devcoopspawnmarkers == 20){
-		iprintlnbold_noloc ( "SPAWN CONFIG: -x -y 3rows :20" )
+		self iprint ("SPAWN CONFIG 20: -x -y 3rows" ) 1 NIL
 		local.testorigin = local.origin
 		local.row = 1
 		for(local.i=1;local.i<=8;local.i++){
-			$("hzmCoopModSpawnMarker"+local.i) origin local.testorigin
+			$("coopSMkr"+local.i) origin local.testorigin
 			
 			local.testorigin[0] -= 40
 			if(local.row == 3){
@@ -612,12 +700,12 @@ testmarkers:{
 if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread developer/testmarkers->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
 	if(thread coop_mod/main.scr::checkCoopDeveloper "Test Spawnpoints command"){ end }
 	
-	if( self == NULL || self.health <= 0 ){
+	if( self == NULL || self.health <= 0 || level.coopDevtestNewSpawn == 1){
 		end
 	}
+	level.coopDevtestNewSpawn = 1
 	
-	iprintlnbold_noloc ( "developer test spawnpoints" )
-	iprintlnbold_noloc ( "!!! MOVE AWAY TO CONTINUE !!!" )
+	self iprint ( "TEST NEW SPAWNS - MOVE AWAY TO CONTINUE!" ) 1 NIL
 	self nodamage
 	
 	for(local.i=1;local.i<=8;local.i++){
@@ -625,43 +713,59 @@ if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 			if(self){
 				self takedamage
 			}
+			level.coopDevtestNewSpawn = 0
 			end
 		}
 
-		local.vec = $("hzmCoopModSpawnMarker"+local.i).origin
+		local.vec = $("coopSMkr"+local.i).origin
 		
 		if(local.vec == NIL){
-			iprintlnbold_noloc ( "coop_spawn"+local.i+"origin was NIL!" )
+			self iprint ( "coop_spawn"+local.i+"origin was NIL!" ) 1 NIL
 			continue
 		}
 		
 		self forcelegsstate STAND
 		self tele local.vec
+		self viewangles ($("coopSMkr"+local.i).angles)
 		
 		while( self != NULL && self.health > 0 && vector_length( local.vec - self.origin) < 100 && local.i<8 && self.dmteam != "spectator"){
 			waitframe
 		}
 		if(local.i<8){
-			iprintlnbold_noloc ( "Developer check" )
+			self iprint ( "TEST NEW SPAWN: "+local.i ) 1 NIL
 			wait 1
 		}
 	}
-	iprintlnbold_noloc ( "Developer Test complete" )
-	self takedamage
+	if(self){
+		self iprint ( "TEST NEW SPAWN: Complete" ) 1 NIL
+		self takedamage
+	}
+	level.coopDevtestNewSpawn = 0
 }end
 
 //=========================================================================
 printmarkers local.markernames:{
 //=========================================================================
 if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread developer/printmarkers->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-	iprintlnbold_noloc ( "Developer Printed markers ("+local.markernames+")into console" )
-	println("//spawn locations at ("+string(self.origin)+") for "+local.markernames)
+	if(!level.coopMarkersIndex){
+		level.coopMarkersIndex=0
+	}else{
+		level.coopMarkersIndex++
+	}
+	local.playerCleanName = waitthread playerCleanName self.netname
+	self iprint ( "Printed markers"+level.coopMarkersIndex+" locations into Server console for "+local.playerCleanName) 1 NIL
 	local.angle = " 0 "
 	local.angle += int(self.viewangles[1])
 	local.angle += " 0 "
 	
+	//enable logging on server
+	local.logfile = int(getcvar("logfile"))
+	if(!local.logfile){
+		setcvar ( "logfile 1" )
+	}
+	println("//HZM Coop Dev: printmarkers ["+level.coopMarkersIndex+"] ///////////")
 	for(local.i=1;local.i<9;local.i++){
-		local.marker = $("hzmCoopModSpawnMarker"+local.i)
+		local.marker = $("coopSMkr"+local.i)
 		if(local.marker){
 			local.temporigin = ""
 			local.origin = local.marker.origin
@@ -674,8 +778,32 @@ if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; print
 			
 			println("level.flags[\"coop_spawn"+local.i+"origin\"] = ("+local.origin+")")
 			println("level.flags[\"coop_spawn"+local.i+"angles\"] = ("+local.angle+")")
+			
 		}
 	}
+	println("//end of markers ///////////////////////")
+	waitframe
+	if(!local.logfile){
+		setcvar ( "logfile 0" )
+	}
+}end
+
+//=========================================================================
+dev_blink local.player local.rate:{
+//=========================================================================
+	if(self.flags["coopBlinking"] != NIL){ end }
+	self.flags["coopBlinking"] = 1
+	
+	while(self && self.flags["coopBlinking"] && local.player && self istouching local.player ){
+		if(!self){ end }
+		self hide
+		wait local.rate
+		
+		if(!self){ end }
+		self show		
+		wait (2 *local.rate)
+	}
+	if(self){ self.flags["coopBlinking"] = NIL }
 }end
 
 //creates a preview of how spawnspots would look at this clocation
@@ -684,9 +812,15 @@ spawnmarkers_spawn:{
 //=========================================================================
 if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread developer/spawnmarkers_spawn->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
 	for(local.i=1;local.i<9;local.i++){
-		local.marker = $("hzmCoopModSpawnMarker"+local.i)
+		local.marker = $("coopSMkr"+local.i)
+		
+		local.angles = " ( 0 "
+		local.angles += int(self.viewangles[1])
+		local.angles += " 0 ) "
+		
 		if(!local.marker){
-			spawn script_model model "models/items/Af_P_Lantern.tik" origin (local.origin) notsolid 1 targetname ("hzmCoopModSpawnMarker"+local.i) scale 3
+			//spawn script_model model "models/items/Af_P_Lantern.tik" origin (local.origin) notsolid 1 targetname ("coopSMkr"+local.i) scale 3
+			spawn script_model model "models/player/german_Scientist.tik" origin (local.origin) notsolid 1 targetname ("coopSMkr"+local.i) scale 1 angles local.angles
 		}
 	}
 }end
@@ -697,9 +831,9 @@ spawnmarkers_remove:{
 //=========================================================================
 if(level.cMTE_coop_developer){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread developer/spawnmarkers_remove->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
 	for(local.i=1;local.i<9;local.i++){
-		local.marker = $("hzmCoopModSpawnMarker"+local.i)
+		local.marker = $("coopSMkr"+local.i)
 		if(local.marker){
-			$("hzmCoopModSpawnMarker"+local.i) remove
+			$("coopSMkr"+local.i) remove
 		}
 	}
 }end
