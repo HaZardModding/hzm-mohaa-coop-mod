@@ -43,10 +43,6 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 		//[202] chrissstrahl - handle all players
 		for (local.i = 1;local.i <= $player.size;local.i++){
 			local.player = $player[local.i]
-//////////////////////////////[203] DETECT THE BLODY MOD RELIABLE, not just only when player spawns
-			if(local.player.flags["coop_isActive"] == NIL){
-				waitthread manageSetup
-			}
 /////////////////////////////////////////SPECTATOR
 			if( local.player.dmteam == "spectator" ){
 				waitthread manageSpectator local.player
@@ -59,7 +55,7 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 				if(local.player.flags["coop_isActive"] == -1){
 					//[202] chrissstrahl - changed printout to just console text
 					//commanddelay .1 iprintlnbold_noloc("PLAYER HIT BACKUP SPAWN") //[202] Smithy - i dont believe this will ever hit if spawnEvent takes care of it
-					commanddelay .1 println("PLAYER HIT BACKUP SPAWN") //[202] Smithy - i dont believe this will ever hit if spawnEvent takes care of it
+					commanddelay .1 println("COOPDEBUG: player.scr::manage - PLAYER HIT BACKUP SPAWN") //[202] Smithy - i dont believe this will ever hit if spawnEvent takes care of it
 					//local.player.flags["coop_isActive"] = 0
 					//waitthread coop_mod/main.scr::playerPlaceAtSpawn local.player
 				}
@@ -94,15 +90,15 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 					//m_bSpectator = team spectator
 					//m_bTempSpectator = floaty dude but not on spec team
 				}
-				//prevent this thread to be executed several times
-				//moved it here because we need spectators also to work
-				if(	level.time > (local.player.flags["coop_netnameChanged"] + (game.frame * 15))){
-					if(local.player.flags["coop_netname"] != local.player.netname || waitthread coop_mod/main.scr::containsText local.player.netname "," ){
-						thread manageNamechange local.player
-					}
-				}
 /////////////////////////////////////////DEAD
 				//death is event based handled in: main.scr::playerDeathEvent
+			}
+			//prevent this thread to be executed several times
+			//moved it here because we need spectators also to work
+			if(	level.time > (local.player.flags["coop_netnameChanged"] + (game.frame * 15))){
+				if(local.player.flags["coop_netname"] != local.player.netname || waitthread coop_mod/main.scr::containsText local.player.netname "," ){
+					thread manageNamechange local.player
+				}
 			}
 		}
 		
@@ -160,17 +156,19 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 
 //does first time setup on a player
 //called from ::manage if local.player.flags["coop_isActive"] == NIL
+//[203] chrissstrahl - added debug printouts
 //=========================================================================
 manageSetup local.player:{
 //=========================================================================
 if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread player/manageSetup->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-	//once all setup is done these vars are set:
-	//local.player.flags["coop_setupComplete"] = 1
+println("COOPDEBUG: player.scr::manageSetup "+local.player.entnum+" start")
 
 	if(local.player.flags["coop_isActive"] != NIL){
+		println("COOPDEBUG: player.scr::manageSetup "+local.player.entnum+" allready done, abborting")
 		end
 	}
 	local.player.flags["coop_isActive"] = -3
+println("COOPDEBUG: player.scr::manageSetup "+local.player.entnum+" continue")
 	
 	//[203] chrissstrahl - set previouse spawnlocation for spawn stuck prevention or else we get spam
 	local.player.flags["coop_spawnlocPreviouse"] = ( 0 0 0)
@@ -257,8 +255,8 @@ detectCoop local.player:{
 	}
 	println("Detected Coop for "+local.player.netname+" within :"+ ( 35 - local.delay ) + " frames")
 	
-	//[203] chrissstrahl - start fov detection
-	if(local.player){	
+	//[203] chrissstrahl - start fov detection only if there is no more data in name
+	if(local.player && !(waitthread coop_mod/main.scr::containsText local.player.netname " ," 0)){
 		local.player stufftext ( "vstr g_m2l1" )
 	}
 }end
@@ -296,7 +294,7 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 			if(local.extractedData != NIL && local.extractedData != ""){
 				local.dataExtracted=1
 				local.player.flags["coop_extracted"+local.i+""] = string(local.extractedData)
-				//println ("COOPDEBUG: coop_extracted"+local.i+"="+local.extractedData+"")		
+//println ("COOPDEBUG: coop_extracted"+local.i+"="+local.extractedData+"")	
 			}
 		}
 		else{
@@ -327,8 +325,21 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	//every time name is changed fov needs to be set again
 	//we need a delay before this or it will be reset right away
 	
+	local.renameTimeout=40
 	while(local.player && local.player.netname != local.cleanName){
-		//println("'"+local.player.netname+"'!='"+local.cleanName+"'")
+		local.renameTimeout--
+println("COOPDEBUG: '"+local.player.netname+"'!='"+local.cleanName+"'")
+		if(local.renameTimeout == 0){
+			local.player stufftext ("vstr coop_fov\n")
+			waitframe
+			//on timeout make sure this is executed again but ::detectCoop is still waiting for the parent thread
+			//so execute this with waitthread, to prevent fov being set when timeout has occured
+			if(local.player){
+				local.player.flags["manageNamechange"] = NIL
+				waitthread manageNamechange local.player
+			}
+			end
+		}
 		waitframe
 	}
 	
@@ -524,8 +535,10 @@ playerExtractedTeleport local.player local.dataExtract:{
 //=========================================================================
 playerExtractedDeveloper local.player local.dataExtract:{
 //=========================================================================
-	iprintlnbold_noloc("DEVELOPER DATA: "+local.dataExtract+" - check if coop_dev is on")
-	if(int(getcvar("coop_dev")) <= 0 || !local.player.flags["coop_isHost"] ){ end }
+	if(int(getcvar("coop_dev")) <= 0 || !local.player.flags["coop_isHost"] ){
+		iprintlnbold_noloc ("DEVELOPER COMMAND: - cvar coop_dev needs to be 1")
+		end
+	}
 	local.player thread coop_mod/developer.scr::devcommand local.dataExtract
 }end
 
@@ -576,11 +589,6 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	//run only once per spectator join
 	if(	local.player.flags["coop_isActive"] != -1 ){
 	
-//[203] chrissstrahl - moved this crap
-//if(	local.player.flags["coop_isActive"] == NIL || local.player.flags["coop_iAmTruelyActive"] == NIL){
-//waitthread manageSetup local.player
-//}
-		
 		//[202] chrissstrahl - reset last selected spawnlocation
 		local.player.flags["coop_spawnlocAlt"] = NIL
 	
@@ -648,12 +656,12 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 manageAliveSpawning local.player:{
 //=========================================================================
 if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread player/manageAliveSpawning->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-println("manageAliveSpawning 0 for: "+local.player.targetname+" start")
-	//println("manageAliveSpawning")
+println("COOPDEBUG: manageAliveSpawning 0 for: "+local.player.targetname+" start")
+
 	/////////////////////////////////////////SETUP
 	if(	local.player.flags["coop_isActive"] == NIL){
 		waitthread manageSetup local.player
-println("manageAliveSpawning 1 for: "+local.player.targetname+" manageSetup")
+println("COOPDEBUG: manageAliveSpawning 1 for: "+local.player.targetname+" manageSetup")
 	}
 
 	//isSpectator is a built-in BT bool, more efficient than checking for dmteam string
@@ -661,13 +669,13 @@ println("manageAliveSpawning 1 for: "+local.player.targetname+" manageSetup")
 	if( local.player.dmteam == "spectator" || thread coop_mod/main.scr::forceValidTeam ){
 		//reset the respawn location, makes player spawn at predefined location
 		waitthread coop_mod/main.scr::resetSpawn local.player
-println("manageAliveSpawning 2 for: "+local.player.targetname+" exit resetspawn")
+println("COOPDEBUG: manageAliveSpawning 2 for: "+local.player.targetname+" exit resetspawn")
 		end
 	}
 	
 	//LAST MAN STANDING
 	if( thread coop_mod/main.scr::lmsForceSpectatorHandle local.player ){
-println("manageAliveSpawning 3 for: "+local.player.targetname+" exit lms")
+println("COOPDEBUG: manageAliveSpawning 3 for: "+local.player.targetname+" exit lms")
 		end
 	}
 	
@@ -691,7 +699,7 @@ println("manageAliveSpawning 3 for: "+local.player.targetname+" exit lms")
 	
 	//NO SPEC
 	if(local.player.dmteam == "spectator"){
-println("manageAliveSpawning 4 for: "+local.player.targetname+" exit spectator")
+println("COOPDEBUG: manageAliveSpawning 4 for: "+local.player.targetname+" exit spectator")
 		end
 	}
 
@@ -699,7 +707,7 @@ println("manageAliveSpawning 4 for: "+local.player.targetname+" exit spectator")
 	local.player.fnum = -1		//this is used for friendly orientation see global/friendly::playernode
 	local.player.flags["coop_iAmTruelyActive"] = 1
 	local.player.flags["coop_isActive"] = 1
-println("manageAliveSpawning 5 for: "+local.player.targetname+" coop_isActive: 1")
+println("COOPDEBUG: manageAliveSpawning 5 for: "+local.player.targetname+" coop_isActive: 1")
 	local.player.flags["coop_isAlive"] = game.true
 	local.player threatbias level.coop_threatbias
 	local.player solid
@@ -790,7 +798,7 @@ preventSpawnStuck local.player:{
 manageAliveRespawning local.player:{
 //=========================================================================
 if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread player/manageAliveRespawning->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-	//println("manageAliveRespawning")
+	println("COOPDEBUG: manageAliveRespawning")
 	//respawn if allowed at last pos before death of player
 	//also do not respawn if coop_respawnOrigin flag is set to 0 0 0 or something very close
 	//[202][hotfix] chrissstrahl - added check for cvar disabled respawn warper
