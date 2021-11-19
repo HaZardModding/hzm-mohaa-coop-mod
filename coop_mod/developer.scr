@@ -33,6 +33,8 @@ devcommand local.data:{
 	local.devCommand["heal"] = "heal"			//heal self
 	local.devCommand["fhea"] = "healfriendly"	//heal friendly
 	
+	local.devCommand["msts"] = "printmissionstatus"	//prints consoleoutput with all mission relevant statusinfos
+	
 	//if the command was found execute it
 	if(local.devCommand[local.data] != NIL){
 		if(	local.devCommand[local.data] != "login" &&
@@ -50,6 +52,65 @@ devcommand local.data:{
 	}else{
 		self iprint ("devcommand unsupported command: "+local.devCommand[local.data]) 1
 	}
+}end
+
+//[203] chrissstrahl - print the missionstatus to server log
+//=========================================================================
+printmissionstatus:{
+//=========================================================================
+	if(level.coopPrintMissionStatus){ end }
+	if(level.coopMissionStatusIndex==NIL){level.coopMissionStatusIndex=1}
+	level.coopPrintMissionStatus=1
+	
+	local.playerCleanName = waitthread coop_mod/player.scr::playerCleanName self.netname
+	self iprint ( "Printed Missions Status "+level.coopMissionStatusIndex+" into Server console for "+local.playerCleanName) 1 NIL
+	
+	//enable logging on server
+	local.logfile = int(getcvar("logfile"))
+	if(!local.logfile){
+		setcvar ( "logfile 1" )
+	}
+	waitframe
+	
+	println("//HZM Coop Dev: ["+local.playerCleanName+"] Mission Status ["+level.coopMissionStatusIndex+"] ///////////")
+	
+	println("//-----------------PLAYERS")
+	for (local.pl = 1;local.pl <= $player.size;local.pl++){
+		local.player =  $player[local.pl]
+		if(local.player){
+			local.playerCleanName = waitthread coop_mod/player.scr::playerCleanName local.player.netname
+			println("//Player["+local.pl+"] "+local.playerCleanName+" E:"+local.player.entnum+" H:"+local.player.health+" T:"+local.player.dmteam+"")
+			println("level.flags[\"coop_spawn"+local.pl+"origin\"] = "+local.player.origin)
+			println("level.flags[\"coop_spawn"+local.pl+"angles\"] = ( 0 "+local.player.angle+" 0 )")
+		}
+	}
+	
+	println("//-----------------FRIENDLIES")
+	if(level.friendly1){ println("level.friendly1 "+level.friendly1.targetname+" E:"+level.friendly1.entnum+" H:"+level.friendly1.health+" O:"+level.friendly1.origin+" A: "+level.friendly1.angles+" T:"+level.friendly1.friendtype) }
+	if(level.friendly2){ println("level.friendly2 "+level.friendly2.targetname+" E:"+level.friendly2.entnum+" H:"+level.friendly2.health+" O:"+level.friendly2.origin+" A: "+level.friendly2.angles+" T:"+level.friendly2.friendtype) }
+	if(level.friendly3){ println("level.friendly3 "+level.friendly3.targetname+" E:"+level.friendly3.entnum+" H:"+level.friendly3.health+" O:"+level.friendly3.origin+" A: "+level.friendly3.angles+" T:"+level.friendly3.friendtype) }
+	if(level.friendly4){ println("level.friendly4 "+level.friendly4.targetname+" E:"+level.friendly4.entnum+" H:"+level.friendly4.health+" O:"+level.friendly4.origin+" A: "+level.friendly4.angles+" T:"+level.friendly4.friendtype) }
+	if(level.friendly5){ println("level.friendly5 "+level.friendly5.targetname+" E:"+level.friendly5.entnum+" H:"+level.friendly5.health+" O:"+level.friendly5.origin+" A: "+level.friendly5.angles+" T:"+level.friendly5.friendtype) }
+	if(level.friendly6){ println("level.friendly6 "+level.friendly6.targetname+" E:"+level.friendly6.entnum+" H:"+level.friendly6.health+" O:"+level.friendly6.origin+" A: "+level.friendly6.angles+" T:"+level.friendly6.friendtype) }
+	
+	println("//-----------------OBJECTIVES")
+	if(level.coopObjective1Text != NIL){ println( "Objective 1: ["+level.coopObjective1+"] "+level.coopObjective1Text) }
+	if(level.coopObjective2Text != NIL){ println( "Objective 2: ["+level.coopObjective2+"] "+level.coopObjective2Text) }
+	if(level.coopObjective3Text != NIL){ println( "Objective 3: ["+level.coopObjective3+"] "+level.coopObjective3Text) }
+	if(level.coopObjective4Text != NIL){ println( "Objective 4: ["+level.coopObjective4+"] "+level.coopObjective4Text) }
+	if(level.coopObjective5Text != NIL){ println( "Objective 5: ["+level.coopObjective5+"] "+level.coopObjective5Text) }
+	if(level.coopObjective6Text != NIL){ println( "Objective 6: ["+level.coopObjective6+"] "+level.coopObjective6Text) }
+	if(level.coopObjective7Text != NIL){ println( "Objective 7: ["+level.coopObjective7+"] "+level.coopObjective7Text) }
+	if(level.coopObjective8Text != NIL){ println( "Objective 8: ["+level.coopObjective8+"] "+level.coopObjective8Text) }
+
+	println("//end of MISSION Status ///////////////////////")
+	
+	
+	waitframe
+	if(!local.logfile){
+		setcvar ( "logfile 0" )
+	}
+	level.coopPrintMissionStatus=0
 }end
 
 //[203] chrissstrahl - login developer
@@ -284,10 +345,8 @@ spawnpointsshow:{ //
 		
 		local.angles = level.flags["coop_spawn"+local.i+"angles"]
 		if(!(local.angles)){
-			self iprint ("a = 0") 1
 			local.angles = level.flags["coop_spawn1angles"]
 			if(!(local.angles)){
-				self iprint ("a = 0") 1
 				local.angles = "( 0 0 0 )"
 			}
 		}
@@ -296,6 +355,28 @@ spawnpointsshow:{ //
 		local.ent = spawn script_model model "models/player/german_Worker.tik" origin (local.vec) notsolid 1 targetname ("coopEMkr"+local.i) scale 1 angles local.angles
 		waitframe
 		local.ent anim "unarmed_stand_walk_fwd"
+	}
+	
+	//update location if it has changed
+	while(level.coopShowExistingSpawnpoints){
+		for(local.i=1;local.i<=8;local.i++){
+			local.entityMarker = $("coopEMkr"+local.i)
+			if(local.entityMarker != NULL){
+				local.vec = level.flags["coop_spawn"+local.i+"origin"]
+				if(local.vec != local.entityMarker.origin){
+					local.angles = level.flags["coop_spawn"+local.i+"angles"]
+					if(!(local.angles)){
+						local.angles = level.flags["coop_spawn1angles"]
+						if(!(local.angles)){
+							local.angles = "( 0 0 0 )"
+						}
+					}
+					local.entityMarker origin local.vec
+					local.entityMarker angles local.angles
+				}
+			}
+		}
+		wait 1
 	}
 }end
 
@@ -729,6 +810,7 @@ printmarkers local.markernames:{
 	}
 	local.playerCleanName = waitthread coop_mod/player.scr::playerCleanName self.netname
 	self iprint ( "Printed markers"+level.coopMarkersIndex+" locations into Server console for "+local.playerCleanName) 1 NIL
+	println ( "Printed markers"+level.coopMarkersIndex+" locations into Server console for "+local.playerCleanName)
 	local.angle = " 0 "
 	local.angle += int(self.viewangles[1])
 	local.angle += " 0 "
