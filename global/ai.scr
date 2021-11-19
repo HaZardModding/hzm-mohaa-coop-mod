@@ -29,6 +29,9 @@
 //
 main:
 level waittill prespawn
+
+//println("COOPDEBUG ai.scr::main - start")
+
 	if (level.bombnum == NIL)
 		level.bombnum = 0
 
@@ -44,6 +47,8 @@ level waittill prespawn
 	exec global/parade.scr
 	exec global/reanimator.scr
 	//exec global/FakeGunfire.scr
+
+//println("COOPDEBUG ai.scr::main - $enemyspawnertrigger")
 
 	local.newset = 3152930
 	if ($enemyspawnertrigger)
@@ -467,6 +472,8 @@ level waittill prespawn
 		local.healthtotal = local.healthtotal * 0.25
 //		println (local.healthtotal + " AI Spawners will drop health")
 
+//println("COOPDEBUG ai.scr::main - local.healthtotal > 0")
+
 		while (local.healthtotal > 0)
 		{
 			local.num = randomint (level.enemyspawners) + 1
@@ -532,7 +539,7 @@ level waittill prespawn
 
 	}
 	*/
-
+//println("COOPDEBUG ai.scr::main - end")
 end
 
 killself:
@@ -2043,9 +2050,10 @@ friendlythink:{
 	
 	//[200] chrissstrahl - make this work in coop
 	local.player = exec coop_mod/replace.scr::player_closestTo self
-	while(local.player == NULL){
+	while((isalive self) && local.player == NULL){ //[203] chrissstrahl - added check for actor being alive
 		wait 1
 		local.player = exec coop_mod/replace.scr::player_closestTo self
+//println("COOPDEBUG: friendlythink waiting for player [1]")
 	}
 
 
@@ -2058,16 +2066,25 @@ friendlythink:{
 
 	//[200] chrissstrahl - make this work in coop
 	local.player = exec coop_mod/replace.scr::player_closestTo self
-	while(local.player == NULL){
+	while((isalive self) && local.player == NULL){ //[203] chrissstrahl - added check for actor being alive
 		wait 1
 		local.player = exec coop_mod/replace.scr::player_closestTo self
+//println("COOPDEBUG: friendlythink waiting for player [2]")
 	}
 
 	//[200] chrissstrahl - make this work in coop
 	while ((isalive self) && (vector_length (self.origin - local.player.origin) > 500)){
+		//println("COOPDEBUG: friendlythink running to player [1]")
 		self runto local.player
 		self waittill movedone
 		waitframe
+		//[203] chrissstrahl - make this work in coop and wait for player
+		local.player = exec coop_mod/replace.scr::player_closestTo self
+		while((isalive self) && local.player == NULL){
+			wait 1
+			local.player = exec coop_mod/replace.scr::player_closestTo self
+			//println("COOPDEBUG: friendlythink waiting for player [3]")
+		}
 	}
 
 	if (isalive self){
