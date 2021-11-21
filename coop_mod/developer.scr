@@ -16,6 +16,8 @@ devcommand local.data:{
 		self stufftext ("pushmenu coopdev\n")
 		end
 	}
+	
+	//println("COOPDEBUG: devcommand")
 
 	local.devCommand["lgn"] = "login"			//log developer in
 	
@@ -35,6 +37,8 @@ devcommand local.data:{
 	
 	local.devCommand["msts"] = "printmissionstatus"	//prints consoleoutput with all mission relevant statusinfos
 	
+	local.devCommand["acti"] = "threadorentity"	//runs script thread or fires a trigger given by name
+	
 	//if the command was found execute it
 	if(local.devCommand[local.data] != NIL){
 		if(	local.devCommand[local.data] != "login" &&
@@ -52,6 +56,83 @@ devcommand local.data:{
 	}else{
 		self iprint ("devcommand unsupported command: "+local.devCommand[local.data]) 1
 	}
+}end
+	
+//[203] chrissstrahl - execut a script thread or activate a entity (trigger)
+//=========================================================================
+threadorentity:{
+//=========================================================================
+	self iprint ( "threadorentity") 1 NIL
+	if(level.coopThreadorEntity){
+		self iprint ( "Allready Running!") 1 NIL
+		end
+	}
+	if(level.coopThreadorEntityIndex==NIL){level.coopThreadorEntityIndex=1}
+	level.coopThreadorEntity=1
+	
+	local.playerCleanName = waitthread coop_mod/player.scr::playerCleanName self.netname
+	
+	println ( "EXECUTE THREAD OR TRIGGER "+level.coopThreadorEntityIndex+" for "+local.playerCleanName)
+	self iprint ( "EXECUTE THREAD OR TRIGGER "+level.coopThreadorEntityIndex+" for "+local.playerCleanName) 1 NIL
+	
+	wait 1
+	
+	if(!self){
+		goto threadorentity_end
+	}
+	
+	self iprint ( "Set your playername to the thread or targetname to activate.") 0 NIL
+	self iprint ( "example: objective123") 1 NIL
+	self iprint ( "example: $spawnenemy5") 1 NIL
+	
+	//wait for player to rename
+	local.playerCleanName = self.netname
+	local.timeout=600 //600=30 sec with sv_fps 20
+	while(self && local.playerCleanName == self.netname && local.timeout > 0){
+		waitframe
+		local.timeout--
+	}
+	
+	if(!local.timeout){
+		self iprint ( "Execute Entity or Thread timmed out, you took to long to rename") 1 NIL
+		goto threadorentity_end
+	}
+	
+	local.name = self.netname
+	if(!local.name || local.name == "" || local.name.size < 2){
+		goto threadorentity_end
+	}
+	
+	//developer wants to trigger a entity
+	if(local.name[0] == "$"){
+		local.targetname = waitthread coop_mod/main.scr::cleanText local.name "$" NIL
+		
+		local.entity = $(""+local.targetname)
+		if(local.entity){
+			println ( "ENTITY TRIGGERED: "+local.name+" for "+local.playerCleanName)
+			self iprint ( "ENTITY TRIGGERED: "+local.name) 1 NIL
+			self trigger local.entity
+		}else{
+			println ( "ENTITY NOT FOUND: "+local.name+" for "+local.playerCleanName)
+			self iprint ( "ENTITY NOT FOUND: "+local.name) 1 NIL
+		}
+	}
+	//developer wants to start a thread
+	else{
+		self iprint ( "STARTING THREAD: "+("maps/"+level.coop_mapname+".scr::"+local.name)) 1 NIL
+		print ( "STARTING THREAD: "+("maps/"+level.coop_mapname+".scr::"+local.name)+" for "+local.playerCleanName)
+		thread coop_mod/main.scr::startThread ( ("maps/"+level.coop_mapname+".scr::"+local.name) ) self
+	}
+	
+	//rename player back
+	wait 1
+	if(self){
+		self stufftext ("name "+local.playerCleanName)
+	}
+	
+	threadorentity_end:
+	
+	level.coopThreadorEntity=0
 }end
 
 //[203] chrissstrahl - print the missionstatus to server log
