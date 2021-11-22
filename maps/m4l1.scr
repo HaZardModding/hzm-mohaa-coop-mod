@@ -151,12 +151,16 @@ plane_sequence:{
 	for (local.i = 1 ; local.i <= $plane_sequence_trigger.size ; local.i ++){
 		$plane_sequence_trigger[local.i] remove
 	}
+	
+	println("COOPDEBUG: ::plane_sequence pilot walkto")
 	 
 	$plane_german3 walkto $german3_node1
 	level.pilot walkto $pilot_node1
 	
 	println "GERMAN1 and GERMAN2 in idle"
 	println "STARTING"
+	
+	println("COOPDEBUG: ::plane_sequence pilot waittill 1")
 	
 	$plane_german1 anim actor_m4l1_400
 	$plane_german1 waittill animdone
@@ -180,44 +184,57 @@ plane_sequence:{
 	
 	$plane_german1 anim plane_german1_idle2
 	println "GERMAN1 idle"
+	
+	println("COOPDEBUG: ::plane_sequence pilot waittill 2")
 
 	wait 1
 		
 	$plane_german2 exec global/stand.scr
 	$plane_german1 anim actor_m4l1_402
 	$plane_german1 waittill animdone
+	
+	println("COOPDEBUG: ::plane_sequence pilot waittill 3")
+	
 	println "fourth waittill done"
 	
 	$plane_german1 anim plane_german1_idle2
 	wait 4
  
+	println("COOPDEBUG: ::plane_sequence Pilot no longer point of intrest for enemies")
 	level.pilot threatbias 0
 }end
 
 //============================================================================
 pilot_waittill_combat:{
 //============================================================================
+	println("COOPDEBUG: ::pilot_waittill_combat while")
+
 	while ($plane_german1.thinkstate == idle && $plane_german2.thinkstate == idle && $plane_german3.thinkstate == idle){
 		wait .2
 	}	
-		
+	
+	println("COOPDEBUG: ::pilot_waittill_combat Pilot ai off")
 	level.pilot exec global/disable_ai.scr //chrissstrahl
 	level.pilot exec global/stand.scr
 	wait .1
+	println("COOPDEBUG: ::pilot_waittill_combat Pilot fall down anim")
 	level.pilot anim pilot_falldown
 	level.pilot waittill animdone
+	println("COOPDEBUG: ::pilot_waittill_combat Pilot ground idle anim")
 	level.pilot anim pilot_ground_idle 
 }end
 
 //============================================================================
 pilot_waittill_rescue:{
 //============================================================================
+	println("COOPDEBUG: ::pilot_waittill_rescue start while wait germans123 dead")
 	while (IsAlive $plane_german1 || IsAlive $plane_german2 || IsAlive $plane_german3){
 		wait 1
 		//println "z:    waiting for the germans to be dead"
 	} 
 	wait 1
 	
+	println("COOPDEBUG: ::pilot_waittill_rescue pilot ai off")
 	level.pilot exec global/disable_ai.scr
 	
 	level.pilot runto $mp40_spot
@@ -236,10 +253,13 @@ pilot_waittill_rescue:{
 	level.pilot exec global/stand.scr
 	wait 1
 	
+	println("COOPDEBUG: ::pilot_waittill_rescue pilot notarget")
+	
 	level.pilot threatbias 0
 	// I'm lucky you came along. There's a Maquis safehouse right near here.  It's over that way.
 	level.pilot waitthread pilotsay dfr_M4L1_400h_1 $player //chrissstrahl - handled in func for coop
 	
+	println("COOPDEBUG: ::pilot_waittill_rescue pilot")
 	waitthread global/objectives.scr::add_objectives 1 3 "Locate the downed G3 pilot." level.pilot.origin
 	waitthread global/objectives.scr::current_objectives 2
 	
@@ -248,6 +268,7 @@ pilot_waittill_rescue:{
 		exec global/autosave.scr 1	//"Downed plane"
 	}
 	
+	println("COOPDEBUG: ::pilot_waittill_rescue pilot friendlythink")
 	level.pilot thread global/friendly.scr::friendlythink
 	level.pilot thread heal_once
 }end
@@ -267,6 +288,8 @@ pilotsay local.alias local.listener local.distance local.movecloser local.animat
 
 	if (local.distance == NIL || local.distance < 64) {local.distance = 160}
 	
+	println("COOPDEBUG: ::pilot_waittill_rescue pilotsay before while")
+	
 	if (local.movecloser != 1){
 		self.friendtype = -1
 		
@@ -285,6 +308,8 @@ pilotsay local.alias local.listener local.distance local.movecloser local.animat
 		self exec global/stand.scr
 		self.friendtype = 1
 	}
+	
+	println("COOPDEBUG: ::pilot_waittill_rescue pilotsay before while end")
 
 	self turnto local.listener
 	self lookat local.listener
@@ -301,7 +326,7 @@ pilotsay local.alias local.listener local.distance local.movecloser local.animat
 	wait 3.5
 
 	self lookat NULL
-	self turnto $altar_buttonpulse	
+	self turnto $altar_buttonpulse
 	wait 2
 	
 	self turnto NULL
@@ -463,7 +488,11 @@ pilot_runto_trucksafepoint:{
 //============================================================================
 heal_once:{
 //============================================================================
+	println("COOPDEBUG: ::heal_once while")
+	
 	while ((self.health > 76) && (IsAlive self)) {wait 4}
+	
+	println("COOPDEBUG: ::heal_once canteen")
 	
 	self thread canteen
 }end
@@ -472,7 +501,11 @@ heal_once:{
 //============================================================================
 canteen:{
 //============================================================================
+	println("COOPDEBUG: ::canteen start")
+
 	while !(self.thinkstate == "idle") {waitframe}
+
+	println("COOPDEBUG: ::canteen while end")
 
 	self exec global/disable_ai.scr
 	
