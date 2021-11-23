@@ -35,6 +35,10 @@ Escape:
 	// now latch on to each one
 	spawn trigger_relay targetname "allEscapeGuysDead"
 	level.escapeGuysAlive = 0
+	
+	//[203] chrissstrahl - make sure players do not get stuck if the ai is hiding to hard
+	thread coop_escapeTimeout
+	
 	$townescapeguys12 thread trackEscapeGuys
 
 	// wait for all $townescapeguys12 to be dead
@@ -70,6 +74,27 @@ Escape:
 	// level ends
 	level.escaped = 1
 end
+
+//[203] chrissstrahl - make sure players do not get stuck if the ai is hiding to hard
+coop_escapeTimeout:{
+	wait 60
+	if($townescapeguys12){
+		if($townescapeguys12.size < 2){
+			if(isalive local.pleasekillme){
+				local.pleasekillme takedamage
+				local.pleasekillme hurt 999999
+			}
+		}
+		local.killed=0
+		for(local.killed=0;local.killed<$townescapeguys12.size;local.killed++){
+			local.pleasekillme = $townescapeguys12[local.killed]
+			if(isalive local.pleasekillme){
+				local.pleasekillme takedamage
+				local.pleasekillme hurt 999999
+			}
+		}	
+	}
+}end
 
 trackEscapeGuys:
 	if (self && isalive self) {
