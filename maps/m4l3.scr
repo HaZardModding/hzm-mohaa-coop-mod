@@ -12,6 +12,7 @@
 main:{
 //=========================================================================
 	level.coop_aaMap = 1						//Pasted by Criminal for coop comp. - let global scripts know this is a AA level
+	
 	waitthread coop_mod/main.scr::main         //Pasted by Criminal for coop comp. - start coop mod extensions
 	
 	soundtrack music/m4l3.mus
@@ -27,6 +28,7 @@ main:{
 	$endgate_left notsolid
 	$endgate_right notsolid
 	$truckgate notsolid
+	
 	level waittill prespawn
 
 	$world farplane 1500
@@ -616,6 +618,11 @@ end_autosave:{
 //=========================================================================
 intro_truck:{
 //=========================================================================
+	//[203] chrissstrahl - fix issue breaking the mission
+	//if any other player than client 0 spawns first
+	//activating a trigger that removes the very entities we need to start the actual mission truck intro
+	level.truckIntroStarted = 1
+
 	//*** temporarily set the disguise so the AI won't shoot at him
 	if(level.gametype == 0){ //chrissstrahl - sp
 		$player.has_disguise = 1
@@ -676,7 +683,13 @@ intro_truck:{
 	if (!level.gametype){
 		thread player_prep //[200] Smithy - only do this in sp
 	}
-	
+	//[203] chrissstrahl - fix issue breaking the mission
+	//if any other player than client 0 spawns first
+	//activating a trigger that removes the very entities we need to start the actual mission truck intro
+	else if($faketruck_playerexit_trigger){
+		$faketruck_playerexit_trigger setsize ( -100 -100 -30 ) ( 100 100 10 )
+		$faketruck_playerexit_trigger triggerable
+	}
 
 	//*** autosave the game
 	exec global/autosave.scr 1
@@ -887,7 +900,16 @@ intro_truck_pushfog:{
 //  player jumping off of truck
 //=========================================================================
 faketruck_playerexit:{
-//=========================================================================
+//=========================================================================	
+	//[203] chrissstrahl - fix issue breaking the mission
+	//if any other player than client 0 spawns first
+	//activating a trigger that removes the very entities we need to start the actual mission truck intro
+	if(level.truckIntroStarted == NIL){
+		wait 3
+		spawn trigger_once targetname faketruck_playerexit_trigger origin ( -3704 -4120 -312 ) nottriggerable 1 setthread faketruck_playerexit
+		end
+	}
+
 	local.firstOne = parm.other //chrissstrahl
 	
 	thread realtruck_drive
