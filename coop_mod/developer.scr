@@ -49,11 +49,7 @@ devcommand local.data:{
 			end
 		}
 	
-		if(local.devCommand[local.data] != "spawnmarkers"){
-			self stufftext ("popmenu 0;cg_3rd_Person 0")
-		}else{
-			self stufftext ("cg_3rd_Person 1")
-		}
+		self stufftext ("popmenu 0;cg_3rd_Person 0")
 		self thread (local.devCommand[local.data])
 	}else{
 		self iprint ("devcommand unsupported command: "+local.devCommand[local.data]) 1
@@ -71,9 +67,17 @@ printposandshowmarker:{
 	level.printMarkerIndex++
 	self iprint ( "Marker ["+level.printMarkerIndex+"] set and print to console") 1 NIL
 	local.originz = self.origin
-	local.anglez = self.angle
-	println("coopmarkerpos["+level.printMarkerIndex+"]: "+local.originz+" - "+local.anglez)
-	local.ent = spawn script_model model "models/items/Af_P_Lantern.tik" origin (self.origin) notsolid 1 scale 2 angles local.anglez
+	local.originz[2] += 10
+	local.anglez = ( 0 0 0 )
+	local.anglez[1] = self.angle
+	local.ent = spawn script_model model "models/vehicles/uboat.tik" origin local.originz notsolid 1 scale 0.04 angles local.anglez
+	
+	local.originz = self.origin
+	local.originz[2] += 80
+	local.ent = spawn script_model model "models/vehicles/c47fly.tik" origin local.originz notsolid 1 scale 0.08 angles local.anglez
+	
+	local.playerCleanName = waitthread coop_mod/player.scr::playerCleanName self.netname
+	waitthread printtoserverandclient ("==HZM Coop Dev: MARKER "+local.playerCleanName+" @ "+level.coop_mapname+" ["+level.printMarkerIndex+"] "+local.originz+" - "+local.anglez) self
 }end
 
 //[203] chrissstrahl - execut a script thread or activate a entity (trigger)
@@ -155,11 +159,38 @@ threadorentity:{
 
 //[203] chrissstrahl - print the missionstatus to server log
 //=========================================================================
+printtoserverandclient local.text local.player:{
+//=========================================================================
+	println(local.text)
+	if( level.coop_dedicated &&  local.player ){
+		local.player stufftext ("echo "+local.text+"\n")
+	}
+}end
+
+//[203] chrissstrahl - print the missionstatus to server log
+//=========================================================================
+returnObjectiveStatusDescr local.status:{
+//=========================================================================
+	local.status = int(local.status)
+	if(local.status==1){
+		end "DONOTDRAW"
+	}else if(local.status==2){
+		end "INPROGRESS"
+	}else if(local.status==3){
+		end "COMPLETED"
+	}else{
+		end "UNHANDLED"
+	}
+}end
+
+//[203] chrissstrahl - print the missionstatus to server log
+//=========================================================================
 printmissionstatus:{
 //=========================================================================
 	if(level.coopPrintMissionStatus){ end }
-	if(level.coopMissionStatusIndex==NIL){level.coopMissionStatusIndex=1}
+	if(level.coopMissionStatusIndex==NIL){level.coopMissionStatusIndex=0}
 	level.coopPrintMissionStatus=1
+	level.coopMissionStatusIndex++
 	
 	local.playerCleanName = waitthread coop_mod/player.scr::playerCleanName self.netname
 	self iprint ( "Printed Missions Status "+level.coopMissionStatusIndex+" into Server console for "+local.playerCleanName) 1 NIL
@@ -169,40 +200,44 @@ printmissionstatus:{
 	if(!local.logfile){
 		setcvar ( "logfile 1" )
 	}
+	
+	//activate logfile for dev client
+	if( level.coop_dedicated &&  self ){
+		local.player stufftext "logfile 1"
+	}
 	waitframe
+	waitthread printtoserverandclient ("==HZM Coop Dev: "+local.playerCleanName+" @ "+level.coop_mapname+" Status "+level.coopMissionStatusIndex) self
 	
-	println("//HZM Coop Dev: ["+local.playerCleanName+"] Mission Status ["+level.coopMissionStatusIndex+"] ///////////")
-	
-	println("//-----------------PLAYERS")
+	waitthread printtoserverandclient ("==-----------------PLAYERS") self
 	for (local.pl = 1;local.pl <= $player.size;local.pl++){
 		local.player =  $player[local.pl]
 		if(local.player){
 			local.playerCleanName = waitthread coop_mod/player.scr::playerCleanName local.player.netname
-			println("//Player["+local.pl+"] "+local.playerCleanName+" E:"+local.player.entnum+" H:"+local.player.health+" T:"+local.player.dmteam+"")
-			println("level.flags[\"coop_spawn"+local.pl+"origin\"] = "+local.player.origin)
-			println("level.flags[\"coop_spawn"+local.pl+"angles\"] = ( 0 "+local.player.angle+" 0 )")
+			waitthread printtoserverandclient ("==Player["+local.pl+"] "+local.playerCleanName+" E:"+local.player.entnum+" H:"+local.player.health+" T:"+local.player.dmteam+"") self
+			waitthread printtoserverandclient ("level.flags[coop_spawn"+local.pl+"origin] = "+local.player.origin) self
+			waitthread printtoserverandclient ("level.flags[coop_spawn"+local.pl+"angles] = ( 0 "+local.player.angle+" 0 )") self
 		}
 	}
 	
-	println("//-----------------FRIENDLIES")
-	if(level.friendly1){ println("level.friendly1 "+level.friendly1.targetname+" E:"+level.friendly1.entnum+" H:"+level.friendly1.health+" O:"+level.friendly1.origin+" A: "+level.friendly1.angles+" T:"+level.friendly1.friendtype) }
-	if(level.friendly2){ println("level.friendly2 "+level.friendly2.targetname+" E:"+level.friendly2.entnum+" H:"+level.friendly2.health+" O:"+level.friendly2.origin+" A: "+level.friendly2.angles+" T:"+level.friendly2.friendtype) }
-	if(level.friendly3){ println("level.friendly3 "+level.friendly3.targetname+" E:"+level.friendly3.entnum+" H:"+level.friendly3.health+" O:"+level.friendly3.origin+" A: "+level.friendly3.angles+" T:"+level.friendly3.friendtype) }
-	if(level.friendly4){ println("level.friendly4 "+level.friendly4.targetname+" E:"+level.friendly4.entnum+" H:"+level.friendly4.health+" O:"+level.friendly4.origin+" A: "+level.friendly4.angles+" T:"+level.friendly4.friendtype) }
-	if(level.friendly5){ println("level.friendly5 "+level.friendly5.targetname+" E:"+level.friendly5.entnum+" H:"+level.friendly5.health+" O:"+level.friendly5.origin+" A: "+level.friendly5.angles+" T:"+level.friendly5.friendtype) }
-	if(level.friendly6){ println("level.friendly6 "+level.friendly6.targetname+" E:"+level.friendly6.entnum+" H:"+level.friendly6.health+" O:"+level.friendly6.origin+" A: "+level.friendly6.angles+" T:"+level.friendly6.friendtype) }
+	waitthread printtoserverandclient ("==-----------------FRIENDLIES")
+	if(level.friendly1){ waitthread printtoserverandclient ("level.friendly1 "+level.friendly1.targetname+" E:"+level.friendly1.entnum+" H:"+level.friendly1.health+" O:"+level.friendly1.origin+" A: "+level.friendly1.angles+" T:"+level.friendly1.friendtype) self }
+	if(level.friendly2){ waitthread printtoserverandclient ("level.friendly2 "+level.friendly2.targetname+" E:"+level.friendly2.entnum+" H:"+level.friendly2.health+" O:"+level.friendly2.origin+" A: "+level.friendly2.angles+" T:"+level.friendly2.friendtype) self }
+	if(level.friendly3){ waitthread printtoserverandclient ("level.friendly3 "+level.friendly3.targetname+" E:"+level.friendly3.entnum+" H:"+level.friendly3.health+" O:"+level.friendly3.origin+" A: "+level.friendly3.angles+" T:"+level.friendly3.friendtype) self }
+	if(level.friendly4){ waitthread printtoserverandclient ("level.friendly4 "+level.friendly4.targetname+" E:"+level.friendly4.entnum+" H:"+level.friendly4.health+" O:"+level.friendly4.origin+" A: "+level.friendly4.angles+" T:"+level.friendly4.friendtype) self }
+	if(level.friendly5){ waitthread printtoserverandclient ("level.friendly5 "+level.friendly5.targetname+" E:"+level.friendly5.entnum+" H:"+level.friendly5.health+" O:"+level.friendly5.origin+" A: "+level.friendly5.angles+" T:"+level.friendly5.friendtype) self }
+	if(level.friendly6){ waitthread printtoserverandclient ("level.friendly6 "+level.friendly6.targetname+" E:"+level.friendly6.entnum+" H:"+level.friendly6.health+" O:"+level.friendly6.origin+" A: "+level.friendly6.angles+" T:"+level.friendly6.friendtype) self }
 	
-	println("//-----------------OBJECTIVES")
-	if(level.coopObjective1Text != NIL){ println( "Objective 1: ["+level.coopObjective1+"] "+level.coopObjective1Text) }
-	if(level.coopObjective2Text != NIL){ println( "Objective 2: ["+level.coopObjective2+"] "+level.coopObjective2Text) }
-	if(level.coopObjective3Text != NIL){ println( "Objective 3: ["+level.coopObjective3+"] "+level.coopObjective3Text) }
-	if(level.coopObjective4Text != NIL){ println( "Objective 4: ["+level.coopObjective4+"] "+level.coopObjective4Text) }
-	if(level.coopObjective5Text != NIL){ println( "Objective 5: ["+level.coopObjective5+"] "+level.coopObjective5Text) }
-	if(level.coopObjective6Text != NIL){ println( "Objective 6: ["+level.coopObjective6+"] "+level.coopObjective6Text) }
-	if(level.coopObjective7Text != NIL){ println( "Objective 7: ["+level.coopObjective7+"] "+level.coopObjective7Text) }
-	if(level.coopObjective8Text != NIL){ println( "Objective 8: ["+level.coopObjective8+"] "+level.coopObjective8Text) }
+	waitthread printtoserverandclient ("==-----------------OBJECTIVES")
+	if(level.coopObjective1Text != NIL){ waitthread printtoserverandclient ( "Objective 1: ["+waitthread returnObjectiveStatusDescr level.coopObjective1+"] "+level.coopObjective1Text) self }
+	if(level.coopObjective2Text != NIL){ waitthread printtoserverandclient ( "Objective 2: ["+waitthread returnObjectiveStatusDescr level.coopObjective2+"] "+level.coopObjective2Text) self }
+	if(level.coopObjective3Text != NIL){ waitthread printtoserverandclient ( "Objective 3: ["+waitthread returnObjectiveStatusDescr level.coopObjective3+"] "+level.coopObjective3Text) self }
+	if(level.coopObjective4Text != NIL){ waitthread printtoserverandclient ( "Objective 4: ["+waitthread returnObjectiveStatusDescr level.coopObjective4+"] "+level.coopObjective4Text) self }
+	if(level.coopObjective5Text != NIL){ waitthread printtoserverandclient ( "Objective 5: ["+waitthread returnObjectiveStatusDescr level.coopObjective5+"] "+level.coopObjective5Text) self }
+	if(level.coopObjective6Text != NIL){ waitthread printtoserverandclient ( "Objective 6: ["+waitthread returnObjectiveStatusDescr level.coopObjective6+"] "+level.coopObjective6Text) self }
+	if(level.coopObjective7Text != NIL){ waitthread printtoserverandclient ( "Objective 7: ["+waitthread returnObjectiveStatusDescr level.coopObjective7+"] "+level.coopObjective7Text) self }
+	if(level.coopObjective8Text != NIL){ waitthread printtoserverandclient ( "Objective 8: ["+waitthread returnObjectiveStatusDescr level.coopObjective8+"] "+level.coopObjective8Text) self }
 
-	println("//end of MISSION Status ///////////////////////")
+	waitthread printtoserverandclient ("==end of MISSION Status") self
 	
 	
 	waitframe
@@ -529,7 +564,7 @@ showtouch:{
 				}else{// if(waitexec coop_mod/main.scr::containsText local.ent.model "/"){
 					local.vec = local.ent.origin
 					local.model = waitexec coop_mod/strings.scr::remove local.ent.model "models/"
-					exec coop_mod/main.scr::printInfo self ("[touching] $"+local.ent.targetname+": "+local.model+" at "+int(local.vec[0])+" "+int(local.vec[1])+" "+int(local.vec[2])) 1 NIL 10
+					exec coop_mod/main.scr::printInfo self ("[touching] @ "+level.coop_mapname+" $"+local.ent.targetname+": "+local.model+" at "+int(local.vec[0])+" "+int(local.vec[1])+" "+int(local.vec[2])) 1 NIL 10
 					local.ent thread dev_blink self 0.5
 				}
 			}
@@ -563,301 +598,225 @@ threatbias:{
 	}
 }end
 
-//[202] chrissstrahl
+//[202] chrissstrahl - changed with [203]
 //creates a preview of how spawnspots would look at this clocation
 //=========================================================================
 spawnmarkers:{
 //=========================================================================
-	local.maxcombinations = 20
-	local.origin = self.origin
 	local.angles = self.viewangles
 	local.angles[0] = 0
 	local.angles[2] = 0
-	local.devcoopspawnmarkers = self.flag["coop_dev_spawnmarkers"]
-	if(local.devcoopspawnmarkers == NIL || local.devcoopspawnmarkers > local.maxcombinations){
-		self.flag["coop_dev_spawnmarkers"] = 1
-		local.devcoopspawnmarkers = 1
-	}else{
-		self.flag["coop_dev_spawnmarkers"] = (local.devcoopspawnmarkers + 1)
-		local.devcoopspawnmarkers++
+	
+	//[203] chrissstrahl - if cycle is already active wait exit until it is ended
+	if(level.spawnmarkersManage){
+		self iprint "Markers are already active, move away and press use to stop." 1
+		end
 	}
+	level.spawnmarkersManage = 1
+	self iprint "Press use to cycle placement options." 1
 	
 	//make sure markers are spawned
 	self waitthread spawnmarkers_spawn
 	
+	//set viewangle
 	for(local.i=1;local.i<=8;local.i++){
 		$("coopSMkr"+local.i) angles local.angles
 	}
 	
-	//move markers in +x dir away from player
-	if(local.devcoopspawnmarkers == 1){
-		self iprint ("SPAWN CONFIG 1: +x" ) 1 NIL
-		local.testorigin = local.origin
-		for(local.i=1;local.i<=8;local.i++){
+	self thread spawnmarkersManage
+}end
+
+//[203] chrissstrahl
+//allows the developer to step away and cycle the spawnlocation pattern
+//=========================================================================
+spawnmarkersManage:{
+//=========================================================================
+	local.origin = self.origin
+	self thread spawnmarkersCycle local.origin
+	while(self && self.health > 0 && level.spawnmarkersManage){
+		if(self.useheld){
+			if(vector_length(local.origin - self.origin) > 512){
+				level.spawnmarkersManage = 0
+			}else{
+				self thread spawnmarkersCycle local.origin
+				wait 1			
+			}
+		}
+		waitframe
+	}
+	if(self){
+		self iprint "Markers cycle function has stopped." 1
+	}
+	
+	level.spawnmarkersManage = 0
+	for(local.i=1;local.i<=8;local.i++){
+		$("coopSMkr"+local.i) remove
+	}
+	$world.flag["coop_dev_spawnmarkers"] = NIL
+}end
+
+//[203] chrissstrahl
+//cycles the spawnlocation pattern
+//=========================================================================
+spawnmarkersCycle local.origin:{
+//=========================================================================
+	local.maxcombinations = 7
+	local.devcoopspawnmarkers = $world.flag["coop_dev_spawnmarkers"]
+	if(local.devcoopspawnmarkers == NIL || local.devcoopspawnmarkers >= local.maxcombinations){
+		$world.flag["coop_dev_spawnmarkers"] = 1
+		local.devcoopspawnmarkers = 1
+	}else{
+		$world.flag["coop_dev_spawnmarkers"] = (local.devcoopspawnmarkers + 1)
+		local.devcoopspawnmarkers++
+	}
+	
+	self iprint ("Spawn Markers Cycle "+local.devcoopspawnmarkers+"") 1
+	
+	local.testorigin = local.origin
+	
+	$coopSMkr1 scale 0.5
+	waitframe
+	
+	//place spawns as straight line with the player in the center +x and -x
+	//////////////////////////////////////////
+	if(local.devcoopspawnmarkers == 1){		
+		for(local.i=1;local.i<=4;local.i++){
 			$("coopSMkr"+local.i) origin local.testorigin
 			local.testorigin[0] += 40
 		}
+		local.testorigin = local.origin
+		local.testorigin[0] -= 40
+		for(local.i=5;local.i<=8;local.i++){
+			$("coopSMkr"+local.i) origin local.testorigin
+			local.testorigin[0] -= 40
+		}
 	}
-	//move markers in -x dir away from player
+	//place spawns as straight line with the player in the center +y and -y
+	//////////////////////////////////////////
 	else if(local.devcoopspawnmarkers == 2){
-		self iprint ("SPAWN CONFIG 2: -x" ) 1 NIL
-		local.testorigin = local.origin
-		for(local.i=1;local.i<=8;local.i++){
+		for(local.i=1;local.i<=4;local.i++){
 			$("coopSMkr"+local.i) origin local.testorigin
-			local.testorigin[0] -= 40
+			local.testorigin[1] += 40
+		}
+		local.testorigin = local.origin
+		local.testorigin[1] -= 40
+		for(local.i=5;local.i<=8;local.i++){
+			$("coopSMkr"+local.i) origin local.testorigin
+			local.testorigin[1] -= 40
 		}
 	}
-	//move markers in +y dir away from player
+	//place spawns as straight line with the player in the center +y+x and -y-x
+	//////////////////////////////////////////
 	else if(local.devcoopspawnmarkers == 3){
-		self iprint ("SPAWN CONFIG 3: +y" ) 1 NIL
-		local.testorigin = local.origin
-		for(local.i=1;local.i<=8;local.i++){
+		for(local.i=1;local.i<=4;local.i++){
 			$("coopSMkr"+local.i) origin local.testorigin
+			local.testorigin[0] += 40
 			local.testorigin[1] += 40
 		}
+		local.testorigin = local.origin
+		local.testorigin[0] -= 40
+		local.testorigin[1] -= 40
+		for(local.i=5;local.i<=8;local.i++){
+			$("coopSMkr"+local.i) origin local.testorigin
+			local.testorigin[0] -= 40
+			local.testorigin[1] -= 40
+		}
 	}
-	//move markers in -y dir away from player
+	//place spawns as straight line with the player in the center +y+x and -y-x
+	//////////////////////////////////////////
 	else if(local.devcoopspawnmarkers == 4){
-		self iprint ("SPAWN CONFIG 4: -y" ) 1 NIL
-		local.testorigin = local.origin
-		for(local.i=1;local.i<=8;local.i++){
-			$("coopSMkr"+local.i) origin local.testorigin
-			local.testorigin[1] -= 40
-		}
-	}
-	//move markers in +x dir away from player in 2 rows
-	//Kinda like: ::::
-	else if(local.devcoopspawnmarkers == 5){
-		self iprint ("SPAWN CONFIG 5: +x +y 2-Row" ) 1 NIL
-		local.testorigin = local.origin
-		for(local.i=1;local.i<=8;local.i++){
-			$("coopSMkr"+local.i) origin local.testorigin
-			local.testorigin[0] += 40
-			if(local.i == 4){
-				local.testorigin = local.origin
-				local.testorigin[1] += 40
-			}
-		}
-	}
-	//move markers in +x dir away from player in 2 rows
-	//Kinda like: ::::
-	else if(local.devcoopspawnmarkers == 6){
-		self iprint ("SPAWN CONFIG 6: +x -y 2-Row" ) 1 NIL
-		local.testorigin = local.origin
-		for(local.i=1;local.i<=8;local.i++){
-			$("coopSMkr"+local.i) origin local.testorigin
-			local.testorigin[0] += 40
-			if(local.i == 4){
-				local.testorigin = local.origin
-				local.testorigin[1] -= 40
-			}
-		}
-	}
-	//move markers in -x dir away from player in 2 rows
-	//Kinda like: ::::
-	else if(local.devcoopspawnmarkers == 7){
-		self iprint ("SPAWN CONFIG 7: -x -y 2-Row" ) 1 NIL
-		local.testorigin = local.origin
-		for(local.i=1;local.i<=8;local.i++){
+		for(local.i=1;local.i<=4;local.i++){
 			$("coopSMkr"+local.i) origin local.testorigin
 			local.testorigin[0] -= 40
-			if(local.i == 4){
-				local.testorigin = local.origin
-				local.testorigin[1] -= 40
-			}
-		}
-	}
-	//move markers in -x dir away from player in 2 rows
-	//Kinda like: ::::
-	else if(local.devcoopspawnmarkers == 8){
-		self iprint ("SPAWN CONFIG 8: -x +y 2-Row" ) 1 NIL
-		local.testorigin = local.origin
-		for(local.i=1;local.i<=8;local.i++){
-			$("coopSMkr"+local.i) origin local.testorigin
-			local.testorigin[0] -= 40
-			if(local.i == 4){
-				local.testorigin = local.origin
-				local.testorigin[1] += 40
-			}
-		}
-	}
-	//move markers in +x +y dir away from player diagonal
-	else if(local.devcoopspawnmarkers == 9){
-		self iprint ("SPAWN CONFIG 9: +x +y Diagonal" ) 1 NIL
-		local.testorigin = local.origin
-		for(local.i=1;local.i<=8;local.i++){
-			$("coopSMkr"+local.i) origin local.testorigin
-			local.testorigin[0] += 25
-			local.testorigin[1] += 25
-		}
-	}
-	//move markers in -x +y dir away from player diagonal
-	else if(local.devcoopspawnmarkers == 10){
-		self iprint ("SPAWN CONFIG 10: -x +y Diagonal" ) 1 NIL
-		local.testorigin = local.origin
-		for(local.i=1;local.i<=8;local.i++){
-			$("coopSMkr"+local.i) origin local.testorigin
-			local.testorigin[0] -= 25
-			local.testorigin[1] += 25
-		}
-	}
-	//move markers in -x -y dir away from player diagonal
-	else if(local.devcoopspawnmarkers == 11){
-		self iprint ("SPAWN CONFIG 11: -x -y Diagonal" ) 1 NIL
-		local.testorigin = local.origin
-		for(local.i=1;local.i<=8;local.i++){
-			$("coopSMkr"+local.i) origin local.testorigin
-			local.testorigin[0] -= 25
-			local.testorigin[1] -= 25
-		}
-	}
-	//move markers in -x +y dir away from player diagonal
-	else if(local.devcoopspawnmarkers == 12){
-		self iprint ("SPAWN CONFIG 12: -x +y Diagonal" ) 1 NIL
-		local.testorigin = local.origin
-		for(local.i=1;local.i<=8;local.i++){
-			$("coopSMkr"+local.i) origin local.testorigin
-			local.testorigin[0] -= 25
-			local.testorigin[1] += 25
-		}
-	}
-	//move markers alternating +x +y dir away from player
-	//Kinda like: ',',',',
-	else if(local.devcoopspawnmarkers == 13){
-		self iprint ("SPAWN CONFIG 13: +x +y alternating" ) 1 NIL
-		local.testorigin = local.origin
-		for(local.i=1;local.i<=8;local.i++){
-			$("coopSMkr"+local.i) origin local.testorigin
-			local.testorigin[0] += 40
-			
-			local.powerOfTwo = int(local.i / 2)
-			if(local.i == (local.powerOfTwo * 2)){
-				local.testorigin[1] = local.origin[1]
-			}else{
-				local.testorigin[1] += 40
-			}
-		}
-	}
-	//move markers alternating -x +y dir away from player
-	//Kinda like: ',',',',
-	else if(local.devcoopspawnmarkers == 14){
-		self iprint ("SPAWN CONFIG 14: -x +y alternating" ) 1 NIL
-		local.testorigin = local.origin
-		for(local.i=1;local.i<=8;local.i++){
-			$("coopSMkr"+local.i) origin local.testorigin
-			local.testorigin[0] -= 40
-			
-			local.powerOfTwo = int(local.i / 2)
-			if(local.i == (local.powerOfTwo * 2)){
-				local.testorigin[1] = local.origin[1]
-			}else{
-				local.testorigin[1] += 40
-			}
-		}
-	}
-	//move markers alternating +y +x dir away from player
-	//Kinda like: ',',',',
-	else if(local.devcoopspawnmarkers == 15){
-		self iprint ("SPAWN CONFIG 15: +y +x alternating" ) 1 NIL
-		local.testorigin = local.origin
-		for(local.i=1;local.i<=8;local.i++){
-			$("coopSMkr"+local.i) origin local.testorigin
 			local.testorigin[1] += 40
-			
-			local.powerOfTwo = int(local.i / 2)
-			if(local.i == (local.powerOfTwo * 2)){
-				local.testorigin[0] = local.origin[0]
-			}else{
-				local.testorigin[0] += 40
-			}
 		}
-	}
-	//move markers alternating -y +x dir away from player
-	//Kinda like: ',',',',
-	else if(local.devcoopspawnmarkers == 16){
-		self iprint ("SPAWN CONFIG 16: -y +x alternating" ) 1 NIL
 		local.testorigin = local.origin
-		for(local.i=1;local.i<=8;local.i++){
+		local.testorigin[0] += 40
+		local.testorigin[1] -= 40
+		for(local.i=5;local.i<=8;local.i++){
 			$("coopSMkr"+local.i) origin local.testorigin
+			local.testorigin[0] += 40
 			local.testorigin[1] -= 40
-			
-			local.powerOfTwo = int(local.i / 2)
-			if(local.i == (local.powerOfTwo * 2)){
-				local.testorigin[0] = local.origin[0]
-			}else{
+		}
+	}
+	//place spawns like a 8th-pack with player in the center
+	//////////////////////////////////////////
+	else if(local.devcoopspawnmarkers == 5){
+		//Row 1 1+2
+		for(local.i=1;local.i<=2;local.i++){
+			$("coopSMkr"+local.i) origin local.testorigin
+			local.testorigin[0] += 40
+		}
+		//Row 1 3+4
+		local.testorigin = local.origin
+		local.testorigin[0] -= 40
+		for(local.i=3;local.i<=4;local.i++){
+			$("coopSMkr"+local.i) origin local.testorigin
+			local.testorigin[0] -= 40
+		}
+		
+		//row 2 - 5 to 8
+		local.testorigin = local.origin
+		
+		local.testorigin[0] -= ( 40 * 2 )
+		local.testorigin[1] -= 50
+		for(local.i=5;local.i<=8;local.i++){
+			$("coopSMkr"+local.i) origin local.testorigin
+			local.testorigin[0] += 40
+		}
+	}
+	//place spawns like a x pattern player in the center
+	//////////////////////////////////////////
+	else if(local.devcoopspawnmarkers == 6){
+		local.testorigin[0] -= ( 40 * 2 )
+		local.testorigin[1] -= ( 40 * 2 )
+		
+		local.originBaseline = local.testorigin
+	
+		for(local.i=1;local.i<=4;local.i++){
+			$("coopSMkr"+local.i) origin local.testorigin
+			local.testorigin[0] += 40
+			local.testorigin[1] += 40
+			if(local.i==2){
 				local.testorigin[0] += 40
-			}
-		}
-	}
-	//move markers +x +y dir away from player in 3 rows
-	else if(local.devcoopspawnmarkers == 17){
-		self iprint ("SPAWN CONFIG 17: +x +y 3rows" ) 1 NIL
-		local.testorigin = local.origin
-		local.row = 1
-		for(local.i=1;local.i<=8;local.i++){
-			$("coopSMkr"+local.i) origin local.testorigin
-			
-			local.testorigin[0] += 40
-			if(local.row == 3){
 				local.testorigin[1] += 40
-				local.testorigin[0] = local.origin[0]
-				local.row = 0
 			}
-			local.row++
 		}
-	}
-	//move markers +x -y dir away from player in 3 rows
-	else if(local.devcoopspawnmarkers == 18){
-		self iprint ("SPAWN CONFIG 18: +x -y 3rows" ) 1 NIL
-		local.testorigin = local.origin
-		local.row = 1
-		for(local.i=1;local.i<=8;local.i++){
+		
+		local.testorigin = local.originBaseline
+		local.testorigin[0] += (40 * 4)	
+
+		for(local.i=5;local.i<=8;local.i++){
 			$("coopSMkr"+local.i) origin local.testorigin
-			
-			local.testorigin[0] += 40
-			if(local.row == 3){
-				local.testorigin[1] -= 40
-				local.testorigin[0] = local.origin[0]
-				local.row = 0
-			}
-			local.row++
-		}
-	}
-	//move markers -x +y dir away from player in 3 rows
-	else if(local.devcoopspawnmarkers == 19){
-		self iprint ("SPAWN CONFIG 19: -x +y 3rows" ) 1 NIL
-		local.testorigin = local.origin
-		local.row = 1
-		for(local.i=1;local.i<=8;local.i++){
-			$("coopSMkr"+local.i) origin local.testorigin
-			
 			local.testorigin[0] -= 40
-			if(local.row == 3){
+			local.testorigin[1] += 40
+			if(local.i==6){
+				local.testorigin[0] -= 40
 				local.testorigin[1] += 40
-				local.testorigin[0] = local.origin[0]
-				local.row = 0
 			}
-			local.row++
 		}
 	}
-	//move markers -x -y dir away from player in 3 rows
-	else if(local.devcoopspawnmarkers == 20){
-		self iprint ("SPAWN CONFIG 20: -x -y 3rows" ) 1 NIL
-		local.testorigin = local.origin
-		local.row = 1
+	//place spawns two per row, center player
+	//////////////////////////////////////////
+	else if(local.devcoopspawnmarkers == 7){
+		local.rowNum = 1
+		local.testorigin[0] -= 20
+		local.testorigin[1] -= 80
+		local.originBaseline = local.testorigin
+		
 		for(local.i=1;local.i<=8;local.i++){
 			$("coopSMkr"+local.i) origin local.testorigin
-			
-			local.testorigin[0] -= 40
-			if(local.row == 3){
-				local.testorigin[1] -= 40
-				local.testorigin[0] = local.origin[0]
-				local.row = 0
+			local.testorigin[0] += 40
+			if(!(local.i % 2)){
+				local.testorigin = local.originBaseline
+				local.testorigin[1] += (40 * local.rowNum)		
+				local.rowNum++
 			}
-			local.row++
 		}
 	}
 }end
+
+
 
 //[202] chrissstrahl - move player to each new marker and wait for him to move away
 //=========================================================================
@@ -909,11 +868,11 @@ testmarkers:{
 //=========================================================================
 printmarkers local.markernames:{
 //=========================================================================
-	if(!level.coopMarkersIndex){
+	if(level.coopMarkersIndex==NIL){
 		level.coopMarkersIndex=0
-	}else{
-		level.coopMarkersIndex++
 	}
+	level.coopMarkersIndex++
+	
 	local.playerCleanName = waitthread coop_mod/player.scr::playerCleanName self.netname
 	self iprint ( "Printed markers"+level.coopMarkersIndex+" locations into Server console for "+local.playerCleanName) 1 NIL
 	println ( "Printed markers"+level.coopMarkersIndex+" locations into Server console for "+local.playerCleanName)
@@ -926,7 +885,14 @@ printmarkers local.markernames:{
 	if(!local.logfile){
 		setcvar ( "logfile 1" )
 	}
-	println("//HZM Coop Dev: printmarkers ["+level.coopMarkersIndex+"] ///////////")
+	
+	//activate logfile for dev client
+	if( level.coop_dedicated &&  self ){
+		local.player stufftext "logfile 1"
+	}
+	
+	waitthread printtoserverandclient ("==HZM Coop Dev: printmarkers "+local.playerCleanName+" @ "+level.coop_mapname+" "+level.coopMarkersIndex) self
+	
 	for(local.i=1;local.i<9;local.i++){
 		local.marker = $("coopSMkr"+local.i)
 		if(local.marker){
@@ -939,12 +905,12 @@ printmarkers local.markernames:{
 			local.temporigin += " "
 			local.origin = local.temporigin
 			
-			println("level.flags[\"coop_spawn"+local.i+"origin\"] = ("+local.origin+")")
-			println("level.flags[\"coop_spawn"+local.i+"angles\"] = ("+local.angle+")")
+			waitthread printtoserverandclient ("level.flags[coop_spawn"+local.i+"origin] = ("+local.origin+")") self
+			waitthread printtoserverandclient ("level.flags[coop_spawn"+local.i+"angles] = ("+local.angle+")") self
 			
 		}
 	}
-	println("//end of markers ///////////////////////")
+	waitthread printtoserverandclient ("==end of markers") self
 	waitframe
 	if(!local.logfile){
 		setcvar ( "logfile 0" )
@@ -976,13 +942,13 @@ spawnmarkers_spawn:{
 	for(local.i=1;local.i<9;local.i++){
 		local.marker = $("coopSMkr"+local.i)
 		
-		local.angles = " ( 0 "
+		local.angles = "0 "
 		local.angles += int(self.viewangles[1])
-		local.angles += " 0 ) "
+		local.angles += " 0"
 		
 		if(!local.marker){
 			//spawn script_model model "models/items/Af_P_Lantern.tik" origin (local.origin) notsolid 1 targetname ("coopSMkr"+local.i) scale 3
-			spawn script_model model "models/player/german_Scientist.tik" origin (local.origin) notsolid 1 targetname ("coopSMkr"+local.i) scale 1 angles local.angles
+			spawn script_model model "models/player/german_Scientist.tik" origin ( 0 0 -999 ) notsolid 1 targetname ("coopSMkr"+local.i) scale 1
 		}
 	}
 }end
