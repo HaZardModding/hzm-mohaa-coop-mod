@@ -106,7 +106,7 @@ coop_setDriverForTank local.player:{
 		//monitor driver, see if he dies, changes team or just wants to leave tank by pressing use
 		//[200] Smithy - minor optimisations (removed redundant if NULL check and while conditions)
 		//also moved inside if
-		while (isAlive local.player && local.player.flags["coop_isActive"] == 1 && local.player.dmteam == "allies"){	
+		while (isAlive local.player && local.player.flags["coop_isActive"] == 1 && local.player.dmteam == "allies"){
 			//chrissstrahl - if player wants to exit the tank
 			if(local.player.useheld == 1){
 				if( level.time > level.coop_tankLastDriverTime ){
@@ -141,6 +141,10 @@ coop_setDriverForTank local.player:{
 				local.player useweaponclass level.coop_weaponUse //[200] Smithy - stop weapon disappearing on exiting tank (can happen with sniper)
 			}
 			*/
+			//[203] chrissstrahl - make the player join the game again
+			if(local.player){
+				local.player thread coop_reJoinTankDriver
+			}
 		}
 	}else{
 		self DetachDriverSlot 0  ( $coop_tankExit.origin + (0 0 150) )
@@ -153,7 +157,16 @@ coop_setDriverForTank local.player:{
 	self thread coop_selectDriverForTank
 }end
 
-
+//[203] Chrissstrahl + Smithy
+//============================================================================
+coop_reJoinTankDriver:{
+//============================================================================
+	waitthread coop_mod/main.scr::skipTeamAndWeaponSelect self
+	//MAGIC CODE - This fixes the weapon being invisible, caused by the state when entering vehicle
+	if(self && self.health){
+		self forcetorsostate PUTAWAY_MAIN
+	}
+}end
 
 
 player_tank_health:
