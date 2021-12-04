@@ -140,10 +140,11 @@ isInCover local.player:{
 //=========================================================================
 manageRespawns:{
 //=========================================================================
-	while(1){
+	local.runThisLoop = 1
+	while(local.runThisLoop){
 		for(local.pNum = 1;local.pNum<=$player.size;local.pNum++){
 			local.player = $player[local.pNum]
-			if(	local.player != NULL &&
+			if(	local.player &&
 				local.player.health > 0 &&
 				local.player.dmteam != "spectator" &&
 				local.player.flags["coop_isActive"] == 1 &&
@@ -157,7 +158,8 @@ manageRespawns:{
 					local.player.flags["congratsYouMadeit"] = 1 //this player will not be updated anymore
 					//iprintlnbold_noloc("no more spawn updates for you")
 				}
-				else if((local.player.flags["coverRespawnManageTime"] + 20) < level.time){
+				//[203] Chrissstrahl - changed the time a spawnlocation will be saved after respawn to 10sec
+				else if((local.player.flags["coverRespawnManageTime"] + 10) < level.time){
 					for(local.cpp=1;local.cpp<=$cover_trigger.size;local.cpp++){
 						local.coverTrigger = $cover_trigger[local.cpp]
 						if(local.player istouching local.coverTrigger){
@@ -182,6 +184,22 @@ manageRespawns:{
 			 }
 		}
 		wait 0.2
+		//[203] chrissstrahl - make it quick
+		if(level.beachPartyTime){
+			local.runThisLoop=0
+		}
+	}
+	//[203] Chrissstrahl - allow players now to spawn near shingle, end loop
+	
+	iprintlnbold_noloc("DEVDEBUG: allow players now to spawn near shingle, end loop")
+	
+	for(local.pNum = 1;local.pNum<=$player.size;local.pNum++){
+		local.player = $player[local.pNum]
+		if(	local.player != NULL ){
+			level.flags["coop_spawn"+local.pNum+"origin"] = (1656 4784 -504)
+			level.flags["coop_spawn"+local.pNum+"angles"] = (0 0 0)
+			local.player.flags["congratsYouMadeit"] = 1
+		}
 	}
 }end
 
