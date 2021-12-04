@@ -2791,8 +2791,24 @@ end
 //		*SCENE 11* SUPPORT THREADS - ATTACKING THE FLAK 20MM AA GUN							//
 //																								//
 //==============================================================================================================================================//
-
-scene11_flak20_destruction:
+scene11_flak20_destruction:{
+	//[203] chrissstrahl - move players that are to far away here
+	//[203] chrissstrahl - allow respawn in place again
+	
+	iprintlnbold_noloc("DEVDEBUG: move players that are to far away here - allow respawnwarp")
+	
+	for (local.i = 1; local.i <= 8; local.i++){
+		local.player = $player[local.i]
+		if (local.player){
+			local.origin = local.player.origin
+			if( local.origin[0] < 1900 ){
+				local.player iprint "You where moved because you where to far away from the Battle" 1
+				thread playerPlaceAtSpawn local.player
+			}
+		}
+	}
+	level.coop_disableSpawnWarper = 0
+	
 
 	//called by the BSP
 
@@ -2815,8 +2831,7 @@ scene11_flak20_destruction:
 	//*** BRING IN THE REINFORCEMENTS
 
 		thread scene12_spawner1_initialize
-
-end
+}end
 
 //==============================================================================================================================================//
 //																								//
@@ -2826,8 +2841,7 @@ end
 
 //===============================================================================================================================//
 
-scene11_mgspawner1_initialize:
-
+scene11_mgspawner1_initialize:{
 	level.scene11_mgspawn1_teamvalue = 0		//initializes variable for total number spawned to date
 	level.scene11_mgspawn1_teamlimitmax = 4	//initializes constant for total number allowed to spawn
 	level.scene11_mgspawn1_currentalive = 0	//initializes variable for number of enemies currently alive from this spawner
@@ -2837,7 +2851,34 @@ scene11_mgspawner1_initialize:
 
 	thread scene11_mgspawndetector1_control
 
-end
+	//[203] chrissstrahl - set new spawnlocations and disable respawn in place for some time
+	
+	iprintlnbold_noloc("DEVDEBUG: set new spawnlocations and disable respawnwarp")
+	
+	level.coop_disableSpawnWarper = 1
+	
+	local.spawnloc = ( 1960 -1032 -56 )
+	local.rowNum = 1
+	local.originBaseline = local.spawnloc
+	for(local.i=1;local.i<=8;local.i++){
+		level.flags["coop_spawn"+local.i+"origin"] = local.spawnloc
+		level.flags["coop_spawn"+local.i+"angles"] = ( 0 270 0 )
+		
+		local.player = $player[local.i]
+		if(local.player){		
+			local.player.flags["coop_respawnOrigin"] = ( 0 0 0 )
+			local.player.flags["coop_respawnAngle"] = 0
+		}
+		
+		local.testorigin[0] += 40
+		if(!(local.i % 2)){
+			local.testorigin = local.originBaseline
+			local.testorigin[1] += (40 * local.rowNum)		
+			local.rowNum++
+		}
+	}
+	
+}end
 
 //============================================================//
 
@@ -2927,11 +2968,20 @@ end
 
 //============================================================//
 
-scene11_mgspawn1_terminate:
-
+scene11_mgspawn1_terminate:{
 	level.scene11_mgspawn1_deactivator = 1
-
-end
+	
+	//[203] chrissstrahl - move spawnlocations up towards flak and radar and bunker
+	
+	iprintlnbold_noloc("DEVDEBUG: move spawnlocations up towards flak and radar and bunker")
+	
+	local.spawnloc = ( 2576 -3888 -64 )
+	for(local.i=1;local.i<=8;local.i++){
+		level.flags["coop_spawn"+local.i+"origin"] = local.spawnloc
+		level.flags["coop_spawn"+local.i+"angles"] = ( 0 90 0 )
+		local.spawnloc[0] += 40
+	}
+}end
 
 //===============================================================================================================================//
 
@@ -3285,6 +3335,24 @@ scene12_spawn1_terminate:
 
 	level.scene12_spawn1_deactivator = 1
 	
+	//[203] chrissstrahl - now spawn players down there again on the way back from the radar and bunker and flak
+	
+	iprintlnbold_noloc("DEVDEBUG: spawn again on the way back from radar/flak")
+	
+	local.spawnloc = ( 3480 -1160 -56 )
+	local.rowNum = 1
+	local.originBaseline = local.spawnloc
+	for(local.i=1;local.i<=8;local.i++){
+		level.flags["coop_spawn"+local.i+"origin"] = local.spawnloc
+		level.flags["coop_spawn"+local.i+"angles"] = ( 0 180 0 )
+		
+		local.testorigin[0] -= 40
+		if(!(local.i % 2)){
+			local.testorigin = local.originBaseline
+			local.testorigin[1] += (40 * local.rowNum)		
+			local.rowNum++
+		}
+	}
 end
 
 
