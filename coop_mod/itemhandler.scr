@@ -744,8 +744,11 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 takeUniformFromPlayer local.player:{
 //=========================================================================
 if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread itemhandler/takeUniformFromPlayer->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
+	println("====")
+	println("takeUniformFromPlayer")
+	println("====")
 
-	/*
+/*
 	if (local.player.flags["coop_hasEnemyUniform"]){
 		if (local.player.flags["coop_alliedUniform"]){
 			local.uniform = local.player.flags["coop_alliedUniform"]
@@ -762,15 +765,27 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 		local.uniform = waitthread getPlayerUniform local.player
 		local.player stufftext ("dm_playermodel " + local.uniform)
 	}
-	*/
-		
-	//if (waitthread playerHasEnemyUniform local.player local.uniform){ //set a default uniform if they somehow manage to have an exis one.
-	//	println "PLAYER HAS ENEMY UNIFORM - NOT ALLOWED!"
+*/
+//[203] chrissstrahl - reactivating Smithy code to allow other allied models
+	if (waitthread playerHasEnemyUniform local.player local.uniform){ //set a default uniform if they somehow manage to have an exis one.
+		println "PLAYER HAS ENEMY UNIFORM - NOT ALLOWED!"
 		local.uniform = "american_army"
-		local.model = "models/player/american_army.tik"
+		local.model = "models/player/"+local.uniform+".tik"
+		
+		println("====")
+		println("takeUniformFromPlayer reset")
+		println("====")
+		
 		local.player stufftext ("dm_playermodel "+local.uniform+";vstr g_m2l1") //[203] chrissstrahl - fix fov being reset on uinform change
 		local.player.model = local.model
-	//}
+	}else{
+		println("====")
+		println("takeUniformFromPlayer set fov again")
+		println("====")
+		
+		local.model = local.player.model
+		local.player stufftext ("vstr g_m2l1") //[203] chrissstrahl - fix fov being reset on uinform change
+	}
 }end
 
 //[202] Smithy
@@ -791,16 +806,18 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 		local.uniform = level.coop_disguiseUniform
 	}
 	
-	//[202] Smithy
-	/*
+	//[202] Smithy [203] chrissstrahl - reactivated to allow player selecting any allied model
 	local.player.flags["coop_hasEnemyUniform"] = game.true
 	if (!local.player.flags["coop_alliedUniform"]){
 		local.player.flags["coop_alliedModel"] = local.player.model
 		local.player.flags["coop_alliedUniform"] = waitthread getPlayerUniform local.player
 	}
-	*/
-		
-	local.player.model = ("models/player/" + local.uniform + ".tik")	
+
+	local.model = "models/player/" + local.uniform + ".tik"
+	local.player.model = (local.model)
+	println("====")
+	println("giveUniformToPlayer")
+	println("====")
 	local.player stufftext ("dm_playermodel " + local.uniform+";vstr g_m2l1") //[203] chrissstrahl - fix fov being reset on uinform change
 }end
 
