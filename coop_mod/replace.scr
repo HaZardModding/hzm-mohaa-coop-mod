@@ -1919,14 +1919,23 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 	level.coop_skip = 1 //level wide on purpose
 	local.coop_skipping = 0
 	local.coop_needed = 0
+	
+	//[203] chrissstrahl - prevent skipping in the first few sec
+	while((level.coop_gameStartedAt + 10) > level.time){
+		wait 1
+	}
+	
 	while(level.coop_skip){
 		for (local.i = 1;local.i <= $player.size;local.i++){
 			local.player =  $player[local.i]
 			local.coop_needed++
-			if(local.player.flags["coop_wantsToSkip"] != NIL){
+			
+			if(local.player.flags["coop_wantsToSkip"] == 1){
 				local.coop_skipping++
+				continue
 			}
-			else if( local.player.dmteam != "spectator" && local.player.health > 0 && local.player.flags["coop_isActive"] == 1 ){
+			
+			if( local.player.dmteam != "spectator" && local.player.health > 0 && local.player.flags["coop_isActive"] == 1 ){
 				if( local.useOnly == NIL && local.player.fireheld || local.player.useheld ){
 					local.player.flags["coop_wantsToSkip"] = 1
 					local.coop_skipping++
