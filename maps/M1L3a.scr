@@ -458,17 +458,79 @@ coop_setup:{
 	
 	thread coop_fixTriggers //[200] Smithy
 	
+	thread coop_spawnBlockers
+	thread coop_updateSpawns
+	thread coop_transporterAccident
 	
-	//chrissstrahl - spawn trigger to run a thread each time a player spawns to manager player upon spawn
-	/*
-	spawn trigger_multiple setthread "coop_playerSpawned" targetname "coop_playerSpawn" origin (3352 -6176 -88)
-	waitframe
-	$coop_playerSpawn setsize ( -500 -500 -1000) (500 500 1000)
-	*/
 	while (1){ //[200] Smithy - use waittill event instead
 		level waittill playerspawn				
 		thread coop_playerSpawned
 	}
+}end
+
+
+//[203] chrissstrahl - updates player spawns to jeep location
+//=========================================================================
+coop_updateSpawns:{
+//=========================================================================
+	//coopdev devdebug coopdebug testdebug @smithy @chrissstrahl - this worker is just here for debugging
+	//when done we should use fx dummy
+	//models/fx/dummy.tik
+	local.ent = spawn script_model "model" "models/player/german_Worker.tik" targetname ("coopPlayerRespawn") notsolid 1 angle 113
+	waitframe
+	local.ent attach $s1_jeep1 "passenger0" 0 ( -120 0 100 )
+	
+	while(1){
+		local.destOrigin = $coopPlayerRespawn.origin
+		local.destAngles = $oss_man.angles
+		
+		for(local.i=1;local.i <= 8;local.i++){
+			level.flags["coop_spawn"+local.i+"origin"] = local.destOrigin
+			level.flags["coop_spawn"+local.i+"angles"] = local.destAngles
+		}
+		wait 1
+	}
+}end
+
+//[203] chrissstrahl - move player back to jeep if they fell under the map
+//=========================================================================
+coop_transporterAccident:{
+//=========================================================================
+	wait 4
+	while(1){
+		for(local.i=1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+			if(isAlive local.player && !local.player.isSpectator){
+				local.origin = local.player.origin
+				if(local.origin[2] <= -180){
+					local.destOrigin = $coopPlayerRespawn.origin
+					local.player tele local.destOrigin
+					waitframe
+					local.player droptofloor 150
+				}
+			}
+		}
+		wait 4
+	}
+}end
+
+//[203] chrissstrahl - spawns script_models that block players from going to certain areas they could fall down
+//=========================================================================
+coop_spawnBlockers:{
+//=========================================================================
+	//baricade to prevent falling off map
+	thread coop_mod/replace.scr::spawnclip ( 4032 -6760 -208 ) ( -3000 -1 0 ) ( 3000 20 3000 ) "blockschockolade1" 1 170
+	thread coop_mod/replace.scr::spawnclip ( -304 -6112 -208 ) ( -3000 -1 0 ) ( 3000 20 3000 ) "blockschockolade2" 1 170
+	thread coop_mod/replace.scr::spawnclip ( 3960 -6976 -208 ) ( 0 -1 0 ) ( 4672 20 3000 ) "blockschockolade3" 1 90
+	thread coop_mod/replace.scr::spawnclip ( -1740 -4911 -208 ) ( -1050 -0 -0 ) ( 0 1700 3000 ) "blockschockolade4" 1 90
+	thread coop_mod/replace.scr::spawnclip ( -3007 -4672 -208 ) ( -300 -0 -0 ) ( 0 300 3000 ) "blockschockolade5" 1 90
+	thread coop_mod/replace.scr::spawnclip ( -3676 -1723 -208 ) ( -100 -40 -0 ) ( 4300 4000 3000 ) "blockschockolade6" 1 7
+	thread coop_mod/replace.scr::spawnclip ( 421 848 -208 ) ( -100 -40 -0 ) ( 4300 4000 2000 ) "blockschockolade7" 1 -14
+	thread coop_mod/replace.scr::spawnclip ( 4135 -1473 -208 ) ( -100 -100 -0 ) ( 4000 0 2000 ) "blockschockolade8" 1 18
+	thread coop_mod/replace.scr::spawnclip ( 6031 -774 -208 ) ( -500 -200 -0 ) ( 4000 0 2000 ) "blockschockolade9" 1 63
+	thread coop_mod/replace.scr::spawnclip ( 1029 -4266 130 ) ( -100 -100 -300 ) ( 100 0 0 ) "blockschockolade9" 1 -14
+	thread coop_mod/replace.scr::spawnclip ( 2429 -3229 -208 ) ( -0 -100 0 ) ( 3000 0 2000 ) "blockschockolade9" 1 -19
+	thread coop_mod/replace.scr::spawnclip ( 2440 -1774 -208 ) ( -0 -10 0 ) ( 500 0 2000 ) "blockschockolade9" 1 51
 }end
 
 //[200] Smithy - make sure triggers can be enabled by an empty (just Grillo) jeep. 
@@ -513,6 +575,11 @@ coop_enableJeepActivation:{
 //=========================================================================
 coop_setupAttach:{
 //=========================================================================
+	//[203] chrissstrahl - @chrissstrahl @smithy //devdebug devtest cooptest tempcode
+	//this is disabled as we now try to allow players roaming around the map
+	//no longer glued to jeep
+	end
+	
 	//chrissstrahl - spawn entities which we'll attach to the model then glue the players to
 	local.distance = -100
 	for(local.i=2;local.i<=8;local.i++){
@@ -541,6 +608,13 @@ coop_playerSpawned:{
 	if (parm.other == $player[1]){ //[200] Smithy - easier way
 		$player[1].flags["coop_inJeep"] = game.false 
 	}
+
+//COOPTEST - DEVTEST - DEVDEBUG [203] Chrisssstrahl
+//this allowes the jeep to go without a gunner
+//we want this to be so, only @smithy will have to make the jeep usable
+	level.coop_inJeep = 1
+	//level.playerjeep = $s1_jeep1
+end
 
 	for(local.i=1;local.i <= $player.size;local.i++){
 		local.player = $player[local.i]
