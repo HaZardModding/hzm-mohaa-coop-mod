@@ -458,7 +458,7 @@ spawnpoints:{
 }end
 
 //=========================================================================
-spawnpointsshow:{ //
+spawnpointsshow:{
 //=========================================================================
 	self iprint ("TOGGLE spawnpointsshow") 1
 	
@@ -481,6 +481,7 @@ spawnpointsshow:{ //
 		
 		if(!(local.vec)){
 			self iprint ("coop_spawn"+local.i+"origin was EMPTY/NIL") 1
+			local.vec = level.flags["coop_spawn1origin"]
 		}
 		//local.vec_z += 20
 		
@@ -504,6 +505,17 @@ spawnpointsshow:{ //
 			local.entityMarker = $("coopEMkr"+local.i)
 			if(local.entityMarker != NULL){
 				local.vec = level.flags["coop_spawn"+local.i+"origin"]
+				if(!(local.vec)){
+					local.vec = level.flags["coop_spawn1origin"]
+					//no valid spawns, end it here
+					if(!(local.vec)){
+						for(local.i=1;local.i<=8;local.i++){
+							$("coopEMkr"+local.i) remove
+						}
+						level.coopShowExistingSpawnpoints=0
+						end
+					}
+				}
 				if(local.vec != local.entityMarker.origin){
 					local.angles = level.flags["coop_spawn"+local.i+"angles"]
 					if(!(local.angles)){
@@ -632,14 +644,17 @@ spawnmarkers:{
 spawnmarkersManage:{
 //=========================================================================
 	local.origin = self.origin
-	self thread spawnmarkersCycle local.origin
+	local.angles = self.viewangles
+	local.angles[0] = 0
+	local.angles[2] = 0
+	self thread spawnmarkersCycle local.origin local.angles
 	while(self && self.health > 0 && level.spawnmarkersManage){
 		if(self.useheld){
-			if(vector_length(local.origin - self.origin) > 512){
+			if(vector_length(local.origin - self.origin) > 400){
 				level.spawnmarkersManage = 0
 			}else{
-				self thread spawnmarkersCycle local.origin
-				wait 1			
+				self thread spawnmarkersCycle local.origin local.angles
+				wait 0.5			
 			}
 		}
 		waitframe
@@ -658,9 +673,9 @@ spawnmarkersManage:{
 //[203] chrissstrahl
 //cycles the spawnlocation pattern
 //=========================================================================
-spawnmarkersCycle local.origin:{
+spawnmarkersCycle local.origin local.angles:{
 //=========================================================================
-	local.maxcombinations = 7
+	local.maxcombinations = 15
 	local.devcoopspawnmarkers = $world.flag["coop_dev_spawnmarkers"]
 	if(local.devcoopspawnmarkers == NIL || local.devcoopspawnmarkers >= local.maxcombinations){
 		$world.flag["coop_dev_spawnmarkers"] = 1
@@ -814,6 +829,168 @@ spawnmarkersCycle local.origin:{
 			}
 		}
 	}
+	//place spawns two per row, center player
+	//////////////////////////////////////////
+	else if(local.devcoopspawnmarkers == 8){
+		$coopSMkr1 origin local.testorigin
+		
+		local.baseOrigin = local.testorigin
+		
+		local.baseOrigin[0] -= 20
+		local.baseOrigin[1] += 40
+		for(local.i=2;local.i<=3;local.i++){
+			$("coopSMkr"+local.i) origin local.baseOrigin
+			local.baseOrigin[0] += 40
+		}
+		
+		local.baseOrigin = local.testorigin
+		local.baseOrigin[0] -= 60
+		local.baseOrigin[1] += 80
+		for(local.i=4;local.i<=6;local.i++){
+			$("coopSMkr"+local.i) origin local.baseOrigin
+			local.baseOrigin[0] += 40
+		}
+		
+		local.baseOrigin = local.testorigin
+		local.baseOrigin[0] -= 20
+		local.baseOrigin[1] += 120
+		for(local.i=7;local.i<=8;local.i++){
+			$("coopSMkr"+local.i) origin local.baseOrigin
+			local.baseOrigin[0] += 40
+		}
+	}
+	//place spawns two per row, center player
+	//////////////////////////////////////////
+	else if(local.devcoopspawnmarkers == 9){
+		$coopSMkr1 origin local.testorigin
+		
+		local.baseOrigin = local.testorigin
+		
+		local.baseOrigin[1] -= 20
+		local.baseOrigin[0] += 40
+		for(local.i=2;local.i<=3;local.i++){
+			$("coopSMkr"+local.i) origin local.baseOrigin
+			local.baseOrigin[1] += 40
+		}
+		
+		local.baseOrigin = local.testorigin
+		local.baseOrigin[1] -= 60
+		local.baseOrigin[0] += 80
+		for(local.i=4;local.i<=6;local.i++){
+			$("coopSMkr"+local.i) origin local.baseOrigin
+			local.baseOrigin[1] += 40
+		}
+		
+		local.baseOrigin = local.testorigin
+		local.baseOrigin[1] -= 20
+		local.baseOrigin[0] += 120
+		for(local.i=7;local.i<=8;local.i++){
+			$("coopSMkr"+local.i) origin local.baseOrigin
+			local.baseOrigin[1] += 40
+		}
+	}
+	//place spawns behind player
+	//////////////////////////////////////////
+	else if(local.devcoopspawnmarkers == 10){
+		local.origin = local.testorigin
+		local.forwardAngle = angles_toforward(local.angles)
+		
+		for(local.i=1;local.i<=8;local.i++){
+			$("coopSMkr"+local.i) origin local.origin
+			local.origin += local.forwardAngle * -50 
+		}
+	}
+	//place spawns in front player
+	//////////////////////////////////////////
+	else if(local.devcoopspawnmarkers == 11){
+		local.origin = local.testorigin
+		local.forwardAngle = angles_toforward(local.angles)
+		
+		for(local.i=1;local.i<=8;local.i++){
+			$("coopSMkr"+local.i) origin local.origin
+			local.origin += local.forwardAngle * 50 
+		}
+	}
+	//place spawns in two per row aligned to player angle in front
+	//////////////////////////////////////////
+	else if(local.devcoopspawnmarkers == 12){
+		local.numRow=1
+		local.origin = local.testorigin
+		
+		local.forwardAngle = angles_toforward(local.angles)
+		local.leftAngle = angles_toleft(local.angles)
+		
+		for(local.i=1;local.i<=8;local.i++){
+			if(!(local.i % 2)){
+				local.origin += local.leftAngle * 40 
+			}
+			
+			$("coopSMkr"+local.i) origin local.origin
+			
+			if(!(local.i % 2)){
+				local.origin = local.testorigin
+				local.origin += local.forwardAngle * (50 * local.numRow)
+				local.numRow++
+			}
+		}
+	}
+	//place spawns in two per row aligned to player angle behind
+	//////////////////////////////////////////
+	else if(local.devcoopspawnmarkers == 13){
+		local.numRow=1
+		local.origin = local.testorigin
+		
+		local.forwardAngle = angles_toforward(local.angles)
+		local.leftAngle = angles_toleft(local.angles)
+		
+		for(local.i=1;local.i<=8;local.i++){
+			if(!(local.i % 2)){
+				local.origin += local.leftAngle * 40 
+			}
+			
+			$("coopSMkr"+local.i) origin local.origin
+			
+			if(!(local.i % 2)){
+				local.origin = local.testorigin
+				local.origin += local.forwardAngle * ( -50 * local.numRow )
+				local.numRow++
+			}
+		}
+	}
+	//place spawns in four per row aligned left to player angle behind
+	//////////////////////////////////////////
+	else if(local.devcoopspawnmarkers == 14){
+		local.origin = local.testorigin
+		
+		local.forwardAngle = angles_toforward(local.angles)
+		local.leftAngle = angles_toleft(local.angles)
+		
+		for(local.i=1;local.i<=8;local.i++){
+			local.origin += (local.leftAngle * 40)
+			$("coopSMkr"+local.i) origin local.origin
+			if(!(local.i % 4)){
+				local.origin = local.testorigin
+				local.origin += (local.forwardAngle * -50 )
+			}
+		}
+	}
+	//place spawns in four per row aligned right to player angle behind
+	//////////////////////////////////////////
+	else if(local.devcoopspawnmarkers == 15){
+		local.origin = local.testorigin
+		
+		local.forwardAngle = angles_toforward(local.angles)
+		local.leftAngle = angles_toleft(local.angles)
+		
+		for(local.i=1;local.i<=8;local.i++){
+			local.origin += (local.leftAngle * -40)
+			$("coopSMkr"+local.i) origin local.origin
+			if(!(local.i % 4)){
+				local.origin = local.testorigin
+				local.origin += (local.forwardAngle * -50 )
+			}
+		}
+	}
 }end
 
 
@@ -825,14 +1002,11 @@ testmarkers:{
 	if( self == NULL || self.health <= 0 || level.coopDevtestNewSpawn == 1){
 		end
 	}
-	if(!($("coopSMkr"+local.i))){
+	if(!$coopSMkr1){
 		self iprint ( "TEST NEW SPAWNS - ERROR: No spawns found!" ) 1 NIL
 		end
 	}
-	
 	level.coopDevtestNewSpawn = 1
-	
-	
 	
 	self iprint ( "TEST NEW SPAWNS - MOVE AWAY TO CONTINUE!" ) 1 NIL
 	self nodamage
@@ -903,8 +1077,8 @@ printmarkers local.markernames:{
 		if(local.marker){
 			local.temporigin = ""
 			local.origin = local.marker.origin
-			local.angles = ( 0 0 0 )
-			local.angles[1] = local.marker.angle
+			local.angles = local.marker.angles
+			local.angles =  " 0 "+local.angles[1]+" 0 "
 			for(local.j=0;local.j<3;local.j++){
 				local.temporigin += " "
 				local.temporigin += int(local.origin[local.j])
@@ -912,9 +1086,9 @@ printmarkers local.markernames:{
 			local.temporigin += " "
 			local.origin = local.temporigin
 			
+			//print only the first angle, they are all the same, the hzm coop mod uses angle 1 if others are NIL, why create more code as we need?
+			if(local.i == 1){ waitthread printtoserverandclient ("level.flags[coop_spawn"+local.i+"angles] = ("+local.angles+")") self }
 			waitthread printtoserverandclient ("level.flags[coop_spawn"+local.i+"origin] = ("+local.origin+")") self
-			waitthread printtoserverandclient ("level.flags[coop_spawn"+local.i+"angles] = ("+local.angles+")") self
-			
 		}
 	}
 	waitthread printtoserverandclient ("==end of markers") self
