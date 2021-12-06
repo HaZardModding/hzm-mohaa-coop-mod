@@ -259,6 +259,7 @@ detectCoop local.player:{
 	
 	//[203] chrissstrahl - start fov detection only if there is no more data in name
 	if(local.player && !(waitthread coop_mod/main.scr::containsText local.player.netname " ," 0)){
+		local.player.flags["coopFovIsResetting"] = 1
 		local.player stufftext ( "vstr g_m2l1" )
 	}
 }end
@@ -329,11 +330,10 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	
 	local.renameTimeout=40
 	while(local.player && local.player.netname != local.cleanName){
+		waitframe
 		local.renameTimeout--
 //println("COOPDEBUG: '"+local.player.netname+"'!='"+local.cleanName+"'")
 		if(local.renameTimeout == 0){
-			local.player stufftext ("vstr coop_fov\n")
-			waitframe
 			//on timeout make sure this is executed again but ::detectCoop is still waiting for the parent thread
 			//so execute this with waitthread, to prevent fov being set when timeout has occured
 			if(local.player){
@@ -342,7 +342,6 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 			}
 			end
 		}
-		waitframe
 	}
 	
 	if(!local.player){ end }
@@ -556,19 +555,22 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 		end
 	}
 	
+	local.player.flags["coopFovIsResetting"] = NIL
+	
 	//Cvar used for the coop mod to detect player
 	//desired fov setting set from within menu 
 	//g_m2l1 - vstr append and detect var
 	//g_m2l2 - video options.urc LINKVAR
 	if(local.player){
 		local.player.flags["coop_fov"] = local.fov
-		local.player stufftext ("seta g_m2l2 "+local.fov+"\n")
+		//[203] chrissstrahl - now updating g_m2l1 as well to the new value
+		local.player stufftext ("seta g_m2l2 "+local.fov+";seta g_m2l1 append name ,1"+local.fov+"\n")
 	}
 	
 	local.prevCvar = getcvar "developer"
 	setcvar "developer" "1"
-	waitthread coop_mod/main.scr::changeGameType 0 0	
-	local.player fov local.fov
+	waitthread coop_mod/main.scr::changeGameType 0 0
+	if(local.player){ local.player fov local.fov }
 	waitthread coop_mod/main.scr::changeGameType 2 0
 	setcvar "developer" local.prevCvar
 }end
@@ -592,7 +594,7 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 		local.player.flags["coop_justSpawnedDone"] = NIL
 		
 		//this is used for friendly orientation see global/friendly::playernode
-		local.player.fnum = -100
+		local.player.fnum = -1 //[203] chrissstrahl - changed from -100 to -1 I think it was ment to be at -1
 		
 		local.player unglue
 		local.player threatbias ignoreme		
