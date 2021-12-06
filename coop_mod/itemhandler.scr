@@ -776,7 +776,15 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 		println("takeUniformFromPlayer reset")
 		println("====")
 		
-		local.player stufftext ("dm_playermodel "+local.uniform+";vstr g_m2l1") //[203] chrissstrahl - fix fov being reset on uinform change
+		//[203] chrissstrahl - make sure the command is not send if already in progress
+		local.commandResetFov = ";vstr g_m2l1"
+		if(local.player.flags["coopFovIsResetting"]){
+			local.commandResetFov = ""
+		}else{
+			local.player.flags["coopFovIsResetting"] = 1			
+		}
+		
+		local.player stufftext ("dm_playermodel "+local.uniform+""+local.commandResetFov) //[203] chrissstrahl - fix fov being reset on uinform change
 		local.player.model = local.model
 	}else{
 		println("====")
@@ -784,7 +792,12 @@ if(level.cMTE_coop_itemhandler){if(!level.cMTE){level.cMTE=0}; level.cMTE++; pri
 		println("====")
 		
 		local.model = local.player.model
-		local.player stufftext ("vstr g_m2l1") //[203] chrissstrahl - fix fov being reset on uinform change
+		
+		//[203] chrissstrahl - make sure the command is not send if already in progress
+		if(!(local.player.flags["coopFovIsResetting"])){
+			local.player.flags["coopFovIsResetting"] = 1
+			local.player stufftext ("vstr g_m2l1") //[203] chrissstrahl - fix fov being reset on uinform change
+		}
 	}
 }end
 
