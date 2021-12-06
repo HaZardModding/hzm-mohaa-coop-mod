@@ -458,6 +458,8 @@ coop_setup:{
 	
 	thread coop_fixTriggers //[200] Smithy
 	
+	//[203] chrissstrahl
+	//level.barrier_removed is set to 1 if barrier is destroyed
 	thread coop_spawnBlockers
 	thread coop_updateSpawns
 	thread coop_transporterAccident
@@ -468,6 +470,17 @@ coop_setup:{
 	}
 }end
 
+//[203] chrissstrahl - make sure players that are to far away are put closer to jeep
+//do not force respawn on everyone, just the players that are really far away
+//=========================================================================
+coop_playerJustRespawned:{
+//=========================================================================
+	local.player = parm.other
+	if(vector_length($oss_man.origin - local.player.origin) > 3000 ){
+		local.player tele level.flags["coop_spawn"+(waitthread game.main::getPlayerId local.player)+"origin"]
+		local.player face level.flags["coop_spawn"+(waitthread game.main::getPlayerId local.player)+"angles"]
+	}
+}end
 
 //[203] chrissstrahl - updates player spawns to jeep location
 //=========================================================================
@@ -478,7 +491,7 @@ coop_updateSpawns:{
 	//models/fx/dummy.tik
 	local.ent = spawn script_model "model" "models/player/german_Worker.tik" targetname ("coopPlayerRespawn") notsolid 1 angle 113
 	waitframe
-	local.ent attach $s1_jeep1 "passenger0" 0 ( -120 0 100 )
+	local.ent attach $s1_jeep1 "passenger0" 0 ( -120 0 60 )
 	
 	while(1){
 		local.destOrigin = $coopPlayerRespawn.origin
@@ -612,8 +625,14 @@ coop_playerSpawned:{
 //COOPTEST - DEVTEST - DEVDEBUG [203] Chrisssstrahl
 //this allowes the jeep to go without a gunner
 //we want this to be so, only @smithy will have to make the jeep usable
-	level.coop_inJeep = 1
-	//level.playerjeep = $s1_jeep1
+	for(local.i=1;local.i <= $player.size;local.i++){
+		local.player = $player[local.i]
+		if(isAlive local.player && !local.player.isSpectator){
+			level.coop_inJeep = 1
+			break
+		}
+	}
+	
 end
 
 	for(local.i=1;local.i <= $player.size;local.i++){
