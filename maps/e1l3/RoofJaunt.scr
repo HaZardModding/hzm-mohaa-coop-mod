@@ -322,8 +322,9 @@ Chaser1ThinkThread local.already_on_roof local.init_movedoneradius:
 			
 			if (self == NULL || !(isalive self) ){ end } //[200] chrissstrahl - stop once the actor is gone
 			self turnto NULL
-
-			while (vector_within self.origin $player.origin self.movedoneradius){
+			//[203] chrissstrahl - fixed missing coopfification
+			local.player = exec coop_mod/replace.scr::player_closestTo self
+			while (!local.player || vector_within self.origin local.player.origin self.movedoneradius){
 				wait 0.3
 
 				//chrissstrahl - make sure we do proper null checks
@@ -991,8 +992,9 @@ GuyGoToRoof local.roof_num:
 
 //iprintlnbold ("***** GUYGOTOROOF  from " + self.on_roof + " to " + local.roof_num)
 
-	for (local.i=self.on_roof+1; local.i<=local.roof_num; local.i++)
-		self waitthread GuyGoToRoof_FromPrev local.i
+	for (local.i=self.on_roof+1; local.i<=local.roof_num; local.i++){
+		if(self){ self waitthread GuyGoToRoof_FromPrev local.i } //[203] chrissstrahl - prevent console spam
+	}
 
 end
 
