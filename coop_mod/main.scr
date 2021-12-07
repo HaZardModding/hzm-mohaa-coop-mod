@@ -500,7 +500,8 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 playerMakeSolidAsapCheckTouching local.player local.object local.hasHealth:{
 //=========================================================================
 if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread main/playerMakeSolidAsapCheckTouching->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-	if( local.object && local.player isTouching local.object ){
+	//[203] chrissstrahl - added additional check - we had script errors there
+	if( local.object && local.player && local.player isTouching local.object ){
 		if( local.hasHealth && local.object.health <= 0 ){
 			end
 		}
@@ -635,8 +636,13 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 		
 		//this code is only executed if player did not touch anything relevant
 //println("COOPDEBUG: playerMakeSolidAsap 11 solid and exit for "+local.player.entnum+"")
-		local.player.flags["coop_makesolid"] = NIL
-		local.player solid
+		//[203] chrissstrahl - added additional checks - we had script errors there
+		if(local.player){
+			local.player.flags["coop_makesolid"] = NIL
+			if(local.player.health > 0 && local.player.dmteam != "spectator" ){
+				local.player solid
+			}
+		}
 		end
 		
 		//code that is executed if objects are touching
@@ -1468,15 +1474,11 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 getClient local.num:{
 //=========================================================================
 if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread main/getClient->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-	if ($player){
-		local.maxClients = level.coop_svmaxclients
-		for (local.i = 0; local.i <= local.maxClients; local.i++){
-			local.index = local.i + 1
-			if (!$player[local.index]){ break }
-			if ($player[local.index].entnum == local.num){
-				end($player[local.index])
-			}
-		}	
+	//[203] chrissstrahl - changed to crawl the array preventing out of index
+	for (local.i = 1; local.i <= $player.size; local.i++){
+		if ($player[local.i].entnum == local.num){
+			end($player[local.i])
+		}
 	}
 }end(NULL)
 
