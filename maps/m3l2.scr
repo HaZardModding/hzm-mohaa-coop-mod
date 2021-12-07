@@ -1596,7 +1596,9 @@ scene7_machinegun:
 		wait 0.5
 		self setaimtarget $playertarget_southeast
 		wait 0.5
-		self setaimtarget $player
+		//[203] chrissstrahl - added coopification
+		local.player = exec coop_mod/replace.scr::player_closestTo self
+		self setaimtarget local.player
 		wait 4
 		self stopfiring
 	}
@@ -3103,16 +3105,27 @@ println "z:        at scene11_mgspawn_targeting"
 	local.machinegun maxYawOffset 65
 	local.machinegun bulletdamage 20
 
-	while (!(self cansee $player) && (isAlive self))
-	{
-		wait 0.5
+	//[203] chrissstrahl - fix missing coopification
+	local.canNotSee = 1
+	local.player = NULL
+	while(local.canNotSee && isAlive self){
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player =  $player[local.i]
+			if( local.player.health> 0 || local.player.dmteam == "spectator"){
+				continue
+			}
+			if(self cansee local.player){
+				local.canNotSee=0
+			}
+		}
+		wait 1
 	}
-
-	wait 1
+	
+	
+	wait 0.5
 
 	while (isAlive self)
 	{
-
 		local.misstime = 1.5	//1 hit duration on player, specify how long per miss incident 0.525 original
 
 			local.machinegun setaimtarget $playertarget_northeast
@@ -3130,7 +3143,11 @@ println "z:        at scene11_mgspawn_targeting"
 			wait local.misstime
 			local.machinegun setaimtarget $playertarget_southwest
 			wait local.misstime
-			local.machinegun setaimtarget $player
+			//[203] chrissstrahl - added coopification
+			if(!local.player || local.player.health <= 0 || local.player.dmteam == "spectator"){
+				local.player = exec coop_mod/replace.scr::player_closestTo self
+			}
+			local.machinegun setaimtarget local.player
 			wait 5
 			local.machinegun stopfiring
 
