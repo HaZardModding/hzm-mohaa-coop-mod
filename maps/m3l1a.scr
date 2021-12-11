@@ -4623,39 +4623,41 @@ sequence_7_shingle_chatter:{
 		if (local.dude != NULL){
 			// check his distance to the player, if under 192, say something
 			local.player = exec coop_mod/replace.scr::player_closestTo local.dude
-        	local.distance = vector_length(local.player.origin - local.dude.origin)
-			if (local.distance < 192 && local.dude.isinsequence != 1 && local.dude.isbusy != 1){
-				local.say = randomint 4
+			if (local.player != NULL){ //[203] chrissstrahl - prevent console spam if no player found
+				local.distance = vector_length(local.player.origin - local.dude.origin)
+				if (local.distance < 192 && local.dude.isinsequence != 1 && local.dude.isbusy != 1){
+					local.say = randomint 4
 
-				local.dude lookat local.player //chrissstrahl - coop compatible
-				wait .5
+					local.dude lookat local.player //chrissstrahl - coop compatible
+					wait .5
 
-				// pick a random thing to say
-				switch (local.say)
-				{
-					case 0:
-						local.dude say streamed_dfr_scripted_M3L1_072g  //Damn, that was close!
-						break
+					// pick a random thing to say
+					switch (local.say)
+					{
+						case 0:
+							local.dude say streamed_dfr_scripted_M3L1_072g  //Damn, that was close!
+							break
 
-					case 1:
-						local.dude say dfr_scripted_M3L1_052e  //We're never gonna make it!
-						break
+						case 1:
+							local.dude say dfr_scripted_M3L1_052e  //We're never gonna make it!
+							break
 
-					case 2:
-						local.dude say dfr_scripted_M3L1_061d  //We gotta keep moving sir!
-						break
+						case 2:
+							local.dude say dfr_scripted_M3L1_061d  //We gotta keep moving sir!
+							break
 
-					case 3:
-						local.dude say streamed_dfr_scripted_M3L1_021g  //We're gonna die if we don't get off the beach!
-						break
-				}
+						case 3:
+							local.dude say streamed_dfr_scripted_M3L1_021g  //We're gonna die if we don't get off the beach!
+							break
+					}
 
-				local.dude waittill saydone
-				wait .5
-				local.dude lookat NULL
+					local.dude waittill saydone
+					wait .5
+					local.dude lookat NULL
 
-				// now that the player's heard something, wait quite a while before saying somthing else
-				wait 15
+					// now that the player's heard something, wait quite a while before saying somthing else
+					wait 15
+				}	
 			}
 		}
 		wait .5
@@ -7709,7 +7711,11 @@ ai_execute_todo:{
 	//	println "AI EXE TODO: " self " trying to take path: " local.path
 		self thread takepath local.path local.aimat
 
-		wait self.nextthread_parm1[1]
+		//[203] chrissstrahl - prevent console spam
+		local.waitTimez = self.nextthread_parm1[1]
+		if(local.waitTimez == NIL){ local.waitTimez = 0.1 }
+		wait local.waitTimez
+		
 		self waitthread ai_mg_death
 		self.isbusy = 0
 	}
@@ -7737,7 +7743,11 @@ ai_execute_todo:{
 		//	println "AI EXE TODO: " self " trying to take path: " local.path
 		self thread takepath local.path local.aimat
 
-		wait self.nextthread_parm1[1]
+		//[203] chrissstrahl - prevent console spam
+		local.waitTimez = self.nextthread_parm1[1]
+		if(local.waitTimez == NIL){ local.waitTimez = 0.1 }
+		wait local.waitTimez
+		
 		self waitthread ai_mortar_death self.nextthread_parm2[1]
 
 		if(self != NULL){ //chrissstrahl - prevent console error
