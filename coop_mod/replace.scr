@@ -861,23 +861,38 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 //Example of this being used is m3l1b.scr::seq_bunker_middle_radio:
 //	$bunker_radio thread coop_mod/replace.scr::playsound_wait "den_scripted_M3L1_11d"
 //	$bunker_radio waittill sounddone
+//[203] Smithy - this is dodgy in dedi servers, so wait a pre-defined 
+//time instead.
 //=========================================================================
 playsound_wait local.sound local.volume:{
 //=========================================================================
 if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread replace/playsound_wait->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
 	local.threadName = "coop_mod/replace.scr::playsound_wait"
 	if (!self){
-		println "(" local.threadName "): self was NULL. Fix me!"
+		println "******* WARNING - (" local.threadName "): self was NULL. Fix me!"
 		end
 	}
-	// changeGameType won't run if level.gametype is 0
-	waitthread coop_mod/main.scr::changeGameType 0 0
+	//waitthread coop_mod/main.scr::changeGameType 0 0
 	if (local.volume != NIL){
-		self playsound local.sound wait (float(local.volume))
+		self playsound local.sound NIL (float(local.volume))
 	}else{
-		self playsound local.sound wait
+		self playsound local.sound
 	}
-	waitthread coop_mod/main.scr::changeGameType 2 0
+	//waitthread coop_mod/main.scr::changeGameType 2 0
+	
+	local.length = level.coop_soundLength[level.coop_language][local.sound]
+	
+	if (!local.length){
+		println "******* WARNING - (" local.threadName "): sound with alias '" local.sound "' has a length of " local.length ". Add it to coop_mod/sound.scr!!!"
+		end
+	}
+	
+	local.length += level.coop_SOUND_LEN_DONE_OFFSET
+	
+	println "******* INFO - (" local.threadName "): sound with alias '" local.sound "' is starting to wait " local.length " seconds"
+	wait local.length
+	println "******* INFO - (" local.threadName "): sound with alias '" local.sound "' finished waiting"
+	
 }end
 
 //[200] Smithy - ok, dialogue also doesn't work without hack if no say anim is found... use separate func
