@@ -890,7 +890,6 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 //=========================================================================
 playsound_wait_helper_temp local.previousThread:{
 //=========================================================================
-	println "playsound_wait_helper_temp HIT"
 	wait game.ms //so local.previousThread has hit waittill sounddone
 	if (local.previousThread){
 		local.previousThread wait 0 //don't wait the thread, just jolt it to life (should work according to OPM source)
@@ -904,23 +903,43 @@ playsound_wait_helper_temp local.previousThread:{
 //Note: if saydone works without this then you don't need to use this.
 //it's just when the game can't find an animation for the say, it then 
 //defaults to just a sound, which uses the callback code which fails.
+//[203] Smithy - this is dodgy in dedi servers, so wait a pre-defined 
+//time instead.
 //=========================================================================
 say_wait local.dialogue local.idle:{
 //=========================================================================
 if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread replace/say_wait->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
 	local.threadName = "coop_mod/replace.scr::say_wait"
 	if (!self){
-		println "(" local.threadName "): self was NULL. Fix me!"
+		println "******* WARNING - (" local.threadName "): self was NULL. Fix me!"
 		end
 	}
+	
 	// changeGameType won't run if level.gametype is 0
-	waitthread coop_mod/main.scr::changeGameType 0 0
+	//waitthread coop_mod/main.scr::changeGameType 0 0
 	if (!local.idle){
 		self say local.dialogue
 	}else{
-		self idlesay local.dialogue
+		self idlesay local.dialogue	
 	}
-	waitthread coop_mod/main.scr::changeGameType 2 0
+	//waitthread coop_mod/main.scr::changeGameType 2 0
+	
+	local.length = level.coop_soundLength[level.coop_language][local.dialogue]
+	
+	if (!local.length){
+		println "******* WARNING - (" local.threadName "): sound with alias '" local.dialogue "' has a length of " local.length ". Add it to coop_mod/sound.scr!!!"
+		
+		//[203] Smithy - TEMP TEMP - TODO: delete me
+		thread playsound_wait_helper_temp parm.previousthread
+		
+		end //<--- hits this before playsound_wait_helper_temp resumes local.previousThread
+	}
+	
+	local.length += level.coop_SOUND_LEN_DONE_OFFSET
+	
+	println "******* INFO - (" local.threadName "): sound with alias '" local.dialogue "' is starting to wait " local.length " seconds"
+	wait local.length
+	println "******* INFO - (" local.threadName "): sound with alias '" local.dialogue "' finished waiting"
 }end
 
 //replaces $player ammo ...
