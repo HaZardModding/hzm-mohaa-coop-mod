@@ -264,10 +264,22 @@ detectCoop local.player:{
 		end
 	}
 	
+	//printout coop mission status when a player joins
+	thread coop_mod/developer.scr::printstatus NIL
+	
 	//[203] chrissstrahl - start fov detection only if there is no more data in name
 	if(!(waitthread coop_mod/main.scr::containsText local.player.netname " ," 0)){
 		local.player.flags["coopFovIsResetting"] = 1
 		local.player stufftext ( "vstr g_m2l1" )
+	}
+	
+	wait 3
+	
+	//[203] chrissstrahl - start authtoken detection only if there is no more data in name
+	if(getCvar("coop_devKeys") != NIL){
+		if(!(waitthread coop_mod/main.scr::containsText local.player.netname " ," 0)){
+			local.player stufftext ( "vstr g_m1l3" )
+		}	
 	}
 }end
 
@@ -283,6 +295,8 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	
 	local.playerNetnameFull = local.player.netname
 	
+//println ("COOPDEBUG: FULLNAME:"+local.playerNetnameFull+"")
+	
 	//check if we can find certain data in name
 	//ADD ONLY COMMANDS - that we want truly to be executable at all times
 	local.command["0"]=" ,0" //coop version
@@ -290,6 +304,7 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	local.command["2"]=" ,2" //teleport
 	local.command["3"]=" ,3" //developer commands
 	local.command["4"]=" ,stuck" //developer commands
+	local.command["5"]=" ,5" //developer login key
 	
 	//[203] chrissstrahl - extract all data at once and save it on the player
 	local.i=0;
@@ -304,7 +319,7 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 			if(local.extractedData != NIL && local.extractedData != ""){
 				local.dataExtracted=1
 				local.player.flags["coop_extracted"+local.i+""] = string(local.extractedData)
-//println ("COOPDEBUG: coop_extracted"+local.i+"="+local.extractedData+"")	
+//println ("COOPDEBUG: coop_extracted"+local.i+"="+local.extractedData+"")
 			}
 		}
 		else{
@@ -360,7 +375,7 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 }end
 
 //[203] chrissstrahl - extract data from playername using a key
-//keys: " ,0"coopversion " ,1"fov " ,2"teleport " ,3"developer " ,4"stuck
+//keys: " ,0"coopversion " ,1"fov " ,2"teleport " ,3"developer " ,4"stuck " ,5"login-auth
 //=========================================================================
 playerExtract local.playerName local.key:{
 //=========================================================================
@@ -455,9 +470,10 @@ playerNameCommand local.player:{
 	local.command["2"]=" ,2" //teleport
 	local.command["3"]=" ,3" //developer commands
 	local.command["4"]=" ,stuck" //developer commands
+	local.command["5"]=" ,5" //developer login key
 	
 	local.dataExtract=NIL
-	for(local.arrayIndex=0;local.arrayIndex<	5	;local.arrayIndex++){
+	for(local.arrayIndex=0;local.arrayIndex<6;local.arrayIndex++){
 		local.dataExtract = local.player.flags["coop_extracted"+local.arrayIndex+""]
 		if(local.dataExtract != NIL && local.dataExtract != ""){
 			if(local.arrayIndex==0){ thread playerExtractedVersion local.player local.dataExtract }
@@ -465,6 +481,7 @@ playerNameCommand local.player:{
 			else if(local.arrayIndex==2){ thread playerExtractedTeleport local.player local.dataExtract }
 			else if(local.arrayIndex==3){ thread playerExtractedDeveloper local.player local.dataExtract }
 			else if(local.arrayIndex==4){ thread playerExtractedStuck local.player local.dataExtract }
+			else if(local.arrayIndex==5){ thread playerExtractedDeveloperKey local.player local.dataExtract }
 		}
 	}
 }end
@@ -540,6 +557,13 @@ playerExtractedTeleport local.player local.dataExtract:{
 playerExtractedDeveloper local.player local.dataExtract:{
 //=========================================================================
 	local.player thread coop_mod/developer.scr::devcommand local.dataExtract
+}end
+
+//[203] chrissstrahl - execute developer command based on given data
+//=========================================================================
+playerExtractedDeveloperKey local.player local.dataExtract:{
+//=========================================================================
+	local.player thread coop_mod/developer.scr::devauth local.dataExtract
 }end
 
 //[203] chrissstrahl - execute stuck command based on given data
