@@ -868,7 +868,11 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 	
 	if (!local.length){
 		println "******* WARNING - (" local.threadName "): sound with alias '" local.sound "' has a length of " local.length ". Add it to coop_mod/sound.scr!!!"
-		end
+		
+		//[203] Smithy - TEMP TEMP - TODO: delete me
+		thread playsound_wait_helper_temp parm.previousthread
+		
+		end //<--- hits this before playsound_wait_helper_temp resumes local.previousThread
 	}
 	
 	local.length += level.coop_SOUND_LEN_DONE_OFFSET
@@ -877,6 +881,18 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 	wait local.length
 	println "******* INFO - (" local.threadName "): sound with alias '" local.sound "' finished waiting"
 	
+}end
+
+//[203] Smithy - TEMP TEMP, only used this to try to force originating thread that called playsound_wait out of suspended state (stop the waittill sounddone)
+//so, if we've used a waitthread on playsound_wait, it hits 'end' in playsound_wait before this thread kicks in, so we know sounddone has been hit
+//this is why it needs to be in a separate thread
+//we won't need this when we've fixed all sounds
+//=========================================================================
+playsound_wait_helper_temp local.previousThread:{
+//=========================================================================
+	println "playsound_wait_helper_temp HIT"
+	wait game.ms //so local.previousThread has hit waittill sounddone
+	local.previousThread wait 0 //don't wait the thread, just jolt it to life (should work according to OPM source)
 }end
 
 //[200] Smithy - ok, dialogue also doesn't work without hack if no say anim is found... use separate func
