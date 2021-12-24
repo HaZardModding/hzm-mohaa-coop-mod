@@ -1231,9 +1231,24 @@ MyFriendly local.dest local.leash_dist local.far_dist local.catchup_dist:
 	self.my_friendly_turn_off   = 0
 
 	while (self && (isalive self) && (level.conquest_done == 0) && (self.my_friendly_turn_off == 0)){
-		while (self && (isalive self) && (level.conquest_done == 0) && (self.my_friendly_turn_off == 0) &&
-					(vector_within self.origin local.dest.origin local.far_dist)){
+		//[203] chrissstrahl - make sure it waits if there is no playa
+		while (		$player == NULL && (isalive self) ||
+					self &&
+					(isalive self) &&
+					(level.conquest_done == 0) &&
+					(self.my_friendly_turn_off == 0) &&
+					(vector_within self.origin local.dest.origin local.far_dist))
+		{
 			wait 0.5
+			
+			//[203] chrissstrahl - go to player if there is no destination to go to, it is very likley it was a player before
+			if( local.dest == NULL && $player != NULL){
+				if(level.coop_player && level.coop_player != $world){
+					local.dest = level.coop_player
+				}else{
+					local.dest = waitthread coop_mod/replace.scr::player_closestTo self
+				}
+			}
 		}
 
 		if (!self || !(isalive self) || (level.conquest_done == 1) || (self.my_friendly_turn_off == 1)){
