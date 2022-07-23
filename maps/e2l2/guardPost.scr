@@ -52,9 +52,9 @@ DoStuff: {
 	$lyndon holster
 	wait 1
 
-	$lyndon lookat $player	
+	$lyndon exec coop_mod/replace.scr::lookat //[204] chrissstrahl - Made coop compatible
 	$lyndon say A_22_Phillips_3 
-	$lyndon waittill saydone
+	$lyndon waittill saydone //@Smithy
 
 	waitthread global/jeepanim.scr::DriverGetInJeep $GuardPostJeep $lyndon
 	$GuardPostJeep.driver = $lyndon
@@ -63,13 +63,24 @@ DoStuff: {
 	local.player_mount_jeep_dist				= 128		//200
 	local.max_player_dist_to_jeep				= 1024
 	local.time_player_allowed_away_from_jeep	= 5
-	local.usekey = getboundkey1 "+use"
-	local.bail_msg = (loc_convert_string "Press ") + local.usekey + (loc_convert_string " to get in jeep.")
-	thread global/throbtext.scr::throbtext local.bail_msg 0	
 	local.player_shot			= 0
 	local.throb_text_on			= 0
-	level.inJeep				= 1
+	level.inJeep				= 1	
 	
+	//[204] chrissstrahl - made coop compatible
+	if(level.gametype == 0){
+		local.usekey = getboundkey1 "+use" 
+		local.bail_msg = (loc_convert_string "Press ") + local.usekey + (loc_convert_string " to get in jeep.")
+		thread global/throbtext.scr::throbtext local.bail_msg 0	
+	}else{
+		//@chrissstrahl
+		//display to all player within range (local.player_mount_jeep_dist)
+		local.usekey = "use"
+		local.bail_msg = (loc_convert_string "Press ") + local.usekey + (loc_convert_string " to get in jeep.")
+		local.player iprint local.bail_msg 1
+	}
+	
+	//@chrissstrahl
 	while ( (!(vector_within $player.origin $lyndon.origin local.player_mount_jeep_dist) || !$player.useheld) && (local.player_shot == 0) ) {
 		waitframe		
 
@@ -95,6 +106,7 @@ DoStuff: {
 		thread global/throbtext.scr::throbtext_off	
 	}
 
+	//@chrissstrahl
 	if (level.disable_player_gp_jeep_attach == 0) {		
 		$player forcelegsstate "STAND"
 		$GuardPostJeep unlock
@@ -138,9 +150,11 @@ getout: {
 	$GuardPostJeep unlock
 	$GuardPostJeep.turret unlock
 
+	//@chrissstrahl
 	$player.origin = $GuardPostJeep.turret.origin
 	wait .5
 
+	//@chrissstrahl
 	$GuardPostJeep doUse $player
 	$GuardPostJeep lock
 	$GuardPostJeep.turret lock
@@ -149,6 +163,7 @@ getout: {
 	local.angles[0] = 0
 	local.angles[2] = 0
 
+	//@chrissstrahl
 	$player.viewangles = local.angles		
 	$GuardPostJeep thread jeepnewpath
 }end
@@ -174,7 +189,7 @@ blockade_reverse1: {
 //============================================================================
 jeepnewpath: {
 //============================================================================
-	$player.origin = $playeroutofjeep.origin
+	$player.origin = $playeroutofjeep.origin //@chrissstrahl
 	$player glue $airfieldspot
 	$guysnearairfield delete
 
@@ -185,7 +200,7 @@ jeepnewpath: {
 	wait 1
 
 	//Give him the silenced pistol
-	$player takeall		
+	$player takeall		//@chrissstrahl
 	$player item weapons/It_W_Beretta.tik
 	$player item weapons/DeLisle.tik
 	$player ammo rifle 70
@@ -269,7 +284,7 @@ DoCappyAirFieldSpeech: {
 	self waittill saydone
 	
 	thread maps/e2l2/objectives.scr::transition "reachedAirfield"		
-	$player unglue $airfieldspot
+	$player unglue $airfieldspot //@chrissstrahl
 	$GuardPostJeep thread maps/e2l2/JeepAnims.scr::DoJeepLeaveAirFieldAnims
 }end
 
