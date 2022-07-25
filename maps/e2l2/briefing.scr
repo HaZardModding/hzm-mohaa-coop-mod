@@ -12,8 +12,17 @@ doBriefing: {
 //============================================================================
 	spawn trigger_once targetname "briefingOverTrigger"
 	
-	$player thread doplayer  //@chrissstrahl
+	//[204] chrissstrahl - moved here
 	$lyndon thread golyndon
+	
+	//[204] chrissstrahl - handle sp/coop
+	if(level.gametype == 0){
+		$player thread doplayer
+	}else{
+		// lock the player to a script origin
+		 exec coop_mod/replace.scr::glue $playerstartspot NIL NIL 
+	}
+	
 }end	
 
 //============================================================================
@@ -41,11 +50,30 @@ doplayer: {
 	waitthread maps/e2l2/saves.scr::DoAutoSave "afterBriefing"
 }end
 
+//[204] chrissstrahl - made coop compatible
+//============================================================================
+coop_doplayer: {
+//============================================================================
+	
+ 	// move the script object, to get the player to squat
+	wait 1
+	$playerstartspot time 0.001
+	$playerstartspot movedown 20
+	$playerstartspot move
+	
+	// wait for the briefing to be over
+	$briefingOverTrigger waittill trigger	
+
+	// move the script origin again and unglue the player
+	$playerstartspot moveup 30	
+	$playerstartspot move
+}end
+
 //============================================================================
 golyndon: {
 //============================================================================
 	self.friendtype = 1
-	self.destination = $player //@chrissstrahl
+	self.destination = $player //@Smithy - I am not sure but this might be managed in friendly ?
 	self.distance = 225
 	self exec global/disable_ai.scr	
 	
@@ -86,11 +114,16 @@ golyndon: {
 	wait 1
 	
 	self solid
-	$player solid //@chrissstrahl
-	
 	self angles (0 180 0)
-	$player unglue $playerstartspot //@chrissstrahl
-	$player physics_on //@chrissstrahl
+	
+	//[204] chrissstrahl - made coop compatible
+	if(level.gametype == 0){
+		$player solid
+		$player unglue $playerstartspot
+		$player physics_on
+	}else{
+		exec coop_mod/replace.scr::unglue $playerstartspot
+	}
 
 	self lookat NULL
 	self turnto NULL	
