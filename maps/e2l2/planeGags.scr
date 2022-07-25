@@ -60,8 +60,9 @@ UpdateAirplanesObj: {
 
 			if (local.p.sabotaged == 0) {
 				local.p = $("airplane" + local.i)
-//@chrissstrahl
-				if ((local.nearest == NULL) || (vector_closer local.p.origin local.nearest.origin $player.origin)) {
+				//[204] chrissstrahl - grab any player and mark plane
+				local.player = exec coop_mod/replace.scr::player_random
+				if ((local.nearest == NULL) || (vector_closer local.p.origin local.nearest.origin local.player.origin)) {
 					local.nearest = local.p
 				}
 			}
@@ -219,10 +220,17 @@ GiveVickers: {
 //============================================================================
 	self waittill trigger
 
-	$vickersincase hide
-
-	$player item weapons/uk_w_vickers.tik //@chrissstrahl
-	$player useweaponclass mg
+	$vickersincase hide //@Smithy, can we delete it safely?
+	
+	//[204] Chrissstrahl - give weapon
+	//[204] Chrissstrahl - make player use weapon right away
+	thread coop_mod/replace.scr::givePlayerWeapon "weapons/uk_w_vickers.tik" parm.other
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player.dmteam != "spectator" && local.player.health > 0 ){
+			local.player useweaponclass mg
+		}
+	}
 }end
 
 //============================================================================
@@ -240,11 +248,16 @@ DoPlaneThrobbingText local.plane: {
 //============================================================================
 	self waittill trigger
 
-	local.usekey = getboundkey1 "+use"	  //@chrissstrahl
+	//[204] chrissstrahl - made coop compatible
+	local.usekey = "use"
+	if( level.gametype == 0 ){ local.usekey = getboundkey1 "+use" }
+	
+	//@Smithy - maybe we should not use strobo or show it to each player individually ?
 	local.msg = (loc_convert_string ("Press " + local.usekey + " twice to sabotage the fighter."))
 	thread global/throbtext.scr::throbtext local.msg 0	
 
-	while( $player isinside self ) {  //@chrissstrahl
+	//[204] chrissstrahl - made coop compatible
+	while( exec coop_mod/replace.scr::isinside self ) {
 		waitframe
 	}
 	
