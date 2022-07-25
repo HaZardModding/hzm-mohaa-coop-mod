@@ -54,7 +54,7 @@ DoStuff: {
 
 	$lyndon exec coop_mod/replace.scr::lookat //[204] chrissstrahl - Made coop compatible
 	$lyndon say A_22_Phillips_3 
-	$lyndon waittill saydone //@Smithy
+	$lyndon waittill saydone //@Smithy - I don't recall what needed to be done here
 
 	waitthread global/jeepanim.scr::DriverGetInJeep $GuardPostJeep $lyndon
 	$GuardPostJeep.driver = $lyndon
@@ -73,14 +73,13 @@ DoStuff: {
 		local.bail_msg = (loc_convert_string "Press ") + local.usekey + (loc_convert_string " to get in jeep.")
 		thread global/throbtext.scr::throbtext local.bail_msg 0	
 	}else{
-		//@chrissstrahl
 		//display to all player within range (local.player_mount_jeep_dist)
 		local.usekey = "use"
 		local.bail_msg = (loc_convert_string "Press ") + local.usekey + (loc_convert_string " to get in jeep.")
 		local.player iprint local.bail_msg 1
 	}
 	
-	//@chrissstrahl
+	//@Smithy
 	while ( (!(vector_within $player.origin $lyndon.origin local.player_mount_jeep_dist) || !$player.useheld) && (local.player_shot == 0) ) {
 		waitframe		
 
@@ -106,7 +105,7 @@ DoStuff: {
 		thread global/throbtext.scr::throbtext_off	
 	}
 
-	//@chrissstrahl
+	//@chrissstrahl - was to tired to finsih it up
 	if (level.disable_player_gp_jeep_attach == 0) {		
 		$player forcelegsstate "STAND"
 		$GuardPostJeep unlock
@@ -150,11 +149,11 @@ getout: {
 	$GuardPostJeep unlock
 	$GuardPostJeep.turret unlock
 
-	//@chrissstrahl
+	//@chrissstrahl - was to tired to finsih it up
 	$player.origin = $GuardPostJeep.turret.origin
 	wait .5
 
-	//@chrissstrahl
+	//@chrissstrahl - was to tired to finsih it up
 	$GuardPostJeep doUse $player
 	$GuardPostJeep lock
 	$GuardPostJeep.turret lock
@@ -163,7 +162,7 @@ getout: {
 	local.angles[0] = 0
 	local.angles[2] = 0
 
-	//@chrissstrahl
+	//@chrissstrahl - was to tired to finsih it up
 	$player.viewangles = local.angles		
 	$GuardPostJeep thread jeepnewpath
 }end
@@ -190,7 +189,15 @@ blockade_reverse1: {
 jeepnewpath: {
 //============================================================================
 	$player.origin = $playeroutofjeep.origin //@chrissstrahl
-	$player glue $airfieldspot
+	
+	//[204] chrissstrahl - made coop compatible
+	if(level.gametype == 0){
+		$player glue $airfieldspot
+	}else{
+		exec coop_mod/replace.scr::glue $airfieldspot NIL 1
+		iprintlnbold_noloc("glue jeepnewpath - Origin?")	//@chrissstrahl
+	}
+
 	$guysnearairfield delete
 
 	level.reversespeed = -250
@@ -199,12 +206,20 @@ jeepnewpath: {
 	$lyndon waitthread DoCappyAirFieldSpeech		
 	wait 1
 
-	//Give him the silenced pistol
-	$player takeall		//@chrissstrahl
-	$player item weapons/It_W_Beretta.tik
-	$player item weapons/DeLisle.tik
-	$player ammo rifle 70
-	$player useweaponclass rifle
+	//[204] chrissstrahl - made coop compatible
+	if(level.gametype == 0){
+		//Give him the silenced pistol
+		$player takeall
+		$player item weapons/It_W_Beretta.tik
+		$player item weapons/DeLisle.tik
+		$player ammo rifle 70
+		$player useweaponclass rifle
+	}else{
+		waitexec coop_mod/replace.scr::takeall
+		waitexec coop_mod/replace.scr::givePlayerWeapon "weapons/It_W_Beretta.tik" 0
+		exec coop_mod/replace.scr::ammo rifle 70
+		exec coop_mod/replace.scr::givePlayerWeapon "weapons/DeLisle.tik" 1 0.25
+	}
 	
 	thread control_tower
 	wait 2
@@ -274,17 +289,25 @@ DoCappyAirFieldSpeech: {
 	
 	self thread global/loopanim.scr::LoopUpperAnim A_22_TerryTalkTurn_idle	
 	self say A_22_Phillips_5A
-	self waittill saydone
+	self waittill saydone //@Smithy - I don't recall what needed to be done here
 	self say A_22_Phillips_5B
-	self waittill saydone
+	self waittill saydone //@Smithy - I don't recall what needed to be done here
 	
 	//self thread global/loopanim.scr::LoopAnimStop
 	self upperanim A_22_Phillips_5c
 	self say A_22_Phillips_5c_talk
-	self waittill saydone
+	self waittill saydone //@Smithy - I don't recall what needed to be done here
 	
 	thread maps/e2l2/objectives.scr::transition "reachedAirfield"		
-	$player unglue $airfieldspot //@chrissstrahl
+	
+	//[204] chrissstrahl - made coop compatible
+	if(level.gametype == 0){
+		$player unglue $airfieldspot
+	}else{
+		exec coop_mod/replace.scr::unglue $airfieldspot 1
+		iprintlnbold_noloc("unglue DoCappyAirFieldSpeech")	//@chrissstrahl
+	}
+	
 	$GuardPostJeep thread maps/e2l2/JeepAnims.scr::DoJeepLeaveAirFieldAnims
 }end
 
