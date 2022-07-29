@@ -343,7 +343,9 @@ threadorentity:{
 printtoserverandclient local.text local.player:{
 //=========================================================================
 	println(local.text)
-	if( level.coop_dedicated &&  local.player ){
+	////[204] chrissstrahl - always send command to player, just top be sure (listen sv)
+	//if( level.coop_dedicated &&  local.player ){
+	if( local.player ){
 		local.player stufftext ("echo "+local.text+"\n")
 	}
 }end
@@ -388,20 +390,9 @@ printstatus local.player:{
 		local.player iprint ( "Printed Missions Status "+level.coopMissionStatusIndex+" into Server console for "+local.playerCleanName) 1 NIL
 	}
 	
-	//enable logging on server
-	if(local.player){
-		local.logfile = int(getcvar("logfile"))
-		if(!local.logfile){
-			setcvar ( "logfile 1" )
-		}
-	}else{
-		local.logfile = 666
-	}
-	
-	//activate logfile for dev client
-	if( level.coop_dedicated &&  local.player ){
-		local.player stufftext "logfile 1"
-	}
+	//[204] chrissstrahl - use standard handle
+	local.logWasActive = local.player waitthread developerLogfileActivate
+
 	waitframe
 	if(local.player){ waitthread printtoserverandclient ("==HZM Coop Dev: "+local.playerCleanName+" @ "+level.coop_mapname+" Status "+level.coopMissionStatusIndex) local.player }
 	
@@ -456,9 +447,10 @@ printstatus local.player:{
 	
 	
 	waitframe
-	if(!local.logfile){
-		setcvar ( "logfile 0" )
-	}
+	
+	//[204] chrissstrahl - use standard handle
+	local.player waitthread developerLogfileDectivate local.logWasActive
+
 	level.coopPrintMissionStatus=0
 }end
 
@@ -1286,16 +1278,8 @@ printmarkers local.markernames:{
 	self iprint ( "Printed markers"+level.coopMarkersIndex+" locations into Server console for "+local.playerCleanName) 1 NIL
 	println ( "Printed markers"+level.coopMarkersIndex+" locations into Server console for "+local.playerCleanName)
 	
-	//enable logging on server
-	local.logfile = int(getcvar("logfile"))
-	if(!local.logfile){
-		setcvar ( "logfile 1" )
-	}
-	
-	//activate logfile for dev client
-	if( level.coop_dedicated &&  self ){
-		self stufftext "logfile 1"
-	}
+	//[204] chrissstrahl - use standard handle
+	local.logWasActive = local.player waitthread developerLogfileActivate
 	
 	waitthread printtoserverandclient ("==HZM Coop Dev: printmarkers "+local.playerCleanName+" @ "+level.coop_mapname+" "+level.coopMarkersIndex) self
 	
@@ -1319,10 +1303,11 @@ printmarkers local.markernames:{
 		}
 	}
 	waitthread printtoserverandclient ("==end of markers") self
+	
 	waitframe
-	if(!local.logfile){
-		setcvar ( "logfile 0" )
-	}
+	
+	//[204] chrissstrahl - use standard handle
+	local.player waitthread developerLogfileDectivate local.logWasActive
 }end
 
 //=========================================================================
@@ -1371,4 +1356,25 @@ spawnmarkers_remove:{
 			$("coopSMkr"+local.i) remove
 		}
 	}
+}end
+
+//[204] chrissstrahl - activate logfile, have a standard way of doing this
+//=========================================================================
+developerLogfileActivate:{ //level.coop_dedicated
+//=========================================================================
+	local.logWasActive = int(getcvar("logfile"))
+	if(local.logWasActive != game.true){
+		setcvar ( "logfile 1" )
+	}
+	self stufftext "logfile 1"
+}end local.logWasActive
+
+//[204] chrissstrahl - deactivate logfile, have a standard way of doing this
+//=========================================================================
+developerLogfileDeactivate local.logWasActive:{
+//=========================================================================
+	if(!local.logWasActive){
+		setcvar ( "logfile 0" )
+	}
+	//self stufftext "logfile 1"
 }end
