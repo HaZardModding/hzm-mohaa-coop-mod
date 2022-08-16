@@ -35,6 +35,11 @@ DoStuff: {
 	//JEEP SEQUENCE	
 	// run lyndon to jeep after the tower is destroyed...	
 	level.CommDestroyed waittill trigger
+	
+	//[204] chrissstrahl - this is for testing
+	if(level.skippedToAirfield){
+		end
+	}
 
 	$lyndon waitthread global/friendly.scr::friendlystop
 	wait 0.25
@@ -298,7 +303,29 @@ DoCappyAirFieldSpeech: {
 	
 	//[204] chrissstrahl - dev testing
 	if(getCvar("username") == "Chrissstrahl"){
-		iprintlnbold_noloc("DoCappyAirFieldSpeech - skipped dialog");
+		level.skippedToAirfield = 1
+		trigger level.CommDestroyed
+	
+		iprintlnbold_noloc("DoCappyAirFieldSpeech - moved players")
+		thread coop_mod/main.scr::playersWarpto NIL NIL NIL
+		
+		thread global/items.scr::remove_item "explosives" noprint
+		
+		//trigger level.CommDestroyed
+		thread maps/e2l2/objectives.scr::transition "commTowerDestroyed"
+		wait 1
+		thread maps/e2l2/objectives.scr::transition "gottojeep"
+		
+		thread coop_mod/replace.scr::givePlayerWeapon "weapons/uk_w_vickers.tik" "all"
+		
+		exec coop_mod/replace.scr::ammo smg 400
+		
+		wait 1.5
+	
+		iprintlnbold_noloc("DoCappyAirFieldSpeech - skipped dialog")
+		
+		
+		exec coop_mod/replace.scr::ammo smg 400
 		goto skipDoCappyAirFieldSpeech
 	}
 	
