@@ -7,7 +7,10 @@ init: {
 //============================================================================
 	level.guard_post_disable_baddies = 0
 	level.disable_player_gp_jeep_attach = 0
-	level.reversespeed = -200	
+	level.reversespeed = -200
+	
+	//[204] chrissstrahl
+	level.jeepAttachedPlayer = NULL
 	
 	// initialization  
 	$GuardPostJeep.turret = $GuardPostJeep queryturretslotentity 0
@@ -81,46 +84,89 @@ DoStuff: {
 		//display to all player within range (local.player_mount_jeep_dist)
 		local.usekey = "use"
 		local.bail_msg = (loc_convert_string "Press ") + local.usekey + (loc_convert_string " to get in jeep.")
-		local.player iprint local.bail_msg 1
+		iprintlnbold_noloc( local.bail_msg )
 	}
 	
-	//@Smithy
-	while ( (!(vector_within $player.origin $lyndon.origin local.player_mount_jeep_dist) || !$player.useheld) && (local.player_shot == 0) ) {
-		waitframe		
+	//[204] chrissstrahl - made coop compatible
+	//SINGLEPLAYER
+	if(level.gametype == 0){
+		while ( (!(vector_within $player.origin $lyndon.origin local.player_mount_jeep_dist) || !$player.useheld) && (local.player_shot == 0) ) {
+			waitframe		
 
-		if (vector_within $player.origin $lyndon.origin local.player_mount_jeep_dist) {
-			if (local.throb_text_on == 0) {					
-				local.usekey = getboundkey1 "+use"
-				local.msg = (loc_convert_string ("Press " + local.usekey + " to get in jeep."))
-				thread global/throbtext.scr::throbtext local.msg 0
-				local.throb_text_on = 1
+			if (vector_within $player.origin $lyndon.origin local.player_mount_jeep_dist) {
+				if (local.throb_text_on == 0) {					
+					local.usekey = getboundkey1 "+use"
+					local.msg = (loc_convert_string ("Press " + local.usekey + " to get in jeep."))
+					thread global/throbtext.scr::throbtext local.msg 0
+					local.throb_text_on = 1
+				}
+			}
+			else {
+				if (local.throb_text_on == 1) {
+					thread global/throbtext.scr::throbtext_off
+					local.throb_text_on = 0
+				}
 			}
 		}
-		else {
-			if (local.throb_text_on == 1) {
-				thread global/throbtext.scr::throbtext_off
-				local.throb_text_on = 0
-			}
+		
+		if (level.disable_player_gp_jeep_attach == 0) {	
+			$player forcelegsstate "STAND"
+			$GuardPostJeep unlock
+			$GuardPostJeep.turret unlock
+			$GuardPostJeep attachturretslot 0 $player
+			$GuardPostJeep.turret lock
+			$GuardPostJeep lock
 		}
+	}
+	//COOP / MULTIPLAYER
+	else{
+		local.waitForJeepAndPlayer = 1
+		while(local.waitForJeepAndPlayer){
+			waitframe
+			
+			//handle strobe text
+			if(waitWithinDistance $lyndon.origin local.player_mount_jeep_dist)){
+				if (local.throb_text_on == 0) {					
+					local.msg = (loc_convert_string ("Press " + "use" + " to get in jeep."))
+					thread global/throbtext.scr::throbtext local.msg 0
+					local.throb_text_on = 1
+				}
+			}else{
+				if (local.throb_text_on == 1) {
+					thread global/throbtext.scr::throbtext_off	
+				}
+			}
+			
+			//check if any player that is close holds use
+			for (local.i = 1;local.i <= $player.size;local.i++){
+				local.player =  $player[local.i]
+				if( local.player.dmteam != "spectator" && local.player.health > 0 && local.player.flags["coop_isActive"] == 1 ){
+					if(vector_within local.player.origin $lyndon.origin local.player_mount_jeep_dist){
+						if(local.player.useheld ){
+							local.waitForJeepAndPlayer = 0;
+							if (level.disable_player_gp_jeep_attach == 0) {	
+								
+								level.jeepAttachedPlayer = local.player
+								
+								local.player forcelegsstate "STAND"
+								$GuardPostJeep unlock
+								$GuardPostJeep.turret unlock
+								$GuardPostJeep attachturretslot 0 local.player
+								$GuardPostJeep.turret lock
+								$GuardPostJeep lock
+								iprintlnbold_noloc( "::DoStuff - unfinished code") 
+							}
+						}
+					}
+				}
+			}
+			
+			
+		}
+
 	}
 	
 	$lyndon lookat NULL
-
-	if (local.throb_text_on == 1) {
-		thread global/throbtext.scr::throbtext_off	
-	}
-
-	//@smithy
-	if (level.disable_player_gp_jeep_attach == 0) {		
-		$player forcelegsstate "STAND"
-		$GuardPostJeep unlock
-		$GuardPostJeep.turret unlock
-		$GuardPostJeep attachturretslot 0 $player
-		$GuardPostJeep.turret lock
-		$GuardPostJeep lock
-		
-		iprintlnbold_noloc( "::DoStuff - unfinished code") 
-	}
 
 	//Init the chase trucks
 	thread maps/e2l2/trucks.scr::InitChaseTrucks
@@ -158,12 +204,21 @@ getout: {
 	
 	iprintlnbold_noloc( "::getout - unfinished code") 
 
-	//@smithy
-	$player.origin = $GuardPostJeep.turret.origin
+	//[204] chrissstrahl
+	if(level.gametype == 0){
+		$player.origin = $GuardPostJeep.turret.origin
+	}else{
+		level.jeepAttachedPlayer.origin = $GuardPostJeep.turret.origin
+	}
 	wait .5
 
-	//@smithy
-	$GuardPostJeep doUse $player
+	//[204] chrissstrahl
+	if(level.gametype == 0){
+		$GuardPostJeep doUse $player
+	}else{
+		$GuardPostJeep doUse level.jeepAttachedPlayer
+	}
+		
 	$GuardPostJeep lock
 	$GuardPostJeep.turret lock
 
@@ -171,8 +226,13 @@ getout: {
 	local.angles[0] = 0
 	local.angles[2] = 0
 
-	//@smithy
-	$player.viewangles = local.angles		
+	//[204] chrissstrahl
+	if(level.gametype == 0){
+		$player.viewangles = local.angles
+	}else{
+		level.jeepAttachedPlayer.viewangles = local.angles
+	}
+	
 	$GuardPostJeep thread jeepnewpath
 }end
 
@@ -197,12 +257,12 @@ blockade_reverse1: {
 //============================================================================
 jeepnewpath: {
 //============================================================================
-	$player.origin = $playeroutofjeep.origin //@smithy
-	
 	//[204] chrissstrahl - made coop compatible
 	if(level.gametype == 0){
+		$player.origin = $playeroutofjeep.origin
 		$player glue $airfieldspot
 	}else{
+		level.jeepAttachedPlayer.origin = $playeroutofjeep.origin //@smithy
 		exec coop_mod/replace.scr::glue $airfieldspot NIL 1
 		iprintlnbold_noloc("glue jeepnewpath - Origin?")	//@smithy
 	}
