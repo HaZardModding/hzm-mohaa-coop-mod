@@ -1,0 +1,269 @@
+//
+// squad.scr
+//
+
+//-----------------------------------------------------------------------------
+create_squad:
+//-----------------------------------------------------------------------------
+
+	if (self.squad != NULL && self.squad != NIL) { self waitthread destroy_squad }
+	
+	// create squad
+
+	self.squad = spawn info_notnull
+	self.squad.numpositions = 4
+	self.squad.leader = self
+	self.squad.destroyme = 0
+
+	// setup
+
+	for (local.i = 1; local.i <= self.squad.numpositions; local.i++) 
+	{
+		local.position = spawn models/human/german_DoubleAgent.tik
+		local.position ai_off
+		local.position notsolid
+		local.position physics_off
+		local.position hide
+		local.position threatbias ignoreme
+		local.position.squad = self.squad
+		local.position.follower = NULL
+		local.position.followDistance = 10
+		local.position.in_formation = 1
+		switch (local.i)
+		{
+			case 1:	local.position.formation_offset = ( 200 100 0 )
+				break
+			case 2:	local.position.formation_offset = ( 200 -100 0 )	
+				break
+			case 3:	local.position.formation_offset = ( 100 -200 0 )
+				break
+			case 4:	local.position.formation_offset = ( 100 200 0 )
+				break
+		}
+		self.squad.position[local.i] = local.position
+	}
+
+	// maintain the squad
+
+	self.squad thread private_maintain
+
+end
+
+//-----------------------------------------------------------------------------
+get_squad:
+//-----------------------------------------------------------------------------
+
+end self.squad
+
+//-----------------------------------------------------------------------------
+set_squad local.squad:
+//-----------------------------------------------------------------------------
+
+	if (local.squad != NULL && local.squad != NIL) { local.squad.leader = self }
+	self.squad = local.squad
+
+end
+
+//-----------------------------------------------------------------------------
+destroy_squad:
+//-----------------------------------------------------------------------------
+
+	if (self.squad != NULL && self.squad != NIL)
+	{
+		self.squad.leader = NULL
+		self.squad.destroyme = 1
+		self.squad thread private_destroy
+		self.squad = NULL
+	}
+
+end
+
+//-----------------------------------------------------------------------------
+join_squad local.whose_squad:
+//-----------------------------------------------------------------------------
+
+	if (local.whose_squad != NULL && local.whose_squad) { local.squad = $player.squad }
+	else                                                { local.squad = local.whose_squad.squad }
+	local.found = 0
+	if (local.squad != NULL && local.squad != NIL)
+	{
+		for (local.i = 1; local.i <= local.squad.numpositions; local.i++) 
+		{
+			local.position = local.squad.position[local.i]
+			if (local.position.follower == NULL || local.position.follower == NIL) 
+			{
+				if (self.squadposition != NULL && self.squadposition != NIL)
+				{
+					self.squadposition.follower = NULL
+					self.squadposition = NULL
+				}
+				local.position.follower = self
+				self.squadposition = local.position
+				self.destination = local.position
+				self.distance = local.position.followDistance
+				self.friendtype = 1
+				local.found = 1
+				break
+			}
+		}
+	}
+
+end local.found
+
+//-----------------------------------------------------------------------------
+leave_squad:
+//-----------------------------------------------------------------------------
+
+	if (self.squadposition != NULL && self.squadposition != NIL)
+	{
+		self.squadposition.follower = NULL
+		self.squadposition = NULL
+	}
+	
+end
+
+//-----------------------------------------------------------------------------
+squadstop:
+//-----------------------------------------------------------------------------
+
+	self waitthread global/friendly.scr::friendlystop
+
+end
+
+//-----------------------------------------------------------------------------
+squadthink:
+//-----------------------------------------------------------------------------
+
+	self.destination = self.squadposition
+	self.distance = self.squadposition.followDistance
+	self.friendtype = 1
+	self fixedleash 1
+	self leash 0
+	self thread global/friendly.scr::friendlythink
+		
+end
+
+//-----------------------------------------------------------------------------
+break_formation local.index local.offset:
+//-----------------------------------------------------------------------------
+
+	local.position = self.position[local.index]
+	local.position.offset = local.offset
+	local.position.in_formation = 0
+
+end
+
+//-----------------------------------------------------------------------------
+join_formation local.index:
+//-----------------------------------------------------------------------------
+
+	local.position = self.position[local.index]
+	local.position.in_formation = 1
+	
+end
+
+//-----------------------------------------------------------------------------
+private_maintain:
+//-----------------------------------------------------------------------------
+
+	self.running = 1
+	for (local.i = 1; local.i <= self.numpositions; local.i++) 
+	{
+		self.position[local.i] thread private_maintain_position
+	}
+	self waitthread private_maintain_members
+	self.running = 0
+
+end
+
+//-----------------------------------------------------------------------------
+private_maintain_position:
+//-----------------------------------------------------------------------------
+
+	while (self.squad.destroyme != 1)
+	{
+		if (self.in_formation && self.squad.leader != NULL)
+		{
+			local.forward = (angles_toforward self.squad.leader.angles)
+			local.right = ( local.forward[1] -local.forward[0] local.forward[2] )		
+			local.vx = local.forward[0] * self.formation_offset[0] + local.forward[1] * self.formation_offset[1]
+			local.vy = local.right[0] * self.formation_offset[0] + local.right[1] * self.formation_offset[1]
+			local.offset = (local.vx local.vy 0)
+			local.offset += self.squad.leader.origin
+			self.origin = local.offset
+		}
+		else
+		{
+			self.origin = self.offset
+		}
+		waitframe
+	}
+
+end
+
+//-----------------------------------------------------------------------------
+private_maintain_members:
+//-----------------------------------------------------------------------------
+
+	while (self.destroyme != 1)
+	{
+		// cleanup dead positions
+
+		for (local.i = 1; local.i <= self.numpositions; local.i++)
+		{
+			if (self.position[local.i].follower != NULL)
+			{
+				if (
+					self.position[local.i].follower == NIL || 
+					!isalive self.position[local.i].follower
+				) { self.position[local.i].follower = NULL }
+			}
+		}
+
+		// now loop through and reform
+
+		for (local.i = 1; local.i <= self.numpositions; local.i++) 
+		{
+			if (self.position[local.i].follower == NULL)
+			{
+				for (local.j = local.i + 1; local.j <= self.numpositions; local.j++) 
+				{
+					local.position = self.position[local.j]
+					if (local.position.follower != NULL && local.position.in_formation)
+					{
+						local.member = local.position.follower
+						local.member.squadposition = NULL
+						local.position.follower = NULL
+						local.member waitthread join_squad self.leader
+						break
+					}
+				}
+			}
+		}
+
+		// wait a bit, we don't want to do this every frame
+
+		wait 2
+	}	
+
+end
+
+//-----------------------------------------------------------------------------
+private_destroy:
+//-----------------------------------------------------------------------------
+
+	while (self.running) { wait 1 }
+	for (local.i = self.numpositions; local.i >= 1; local.i--) 
+	{
+		local.position = self.position[local.i]
+		if (local.position.follower != NULL && local.position.follower != NIL)
+		{
+			local.position.follower waitthread squadstop
+			local.position.follower.squadposition = NULL
+			local.position.follower = NULL
+		}
+		self.position[local.i] delete
+	}
+	self delete
+
+end
