@@ -1,0 +1,701 @@
+main:
+level waittill prespawn
+	if (level.bombs == NIL)
+		level.bombs = 2
+
+	if ($nebel)
+	for (local.i=1;local.i<$nebel.size+1;local.i++)
+		$nebel[local.i] thread turret_start "nebel"
+
+	if ($nebel_trigger)
+	for (local.i=1;local.i<$nebel_trigger.size+1;local.i++)
+		$nebel_trigger[local.i] thread trigger_start "nebel"
+
+	if ($mg42)
+	for (local.i=1;local.i<$mg42.size+1;local.i++)
+		$mg42[local.i] thread mg42_start
+
+	if ($flak88)
+	for (local.i=1;local.i<$flak88.size+1;local.i++)
+		$flak88[local.i] thread flak88_start
+end
+
+on local.set:
+	if ($nebel)
+	for (local.i=1;local.i<$nebel.size+1;local.i++)
+		if ($nebel[local.i].set == local.set)
+			$nebel[local.i].do_attack = TRUE
+
+	if ($nebel_trigger)
+	for (local.i=1;local.i<$nebel_trigger.size+1;local.i++)
+		if ($nebel_trigger[local.i].set == local.set)
+			$nebel_trigger[local.i].turret.do_attack = TRUE
+end
+
+off local.set:
+	if ($nebel)
+	for (local.i=1;local.i<$nebel.size+1;local.i++)
+		if ($nebel[local.i].set == local.set)
+			$nebel[local.i].do_attack = FALSE
+
+	if ($nebel_trigger)
+	for (local.i=1;local.i<$nebel_trigger.size+1;local.i++)
+		if ($nebel_trigger[local.i].set == local.set)
+			$nebel_trigger[local.i].turret.do_attack = FALSE
+end
+
+
+mg42_start local.type:
+	level waittill spawn
+	if !(self.set)
+		self.set = -1
+	
+	if (self.target)
+	{
+		local.man = $(self.target)
+		local.man.mg = self
+		local.man thread gunner_think
+	}
+	else
+	{
+		println ("Error, MG42 at " + self.origin + " had no target gunner.")
+		end
+	}
+end
+
+gunner_think:
+	self.mg targettype "auto"
+	self type_idle "machinegunner"
+	self type_attack "machinegunner"
+	self type_disguise "machinegunner"
+	self type_grenade "machinegunner"
+	self gun "MG42"
+	self turret self.mg
+	self threatbias 5000
+
+	local.mg = self.mg
+	local.org = self.origin
+	if (self.target)
+	{
+		local.siz = $(self.target).size
+		for (local.i=local.siz;local.i>0;local.i--)
+		{
+			local.ent[local.i] = $(self.target)[local.i]
+			local.ent[local.i] = waitthread global/spawner.scr::spawner_create local.ent[local.i]
+		}
+	}
+
+//	self.targetname = "not_feeling_like_myself_anymore"
+	if (local.mg.min_time)
+		local.mg burstfiresettings local.mg.min_time local.mg.max_time local.mg.min_delay local.mg.max_delay
+
+	self waittill death
+	if (local.mg.thread)
+	{
+		thread level.script::local.mg.thread
+		println ("ran thread " + local.mg.thread)
+	}
+	else
+		println ("no thread to ran thread")
+
+	local.spawn_org = spawn script_origin
+	local.spawn_org.origin = local.org
+
+	while (local.siz)
+	{
+		for (local.i=1;local.i<local.siz+1;local.i++)
+		{
+			if !($player canseenoents local.ent[local.i])
+			{
+				local.newent = waitthread global/spawner.scr::spawner_activate local.ent[local.i]
+				local.newent tether local.spawn_org
+				local.newent leash 16
+
+				while ((isalive local.newent) && (vector_length (local.newent.origin - local.org) > 128))
+				{
+					local.newent runto local.org
+					wait 2
+				}
+
+				if (isalive local.newent)
+				{
+					local.newent type_idle "machinegunner"
+					local.newent type_attack "machinegunner"
+					local.newent type_disguise "machinegunner"
+					local.newent type_grenade "machinegunner"
+					local.newent gun "MG42"
+					local.newent turret local.mg
+					local.newent threatbias 5000
+
+					local.newent waittill death
+
+//					if (local.mg.thread)
+//						thread level.script::local.mg.thread
+
+					wait (7 + randomint(4))
+				}
+			}
+		}
+		wait 2
+	}
+
+end
+
+trigger_start local.type:
+	level waittill spawn
+	if !(self.set)
+		self.set = -1
+
+	if (self.target)
+	{
+		local.aim = $(self.target)
+		if (local.aim.target)
+		{
+			println ("turret trigger at origin " + self.origin + " has target " + local.aim.target)
+			local.turret = $(local.aim.target)
+			self.turret = local.turret
+			local.trigger = self
+
+			local.bomb = -1
+			if (local.turret.target)
+			{
+				local.bombtrigger = $(local.turret.target)
+				if (local.bombtrigger.target)
+				{
+					local.bomb = $(local.bombtrigger.target)
+					println ("Error, Turret at " + local.turret.origin + " has a bomb.")
+				}
+				else
+				{
+					local.bomb = -1
+					println ("Error, Turret at " + local.turret.origin + " has a bomb trigger but no bomb.")
+				}
+			}
+			println ("Created turret at " + local.turret.origin);
+		}
+		else
+		{
+			println ("Error, Turret Trigger at " + self.origin + " had no Turret to set off.")
+			end
+		}
+	}
+	else
+	{
+		println ("Error, Turret Trigger at " + self.origin + " had no target to aim at.")
+		end
+	}
+
+	local.turret thread turret_think local.type local.trigger local.aim local.bomb local.bombtrigger
+end
+
+turret_think local.type local.trigger local.aim local.bomb local.bombtrigger:
+
+	if (self.radius == NIL)
+		self.radius = 256
+
+	if (self.arc == NIL)
+		self.arc = 0.2
+
+	self.radius = self.radius * 2
+	self.do_attack = FALSE
+
+	if (self.bomb == NIL)
+	{
+		self.bomb = 1	
+		if (local.bomb != -1)
+			thread bombtrigger local.bomb local.bombtrigger
+	}
+
+	self.operator = TRUE
+	if ($nebeller)
+	for (local.i=1;local.i<$nebeller.size+1;local.i++)
+	{
+		if (vector_length (self.origin - $nebeller[local.i].origin) < 600)
+		{
+			$nebeller[local.i].nebl = self
+			$nebeller[local.i] thread nebel_owner
+			local.i = $nebeller.size+5
+		}
+	}
+
+	self.lastshot = level.time
+	self.shooter = TRUE
+	while (self.shooter == TRUE)
+	{
+		local.trigger waittill trigger
+
+		if ((self.shooter == TRUE) && (self.operator == TRUE))
+		if (((parm.other == $player) || (parm.other.targetname == "friendly")) || (self.do_attack == TRUE))
+		{
+			thread fire_turret local.aim
+			wait (0.25 + randomfloat(3))
+		}
+		wait 1
+	}
+
+end
+
+nebel_owner:
+	local.nebl = self.nebl
+	local.org = self.origin
+	if (self.target)
+	{
+		local.siz = $(self.target).size
+		for (local.i=local.siz;local.i>0;local.i--)
+		{
+			local.ent[local.i] = $(self.target)[local.i]
+			local.ent[local.i] = waitthread global/spawner.scr::spawner_create local.ent[local.i]
+		}
+	}
+
+	self.targetname = "not_feeling_like_myself_anymore"
+	self waittill death
+	local.nebl.operator = FALSE
+	local.spawn_org = spawn script_origin
+	local.spawn_org.origin = local.org
+
+	while ((local.siz) && (local.nebl.shooter == TRUE))
+	{
+		
+		for (local.i=1;local.i<local.siz+1;local.i++)
+		{
+			if ((local.nebl.shooter == TRUE) && !($player canseenoents local.ent[local.i]))
+			{
+				local.newent = waitthread global/spawner.scr::spawner_activate local.ent[local.i]
+				local.newent tether local.spawn_org
+				local.newent leash 16
+
+				while ((isalive local.newent) && (vector_length (local.newent.origin - local.org) > 128))
+				{
+					local.newent runto local.org
+					wait 2
+				}
+
+				if (isalive local.newent)
+				{
+					local.nebl.operator = TRUE
+					local.newent waittill death
+					local.nebl.operator = FALSE
+					wait (6 + randomint(4))
+				}
+			}
+		}
+		wait 2
+	}
+end
+
+flak88_start local.type:
+	level waittill spawn
+
+	self setaimtarget $player
+	self turnspeed 6.666
+//	self waittill ontarget
+
+	if !(self.set)
+		self.set = -1
+
+	local.aimer = spawn human/german_wehrmact_soldier.tik
+	local.aimer.start = self gettagposition "tag_aimer"
+	local.aimer.angles = self gettagangles "tag_aimer"
+	local.aimer.origin = local.aimer.start
+	local.aimer exec global/disable_ai.scr
+	local.aimer.oldanim = 88_loader_turnleft
+	local.aimer thread animator 88_aimer_idle
+	local.aimer holster
+//	local.aimer lookat $player
+
+	local.loader = spawn human/german_wehrmact_soldier.tik
+	local.loader.start = self gettagposition "tag_loader2"
+	local.loader.angles = self gettagangles "tag_loader2"
+	local.loader.origin = local.loader.start
+	local.loader exec global/disable_ai.scr
+	local.loader.oldanim = 88_loader_turnleft
+	local.loader thread animator 88_loader_idle
+	local.loader holster
+//	local.loader lookat $player
+
+	local.timer = randomfloat(2)
+	local.turn = 0
+	local.aimer.no_idle = 1
+	local.loader.no_idle = 1
+	while (1)
+	{
+		local.start = $player.origin
+		local.end = self.origin
+		local.dif = local.start - local.end
+		local.ang = angles_toleft (self.angles)
+		local.total = (local.dif[0] * local.ang[0]) + (local.dif[1] * local.ang[1]) + (local.dif[2] * local.ang[2]) 
+		if (local.total > 1)
+			local.turn = 1
+		else
+		if (local.total < -1)
+			local.turn = -1
+		else
+			local.turn = 0
+
+		if (isalive local.aimer)
+		{
+			local.aimer.start = self gettagposition "tag_aimer"
+			local.aimer.origin = local.aimer.start
+			local.aimer.angles = self gettagangles "tag_aimer"
+			if (local.turn < 0)
+				local.aimer thread animator 88_aimer_turnleft
+			else
+			if (local.turn > 0)
+				local.aimer thread animator 88_aimer_turnright
+			else
+				local.aimer thread animator 88_aimer_idle
+		}
+		else
+			break
+
+		if (isalive local.loader)
+		{
+			local.loader.start = self gettagposition "tag_loader2"
+			local.loader.origin = local.loader.start
+			local.loader.angles = self gettagangles "tag_loader2"
+
+			if (local.turn < 0)
+				local.loader thread animator 88_loader_turnleft
+			else
+			if (local.turn > 0)
+				local.loader thread animator 88_loader_turnright
+			else
+				local.loader thread animator 88_loader_idle
+		}
+		else
+			break
+
+		waitframe
+
+//			println local.total
+		if ((abs (local.total) < 25) && (level.time > local.timer))
+		{
+			self setaimtarget NULL
+			if (local.aimer.animator)
+				local.aimer.animator delete
+
+			if (local.loader.animator)
+				local.loader.animator delete
+
+			local.aimer anim 88_aimer_fire
+			local.loader anim 88_loader_fire
+			wait 1
+
+			local.timer = level.time + 4 + randomfloat(2)
+			$flak88 playsound flak_snd_fire
+			local.dist = vector_length ($flak88.origin - $player.origin)
+			local.dist = local.dist - 1300
+			local.range = 25 + (local.dist / 7)
+			local.offset = 50 + (local.dist / 1.2727)
+
+			local.vec = vector_normalize (self.origin - ($player.origin))
+			local.a = vector_scale local.vec local.offset
+			local.a =  local.a + $player.origin + (0 0 32)
+
+			for (local.i=0;local.i<2;local.i++)
+			{
+				if (randomint(100) > 50)
+				local.a[local.i] = local.a[local.i] + randomint(local.range)
+				else
+				local.a[local.i] = local.a[local.i] - randomint(local.range)
+			}
+			
+			exec global/model.scr local.a "models/fx/scriptbazookaexplosion.tik"
+			local.aimer waittill animdone
+
+			local.aimer anim 88_aimer_load
+			local.loader anim 88_loader_load
+			local.aimer waittill animdone
+			wait 3
+			self setaimtarget $player
+		}
+
+	}
+
+	self setaimtarget NULL
+
+	if (isalive local.loader)
+		local.loader thread attackplayer
+
+	if (isalive local.aimer)
+		local.aimer thread attackplayer
+
+end
+
+attackplayer:
+	if (self.animator)
+		self.animator delete
+
+	self.no_idle = 0
+	self.nosurprise = 1
+	self exec global/enable_ai.scr
+end
+
+animator local.anim:
+	if (local.anim == self.oldanim)
+		end
+	self.oldanim = local.anim
+
+	if (self.animator)
+		self.animator delete
+	
+	self.animator = local
+
+	while (isalive self)
+	{
+//		println ("playing anim " + local.anim)
+		self anim local.anim
+		self waittill animdone
+	}
+end
+
+
+turret_start local.type:
+	level waittill spawn
+	if !(self.set)
+		self.set = -1
+
+	if (self.target)
+	{
+		local.aim = $(self.target)
+		if (local.aim.target)
+		{
+			local.bomb = -1
+			local.trigger = $(local.aim.target)
+			if (local.trigger.target)
+			{
+				local.bombtrigger = $(local.trigger.target)
+				if (local.bombtrigger.target)
+					local.bomb = $(local.bombtrigger.target)
+				else
+				{
+					local.bomb = -1
+					println ("Error, Turret at " + self.origin + " has a bomb trigger but no bomb.")
+				}
+			}
+			println ("Created turret at " + self.origin);
+		}
+		else
+		{
+			println ("Error, Turret at " + self.origin + " had no trigger to set it off.")
+			end
+		}
+	}
+	else
+	{
+		println ("Error, Turret at " + self.origin + " had no target to aim at.")
+		end
+	}
+
+	self thread turret_think local.type local.trigger local.aim local.bomb local.bombtrigger
+end
+
+bombtrigger local.bomb local.bombtrigger:
+	
+	while (local.bombtrigger != NIL)
+	{
+		local.bombtrigger waittill trigger
+		println ("trying the trigger")
+		if (level.bombs > 0)
+		{
+			local.bombtrigger delete
+			local.bombtrigger = NIL
+			level.bombs--
+			local.bomb model animate/explosive.tik
+			$player stopwatch 5
+			local.bomb playsound plantbomb
+			local.bomb loopsound bombtick
+			wait 5
+			println ("KABOOM")
+			exec global/model.scr local.bomb.origin "emitters/mortar_higgins.tik"
+			local.bomb playsound explode_flak88
+			radiusdamage local.bomb.origin 300 300
+			local.bomb remove
+			self model statweapons/nebelwerfer_d.tik
+			self.shooter = FALSE
+			if (self.thread)
+			{
+				self thread level.script::self.thread
+				println ("TURRET THREADED " + self.thread)
+			}
+			else
+				println "TURRET THREADED NONE"
+		}
+		else
+		iprintlnbold "You have no explosives."
+	}
+	
+end
+
+
+fire_turret local.aim:
+
+	local.first = false
+
+	if (level.time - self.lastshot > 10)
+		local.first = true
+
+	self.lastshot = level.time
+
+	local.ent = spawn script_origin
+	local.ent.origin = local.aim.origin
+	local.ent.origin += (( randomint (self.radius) - (self.radius *0.5)) ( randomint (self.radius) - (self.radius *0.5)) 300)
+	if (local.first == true)
+	{
+		println "FIRST SHOT"
+		local.playorg = $player.origin
+		local.destorg = local.ent.origin
+		local.rad = self.radius * 1
+		for (local.i=0;local.i<2;local.i++)
+		{
+			if (abs(local.playorg[local.i] - local.destorg[local.i]) < local.rad)
+			if (local.destorg[local.i] < local.playorg[local.i])
+				local.destorg[local.i] = local.playorg[local.i] - local.rad
+			else
+				local.destorg[local.i] = local.playorg[local.i] + local.rad
+		}
+		local.destorg[2]+=500
+		local.ent.origin = local.destorg
+	}
+
+	local.ent droptofloor
+	println ("Player origin " + $player.origin + " and dest origin " + local.ent.origin + " and total dif " + vector_length ($player.origin - local.ent.origin))
+	local.target = local.ent.origin
+	local.ent delete
+
+	local.org = angles_toforward (self.angles)
+	local.org = ((local.org * 135) + (self.origin)) + ( 0 0 30 )
+	local.rocket = spawn script_model
+	self playsound nebelwerfer_launch
+	local.dist = vector_length (local.target - self.origin)
+	local.frames = local.dist / 350.0
+	local.dist = local.dist * self.arc
+
+	local.max = 10
+	for (local.i=0;local.i<local.max+1;local.i++)
+	{
+		local.spline[local.i] = spawn script_origin
+//		local.spline[local.i] model models/fx/fx_nebelwerfer.tik // projectiles/m2fgrenade.tik // 
+//		local.spline[local.i] scale 5
+
+		local.spline[local.i].origin = local.target * float(local.i/(local.max*1.0)) + self.origin * float ((local.max - local.i)/(local.max*1.0))
+
+		local.num = local.i
+		
+		if (local.num > local.max/2)
+			local.num = local.max - (local.num - local.max) - local.max
+
+		local.num = (local.max /2.0) - local.num
+
+		local.z = local.dist * ((local.num/(local.max*1.0))*(local.num/(local.max*1.0)))
+		local.spline[local.i].origin -= (0 0 local.z)
+		local.spline[local.i].origin += (0 0 (local.dist / 4.0))
+
+	}
+
+	local.rocket.angles = self.angles
+	local.rocket.origin = local.spline[0].origin
+	local.rocket model models/fx/fx_nebelwerfer.tik // model projectiles/m2fgrenade.tik // 
+	local.p = 0.0
+	for (local.i=1;local.i<local.max+1;local.i++)
+	{
+		while (local.p < local.frames + 1)
+		{
+			local.rocket.origin = local.spline[local.i-1].origin*((local.frames - local.p)/local.frames) + local.spline[local.i].origin*(local.p/local.frames)
+			wait 0.01
+			local.p++
+		}
+		while (local.p > 1)
+			local.p--
+	}
+	local.rocket.origin = local.spline[local.max].origin
+
+	/*
+		for (local.i=1;local.i<local.max+1;local.i++)
+		for (local.p=1;local.p<local.frames+1;local.p++)
+		{
+			local.rocket.origin = local.spline[local.i-1].origin*((local.frames - local.p)/local.frames) + local.spline[local.i].origin*(local.p/local.frames)
+			wait 0.01
+		}
+	*/
+	wait 0.1
+	for (local.i=0;local.i<local.max+1;local.i++)
+		local.spline[local.i] remove
+
+	local.blastname = spawn models/emitters/mortar_dirt_nebelwerfer.tik
+	local.blastname.origin = local.rocket.origin
+	local.blastname anim start
+
+	exec global/earthquake.scr .03 .05 0 0	//original .13 2 0 0
+
+	local.damageamount = 260	
+
+	if (level.skill == "1")
+		local.damageamount = 360	
+	else
+	if (level.skill == "2")
+		local.damageamount = 460	
+
+	radiusdamage local.rocket.origin local.damageamount 650
+
+	local.rocket remove
+
+	wait 3
+
+	//*** Remove the effect
+
+	local.blastname remove
+
+	
+	end
+	local.rocket flypath local.spline[0]
+	local.rocket waitmove
+
+end
+
+/////////////////////////////////////////////////////////////////////////////
+// playerturret_throbbox_think:
+// Connects a player turret's destruction to its throbbox so they remain
+// in sync when the turret is destroyed by other means.
+// Self:
+//   target name of the player mounted turret
+// Input:
+//   target name of the throbbox
+/////////////////////////////////////////////////////////////////////////////
+playerturret_throbbox_think local.throbbox:
+	self.health = 450
+	local.throbbox.health = 1
+	dprintln "Turret waiting for death"
+	self waittill death
+	dprintln "Turret dead"
+    if (isAlive local.throbbox)
+    {
+		dprintln "Turret throbbox blowup"
+        local.throbbox blowup
+    }
+end
+
+
+/////////////////////////////////////////////////////////////////////////////
+// playerturret_proj_think_aim:
+// Causes a projectile generator to control the way a playerturret looks
+// at its target while in AI mode and not controlled by a player
+// Self:
+//   target name of the player mounted turret turret0
+// Input:
+//   target name of the player mounted turret
+//   target name of the projectile generator
+/////////////////////////////////////////////////////////////////////////////
+playerturret_proj_think_aim local.turret local.projgen:
+	while (isAlive local.turret)
+	{
+		wait 0.1
+		local.val = local.projgen isturnedon
+		if ( local.val == 1 )
+		{
+			local.ent = local.projgen gettargetentity
+			self settargetentity local.ent
+		}
+	}
+end
