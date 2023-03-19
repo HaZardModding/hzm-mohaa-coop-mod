@@ -4,7 +4,21 @@
 Init: {
 //============================================================================
 	if (level.skipairdrop == 1) {
-		$player.origin = ( -3900 3200 0 )
+	
+		//[204] chrissstrahl
+		for(local.i=1;local.i<9;local.i++){
+			level.flags["coop_spawn"+local.i+"origin"] = ( -3900 3200 0 )
+			level.flags["coop_spawn"+local.i+"angles"] = ( 0 1 0 )	
+		}
+		if($player){
+			for (local.i = 1;local.i <= $player.size;local.i++){
+				local.player =  $player[local.i]
+				if( local.player.health > 0){
+					local.player.origin = ( -3900 3200 0 )
+				}
+			}
+		}
+		
 		thread maps/e2l3/Paratrooper.scr::updateObjectives
 		end
 	}
@@ -19,9 +33,12 @@ CrippleCurrentForces: {
 	$summonPlane waittill trigger
 
 	if ($battleAirborne_Commander) {
-		$battleAirborne_Commander turnto $player
-		$battleAirborne_Commander lookat $player
-		$battleAirborne_Commander runto $player
+	
+		//[204] chrissstrahl
+		$battleAirborne_Commander waitthread coop_mod/replace.scr::turntolookat
+		$battleAirborne_Commander waitthread coop_mod/replace.scr::runtoClosest
+		
+		
 		$battleAirborne_Commander waittill movedone
 		$battleAirborne_Commander upperanim A_23_Hudson_1D
 		$battleAirborne_Commander waittill upperanimdone
@@ -61,7 +78,8 @@ FlySpew: {
 	self move
 	wait 2
 
-	$player playsound e2l3_c47_flyby
+	//[204] chrissstrahl
+	thread coop_mod/replace.scr:: e2l3_c47_flyby
 
 	local.guys = 3
 	local.i = 1
