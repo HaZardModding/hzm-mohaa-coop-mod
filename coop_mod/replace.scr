@@ -24,6 +24,7 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 		end
 	}
 	level waittill prespawn
+	waitframe //[204] chrissstrahl - maybe this helps a bit...
 	end
 
 	//this does not really work out yet
@@ -2554,4 +2555,44 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 	local.player = exec coop_mod/replace.scr::player_closestTo self
 
 	self favoriteenemy local.player
+}end
+
+//[204] Chrissstrahl - replace create_squad - IF USED ON or SELF IS PLAYER
+//============================================================================
+create_squad:{
+//============================================================================
+	if( $coop_playerSquad == NULL ){
+		
+		//create a new entity that we accsess instead of a player that could be leaving the server at any given moment
+		spawn info_notnull targetname $coop_playerSquad
+		//give the MULTIPLAYER server a moment to spawn and update the new entity
+		waitframe
+		
+		$coop_playerSquad thread create_squad_maintain
+	}
+	
+	//now start the original stock function
+	$coop_playerSquad waitthread global/squad.scr::create_squad
+}end
+
+//[204] Chrissstrahl - makes sure there is a valid player maintained
+//============================================================================
+create_squad_maintain:{
+//============================================================================
+	while($coop_playerSquad.squad){ //check for info_notnull reference entity
+		local.findNewLeader = 1
+		if($coop_playerSquad.squad.leader){ //check if leader player is still there
+			if($coop_playerSquad.squad.leader.health > 0 && $coop_playerSquad.squad.leader.dmteam != "spectator"){
+				local.findNewLeader = 0
+			}
+		}
+		
+		if(local.findNewLeader){
+			if(level.coop_player){
+				$coop_playerSquad.squad.leader = level.coop_player
+			}
+		}
+		
+		waitframe
+	}
 }end
