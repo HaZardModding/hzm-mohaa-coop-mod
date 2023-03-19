@@ -20,7 +20,7 @@ main: {
 	setcvar g_mission 2
 	exec global/exploder.scr
 	exec global/ambience.scr e2l3
-	waitexec maps/e2l3/hacks.scr //@chrissstrahl
+	waitexec maps/e2l3/hacks.scr
 	exec maps/e2l3/aicleanup.scr //@chrissstrahl
 	
 	thread InitLevel
@@ -60,7 +60,7 @@ main: {
 	waitthread global/ObjMgr.scr::SetObjCompassTarg "meet82nd" $battleAirborne_Commander
 	waitthread global/ObjMgr.scr::SetCurrObjStrategy		"inOrder"
 
-	if (level.nofog == 1) { //@chrissstrahl
+	if (level.nofog == 1) {
 		end // MPS because Mercieca told me to...
 		$world farclipoverride 10000
 		$world farplane 10000
@@ -80,42 +80,67 @@ InitLevel: {
 		waitthread Fadein 
 	}
 
-	level waittill prespawn //@chrissstrahl
+	//[204] chrissstrahl
+	waitthread coop_mod/replace.scr::waitTillPrespawn
 
-	$player heal 1 //@chrissstrahl
+	//[204] chrissstrahl
+	if(level.gametype == 0){
+		$player heal 1
+	}
+	
 	level.commander_kill = 0
 	waitexec global/loadout.scr
 
-	level waittill spawn //@chrissstrahl
+	//[204] chrissstrahl
+	waitthread coop_mod/replace.scr::waitForPlayer
 
-	$player waitthread global/squad.scr::create_squad //@chrissstrahl
+	//[204] chrissstrahl
+	waitthread coop_mod/replace.scr::create_squad
+	
 	//level.autosave = 1
 	//exec global/autosave.scr level.autosave	//"Starting"
 	//level.autosave++	
 }end
 
 //============================================================================
-Fadein: { //@chrissstrahl
+Fadein: {
 //============================================================================
-	level.startangles = $player.viewangles
-	$player physics_off
+	//[204] chrissstrahl
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		local.player.flags["coopViewAngleMemory"] = local.player.viewangles
+		local.player physics_off
+	}
+
 	exec global/fadein.scr
 	waitframe
 
 	waitthread global/fadein.scr::DoFadeIn e2l3_1 e2l3_2 e2l3_3 NIL 1
-	$player.viewangles = level.startangles  //undo any mousemovment during the hud stuff
-	$player physics_on
+	
+	//[204] chrissstrahl
+	//undo any mousemovment during the hud stuff
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		local.viewMem = local.player.flags["coopViewAngleMemory"]
+		if(vector_length(local.viewMem) > 1){
+			local.player.viewangles = local.viewMem
+		}
+		local.player physics_on
+	}
 }end
 
 //============================================================================
 startMusic_e2l3_main: {
 //============================================================================
-	level waittill prespawn //@chrissstrahl
+	waitthread coop_mod/replace.scr::waitTillPrespawn
 
 	if (level.skiptown != 1) {
 		// start looping at intro
-		$player stufftext "tmstop; tmstartloop sound/music/mus_11a_surprise.mp3" //@chrissstrahl
-
+		
+		//[204] chrissstrahl
+		thread coop_mod/replace.scr::tmstartloop "sound/music/mus_11a_surprise.mp3"
+		
+		
 		while (level.startTankDead != 1) {
 			wait 0.1
 		}
@@ -123,7 +148,9 @@ startMusic_e2l3_main: {
 		// start looping after destroying the first tank
 		// (at opening of level)
 		waitthread global/music.scr::StopSong 1.5
-		$player stufftext "tmstartloop sound/music/E2L1_Streets_of_Paris.mp3" //@chrissstrahl
+		
+		//[204] chrissstrahl
+		thread coop_mod/replace.scr::tmstartloop "sound/music/E2L1_Streets_of_Paris.mp3"
 	}
 
 	if (level.skipairdrop != 1) {
@@ -132,7 +159,9 @@ startMusic_e2l3_main: {
 		}
 
 		waitthread global/music.scr::StopSong 1.5
-		$player stufftext "tmstartloop sound/music/mus_14a_action.mp3" //@chrissstrahl
+		
+		//[204] chrissstrahl
+		thread coop_mod/replace.scr::tmstartloop "sound/music/mus_14a_action.mp3"
 	}
 
 	$FH_OnTopFloorTrigger waittill trigger
@@ -142,7 +171,9 @@ startMusic_e2l3_main: {
 		waitframe
 	}
 	
-	$player stufftext "tmstartloop sound/music/medicdance.mp3" //@chrissstrahl
+	//[204] chrissstrahl
+	thread coop_mod/replace.scr::tmstartloop "sound/music/medicdance.mp3" //@chrissstrahl
+	
 
 	while (level.tanksDefeated == 0) { 
 		waitframe
@@ -158,5 +189,8 @@ startMusic_e2l3_main: {
 GiveMedal: {
 //============================================================================
 	//E2 Specific Medal, the Air Medal
-	setcvar "g_medal4" "1"
+	//[204] chrissstrahl
+	if(level.gametype == 0){
+		setcvar "g_medal4" "1"
+	}
 }end
