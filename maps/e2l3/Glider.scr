@@ -15,8 +15,21 @@ Init: {
 		if ($summonTrucks) {
 			$summonTrucks delete
 		}
-		$player.origin = (500 3200 100)
-		$player.angles += ( 0 180 0 )
+		
+		//[204] chrissstrahl
+		for(local.i=1;local.i<9;local.i++){
+			level.flags["coop_spawn"+local.i+"origin"] = ( 500 3200 100 )
+			level.flags["coop_spawn"+local.i+"angles"] = ( 0 180 0 )	
+		}
+		if($player){
+			for (local.i = 1;local.i <= $player.size;local.i++){
+				local.player =  $player[local.i]
+				if( local.player.health > 0){
+					local.player.origin = ( 500 3200 100 )
+					local.player.angles += ( 0 180 0 )
+				}
+			}
+		}
 		end
 	}
 
@@ -102,7 +115,11 @@ DriverThinkThread: {
 	}
 
 	if(level.GliderSummonTrucks == 1 && isalive self) {
-		self.destination = $player
+	
+		//[204] chrissstrahl
+		self waitthread coop_mod/main.scr::destination
+		
+
 		self.distance = 250
 		self.friendtype = 1
 		self fixedleash 1
@@ -119,7 +136,11 @@ DriverThinkThread: {
 	waitthread PickUpAmmo
 	
 	// gag over, go back to friendly state
-	self.destination = $player
+	
+	//[204] chrissstrahl
+	self waitthread coop_mod/main.scr::destination
+	
+	
 	self.distance = 250
 	self.friendtype = 1
 	self thread global/friendly.scr::friendlythink
@@ -147,9 +168,12 @@ PickUpAmmo: {
 	level.pickedupammo = 1 
 
 	self exec global/enable_ai.scr
-	self runto $player
-	self turnto $player
-	self lookat $player
+
+	//[204] chrissstrahl
+	self waitthread coop_mod/replace.scr::turntolookat
+	self waitthread coop_mod/replace.scr::runtoClosest
+	
+	
 	self waittill movedone
 	self exec global/disable_ai.scr
 	wait 1.0
@@ -166,7 +190,11 @@ PickUpAmmo: {
 	wait 1.0
 
 	self lookat NULL
-	self.destination = $player
+	
+	//[204] chrissstrahl
+	self waitthread coop_mod/main.scr::destination
+	
+	
 	self.distance = 250
 	self.friendtype = 1
 	self thread global/friendly.scr::friendlythink
@@ -189,12 +217,23 @@ DriverLeadCode: {
 	self tether self.leader
 	self lookat $gliderammotrigger
 	
-	local.beginning = $player.origin 
+	//[204] chrissstrahl
+	//local.beginning = $player.origin 
+	
+	
 	local.pathvector = (1828 3606 72)
 	local.pathvector2 = (807 3500 50)
 	local.alpha = 0
 	
-	self waitthread LinearInterpolationMotion local.pathvector $player.origin 0.1
+	
+	//[204] chrissstrahl
+	local.player = exec coop_mod/replace.scr::player_closestTo self
+	while(local.player == NULL){
+		wait 1
+		local.player = exec coop_mod/replace.scr::player_closestTo self
+	}
+	
+	self waitthread LinearInterpolationMotion local.pathvector local.player.origin 0.1
 	self waitthread LinearInterpolationMotion local.pathvector2 local.pathvector 0.2
 	self waitthread LinearInterpolationMotion $gliderammotrigger.origin local.pathvector2 0.2
 	self runto $gliderammotrigger.origin
@@ -203,7 +242,10 @@ DriverLeadCode: {
 		waitframe
 	}
 
-	self.destination = $player
+	//[204] chrissstrahl
+	self waitthread coop_mod/main.scr::destination
+	
+	
 	waitframe
 	$DriverLeadCode remove
 }End
@@ -219,15 +261,28 @@ LinearInterpolationMotion local.pathvector local.startlocation local.step: {
 		self.leader.origin = self.leader.origin + (0 0 50)
 		wait 1.0
 		
-		while(vector_length(self.origin - $player.origin) > 300 &&
-			(vector_length(self.origin - $gliderammotrigger.origin) <
-			 vector_length($player.origin - $gliderammotrigger.origin)) && 
-			 level.GliderSummonTrucks != 1) {
+		//[204] chrissstrahl
+		local.player = exec coop_mod/replace.scr::player_closestTo self
+		while(local.player == NULL){
+			wait 1
+			local.player = exec coop_mod/replace.scr::player_closestTo self
+		}
+		
+		//[204] chrissstrahl
+		while(vector_length(self.origin - local.player.origin) > 300 &&
+			(vector_length(self.origin - $gliderammotrigger.origin) < vector_length(local.player.origin - $gliderammotrigger.origin)) && 
+			 level.GliderSummonTrucks != 1)
+		{
 			waitframe
+			
+			//[204] chrissstrahl
+			while(local.player == NULL){
+				wait 1
+				local.player = exec coop_mod/replace.scr::player_closestTo self
+			}
 		}
 
-		if(vector_length(self.origin - $gliderammotrigger.origin) <
-			 vector_length($player.origin - $gliderammotrigger.origin)) {
+		if(vector_length(self.origin - $gliderammotrigger.origin) < vector_length(local.player.origin - $gliderammotrigger.origin)){
 			 local.step += 0.01
 		}
 		local.alpha += local.step
