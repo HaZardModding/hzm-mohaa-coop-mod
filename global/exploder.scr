@@ -1,9 +1,9 @@
 //	Exploding chunk system created by Mackey McCandlish.
-//	
+//
 //	Before level waittill prespawn "exec global/exploder.scr".
-//	
+//
 //	Used in levels where stuff blows up.
-//	
+//
 //	Create a script_object that is a "undestroyed" version of the thing that is supposed to blow up and targetname it "exploder"
 //
 //	Create a script_object that is a "destroyed" version of the thing that is supposed to blow up and targetname it
@@ -12,21 +12,21 @@
 //	Create script_object chunks of geometry that are going to fly out of the destroyable object/building and place them in the
 //	places they're supposed to fly from. Make them near but not touching the geometry of the explodersmashed. Targetname them
 //	"exploderchunk".
-//	
+//
 //	Create one script_origin for each exploderchunk and make the chunk target the origin the same way a jump pad would target
 //	the jump pad destination in Quake3.
-//	
+//
 //	Create script_models with targetname "exploderfire" and the "model" value of the tiki you want to use. These will be tiki
 //	explosions that will go off.
 //
-//	Give all the chunks, smasheds, fires, and exploders the same #set value. Note you can have any number of smasheds, chunks, 
-//	fires, or exploders, but typically you only have one smashed and one exploder. The reason you would want multiple of any 
-//	of these is that you can give any of them a #pause value, and that will make it delay that long before occuring, so you 
+//	Give all the chunks, smasheds, fires, and exploders the same #set value. Note you can have any number of smasheds, chunks,
+//	fires, or exploders, but typically you only have one smashed and one exploder. The reason you would want multiple of any
+//	of these is that you can give any of them a #pause value, and that will make it delay that long before occuring, so you
 //	could create a multistage explosion.
-//	
-//	You can create an explodertrigger (with the same #set), or just do "thread global/exploder.scr::explode #" (# being the 
+//
+//	You can create an explodertrigger (with the same #set), or just do "thread global/exploder.scr::explode #" (# being the
 //	#set value of the exploder in question).
-//	
+//
 
 
 main:
@@ -81,7 +81,6 @@ main:
 				exec global/error.scr ("Error, ExploderChunk at " + level.exploderchunk[local.i].origin + " has no target") 1
 		}
 	}
-
 	
 	if ($exploderfire == NULL)
 		level.exploderfires = 0
@@ -190,8 +189,7 @@ end
 
 
 solidify:
-	//chrissstrahl - replacing level waittill spawn
-	waitthread coop_mod/replace.scr::waitForPlayer
+	level waittill spawn
 	self solid
 	self disconnect_paths
 end
@@ -201,6 +199,7 @@ repeat:
 	wait 2
 	level.exploderrepeat = 0
 end
+
 
 
 explodetrigger:
@@ -239,7 +238,7 @@ firelight:
 
 	local.r = 0.5 + randomfloat (0.8)
 	local.g = 0.4 + randomfloat (0.6)
-	
+
 	self lightRed (local.r)
 	self lightGreen (local.g)
 
@@ -250,11 +249,8 @@ end
 
 
 fireoff local.i:
-//			level.exploderfire[local.i] hide
-//			level.exploderfire[local.i] anim stop
-//			level.exploderfire[local.i] model "fx/dummy.tik"
-
-	if (level.exploderfire[local.i].fire != NIL){
+	if (level.exploderfire[local.i].fire != NIL)
+	{
 		level.exploderfire[local.i] lightOff
 		level.exploderfire[local.i] stoploopsound
 		level.exploderfire[local.i].thread delete
@@ -263,12 +259,15 @@ end
 
 
 fireoff2 local.name:
-	for (local.i=1;local.i<level.exploderfires + 1;local.i++){
-		if (level.exploderfire[local.i].set == local.name){
+	for (local.i=1;local.i<level.exploderfires + 1;local.i++)
+	{
+		if (level.exploderfire[local.i].set == local.name)
+		{
 			level.exploderfire[local.i] hide
 			level.exploderfire[local.i] model "fx/dummy.tik"
 
-			if (level.exploderfire[local.i].fire != NIL){
+			if (level.exploderfire[local.i].fire != NIL)
+			{
 				level.exploderfire[local.i] lightOff
 				level.exploderfire[local.i] stoploopsound
 				level.exploderfire[local.i].thread delete
@@ -291,7 +290,7 @@ fireon local.i:
 		radiusdamage level.exploderfire[local.i].origin level.exploderfire[local.i].damage local.damageradius
 
 	if (getcvar(debug) == "1")
-		println ("Model is " + level.exploderfire[local.i].mdl)
+		dprintln ("Model is " + level.exploderfire[local.i].mdl)
 
 //			level.exploderfire[local.i] model level.exploderfire[local.i].mdl
 //			level.exploderfire[local.i] show
@@ -301,13 +300,14 @@ fireon local.i:
 //			level.exploderfire[local.i] anim start
 
 	exec global/model.scr level.exploderfire[local.i].origin level.exploderfire[local.i].mdl
-	if (level.exploderfire[local.i].fire != NIL){
-		level.exploderfire[local.i] lightOn	
+	if (level.exploderfire[local.i].fire != NIL)
+	{
+		level.exploderfire[local.i] lightOn
 
 		if (randomint(100) > 50)
 			level.exploderfire[local.i] loopsound "sound/environment/fire_small.wav" 1.5 256
 		else
-			level.exploderfire[local.i] loopsound "sound/environment/fire_big.wav" 1.5 256	
+			level.exploderfire[local.i] loopsound "sound/environment/fire_big.wav" 1.5 256
 
 		level.exploderfire[local.i] thread firelight
 		level.exploderfire[local.i].thread = parm.previousthread
@@ -322,16 +322,33 @@ fireinit local.name:
 			}
 		}
 	}
-
 end
 
 explodersmashedON local.i:
+	//[204] chrissstrahl - upgraded to no longer get stuck in mission e2l3
 	if (level.explodersmashed[local.i].pause != NIL)
 		wait level.explodersmashed[local.i].pause
+
+	if (	(level.explodersmashed[local.i].silent == NIL) ||
+			(level.explodersmashed[local.i].silent != 1 ) ){
+		level.explodersmashed[local.i] playsound ("stonecrash0" + (randomint(3) + 1))
+	}
 	
-	level.explodersmashed[local.i] playsound ("stonecrash0" + (randomint(3) + 1))
 	level.explodersmashed[local.i] show
-	level.explodersmashed[local.i] solid
+
+	//--- added by Benson 8.8.2003
+	//--- if the parm #notsolid is set to 1, make the smashed piece be notsolid
+	if( level.explodersmashed[local.i].notsolid == 1 )
+	{
+		level.explodersmashed[local.i] notsolid
+		//println ( "EXPLODER SMASHED ON: explodersmashed: " + local.i + " is set to be notsolid" )
+	}
+	else
+	{
+		level.explodersmashed[local.i] solid
+		//println ( "EXPLODER SMASHED ON: explodersmashed: " + local.i + " is set to be solid" )
+	}
+
 	waitframe
 	waitframe
 	level.explodersmashed[local.i] disconnect_paths
@@ -339,10 +356,10 @@ end
 
 
 exploderchunkONN local.i:
-	if (level.exploderchunk[local.i].pause != NIL){
+	if (level.exploderchunk[local.i].pause != NIL)
 		wait level.exploderchunk[local.i].pause
-	}
-	level.exploderchunk[local.i] show
+		level.exploderchunk[local.i] show
+
 end
 
 
@@ -357,19 +374,27 @@ exploderOFF local.i:
 	level.exploder[local.i] hide
 	level.exploder[local.i] notsolid
 	level.exploder[local.i] connect_paths
+	
+	/* //[204] chrissstrahl - disabled
+	if (level.exploder[local.i].exlodethread != NIL){
+		dprintln ("****Running explode thread for exploder: " + level.exploder[local.i].set)
+		thread level.script::level.exploder[local.i].exlodethread
+	}*/
 end
 
 
 
 explode local.name:
+
 	if (getcvar(exploders) == "0")
 		end
 
 	if (getcvar(debug) == "1")
-		println ("** Set off explosion with set #: " + local.name)
+		dprintln ("** Set off explosion with set #: " + local.name)
 
 //	println ("explode " + local.name)
 	level.explodertimer[local.name] = level.time + 6
+
 
 	for (local.i=1;local.i<level.explodersmasheds+1;local.i++){
 		if (local.name == level.explodersmashed[local.i].set){
@@ -387,41 +412,53 @@ explode local.name:
 	}
 	*/
 
-	for (local.i=1;local.i<level.exploders+1;local.i++){
-		if (local.name == level.exploder[local.i].set){
+	for (local.i=1;local.i<level.exploders+1;local.i++)
+	{
+		if (local.name == level.exploder[local.i].set)
+		{
 			thread exploderOFF local.i
 		}
 	}
 
-	for (local.i=1;local.i<level.exploderfires + 1;local.i++){
-		if(level.exploderfire[local.i] == NULL){continue} //chrissstrahl - null entity
-		if (level.exploderfire[local.i].set == local.name){
+
+	for (local.i=1;local.i<level.exploderfires + 1;local.i++)
+	{
+		if (level.exploderfire[local.i].set == local.name)
+		{
 			level.exploderfire[local.i] thread fireon local.i
 		}
 	}
 
-	for (local.i=1;local.i<level.exploderchunks+1;local.i++){
-		if (level.exploderchunk[local.i]){
-			if (local.name == level.exploderchunk[local.i].set){
-				level.exploderchunk[local.i] thread explodechunk
-			}
+
+
+
+	for (local.i=1;local.i<level.exploderchunks+1;local.i++)
+	{
+		if (level.exploderchunk[local.i])
+		if (local.name == level.exploderchunk[local.i].set)
+		{
+			level.exploderchunk[local.i] thread explodechunk
 		}
 	}
 
-	for (local.i=1;local.i<level.exploderfires+1;local.i++){
+	for (local.i=1;local.i<level.exploderfires+1;local.i++)
+	{
 		if(level.exploderfire[local.i] == NULL){continue} //chrissstrahl - null entity
+		
 		if (local.name == level.exploderfire[local.i].set){
 			level.exploderfire[local.i] thread fireoff local.i
 		}
-//			level.exploderfire[local.i] thread fireoff level.exploderfire[local.i].set
+//		level.exploderfire[local.i] thread fireoff level.exploderfire[local.i].set
 	}
 
 
 	if (level.exploderrepeat != 1)
 		end
 
-	for (local.i=1;local.i<level.exploderchunks+1;local.i++){
-		if (local.name == level.exploderchunk[local.i].set){
+	for (local.i=1;local.i<level.exploderchunks+1;local.i++)
+	{
+		if (local.name == level.exploderchunk[local.i].set)
+		{
 			level.exploderchunk[local.i] physics_off
 			level.exploderchunk[local.i].velocity = (0 0 0)
 			level.exploderchunk[local.i] hide
@@ -433,25 +470,31 @@ explode local.name:
 
 	wait 6
 
-	for (local.i=1;local.i<level.exploders+1;local.i++){
-		if (local.name == level.exploder[local.i].set){
+	for (local.i=1;local.i<level.exploders+1;local.i++)
+	{
+		if (local.name == level.exploder[local.i].set)
+		{
 			level.exploder[local.i] show
 			level.exploder[local.i] solid
 		}
 	}
 
 	for (local.i=1;local.i<level.explodersmasheds+1;local.i++)
-		if (local.name == level.explodersmashed[local.i].set){
+		if (local.name == level.explodersmashed[local.i].set)
+		{
 			level.explodersmashed[local.i] hide
 			level.explodersmashed[local.i] notsolid
 		}
-		
-	for (local.i=1;local.i<level.exploderfires+1;local.i++){
+
+
+	for (local.i=1;local.i<level.exploderfires+1;local.i++)
+	{
 		if (local.name == level.exploderfire[local.i].set)
 			level.exploderfire[local.i] thread fireoff local.i
 
 //			level.exploderfire[local.i] thread fireoff level.exploderfire[local.i].set
 	}
+
 end
 
 phyvel local.vec:
@@ -459,17 +502,29 @@ phyvel local.vec:
 	wait 0.2
 	self physics_on 1
 	self physics_velocity ( local.vec )
+
 end
 
 rocksound:
-	wait (1 + randomfloat(4))
-	self playsound ("stonesmall0" + (randomint(5) + 1))
+
+	if ( (self.silent == NIL) || (self.silent != 1 ) )
+	{
+		wait (1 + randomfloat(4))
+		self playsound ("stonesmall0" + (randomint(5) + 1))
+	}
+
 end
 
 moveitout local.num:
+
 	local.num = local.num / 15
+	if ( local.num < -5 )
+	   local.num = -5
+	if ( local.num > 5 )
+	   local.num = 5
 	local.number = 1
-	while (local.number < 20){
+	while (local.number < 20)
+	{
 		local.number = local.number + 0.4
 		local.o = self.origin
 		if (local.num > 0)
@@ -480,16 +535,21 @@ moveitout local.num:
 		self.origin = local.o
 		waitframe
 	}
+
 end
 
 
 explodetouch:
-	self waittill touch
+self waittill touch
 
 // if (parm.other == $world)
 	if (self != NULL)
 		thread moveitout self.velocity[2]
-//	self hide
+
+//[204] chrisstrahl
+// AJS -- Added for AB41 barricades in e3l3
+	self hide
+	self notsolid
 end
 
 
@@ -497,7 +557,7 @@ explodechunk:
 	if (!self){ end } //[200] Smithy - fix console spam?
 
 	if (self.pause != NIL)
-		wait self.pause
+	wait self.pause
 
 	self show
 	self notsolid
@@ -515,56 +575,61 @@ explodechunk:
 	self thread rocksound
 
 	if (self.anglex == NIL)
-		self.anglex = 0
+	self.anglex = 0
 
 	if (self.angley == NIL)
-		self.angley = 0
+	self.angley = 0
 
 	if (self.anglez == NIL)
-		self.anglez = 0
+	self.anglez = 0
 
-	if ((self.anglex == 0) && (self.angley == 0) && (self.anglez == 0)){
+	if ((self.anglex == 0) && (self.angley == 0) && (self.anglez == 0))
+	{
 		if (self.origin[0] > self.target.origin[0])
-			local.xnum = self.origin[0] - self.target.origin[0]
+		local.xnum = self.origin[0] - self.target.origin[0]
 		else
-			local.xnum = self.target.origin[0] - self.origin[0]
+		local.xnum = self.target.origin[0] - self.origin[0]
 
 		if (self.origin[1] > self.target.origin[1])
-			local.ynum = self.origin[1] - self.target.origin[1]
+		local.ynum = self.origin[1] - self.target.origin[1]
 		else
-			local.ynum = self.target.origin[1] - self.origin[1]
+		local.ynum = self.target.origin[1] - self.origin[1]
 
 
 		self.anglex = randomfloat(local.veclength / 3) * (randomint(3) - 1)
 		self.angley = randomfloat(local.veclength / 3) * (randomint(3) - 1)
 		self.anglez = randomfloat(local.veclength / 3) * (randomint(3) - 1)
-		
-		if (local.xnum > local.ynum){ // was 1.5s
+
+		if (local.xnum > local.ynum)
+		{ // was 1.5s
 			if (self.origin[0] > self.target.origin[0])
 				self.anglex = local.veclength * -0.5 - (randomfloat(0.5))
 			else
 				self.anglex = local.veclength * 0.5 + (randomfloat(0.5))
 		}
-		else{
+		else
+		{
 			if (self.origin[1] > self.target.origin[1])
 				self.anglez = local.veclength * 0.5  + (randomfloat(0.5))
 			else
 				self.anglez = local.veclength * -0.5 - (randomfloat(0.5))
 		}
+
 	}
 
-	local.vec[0] = self.anglex
-	local.vec[1] = self.angley
-	local.vec[2] = self.anglez
+		local.vec[0] = self.anglex
+		local.vec[1] = self.angley
+		local.vec[2] = self.anglez
 
-	self rotatex local.vec[0]
-	self rotatey local.vec[1]
-	self rotatez local.vec[2]
+		self rotatex local.vec[0]
+		self rotatey local.vec[1]
+		self rotatez local.vec[2]
 
 	local.break = 0
 	local.breaker = 1.2
 
 //	self thread removetouch
+
 
 	wait 0.5
 	local.inc = 10.0 + (randomint(15))
@@ -573,22 +638,23 @@ explodechunk:
 	local.z = local.vec[2] / local.inc
 
 //	thread moveitdown
-	
-	for (local.i = 0; local.i < local.inc; local.i++){
+
+	for (local.i = 0; local.i < local.inc; local.i++)
+	{
 		if (local.vec[0] > 0)
-			local.vec[0] = local.vec[0] - local.x
+		local.vec[0] = local.vec[0] - local.x
 		else
-			local.vec[0] = local.vec[0] - local.x
+		local.vec[0] = local.vec[0] - local.x
 
 		if (local.vec[1] > 0)
-			local.vec[1] = local.vec[1] - local.y
+		local.vec[1] = local.vec[1] - local.y
 		else
-			local.vec[1] = local.vec[1] - local.y
+		local.vec[1] = local.vec[1] - local.y
 
 		if (local.vec[2] > 0)
-			local.vec[2] = local.vec[2] - local.z
+		local.vec[2] = local.vec[2] - local.z
 		else
-			local.vec[2] = local.vec[2] - local.z
+		local.vec[2] = local.vec[2] - local.z
 
 		self rotatex local.vec[0]
 		self rotatey local.vec[1]
@@ -597,9 +663,11 @@ explodechunk:
 		waitframe
 	}
 	wait 10
-	
+
 	if (self != NULL)
 		self delete
+
+
 end
 
 removetouch:
@@ -608,10 +676,12 @@ removetouch:
 
 	local.break = 0
 	local.amount = 50
-	while (local.break == 0){
+	while (local.break == 0)
+	{
 		local.v = self.velocity
 		local.count = 0
-		for (local.i=0;local.i<3;local.i++){
+		for (local.i=0;local.i<3;local.i++)
+		{
 			if ((local.v[local.i] > local.amount * -1) && (local.v[local.i] < local.amount))
 				local.count++
 		}
@@ -633,7 +703,8 @@ end
 moveitdown:
 	wait (2 + randomfloat(1.5))
 	local.number = 1
-	while (local.number < 20){
+	while (local.number < 20)
+	{
 		local.number = local.number + 0.4
 		local.o = self.origin
 		local.o[2] = local.o[2] - local.number
@@ -641,9 +712,6 @@ moveitdown:
 		waitframe
 	}
 end
-
-
-
 
 
 waitplaysound local.waiter local.sound local.chan local.vol local.range:
@@ -657,4 +725,5 @@ end
 	models/emitters/explosion_mine.tik
 	models/emitters/explosion_tank.tik
 	models/emitters/explosion_bombdirt.tik
+
 */
