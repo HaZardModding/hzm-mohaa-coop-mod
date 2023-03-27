@@ -203,10 +203,14 @@ createInvisibleTarget: {
 cannonThink: {
 //============================================================================
 	self lock
-	local.backward  = -1 * angles_toforward self.angles 
+	local.backward  = -1 * angles_toforward self.angles
+	
+	//[204] chrissstrahl - I need some sleep before I can continue on this
+	//-needs to retain first closest player as long as viable (killed/distance/using)
+	local.playerChosen = NULL
 	
 	while (self) {
-		local.usekey = getboundkey1 "+use"
+		//local.usekey = getboundkey1 "+use"
 		local.playerClose = 0
 		
 		while (1) {
@@ -242,8 +246,16 @@ cannonThink: {
 		self lock
 		wait .25
 		
-		while (!($player.useheld)) {
-			waitframe
+		//[204] chrissstrahl
+		//if player disconnected or killed
+		if(level.gametype==0){
+			while (!($player.useheld)) {
+				waitframe
+			}
+		}else{
+			while ($player != NULL && !($player.useheld) && $player.health > 0 && local.player.dmteam != "spectator" ) {
+				waitframe
+			}
 		}
 		
 		self unlock
