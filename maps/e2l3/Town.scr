@@ -66,6 +66,10 @@ tankThink: {
 
 	local.targets = self waitthread allocateTankEnemies
 
+
+	//[204]chrissstrahl
+	local.player = NULL
+
 	while (self != NULL && self.health > 0) {
 		self.myenemy = NULL
 		local.p1 = self.origin + ( 0 0 200 )
@@ -90,20 +94,36 @@ tankThink: {
 		}
 
 		if (self.myenemy == NULL) {
-			local.p2 = $player.origin + ( 0 0 94 )
+			//[204]chrissstrahl - repeat until we can actually grab any player (otherwise the server is empty)
+			while(self && !$player){
+				wait 1
+			}
+			
+			if(level.gametype == 0){
+				local.player = $player
+			}else{
+				//[204]chrissstrahl - grab closest player
+				local.player = waitthread coop_mod/replace.scr::canseeGetClosest NIL NIL
+				//[204]chrissstrahl - if no valid player, grab closest, regardless if tank can actually see player
+				if(local.player){
+					local.player = waitthread coop_mod/replace.scr::canseeGetClosest NIL NIL
+				}
+			}
+		
+			local.p2 = local.player.origin + ( 0 0 94 )
 
 			// 50/50 chance to attack player (if we can see him)
 			local.canSeePlayer = sighttrace local.p1 local.p2 1
 			if (local.canSeePlayer) {
-				self.myenemy = $player
+				self.myenemy = local.player
 			}
 		}
 
 		// Wait 5 seconds to switch targets, or instantly if target dies
 		local.count = 50
-		if (self.myenemy == NULL) {
+		if (self.myenemy == NULL) { 
 			// if we have no target, attack player, but reconsider in 1 second
-			self.myenemy = $player
+			self.myenemy = local.player	//[204]chrissstrahl
 			local.count = 10
 		}
 
