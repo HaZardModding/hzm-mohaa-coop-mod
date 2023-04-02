@@ -123,11 +123,22 @@ summonJohnson: {
 		local.model thread maps/e2l3/JohnsonThinker.scr::Think
 	}
 
-	local.dist = vector_length ( $ParatrooperLeader.origin - $player.origin )
+
+	//[204]chrissstrahl - grab player closest to upstairs radio
+	local.player = NULL
+	while($ParatrooperLeader && !local.player && $tankHouseRadio){
+		wait 0.5
+		local.player = exec coop_mod/replace.scr::player_closestTo $tankHouseRadio
+	}
+	
+	//[204]chrissstrahl - make sure the player to follow/goto is this player
+	level.coop_player = local.player
+	
+	local.dist = vector_length ( $ParatrooperLeader.origin - local.player.origin )	//[204]chrissstrahl
 	$ParatrooperLeader.metWithPlayer = 1
 
 	if (local.dist > 1000) {
-		$ParatrooperLeader.jumpToFinalHouse = 1
+		$ParatrooperLeaderParatrooperLeader.jumpToFinalHouse = 1
 		wait 1.0
 	}
 
@@ -170,7 +181,8 @@ runAndDie local.location: {
 //============================================================================
 playSounds: {
 //============================================================================
-	$player playsound birds_Rustlebush
+	//[204]chrissstrahl
+	thread coop_mod/replace.scr::playsound birds_Rustlebush
 	wait 1.0
 
 	$ParatrooperLeader.doTanksWarning = 1
@@ -187,16 +199,27 @@ playSounds: {
 havePlayerUseMortars: {
 //============================================================================
 	// Don't tell the player to use the mortar if they are already using it
-	if ($player.vehicle == NULL) {
-		local.usekey = getboundkey1 "+use"
-		local.msg = ( loc_convert_string ( "Press " + local.usekey + " to use the mortar." ) )
-		thread global/throbtext.scr::throbtext local.msg 0
+	
+	//[204]chrissstrahl
+	if(level.gametype==0){
+		if ($player.vehicle == NULL) {
+			local.usekey = getboundkey1 "+use"
+			local.msg = ( loc_convert_string ( "Press " + local.usekey + " to use the mortar." ) )
+			thread global/throbtext.scr::throbtext local.msg 0
 
-		while ($player.health > 0 && $player.vehicle == NULL) {
-			waitframe
+			while ($player.health > 0 && $player.vehicle == NULL) {
+				waitframe
+			}
+			thread global/throbtext.scr::throbtext "" 0
 		}
+	}
+	else{
+		local.msg = ( loc_convert_string ( "Press key to use the mortar." ) )
+		thread global/throbtext.scr::throbtext local.msg 0
+		wait 3
 		thread global/throbtext.scr::throbtext "" 0
 	}
+	
 
 	while (1) {
 		if ($mortarSouth_turret0_camera) {
