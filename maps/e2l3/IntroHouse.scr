@@ -398,18 +398,30 @@ StartTankThinkThread local.delay: {
 	exec global/earthquake.scr 2 5 0 0
 	level.duckManDuck = 1
 
-	if (level.playeronjeep == 1) {
-		$player exec global/bullethit.scr (0 -1 0) 200000 50 1
+	//[204]chrissstrahl - players in coop should be at the touching check below
+	if(level.gametype == 0){
+		if (level.playeronjeep == 1) {
+			$player exec global/bullethit.scr (0 -1 0) 200000 50 1
+		}
 	}
 
 	$startjeep delete
+	
 	local.kiltjeep = spawn script_model model "models/vehicles/Jeep_des.tik"
 	local.kiltjeep.origin = local.jeep_origin
 	local.kiltjeep.angles = local.jeep_angles
 	local.kiltjeep playsound e2l3_jeep_explo
 
-	if ($player istouching local.kiltjeep) {
-		$player exec global/bullethit.scr (0 -1 0) 200000 50 1
+	//[204]chrissstrahl - kill players to close to jeep
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if( local.player.health > 0 ){
+			if(level.gametype == 0 || local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1){
+				if(local.player isTouching local.kiltjeep){
+					local.player exec global/bullethit.scr (0 -1 0) 200000 50 1
+				}
+			}
+		}
 	}
 		
 	if ($startClip) {
@@ -420,7 +432,7 @@ StartTankThinkThread local.delay: {
 	wait 4
 
 	if (self) {
-		self.tankTarget = waitthread TankPickTarget
+		self.tankTarget = self waitthread TankPickTarget //[204]chrissstrahl - added self
 	}
 
 	while (self && isalive self && self.tankTarget) {
@@ -436,13 +448,13 @@ StartTankThinkThread local.delay: {
 		}
 
 		// As long as our target isn't the player, remove it after we've shot at it, so we don't target it again
-		if (self.tankTarget != $player) {
+		if (self.tankTarget.targetname != "player") { //[204]chrissstrahl
 			self.tankTarget remove
 		}
 		wait 1
 
 		if (self){
-			self.tankTarget = waitthread TankPickTarget
+			self.tankTarget = self waitthread TankPickTarget //[204]chrissstrahl - added self
 		}
 	}
 
@@ -466,9 +478,13 @@ PlayerInside: {
 //============================================================================
 TankPickTarget: {
 //============================================================================
+	//[204]Chrissstrahl
+	local.player = NULL
+	
 	// If the player is outside, just shoot at him
 	if (level.playeroutside == 1) {
-		end $player
+		local.player = exec coop_mod/replace.scr::player_closestTo self	
+		end local.player
 	}
 
 	// Otherwise, shoot at these targets, they will remove themselves after they are shot at
@@ -495,7 +511,7 @@ TankPickTarget: {
 	if ($tankfire_target6) {
 		end $tankfire_target6
 	}
-}end $player
+}end local.player
 
 //============================================================================
 CheckTanksDestroyed: {
@@ -518,5 +534,13 @@ BazookaCheck: {
 		wait 0.2
 	}
 
-	$player use "bazooka"
+	//[204]chrissstrahl - make all players use bazooka - one is the correct one =D
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if(isAlive local.player){
+			if(level.gametype == 0 || local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 ){
+				local.player use "bazooka"
+			}
+		}
+	}
 }end
