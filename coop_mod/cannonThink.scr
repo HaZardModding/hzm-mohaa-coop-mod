@@ -1,0 +1,142 @@
+//This kind of function is used over and over again, so have it isolated for erference that it can be reused
+//==========================================================[204] chrissstrahl
+cannonThink: {
+//============================================================================
+	self lock
+	local.backward  = -1 * angles_toforward self.angles 
+	
+	//PLAYER reference
+	local.player = NULL
+	
+	//cannon thinking
+	while(self){
+
+		//wait for any player to exist and getting close
+		while(self){
+			//iprintlnbold_noloc	"::cannonThink - waiting for player"
+		
+			//get closest valid player
+			local.player = waitthread coop_mod/replace.scr::player_closestTo self
+			
+			//check if the closest player is within range
+			if(local.player){
+				if(vector_length( local.player.origin - self.origin ) < 200 ){
+					break
+				}
+			}
+			
+			wait .25
+		}
+		
+		//a player is in range
+		//iprintlnbold_noloc	"::cannonThink - a player is in range"
+		
+		//wait until any player that is in range and valid
+		local.playerSelected = NULL
+		while(self && local.playerSelected == NULL){
+			waitframe
+		
+			//check for each player
+			for (local.i = 1;local.i <= $player.size;local.i++){
+				local.player = $player[local.i]
+				//only check alive player
+				if(local.player.health > 0){
+					//in coop skip invalid player
+					if(level.gametype != 0){
+						if(local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1 && local.player.flags["coopDevNoclip"] != NIL){
+							continue
+						}
+					}
+					//check distance to player
+					if(vector_length (local.player.origin - self.origin) < 200){
+						//check if player is pressing use
+						if(local.player.useheld) {
+							//check if player is actually behind the cannon
+							local.vObjDir = vector_subtract local.player.origin self.origin
+							local.vObjDir = vector_normalize local.vObjDir
+							local.dot = vector_dot local.vObjDir local.backward
+							if (local.dot > .707) {
+								//set player for the next code
+								local.playerSelected = local.player
+								
+								//iprintlnbold_noloc	"::cannonThink - player using cannon"
+								
+								//stop itterating the FOR-Loop
+								break
+							}
+						}
+					}
+				}
+			}
+		}
+		
+		//if the cannon is gone, end it here
+		if(!self){ end }
+		
+		//the selected player is now made using the cannon
+		self unlock
+		self doUse local.playerSelected
+		self lock
+		
+		//wait before accepting any kind of input again
+		wait .25
+		
+		//iprintlnbold_noloc	"::cannonThink - ready again for input"
+		
+		//wait until the selected player presses use again or otherwhise becomes invalid
+		while (self){
+			waitframe
+			
+			//player left the server or died or moved somehow out of range
+			if(!local.playerSelected || local.playerSelected.health <= 0 || vector_length (local.player.origin - self.origin) > 200){
+				//iprintlnbold_noloc	"::cannonThink - player NULL or DEAD or OUTofRANGE"
+				break
+			}
+			//in coop check other invalidating factors
+			if(level.gametype != 0){
+				if(local.player.dmteam == "spectator" || local.player.flags["coop_isActive"] != 1 && local.player.flags["coopDevNoclip"] != NIL){
+					//iprintlnbold_noloc	"::cannonThink - player became invalid"
+					break
+				}
+			}
+			//check if player wants to exit by pressing use
+			if(local.playerSelected.useheld){
+				//iprintlnbold_noloc	"::cannonThink - player pressing use to exit"
+				break
+			}
+		}
+		
+		//if the cannon is gone, end it here
+		if(!self){ end }
+		
+		self unlock
+		
+		//check if player still exists, then exit from cannon
+		if(local.playerSelected){
+			if(local.playerSelected.health > 0){
+				
+			
+				if(level.gametype == 0 || local.player.dmteam != "spectator"){
+					//make player use cannon again to exit it
+					self doUse local.playerSelected
+					
+					//iprintlnbold_noloc	"::cannonThink - player exit and present (doing use with self)"
+				}
+				
+				//reset view direction of player
+				local.playerSelected.viewangles = "0 0 0"
+			}
+			//make sure player respawns NOT inside the cannon
+			else{
+				//iprintlnbold_noloc	"::cannonThink - player respawn loc altered"
+				local.player.flags["coop_respawnTime"]		= (level.time - 2)
+				local.player.flags["coop_respawnOrigin"]	= ( -1830 -800 -140 )
+				local.player.flags["coop_respawnAngle"]		= -7
+			}
+		}
+		
+		self lock
+		
+		wait .25
+	}
+}end
