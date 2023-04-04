@@ -230,11 +230,12 @@ turret_think local.type local.trigger local.aim local.bomb local.bombtrigger:
 	{
 		local.trigger waittill trigger
 
-		if ((self.shooter == TRUE) && (self.operator == TRUE))
-		if (((parm.other == $player) || (parm.other.targetname == "friendly")) || (self.do_attack == TRUE))
-		{
-			thread fire_turret local.aim
-			wait (0.25 + randomfloat(3))
+		//[204]chrissstrahl
+		if ((self.shooter == TRUE) && (self.operator == TRUE)){
+			if (((parm.other.targetname == "player") || (parm.other.targetname == "friendly")) || (self.do_attack == TRUE)){
+				thread fire_turret local.aim
+				wait (0.25 + randomfloat(3))
+			}
 		}
 		wait 1
 	}
@@ -295,7 +296,13 @@ flak88_start local.type:
 	//[204] chrissstrahl
 	waitthread coop_mod/replace.scr::waitForPlayer
 
-	self setaimtarget $player
+	//[204] chrissstrahl
+	if(level.gametype==0){
+		self setaimtarget $player
+	}else{
+		self setaimtarget $world
+	}
+	
 	self turnspeed 6.666
 //	self waittill ontarget
 
@@ -328,7 +335,14 @@ flak88_start local.type:
 	local.loader.no_idle = 1
 	while (1)
 	{
-		local.start = $player.origin
+		//[204] chrissstrahl - grab new player each round
+		local.player = exec coop_mod/replace.scr::player_closestInFront self
+		while(!local.player){
+			waitframe
+			local.player = exec coop_mod/replace.scr::player_closestInFront self
+		}
+	
+		local.start = local.player.origin
 		local.end = self.origin
 		local.dif = local.start - local.end
 		local.ang = angles_toleft (self.angles)
@@ -389,17 +403,24 @@ flak88_start local.type:
 			local.aimer anim 88_aimer_fire
 			local.loader anim 88_loader_fire
 			wait 1
+			
+			//[204] chrissstrahl - grab new player only if old is dead or something
+			while(!isalive local.player || local.player.dmteam == "spectator"){
+				waitframe
+				local.player = exec coop_mod/replace.scr::player_closestInFront self
+			}
+			local.playerOriginZ = local.player.origin
 
 			local.timer = level.time + 4 + randomfloat(2)
 			$flak88 playsound flak_snd_fire
-			local.dist = vector_length ($flak88.origin - $player.origin)
+			local.dist = vector_length ($flak88.origin - local.playerOriginZ)
 			local.dist = local.dist - 1300
 			local.range = 25 + (local.dist / 7)
 			local.offset = 50 + (local.dist / 1.2727)
 
-			local.vec = vector_normalize (self.origin - ($player.origin))
+			local.vec = vector_normalize (self.origin - (local.playerOriginZ))
 			local.a = vector_scale local.vec local.offset
-			local.a =  local.a + $player.origin + (0 0 32)
+			local.a =  local.a + local.playerOriginZ + (0 0 32)
 
 			for (local.i=0;local.i<2;local.i++)
 			{
@@ -416,7 +437,13 @@ flak88_start local.type:
 			local.loader anim 88_loader_load
 			local.aimer waittill animdone
 			wait 3
-			self setaimtarget $player
+			
+			//[204] chrissstrahl - grab new player only if old is dead or something
+			while(!isalive local.player || local.player.dmteam == "spectator"){
+				waitframe
+				local.player = exec coop_mod/replace.scr::player_closestInFront self
+			}
+			self setaimtarget local.player
 		}
 
 	}
@@ -504,6 +531,9 @@ bombtrigger local.bomb local.bombtrigger:
 	while (local.bombtrigger != NIL)
 	{
 		local.bombtrigger waittill trigger
+		//[204] chrissstrahl - grab activatorZ
+		local.player = parm.other
+		
 		println ("trying the trigger")
 		if (level.bombs > 0)
 		{
@@ -511,7 +541,10 @@ bombtrigger local.bomb local.bombtrigger:
 			local.bombtrigger = NIL
 			level.bombs--
 			local.bomb model animate/explosive.tik
-			$player stopwatch 5
+			//[204] chrissstrahl - show clock to activatorZ
+			if(!local.player){
+				local.player stopwatch 5
+			}
 			local.bomb playsound plantbomb
 			local.bomb loopsound bombtick
 			wait 5
@@ -552,7 +585,15 @@ fire_turret local.aim:
 	if (local.first == true)
 	{
 		println "FIRST SHOT"
-		local.playorg = $player.origin
+		
+		//[204] chrissstrahl - grab new player each round
+		local.player = NULL
+		while(!local.player){
+			waitframe
+			local.player = exec coop_mod/replace.scr::player_closestInFront self
+		}
+		
+		local.playorg = local.player.origin //[204] chrissstrahl
 		local.destorg = local.ent.origin
 		local.rad = self.radius * 1
 		for (local.i=0;local.i<2;local.i++)
@@ -568,7 +609,7 @@ fire_turret local.aim:
 	}
 
 	local.ent droptofloor
-	println ("Player origin " + $player.origin + " and dest origin " + local.ent.origin + " and total dif " + vector_length ($player.origin - local.ent.origin))
+	println ("Player origin " + local.player.origin + " and dest origin " + local.ent.origin + " and total dif " + vector_length (local.player.origin - local.ent.origin)) //[204] chrissstrahl
 	local.target = local.ent.origin
 	local.ent delete
 
