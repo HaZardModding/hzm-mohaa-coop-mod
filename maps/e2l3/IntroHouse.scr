@@ -162,11 +162,17 @@ playerGetOnJeep: {
 	level.startjeepPassengerSeat.origin = local.seatpos
 	level.startjeepPassengerSeat bind $startjeep
 
-	$player holster
-	$player notsolid
-	$player.viewangles = "0 0 0"
-	$player glue level.startjeepPassengerSeat
-	$player physics_off
+	//[204]chrissstrahl
+	if(level.gametype == 0){
+		$player holster
+		$player notsolid
+		$player.viewangles = "0 0 0"
+		$player glue level.startjeepPassengerSeat
+		$player physics_off
+	}else{
+		thread coop_mod/replace.scr::glue level.startjeepPassengerSeat ( 0 0 0 ) 1
+	}
+	
 	level.playeronjeep = 1
 }end
 
@@ -270,39 +276,42 @@ unloadJeep: {
 	thread driverRunInShack
 	//thread handleTankKillingDriver	// ** dks ** should tank kill driver??
 
-	$player solid
-	$player physics_on
 	drawhud 1
-
-	local.usekey = getboundkey1 "+use"
-	local.msg = ( loc_convert_string ( "Press " + local.usekey + " to exit the Jeep." ) )
-	thread global/throbtext.scr::throbtext local.msg 0
-
-	while (!$player.useheld && $player.health > 0) {
-		waitframe
-	}
-
-	thread global/throbtext.scr::throbtext "" 0
-
-	local.startpos = $player.origin
-	local.exitpos = $startjeep gettagposition "passenger_enter"
-	level.playeronjeep = 0
-
-	$player unglue
-	$player.origin = local.exitpos
+	
+	//[204]chrissstrahl - coopified
 	$startjeep notsolid
+	if(level.gametype==0){
+		$player solid
+		$player physics_on
+		local.usekey = getboundkey1 "+use"
+		local.msg = ( loc_convert_string ( "Press " + local.usekey + " to exit the Jeep." ) )	
+		thread global/throbtext.scr::throbtext local.msg 0
+		while (!$player.useheld && $player.health > 0) {
+			waitframe
+		}
+		thread global/throbtext.scr::throbtext "" 0
+		
+		local.startpos = $player.origin
+		local.exitpos = $startjeep gettagposition "passenger_enter"
+		level.playeronjeep = 0
 
-	local.playerspot = spawn script_origin origin local.startpos
-	$player glue local.playerspot 0
-	local.playerspot time 0.2
-	local.playerspot moveto local.exitpos
-	local.playerspot move
-	
-	wait 0.2
-	$player unglue
-	
-	//AUTO SAVE
-	waitthread maps/e2l3/saves.scr::DoAutoSave "afterJeepRide"	
+		$player unglue
+		$player.origin = local.exitpos
+		
+		local.playerspot = spawn script_origin origin local.startpos
+		$player glue local.playerspot 0
+		local.playerspot time 0.2
+		local.playerspot moveto local.exitpos
+		local.playerspot move
+		wait 0.2
+		$player unglue
+		//AUTO SAVE
+		waitthread maps/e2l3/saves.scr::DoAutoSave "afterJeepRide"	
+	}else{
+		thread coop_mod/replace.scr::unglue level.startjeepPassengerSeat ( 0 0 0 ) 1
+		local.exitpos = $startjeep gettagposition "passenger_enter"
+		thread coop_mod/replace.scr::unglue local.exitpos 1
+	}
 }end
 
 //============================================================================
@@ -403,6 +412,8 @@ StartTankThinkThread local.delay: {
 		if (level.playeronjeep == 1) {
 			$player exec global/bullethit.scr (0 -1 0) 200000 50 1
 		}
+	}else{
+		level.tankFiredOnJeep = 1
 	}
 
 	$startjeep delete
