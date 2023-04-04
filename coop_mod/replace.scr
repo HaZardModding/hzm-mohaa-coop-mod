@@ -405,20 +405,60 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 			}
 		}
 	}
-	//no valid player found return closest player that is hideing
+	
+	//[204] chrissstrahl - no valid player found return any closest player - give it to the dedicated func
 	if(local.playerReturn == NULL){
-		for (local.i = 1;local.i <= $player.size;local.i++){
-			local.player = $player[local.i]
-			//[203] chrissstrahl - ignoring now players that are in noclip
+		local.playerReturn = waitthread player_closestTo local.object
+	}
+}end local.playerReturn
+
+//[204] chrissstrahl - returns closest player in front of a model
+//=========================================================================
+player_closestInFront local.object:{
+//=========================================================================
+if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread replace/player_closestInFront->"+level.cMTE+"" )} //[204] chrissstrahl - this is to debug the coop mod thread handling
+	//SINGLEPLAYER////////////////////////////
+	if( level.gametype == 0 ){ end $player }
+
+	//MULTIPLAYER////////////////////////////
+	if(local.object == NIL ){
+		error ( "coop_mod/replace.scr::player_closestInFront - parameter 1 was NIL" ) 1000
+	}
+	if(local.object == NULL){
+		error ( "coop_mod/replace.scr::player_closestInFront - parameter 1 was NULL" ) 1000
+	}
+	if(local.object.angles == NIL){
+		error ( "coop_mod/replace.scr::player_closestInFront - Needs to have angles or be a model" ) 1000
+	}
+	
+	local.objectOrigin = ( 0 0 0 )
+	local.objectAngles = angles_toforward self.angles 
+	
+	local.player = NULL
+	local.playerReturn = NULL
+	local.playerOrigin = (0 0 0)
+	local.closestDistance = 999999
+	local.objectOrigin = local.object.origin
+
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player = $player[local.i]
+		//[203] chrissstrahl - ignoring now players that are in noclip
 		if( local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 && local.player.flags["coopDevNoclip"] == NIL){
-				if( vector_length( local.player.origin - local.objectOrigin ) < local.closestDistance ){
-					local.playerReturn		= local.player
-					local.closestDistance	= vector_length( local.player.origin - local.objectOrigin )
-				}
+			//check if player is actually in front
+			local.vObjDir = vector_subtract local.player.origin self.origin
+			local.vObjDir = vector_normalize local.vObjDir
+			local.dot = vector_dot local.vObjDir local.objectAngles
+		
+			if(local.dot > .707 && vector_length( local.player.origin - local.objectOrigin ) < local.closestDistance ){
+				local.playerReturn		= local.player
+				local.closestDistance	= vector_length( local.player.origin - local.objectOrigin )
 			}
 		}
 	}
-
+	//no valid player found return any closest player
+	if(local.playerReturn == NULL){
+		local.playerReturn = waitthread player_closestTo local.object
+	}
 }end local.playerReturn
 
 //=========================================================================
