@@ -5,8 +5,12 @@ main: {
 	
 	//[204] chrissstrahl - init coop mod
 	waitthread coop_mod/main.scr::main 			//chrissstrahl - start coop mod, wait for this to finish
-	level.script = "maps/e2l3.scr"	
+	level.script = "maps/e2l3.scr"
 	
+	//[204] chrissstrahl - restore mission after failure
+	thread coop_levelLoadedafterFailure
+	
+	//[204] chrissstrahl - change so that the jeep triggers the sequence regardless if a player is in it
 	thread coop_mod/replace.scr::cloneTrigger $Start_Tanks "trigger_vehicle" "Start_Tanks" "" 1 0
 	
 	//wait 0.5
@@ -26,7 +30,12 @@ main: {
 	setcvar g_mission 2
 	exec global/exploder.scr
 	exec global/ambience.scr e2l3
-	waitexec maps/e2l3/hacks.scr
+	
+	//[204] chrissstrahl - if save / checkpoint was loaded, skip hacks
+	if(!level.coopSave){
+		waitexec maps/e2l3/hacks.scr
+	}
+	
 	exec maps/e2l3/aicleanup.scr
 	
 	
@@ -85,6 +94,43 @@ main: {
 		$world farplane_bias 10000
 	}		
 }end
+
+//if the map was loadad via token or coop save state or something
+//==========================================================[204] chrissstrahl
+coop_levelLoadedafterFailure: {
+//============================================================================
+	if(level.gametype == 0){ end }
+	
+	level.coopSave = getcvar("coop_save")
+	if(level.coopSave != "e2l3_finalHouse"){ end }
+	
+	setcvar "coop_save" ""
+	
+	//setup script
+	level.skipintrohouse	= 1
+	level.skipglider		= 1
+	level.skipbattlehouse	= 1
+	level.skipairdrop		= 1
+	level.skipvineyard		= 1
+	level.skiptown			= 1
+	
+	level.flags[coop_spawn1angles] = ( 0 9.207 0 ) 
+	level.flags[coop_spawn1origin] = ( 536 38 -445 ) 
+	level.flags[coop_spawn2origin] = ( 576 18 -445 ) 
+	level.flags[coop_spawn3origin] = ( 576 58 -445 ) 
+	level.flags[coop_spawn4origin] = ( 616 -21 -445 ) 
+	level.flags[coop_spawn5origin] = ( 616 18 -445 ) 
+	level.flags[coop_spawn6origin] = ( 616 58 -445 ) 
+	level.flags[coop_spawn7origin] = ( 656 18 -445 ) 
+	level.flags[coop_spawn8origin] = ( 656 58 -445 ) 
+	
+	//prevent players going back
+	thread coop_mod/replace.scr::spawnclip ( 640 608 -400 ) ( -64 -64 -10 ) ( 64 64 128 ) "noGoingBackBlockade" 1 0
+	
+	//make spawnlocation update as soon as players are close in the house
+	thread coop_mod/spawnlocations.scr::e2l3_update5
+}end
+
 
 //============================================================================
 InitLevel: {
