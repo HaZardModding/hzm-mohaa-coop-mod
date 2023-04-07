@@ -173,27 +173,41 @@ PickUpAmmo: {
 	self waitthread coop_mod/replace.scr::turntolookat
 	self waitthread coop_mod/replace.scr::runtoClosest
 	
+	//[204] chrissstrahl - check for dude alive
+	if(!(isalive self)){ end }
 	
 	self waittill movedone
 	self exec global/disable_ai.scr
 	wait 1.0
 
-	self exec global/enable_ai.scr
-	self turnto NULL
-	self lookat NULL
-	waitthread SummonTrucks
-	self unholster
-	wait 2.0
+	//[204] chrissstrahl - check for dude alive
+	if(isalive self){
+		self exec global/enable_ai.scr
+		self turnto NULL
+		self lookat NULL
+	}
 
+	waitthread SummonTrucks
+	
+	//[204] chrissstrahl - check for dude alive
+	if(isalive self){
+		self unholster
+		wait 2.0
+	}
+	
+	//[204] chrissstrahl - check for dude alive
+	if(!(isalive self)){ end }
+	
 	self lookat $glidertruck
 	self turnto $glidertruck
 	wait 1.0
 
+	//[204] chrissstrahl - check for dude alive
+	if(!(isalive self)){ end }
 	self lookat NULL
 	
 	//[204] chrissstrahl
 	self waitthread coop_mod/main.scr::destination
-	
 	
 	self.distance = 250
 	self.friendtype = 1
@@ -238,13 +252,17 @@ DriverLeadCode: {
 	self waitthread LinearInterpolationMotion $gliderammotrigger.origin local.pathvector2 0.2
 	self runto $gliderammotrigger.origin
 
-	while(vector_length(self.origin - $gliderammotrigger.origin) > 270) {
+	//[204] chrissstrahl - if dude is killed it needs to stop
+	while(isalive self && vector_length(self.origin - $gliderammotrigger.origin) > 270) {
 		waitframe
 	}
-
-	//[204] chrissstrahl
-	self waitthread coop_mod/main.scr::destination
 	
+	
+	//[204] chrissstrahl - if dude is killed it needs to stop
+	if(isalive self){
+		//[204] chrissstrahl
+		self waitthread coop_mod/main.scr::destination
+	}
 	
 	waitframe
 	$DriverLeadCode remove
