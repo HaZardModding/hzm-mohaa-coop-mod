@@ -8,7 +8,7 @@ main: {
 	level.script = "maps/e2l3.scr"
 	
 	//[204] chrissstrahl - restore mission after failure
-	thread coop_levelLoadedafterFailure
+	waitthread coop_levelLoadedafterFailure
 	
 	//[204] chrissstrahl - change so that the jeep triggers the sequence regardless if a player is in it
 	thread coop_mod/replace.scr::cloneTrigger $Start_Tanks "trigger_vehicle" "Start_Tanks" "" 1 0
@@ -37,11 +37,6 @@ main: {
 	}
 	
 	exec maps/e2l3/aicleanup.scr
-	
-	
-	//[204] chrissstrahl - development
-	//level.skipintrohouse = 1
-	//level.skiptown = 1
 	
 	thread InitLevel
 
@@ -93,26 +88,32 @@ main: {
 		$world farplane 10000
 		$world farplane_bias 10000
 	}		
+	
+	//[204] chrissstrahl - scale down blockade if coop save was loadad
+	if($noGoingBackBlockade){
+		$noGoingBackBlockade scale 0.75
+	}
 }end
 
 //if the map was loadad via token or coop save state or something
 //==========================================================[204] chrissstrahl
 coop_levelLoadedafterFailure: {
 //============================================================================
-	if(level.gametype == 0){ end }
+	if(level.gametype == 0){ end } //seta coop_save e2l3_finalHouse
 	
 	level.coopSave = getcvar("coop_save")
-	if(level.coopSave != "e2l3_finalHouse"){ end }
+	if(level.coopSave != "e2l3_finalHouse" ){
+		end
+	}
 	
-	setcvar "coop_save" ""
+	//level.coopSave = "e2l3_finalHouse"
 	
-	//setup script
-	level.skipintrohouse	= 1
-	level.skipglider		= 1
-	level.skipbattlehouse	= 1
-	level.skipairdrop		= 1
-	level.skipvineyard		= 1
-	level.skiptown			= 1
+	level.skipintrohouse	= 1 //start with the jeep and tank
+	level.skipglider		= 1 //right after the tank is destroyed and a crashed glider spends some ammo
+	level.skipbattlehouse	= 1 //the house where the mg has pinned the troops down, right after the trucks
+	level.skipairdrop		= 1 //soldiers dropping from the air
+	level.skipvineyard		= 1 //puts you right at the paratroopers landing zone at the entrace of the "town"
+	level.skiptown			= 1 //end of town where destroyed tank is and the MG-Nest
 	
 	level.flags[coop_spawn1angles] = ( 0 9.207 0 ) 
 	level.flags[coop_spawn1origin] = ( 536 38 -445 ) 
@@ -125,9 +126,53 @@ coop_levelLoadedafterFailure: {
 	level.flags[coop_spawn8origin] = ( 656 58 -445 ) 
 	
 	//prevent players going back
-	thread coop_mod/replace.scr::spawnclip ( 640 608 -400 ) ( -64 -64 -10 ) ( 64 64 128 ) "noGoingBackBlockade" 1 0
+	thread coop_mod/replace.scr::spawnclip ( 620 560 -400 ) ( -24 -64 -10 ) ( 22 64 128 ) "noGoingBackBlockade" 1 90
+		
+	println("==== ---------- ====")
+	println("==== RESET CVAR ====")
+	println("==== COOP_SAVE- ====")
+	println("==== AFTER-LOAD ====")
+	println("==== ---------- ====")
+	setcvar "coop_save" ""
 	
-	//make spawnlocation update as soon as players are close in the house
+	//[204] chrissstrahl - cleanup some shit
+	$c47_path remove
+	$summonPlane remove
+	$c47 remove
+	
+	$Start_Tanks remove
+	$starttank remove
+	$startjeep remove
+	$jeepCrashGate_BloodyHell remove
+	$driver remove
+	
+	$house1_stayinside remove
+	$house1_wentoutside remove
+	$build1exp1 remove
+	$build1exp2 remove
+	$build1exp3 remove
+	$startbazooka remove
+	
+	$GliderSceneTrigger remove
+	$summonTrucks remove
+	$battleTrigger remove
+	$gliderammotrigger remove
+	
+	$battleTriggerDamage remove
+	$stopHouseParade remove
+	$battleAirborne_Trooper remove
+	
+	$townTrigger remove
+	
+	thread coop_mod/butler.scr::removePath $open_jeep_path2 0.1
+	thread coop_mod/butler.scr::removePath $tankpath 0.2
+	thread coop_mod/butler.scr::removePath $glidertruck 0.3
+	thread coop_mod/butler.scr::removePath $glidertruck2 0.4
+	
+	thread coop_mod/butler.scr::removeArray $t229234530
+	thread coop_mod/butler.scr::removeArray $t229234548
+	
+	//ready spawnlocation check if player gets close
 	thread coop_mod/spawnlocations.scr::e2l3_update5
 }end
 
@@ -256,4 +301,11 @@ GiveMedal: {
 	if(level.gametype == 0){
 		setcvar "g_medal4" "1"
 	}
+}end
+
+//[204] chrissstrahl - this is called from e2l1/objectives script
+//============================================================
+coop_missioncomplete:{
+//============================================================
+	exec global/missioncomplete.scr (level.coopNextMap) 1
 }end
