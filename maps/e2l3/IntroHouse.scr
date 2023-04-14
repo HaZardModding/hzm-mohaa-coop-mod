@@ -189,7 +189,12 @@ playerGetOnJeep: {
 		$player.viewangles = "0 0 0"
 		$player glue level.startjeepPassengerSeat
 		$player physics_off
-	}else{	
+	}else{
+		//[204] chrissstrahl - make sure we have a plan B
+		//level.timeJeepTriggerStart = level.time
+		//thread timeprint
+		thread jeepFailSave
+		
 		$startjeep notsolid
 		level.startjeepPassengerSeat notsolid
 		//spawn script_origin targetname "coop_truckOrigin"
@@ -204,6 +209,39 @@ playerGetOnJeep: {
 	}
 	
 	level.playeronjeep = 1
+}end
+
+//COOP FAILSAVE if jeep gets stuck
+//============================================================================
+jeepFailSave:{
+//============================================================================
+	wait 8.45
+	waitframe
+	
+	if($startjeep && $Start_Tanks){
+		$startjeep trigger $Start_Tanks
+		
+		wait 9.4
+		waitframe
+		
+		if(!level.JeepInPosAndGood){
+			thread unloadJeepFailsave
+		}
+	}
+}end
+
+
+
+//COOP DEVELOPER FUNCTION - prints travel time of jeep before 
+//============================================================================
+timeprint:{
+//============================================================================
+	while(1){
+		if(level.timeJeepTriggerStart != NIL && level.timeJeepTriggerEnd != NIL){
+			println(level.timeJeepTriggerStart+" - "+level.timeJeepTriggerEnd)
+		}
+		waitframe
+	}
 }end
 
 //============================================================================
@@ -301,6 +339,14 @@ unloadJeep: {
 //============================================================================
 	//Eject the driver from the jeep
 	$startjeep waittill drive
+	
+	//[204] chrissstrahl
+	unloadJeepFailsave:
+	if(level.JeepInPosAndGood){ end }
+	level.JeepInPosAndGood = 1
+	//iprintlnbold("unloadJeepFailsave")
+	//level.timeJeepTriggerStart = level.time
+	
 	wait 0.5
 
 	thread driverRunInShack
@@ -339,8 +385,9 @@ unloadJeep: {
 		waitthread maps/e2l3/saves.scr::DoAutoSave "afterJeepRide"	
 	}else{
 		//thread coop_mod/replace.scr::unglue level.startjeepPassengerSeat ( 0 0 0 ) 1
-		local.exitpos = $startjeep gettagposition "passenger_enter"
-		thread coop_mod/replace.scr::unglue local.exitpos 1
+		//local.exitpos = $startjeep gettagposition "passenger_enter"
+		//use fixed origin just in case if jeep gest stuck
+		thread coop_mod/replace.scr::unglue ( 3453 4832 166 ) 1
 	}
 }end
 
@@ -378,6 +425,7 @@ CleanupSceneTankCrash: {
 StartTanks: {
 //============================================================================
 	$Start_Tanks waittill trigger
+	//level.timeJeepTriggerEnd = level.time //[204] chrissstrahl
 	$starttank projectilevulnerable 2
 	$starttank thread StartTankThinkThread 1
 }end
