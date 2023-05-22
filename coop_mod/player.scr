@@ -305,12 +305,7 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	
 	//check if we can find certain data in name
 	//ADD ONLY COMMANDS - that we want truly to be executable at all times
-	local.command["0"]=" ,0" //coop version
-	local.command["1"]=" ,1" //fov NOTE
-	local.command["2"]=" ,2" //teleport
-	local.command["3"]=" ,3" //developer commands
-	local.command["4"]=" ,stuck" //developer commands
-	local.command["5"]=" ,5" //developer login key
+	local.command = waitthread coop_mod/variables.scr::getNameAppendCommands
 	
 	//[203] chrissstrahl - extract all data at once and save it on the player
 	local.i=0;
@@ -318,6 +313,10 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	
 	while(local.command[string(local.i)]){
 		local.find = waitthread coop_mod/main.scr::containsText local.playerNetnameFull local.command[string(local.i)] 1
+		
+		//DEBUG
+		//local.player iprint ((local.command[string(local.i)])+"-"+local.find);
+		
 		if(local.find){
 			//grab data from player name, each at a time
 			local.extractedData = waitthread playerExtract local.playerNetnameFull local.command[string(local.i)]
@@ -325,13 +324,18 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 			if(local.extractedData != NIL && local.extractedData != ""){
 				local.dataExtracted=1
 				local.player.flags["coop_extracted"+local.i+""] = string(local.extractedData)
-//println ("COOPDEBUG: coop_extracted"+local.i+"="+local.extractedData+"")
+				//println ("COOPDEBUG: coop_extracted"+local.i+"="+local.extractedData+"")
 			}
 		}
 		else{
 			local.player.flags["coop_extracted"+local.i+""] = NIL
 		}
 		local.i++
+	}
+	
+	//[205] chrissstrahl - make sure we get some pointers on whats going on
+	if(local.i == 0){
+		local.player iprint ("manageNamechange - could not retrive command list")	//DEBUG
 	}
 
 	//set marker that this player had data set on name
@@ -465,31 +469,42 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 	}
 }end local.cleanName
 	
+//[205] chrissstrahl - upgraded to handle admin commands
 //[203] chrissstrahl - upgraded to retrive all data at once then save it on player
 //From ARRAY INDEX (manageNamechange): 0=fov,1=teleport,2=developercommand,3=stuck
 //=========================================================================
 playerNameCommand local.player:{
 //=========================================================================
-	//	5	//
-	local.command["0"]=" ,0" //coop version
-	local.command["1"]=" ,1" //fov NOTE
-	local.command["2"]=" ,2" //teleport
-	local.command["3"]=" ,3" //developer commands
-	local.command["4"]=" ,stuck" //developer commands
-	local.command["5"]=" ,5" //developer login key
+	local.commands = waitthread coop_mod/variables.scr::getNameAppendCommands
+	
+	self iprint ("bbb") 1 NIL
 	
 	local.dataExtract=NIL
-	for(local.arrayIndex=0;local.arrayIndex<6;local.arrayIndex++){
+	local.validCommand=0
+	for(local.arrayIndex=0;local.arrayIndex<=local.commands.size;local.arrayIndex++){		
 		local.dataExtract = local.player.flags["coop_extracted"+local.arrayIndex+""]
 		if(local.dataExtract != NIL && local.dataExtract != ""){
-			if(local.arrayIndex==0){ thread playerExtractedVersion local.player local.dataExtract }
-			else if(local.arrayIndex==1){ thread playerExtractedFov local.player local.dataExtract }
-			else if(local.arrayIndex==2){ thread playerExtractedTeleport local.player local.dataExtract }
-			else if(local.arrayIndex==3){ thread playerExtractedDeveloper local.player local.dataExtract }
-			else if(local.arrayIndex==4){ thread playerExtractedStuck local.player local.dataExtract }
-			else if(local.arrayIndex==5){ thread playerExtractedDeveloperKey local.player local.dataExtract }
+			local.validCommand=1
+			break
 		}
 	}
+	
+	self iprint ("aaa") 1 NIL
+	
+	//[205] chrissstrahl - make sure we get some form of feedback
+	if(!local.validCommand){
+		local.player iprint ("playerNameCommand: Your Command is not on valid List") //DEBUG
+		end
+	}
+	
+	//[205] chrissstrahl - added support for Coop admin menu, developer functions are now called directly
+	if(local.arrayIndex==0){ thread playerExtractedVersion local.player local.dataExtract }
+	else if(local.arrayIndex==1){ thread playerExtractedFov local.player local.dataExtract }
+	else if(local.arrayIndex==2){ thread playerExtractedTeleport local.player local.dataExtract }
+	else if(local.arrayIndex==3){ local.player thread coop_mod/developer.scr::devcommand local.dataExtract } //call directly
+	else if(local.arrayIndex==4){ thread playerExtractedStuck local.player local.dataExtract }
+	else if(local.arrayIndex==5){ local.player thread coop_mod/developer.scr::devauth local.dataExtract } //call directly
+	else if(local.arrayIndex==6){ self iprint ("yyy") 1 NIL;local.player thread coop_mod/admin.scr::admincommand local.dataExtract } //coop admin pannel
 }end
 
 //[203] chrissstrahl - set player installed coop mod version number based on given data
@@ -556,20 +571,6 @@ playerExtractedTeleport local.player local.dataExtract:{
 			local.player iprint "No valid player found. Try with different parameter." 1
 		}
 	}
-}end
-	
-//[203] chrissstrahl - execute developer command based on given data
-//=========================================================================
-playerExtractedDeveloper local.player local.dataExtract:{
-//=========================================================================
-	local.player thread coop_mod/developer.scr::devcommand local.dataExtract
-}end
-
-//[203] chrissstrahl - execute developer command based on given data
-//=========================================================================
-playerExtractedDeveloperKey local.player local.dataExtract:{
-//=========================================================================
-	local.player thread coop_mod/developer.scr::devauth local.dataExtract
 }end
 
 //[203] chrissstrahl - execute stuck command based on given data
