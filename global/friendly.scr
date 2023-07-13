@@ -895,8 +895,8 @@ friendlythinkstart:{
 											if (!(self exec coop_mod/replace.scr::cansee) && (local.set > level.playernodeset + local.offset) ){
 												local.break = 0
 											}else{
-												//@smithy -> checks distance to player (follow)
-												local.playerToSelfDistance = vector_length (self.origin - local.player)
+												//[205] chrissstrahl - fixed
+												local.playerToSelfDistance = vector_length (self.origin - local.player.origin)
 												if ((local.playerToSelfDistance > 200) && (level.friendlyused[local.nodenum] == 1) && (local.set > level.playernodeset + local.offset)){
 													local.break = 0					
 												}else if ((local.playerToSelfDistance > 200 ) && (local.set > level.playernodeset + local.offset) &&	!(exec coop_mod/replace.scr::sighttrace (0 0 0) level.friendlynode[local.nodenum].origin 1)){
@@ -2558,13 +2558,19 @@ areatrigger local.waitspawn:
 end
 
 friendlydeath:
+{
 	level waittill spawn
+	
+	//[205] chrissstrahl - fixed NULL entity reference issue
+	if(!self){ end }
+	
 	self waittill death
-	for (local.i=1;local.i<level.friendlys+1;local.i++)
-		if (level.friendly[local.i] == self)
+	for (local.i=1;local.i<level.friendlys+1;local.i++){
+		if (level.friendly[local.i] == self){
 			level.friendly[local.i] = level.deadent
-
-end
+		}
+	}
+}end
 
 
 /*
