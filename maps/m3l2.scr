@@ -1792,26 +1792,28 @@ end
 scene7_team_regroup:
 
 		//*** Setup for Private Cobb
+		//[205] chrissstrahl - FIX NULL
+		if(level.cobb){
+			level.cobb.accuracy		= 30		//marksmanship
+			level.cobb.mindist		= 128		//range to stop closing in
+			level.cobb.maxdist		= 4000	//range to close to on enemy for longest range shot
+			level.cobb.health			= 100		//must die before M3L3		
+			level.cobb.leash			= 640
+			//level.cobb tether $player //chrissstrahl
+			level.cobb exec coop_mod/main.scr::tether //chrissstrahl - coop compatible
+			level.cobb.sight			= 4000
+			level.cobb.noticescale		= 1
+			level.cobb.waittime		= 0.1		//respond as fast as possible to player movement
 
-		level.cobb.accuracy		= 30		//marksmanship
-		level.cobb.mindist		= 128		//range to stop closing in
-		level.cobb.maxdist		= 4000	//range to close to on enemy for longest range shot
-		level.cobb.health			= 100		//must die before M3L3		
-		level.cobb.leash			= 640
-		//level.cobb tether $player //chrissstrahl
-		level.cobb exec coop_mod/main.scr::tether //chrissstrahl - coop compatible
-		level.cobb.sight			= 4000
-		level.cobb.noticescale		= 1
-		level.cobb.waittime		= 0.1		//respond as fast as possible to player movement
+		//*** Cobb follows the player
 
-	//*** Cobb follows the player
-
-		level.cobb thread global/friendly.scr::friendlythink
-		level.cobb.friendtype = 1 //toggle this to -1 to shut down following
-		//level.cobb.destination = $player //chrissstrahl
-		level.cobb exec coop_mod/main.scr::destination //chrissstrahl - coop compatible
-		level.cobb.distance = 192
-		level.cobb exec global/enable_ai.scr
+			level.cobb thread global/friendly.scr::friendlythink
+			level.cobb.friendtype = 1 //toggle this to -1 to shut down following
+			//level.cobb.destination = $player //chrissstrahl
+			level.cobb exec coop_mod/main.scr::destination //chrissstrahl - coop compatible
+			level.cobb.distance = 192
+			level.cobb exec global/enable_ai.scr
+		}
 
 	//*** Launch Scene 8
 
@@ -1825,7 +1827,11 @@ scene7_team_regroup:
 		level.ramsey exec coop_mod/replace.scr::runto //chrissstrahl - coop compatible
 		
 		level.ramsey.avoidplayer = 1
-		level.cobb.avoidplayer = 1
+		
+		//[205] chrissstrahl - FIX NULL
+		if(level.cobb){
+			level.cobb.avoidplayer = 1
+		}
 
 //		while !(vector_within level.ramsey $player 320)
 //		{
@@ -2101,10 +2107,12 @@ flak88_thinker local.target local.range local.offset local.trigger local.variabl
 		local.temp playsound flak88_hit
 		local.temp.origin = local.a
 		local.temp anim start
-		if ( (local.trigger == $scene13_flak88_killzone) || (local.trigger == $scene6_flak88_killzone) )
-		{
+		//[205] chrissstrahl - fix NULL
+		if(local.trigger){
+		if ((local.trigger == $scene13_flak88_killzone) || (local.trigger == $scene6_flak88_killzone) ){
 			//println "z:          killing the player using normal_damage" //chrissstrahl - no, one, cares, dude!
 			local.trigger exec coop_mod/replace.scr::killzone		
+			}
 		}
 		wait 1
 		local.temp remove
