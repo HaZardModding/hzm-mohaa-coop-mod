@@ -7326,7 +7326,8 @@ ai_fodder:{
 		local.player = exec coop_mod/replace.scr::player_closestTo local.dead_dork //[200] Smithy - fixes this loop getting caught
 	}
 
-	if (local.dead_dork.origin[1] < (local.player.origin[1] + (randomint 256 + 256)) && local.dead_dork.origin[1] < 2560){	//chrissstrahl - coop
+	//[205] chrissstrahl - fix NULL
+	if (local.dead_dork && local.dead_dork.origin[1] < (local.player.origin[1] + (randomint 256 + 256)) && local.dead_dork.origin[1] < 2560){	//chrissstrahl - coop
 		//println "AI FODDER: " local.dead_dork " is not in the right place to die yet: " local.dead_dork.origin[1] " : player: " $player.origin[1]
 		wait 1
 		goto ai_fodder_loopcheck
@@ -7342,18 +7343,21 @@ ai_fodder:{
 	}
 
 	// neutralize the fodder    -  but wait, I don't want neutral...I want dead!!!
-	if (vector_length(local.dead_dork.origin - local.player.origin) > 768 && randomint 3 == 0){	//chrissstrahl - coop
-		//println "AI FODDER: " local.dead_dork " will die by mortar blast....< -1024 means water: " local.dead_dork.origin[1]
-		if (local.dead_dork.origin[1] > -1024){
-        	local.type = NIL
-		}else{
-			local.type = "water"
+	//[205] chrissstrahl - fix NULL
+	if(local.dead_dork){
+		if (vector_length(local.dead_dork.origin - local.player.origin) > 768 && randomint 3 == 0){	//chrissstrahl - coop
+			//println "AI FODDER: " local.dead_dork " will die by mortar blast....< -1024 means water: " local.dead_dork.origin[1]
+			if (local.dead_dork.origin[1] > -1024){
+				local.type = NIL
+			}else{
+				local.type = "water"
+			}
+			local.dead_dork waitthread ai_mortar_death local.type
 		}
-		local.dead_dork waitthread ai_mortar_death local.type
-	}
-	else{
-		//println "AI FODDER: " local.dead_dork " will die by mgs"
-		local.dead_dork waitthread ai_mg_death
+		else{
+			//println "AI FODDER: " local.dead_dork " will die by mgs"
+			local.dead_dork waitthread ai_mg_death
+		}
 	}
 
 
