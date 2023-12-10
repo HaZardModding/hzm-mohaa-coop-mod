@@ -25,7 +25,9 @@ InitIntro: {
 		$introtruck setcollisionentity $opeltruckcollide
 	}
 	
-	$player threatbias 500
+	//[206] chrissstrahl - coopify
+	thread coop_mod/replace.scr::threatbias 500
+	
 	thread handleDriver
 	thread handlePassenger  
 
@@ -85,10 +87,17 @@ DoIntro: {
 	$startjeep.turret unlock
 
 	// Put the player in the jeep
-	$player.origin = $startjeep.turret.origin
-	$startjeep doUse $player
-	$startjeep lock
-	$startjeep.turret lock
+	//[206] chrissstrahl - do this only in singleplayer
+	if(level.gametype == 0){
+		$player.origin = $startjeep.turret.origin
+		$startjeep doUse $player
+		$startjeep lock
+		$startjeep.turret lock
+	}
+	//[206] chrissstrahl - coopify
+	else{
+		thread coop_mod/replace.scr::glue $startjeep.turret NIL 1
+	}
 
 	// Tell the jeep to drive
 	$startjeep drive $startjeeppath 300 200 200 256
@@ -124,14 +133,22 @@ JeepCrash: {
 	$startjeep DetachDriverSlot 0 $jeepdriver.origin
 
 	// Eject the player from the jeep
-	$startjeep.turret = $startjeep queryturretslotentity 0
-	$startjeep unlock
-	$startjeep.turret unlock
-	$startjeep doUse $player
-	$player.viewangles = ( 0 20 0 )
-	waitframe
-	
-	$player.origin = $player.origin + (0 0 400)
+	//[206] chrissstrahl - do this only in singleplayer
+	if(level.gametype == 0){
+		$startjeep.turret = $startjeep queryturretslotentity 0
+		$startjeep unlock
+		$startjeep.turret unlock
+		$startjeep doUse $player
+		$player.viewangles = ( 0 20 0 )
+		waitframe
+		$player.origin = $player.origin + (0 0 400)
+	}
+	//[206] chrissstrahl - coopify
+	else{
+		thread coop_mod/replace.scr::unglue NIL 1
+		//move players to their actual spawn
+		
+	}
 
 	// Shake the camera
 	exec global/earthquake.scr 3 5 0 0

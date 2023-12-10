@@ -5,6 +5,11 @@ main: {
 	level.fogBias = 1000
 	level.fogColor = ( .25 .26 .28 )
 
+	//[206] chrissstrahl - init coop mod
+	waitthread coop_mod/main.scr::main 			//chrissstrahl - start coop mod, wait for this to finish
+	
+	//level.coop_forceDropWeapons = game.true 		//[206] chrissstrahl - allow weapon drops on this map
+	
 	exec global/auto.scr e3l1
 	exec global/ambience.scr e3l1
 	exec global/fogtrigger.scr
@@ -30,7 +35,10 @@ main: {
 
 	// this is used for player health scaling
 	level.playerHealthScale = 1.0
-	level waittill spawn
+	
+	//[206] chrissstrahl - make sure level starts after a player has joined
+	//level waittill spawn
+	waitthread coop_mod/replace.scr::waitForPlayer
 
 	waitexec maps/e3l1/hacks.scr
 	
@@ -109,12 +117,21 @@ main: {
 //=========================================================================
 Fadein: {
 //=========================================================================
+	iprintlnbold_noloc ("Fadein") //[206] chrissstrahl - printout info for development
 	$player physics_off
 	exec global/fadein.scr
 	waitframe
 
 	waitthread global/fadein.scr::DoFadeIn e3l1_1 e3l1_2 e3l1_3 NIL 1
-	$player.viewangles = "0 3 0"  //undo any mousemovment during the hud stuff
+	
+	
+	//[206] chrissstrahl - adjust angles of all players once (sp+mp)
+	//undo any mousemovment during the hud stuff
+	//$player.viewangles = "0 3 0"
+	for (local.i = 1; local.i <= $player.size; local.i++) {
+		local.player = $player[local.i]
+		local.player.viewangles  = "0 3 0"
+	}  
 }end
 
 //=========================================================================
@@ -126,6 +143,7 @@ Briefing: {
 	$player playsound dfr_E3L3_MOR02 wait
 	$player waittill sounddone
 	*/
+	iprintlnbold_noloc ("Briefing") //[206] chrissstrahl - printout info for development
 	$player physics_on
 }end
 
@@ -146,7 +164,9 @@ InitLevel: {
 //=========================================================================
 InitPlayer: {
 //=========================================================================
-	$player heal 1
+	//[206] chrissstrahl - do this in singleplayer only
+	if(!level.gametype){ $player heal 1 }
+	
 	waitthread ArmPlayer
 	waitthread Fadein
 	waitthread Briefing
@@ -166,6 +186,8 @@ SetPlayerHealthScale local.scale: {
 //=========================================================================
 	//	iprintln "setting player health scale to " local.scale
 	//	iprintln "   old health: " $player.health ", old maxhealth: " $player.max_health
+
+	iprintlnbold_noloc ("SetPlayerHealthScale") //[206] chrissstrahl - printout info for development
 
 	$player healthonly ($player.health / level.playerHealthScale)
 	$player.max_health = ($player.max_health / level.playerHealthScale)
@@ -213,6 +235,7 @@ DoubleParadeDone: {
 //=========================================================================
 startMusic_e3l1_main: {
 //=========================================================================
-	$player stufftext "tmstop; tmstartloop sound/music/E2L2_Road_to_Tobruk.mp3; tmvolume 2"
+	//[206] chrissstrahl - printout info for development
+	thread coop_mod/replace.scr::tmstartloop "sound/music/E2L2_Road_to_Tobruk.mp3; tmvolume 2"
 	//	$player stufftext "tmvolume 2"
 }end
