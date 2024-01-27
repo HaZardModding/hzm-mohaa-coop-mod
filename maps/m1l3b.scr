@@ -107,6 +107,14 @@ level waitTill prespawn
 waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl - coop - make sure level starts after a player has joined
 //////////////////////
 
+	//[206] Chrisssstrahl - moved up here
+	//chrissstrahl - wait until player is glued to jeep
+	if(level.gametype != 0){
+		while( level.coop_inJeep == NIL || level.coop_inJeep == 0 ){
+			waitframe
+		}
+	}
+
 	//[200] chrissstrahl - moved here in the hope to fix a error printout
 	$opel1.nolights = 1
 	$opel1 thread global/vehicles_thinkers.scr::enemy_truck_think level.truck_health
@@ -119,12 +127,6 @@ waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl - coop - make sure
 
 	$opel2 thread global/vehicles_thinkers.scr::enemy_truck_think level.truck_health 5 $opel2_path1 NULL
 	
-	//chrissstrahl - wait until player is glued to jeep
-	if(level.gametype != 0){
-		while( level.coop_inJeep == NIL || level.coop_inJeep == 0 ){
-			waitframe
-		}
-	}
 	//chrissstrahl - give ammo to other players
 	thread coop_giveAmmo
 	//end chrissstrahl
@@ -1158,6 +1160,92 @@ coop_setupAttach:{
 	}
 }end
 
+//[206] chrissstrahl - mark jeep as free and allow next player to use/spawn in it
+//=========================================================================
+coop_jeepNotOccupied:{
+//=========================================================================
+	level.coop_inJeep = 0
+	while(!level.coop_inJeep){
+		for(local.i=1;local.i <= $player.size;local.i++){
+			local.player = $player[local.i]
+			if(isAlive local.player && !local.player.isSpectator){
+				if(vector_within level.playerjeep.origin local.player.origin 1500){
+					if(local.player.useheld){
+						thread coop_playerForceToJeep local.player
+						goto stopJeepHud
+					}else if( local.player.flags["coop_hudPeTeJ"] == NIL){
+						local.player.flags["coop_hudPeTeJ"] = 1
+						local.player stufftext "ui_addhud coop_jeepEnter"
+					}
+				}else{
+					if(local.player && local.player.flags["coop_hudPeTeJ"] != NIL){
+						local.player stufftext "ui_removehud coop_jeepEnter"
+						local.player.flags["coop_hudPeTeJ"] = NIL
+					}
+				}
+			}
+		}
+		waitframe
+	}
+stopJeepHud:
+	for(local.i=1;local.i <= $player.size;local.i++){
+		local.player = $player[local.i]
+		if(local.player && local.player.flags["coop_hudPeTeJ"] != NIL){
+			local.player stufftext "ui_removehud coop_jeepEnter"
+			local.player.flags["coop_hudPeTeJ"] = NIL
+		}
+	}
+}end
+
+//[206] chrissstrahl - mark jeep as free and allow next player to use/spawn in it
+//=========================================================================
+coop_playerJustDied:{
+//=========================================================================
+	local.player = parm.other
+	if(local.player && local.player.targetname != "world"){
+		if(local.player.flags["coop_inJeep"]){
+			local.player.flags["coop_inJeep"] = game.false
+			thread coop_jeepNotOccupied
+		}
+	}
+}end
+
+//[206] chrissstrahl - handle if any player leaves, check if that player was in the jeep
+//=========================================================================
+coop_playerJustLeft:{
+//=========================================================================
+	for(local.i=1;local.i <= $player.size;local.i++){
+		local.player = $player[local.i]
+		if(isAlive local.player && !local.player.isSpectator){
+			if(local.player.flags["coop_inJeep"]){
+				end
+			}
+		}
+	}
+	//no player found that was in jeep - allow next spawning player to enter or player pressing use to enter
+	thread coop_jeepNotOccupied
+}end
+
+//[206] chrissstrahl - move player to jeep
+//=========================================================================
+coop_playerForceToJeep local.player:{
+//=========================================================================
+	level.coop_inJeep = 1
+	if(!local.player.flags["coop_inJeep"]){
+		local.player.flags["coop_inJeep"] = game.true
+
+		local.player notsolid
+		
+		local.vturretent = level.playerjeep queryturretslotentity 0
+		local.vturretent unlock
+		level.playerjeep attachturretslot 0 local.player    // Attach the player to the jeep
+		local.player perferredweapon ".30cal Machine Gun"
+		local.vturretent lock
+		
+		//local.player thread coop_monitorPlayer1 //[200] Smithy - redundant
+	}
+}end
+
 //chrissstrahl - this handles all players that touch the trigger, regardles of who triggred it
 //=========================================================================
 coop_playerSpawned:{
@@ -1165,6 +1253,19 @@ coop_playerSpawned:{
 	$playerjeep notsolid
 	$oss_man notsolid
 	//$t209 remove
+	
+	//[206] chrissstrahl - put player into jeep if jeep is not yet occupied
+	local.player = parm.other
+	if(local.player && local.player.targetname != "world"){
+		if(local.player.dmteam != "spectator"){
+			local.player.flags["coop_inJeep"] = game.false 
+			if(!level.coop_inJeep){
+				thread coop_playerForceToJeep local.player
+			}
+		}
+	}
+	
+	end
 	
 	if (parm.other == $player[1]){ //[200] Smithy - easier way
 		$player[1].flags["coop_inJeep"] = game.false 
