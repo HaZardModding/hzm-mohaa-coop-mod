@@ -74,7 +74,9 @@ gagPlaneSound:
 //=========================================================================
 {
 	$triggerdistantplanesound waittill trigger
-	$player playsound plane_by5
+	
+	//$player playsound plane_by5		//MiaCosa
+	exec coop_mod/replace.scr::playsound plane_by5
 }end
 
 //=========================================================================
@@ -183,7 +185,8 @@ ObjectiveGoToBunker2:
 //=========================================================================
 {
 	if(level.hackskipbunker2 == 1){
-		$player.origin = $bunker3.origin		
+		$player.origin = $bunker3.origin		//MiaCosa @chrissstrahl
+	
 		end
 	}
 		
@@ -198,7 +201,7 @@ ObjectiveGoToBunker2:
 	thread Bunker2CrateDeliver
 
 	$jeepdriver say A_34_JeepDrive_Talk_05 //Here we are, Sarge!  Take these supplies to the gunners downstairs.  I'm headin' to the next bunker!"
-	$jeepdriver waittill saydone
+	$jeepdriver waittill saydone		//MiaCosa @chrissstrahl
 	$jeepdriver thread global/LoopAnim.scr::LoopAnim A_22_driver_idle
 	
 	waitthread maps/e3l4/Bunker1.scr::PlayerGetOffJeepTurret
@@ -220,7 +223,7 @@ ObjectiveGoToBunker2:
 	$bunker2mgguy2 physics_on
 	$bunker2mgguy2 exec global/disable_ai.scr
 	$bunker2mgguy2 say A_34_gunnertalk_01 //thanks for the ammo, you're a life saver
-	$bunker2mgguy2 waittill saydone
+	$bunker2mgguy2 waittill saydone		//MiaCosa @chrissstrahl
 	$bunker2mgguy2 takedamage
 	$bunker2mgguy2 exec global/enable_ai.scr
 	$bunker2mgguy2 physics_off
@@ -374,7 +377,7 @@ ObjectiveDefendBunker2:
 		end
 	}
 
-	$jeepgate2 lock
+	$jeepgate2 lock		//MiaCosa @chrissstrahl
 	waitthread Bunker2BattleManager
 	
 	//dprintln "Opening Bunker 2 Gate"
@@ -392,12 +395,12 @@ OpenGate:
 //=========================================================================
 {
 	while ((vector_length($player.origin - $jeepgate2[1].origin) < 150) && (vector_length($bunker2reinforcement.origin - $jeepgate2[1].origin) < 150)){
-		waitframe
+		waitframe		//MiaCosa @chrissstrahl
 	}
 
 	$clipB2Gate remove	// remove player clip on gate
 	$jeepgate2 wait -1	// stop gate from closing automatically
-	$jeepgate2 unlock
+	$jeepgate2 unlock		//MiaCosa @chrissstrahl
 	trigger $triggerVehB2Gate	// open it
 }end
 
@@ -408,7 +411,9 @@ WakeUpReinforcement:
 	level.b2neworders = 0
 
 	// spawn the reinforcment out of sight of the player
-	while ($player cansee $bunker2reinforcement.origin 30){
+	//while ($player cansee $bunker2reinforcement.origin 30) {		//MiaCosa @chrissstrahl
+	while (exec coop_mod/replace.scr::cansee $bunker2reinforcement.origin 30) {		//MiaCosa @chrissstrahl
+	
 		waitframe
 	}
 	
@@ -431,21 +436,31 @@ ReinforcementGiveOrders:
 	$bunker2reinforcement exec global/disable_ai.scr
 
 	// Make the reinforcement run to the player
-	$bunker2reinforcement runto $player
-	while (vector_length($bunker2reinforcement.origin - $player.origin) > 150){
+	
+	//$bunker2reinforcement runto $player		//MiaCosa - replaced runto
+	$bunker2reinforcement exec coop_mod/replace.scr::runtoClosest
+	
+	
+	while (vector_length($bunker2reinforcement.origin - $player.origin) > 150){		//MiaCosa @chrissstrahl
 		waitframe
 	}
 
 	// pop the player off the turret if necessary
-	if ($player.turret != NIL && $player.turret != NULL){
-		$player usestuff $player.turret
+	if ($player.turret != NIL && $player.turret != NULL){		//MiaCosa @chrissstrahl
+		$player usestuff $player.turret		//MiaCosa @chrissstrahl
 	}
 
 	// the dude gives you instructions
-	$bunker2reinforcement turnto $player
-	$bunker2reinforcement lookat $player
+	//$bunker2reinforcement turnto $player		//MiaCosa
+	$bunker2reinforcement exec coop_mod/replace.scr::turnto
+	
+	//$bunker2reinforcement lookat $player		//MiaCosa
+	$bunker2reinforcement exec coop_mod/replace.scr::lookat
+	
+	
+	
 	$bunker2reinforcement say A_34_Soldier5Talk_01
-	$bunker2reinforcement waittill saydone
+	$bunker2reinforcement waittill saydone		//MiaCosa @chrissstrahl
 	$bunker2reinforcement turnto NULL
 	$bunker2reinforcement lookat NULL
 	$bunker2reinforcement runto NULL
@@ -479,10 +494,17 @@ gagB2ReinforcmentRunToPlayer:
 	$bunker2reinforcement runto $bunker2reinforcepath
 	$bunker2reinforcement waittill movedone
 	
+	//Chrissstrahl - make dude run to closest player, wait .25 while no player found
+	local.player = NULL
+	while(!local.player){
+		wait 0.25
+		local.player = waitexec coop_mod/replace.scr::player_closestTo local.object $bunker2reinforcepath
+	}
+	
 	// if running is still set, we haven't yet encountered player 
 	if (self.running){	
 		// if we got to the end of the defined path without encountering the player, hunt freely
-		$bunker2reinforcement runto $player
+		$bunker2reinforcement runto $player		//MiaCosa @chrissstrahl
 	}
 }end
 
@@ -493,7 +515,7 @@ gagB2ReinforcementWatchForPlayer:
 	//dprintln "thread launched: Bunker2::gagB2ReinforcementWatchForPlayer"
 	
 	while (self.running) {
-		if (vector_length($player.origin - self.origin) < 150){	// if we encounter player before path end...
+		if (vector_length($player.origin - self.origin) < 150){	// if we encounter player before path end...		//MiaCosa @chrissstrahl
 			self runto NULL										// ...stop running
 			self thread gagB2ReinforcementInstructPlayer		// ...give instructions
 			self.running = 0									// ...flag that we stopped
@@ -513,17 +535,22 @@ gagB2ReinforcementInstructPlayer:
 
 	level.thunder = 0
 	self runto NULL		// stop running
-	self turnto $player	// face the player
-	self lookat $player
+	
+	//self turnto $player	// face the player		//MiaCosa 
+	self exec coop_mod/replace.scr::turnto
+	
+	//self lookat $player		//MiaCosa
+	self exec coop_mod/replace.scr::lookat	
+	
 	wait 1	
 	
 	// pop the player off the turret if necessary
-	if ($player.turret != NIL && $player.turret != NULL){
+	if ($player.turret != NIL && $player.turret != NULL){		//MiaCosa @chrissstrahl
 		$player usestuff $player.turret
 	}
 
 	$bunker2reinforcement say A_34_Soldier5Talk_01
-	$bunker2reinforcement waittill saydone
+	$bunker2reinforcement waittill saydone		//MiaCosa @chrissstrahl
 	
 	self turnto NULL	// stop facing player
 	self lookat NULL
@@ -540,7 +567,7 @@ gagPutReinforcementOnGun:
 	$bunker2reinforcement.enableenemy =1	// let him get in a fight if he wants to
 	
 	// wait for player to get away from the gun
-	while (vector_length($player.origin - $bunker2mg4node.origin) < 128){
+	while (vector_length($player.origin - $bunker2mg4node.origin) < 128){		//MiaCosa @chrissstrahl 
 		waitframe
 	}
 	
@@ -564,7 +591,8 @@ LeaveMissionFailure:
 	if (level.currentobjective == level.ObjDefendBunker2){
 		iprintlnbold "You failed to defend Baker Bunker."
 		wait 2
-		missionfailed
+		//missionfailed		//MiaCosa
+		exec coop_mod/replace.scr::missionfailed
 	}
 }end
 
