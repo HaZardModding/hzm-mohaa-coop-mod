@@ -1,7 +1,8 @@
 # HaZardModding Coop: Medal of Honor
-A Coop Mod for Medal of Honor: Allied Assault War Chest.
+A non-commercial fan project - Coop Mod for Medal of Honor: Allied Assault War Chest.
 
 HaZardModding adds modern cooperative experience into the games, that don't support it by default.
+This modification requires a legitimate copy of the original game.
 This particular modification is developed on and meant to be run with Medal of Honor: Allied Assault War Chest that can be found on GOG.com.
 
 https://www.gog.com/game/medal_of_honor_allied_assault_war_chest
@@ -12,6 +13,13 @@ https://www.gog.com/game/medal_of_honor_allied_assault_war_chest
 2. Using [Pakscape or 7-Zip] pack whole folder into zzzzzz_co-op_hzm_mod_mohaa.pk3
 3. Put the folder into /maintt/ directory of your game folder
 4. Launch the game Breaktrough, in the Main Menu head toward Multiplayer -> Start Game and select the HaZardModding Coop Mod Button on the top
+
+# Legal Notice
+This is an independent, non-commercial fan project and is not affiliated with, endorsed by, or sponsored by Electronic Arts, 2015, Inc., DreamWorks Interactive, EA Los Angeles, Danger Close Games, or any other companies involved in the development, publishing, marketing, or licensing of the Medal of Honor series.
+Medal of Honor and all related trademarks, game assets, and intellectual property remain the property of their respective owners.
+
+For detailed legal information see:
+[HaZardModding Legal Notice](hzm_legal.txt)
 
 # Our servers
 You can connect to our Development server by opening the game console and typing:
