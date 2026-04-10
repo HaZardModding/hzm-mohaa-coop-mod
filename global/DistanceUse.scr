@@ -1,3 +1,7 @@
+//[206] chrissstrahl
+//- replaced static $player handling
+//- func will return player that was pressing use
+
 // DistanceUse
 // Takes an entity, a stringn and a distance
 // Will drop out when the player hits "use" when they are in a certain distance
@@ -5,11 +9,14 @@
 main local.entity local.distance local.string:
 
 	level.helptexton = 0
+	local.player = $NULL
 	while (1)
 	{
 		while (level.helptexton == 0)
 		{
-			if (vector_length($player.origin-local.entity.origin) < local.distance)
+			//[206] chrissstrahl - replace static $player
+			//if (vector_length($player.origin-local.entity.origin) < local.distance)
+			if (exec coop_mod/replace.scr::withinDistanceOf local.entity.origin local.distance)
 			{
 				level.helptexton = 1
 				thread global/throbtext.scr::throbtext local.string 0
@@ -18,22 +25,34 @@ main local.entity local.distance local.string:
 		}
 		while (level.helptexton == 1)
 		{
-			if (vector_length($player.origin-local.entity.origin) >= local.distance)
+			//[206] chrissstrahl - replace static $player
+			//if (vector_length($player.origin-local.entity.origin) >= local.distance)
+			if (!exec coop_mod/replace.scr::withinDistanceOf local.entity.origin local.distance)
 			{
 				level.helptexton = 0
 				thread global/throbtext.scr::throbtext_off
 			}
 			else
 			{
-				if ($player.useheld)
-				{
-					thread global/throbtext.scr::throbtext_off
-
-					End
+				//[206] chrissstrahl - replace static $player
+				// if ($player.useheld) {
+				// thread global/throbtext.scr::throbtext_off
+				// end }
+				local.vEntOrigin = local.entity.origin
+				for (local.i = 1;local.i <= $player.size;local.i++){
+					local.player =  $player[local.i]
+					if( local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 && local.player.flags["coopDevNoclip"] == NIL){
+						if( vector_length(local.player.origin-local.vEntOrigin) < local.distance ){
+							if(local.player.useheld){
+								thread global/throbtext.scr::throbtext_off
+								end local.player
+							}
+						}
+					}
 				}
 			}
 			waitframe
 		}
 	}
 
-end
+end $NULL
