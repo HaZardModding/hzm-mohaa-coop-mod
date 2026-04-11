@@ -40,24 +40,44 @@ InitJeepRidePart3: {
 wakeguybehindcar: {
 //=========================================================================
 	$guybehindcar ai_on
-	$guybehindcar favoriteenemy $player	//MiaCosa @Chrissstrahl
+	
+	//[206] chrissstrahl - replace static $player
+	$guybehindcar exec coop_mod/replace.scr::favoriteenemy
+	
 	$guybehindcar exec global/enable_ai.scr
 	wait 2
 
 	$guybehindcrate ai_on
-	$guybehindcrate favoriteenemy $player	//MiaCosa @Chrissstrahl
+	
+	//[206] chrissstrahl - replace static $player
+	$guybehindcrate exec coop_mod/replace.scr::favoriteenemy
+	
 	$guybehindcrate exec global/stand.scr
 }end
 
 //=========================================================================
 PlayerGetOut: {
 //=========================================================================
-	local.usekey = getboundkey1 "+use"	//MiaCosa @Chrissstrahl
+	//[206] chrissstrahl - coop compatibility
+	if(level.gametype == 0){
+		local.usekey = getboundkey1 "+use"
+		
+	}else{
+		local.usekey = "USE"
+	}
+	
 	local.msg = (loc_convert_string ("Press " + local.usekey + " to exit the Jeep."))
 	thread global/throbtext.scr::throbtext local.msg 0
-
-	while (!($player.useheld)) {	//MiaCosa @Chrissstrahl
-		waitframe
+	
+	//[206] chrissstrahl - coop compatibility
+	if(level.gametype == 0){
+		while (!($player.useheld)) {
+			waitframe
+		}
+	}else{
+		while (level.playerJeepGunner && !(level.playerJeepGunner.useheld) && level.playerJeepGunner.health > 0) {
+			waitframe
+		}
 	}
 
 	thread global/throbtext.scr::throbtext_off
@@ -145,14 +165,27 @@ WaitToGetOutOfJeep: {
 
 	$medic.no_idle = 0
 	$medic waitthread global/LoopAnim.Scr::LoopAnimStop
-	$jeep unlock	//MiaCosa @Chrissstrahl
-	$jeep.turret unlock	//MiaCosa @Chrissstrahl
-	$jeep doUse player
+	
+	$jeep unlock
+	$jeep.turret unlock
+	
+	
+	//[206] chrissstrahl - replace static $player
+	if(level.playerJeepGunner) {
+		$jeep doUse level.playerJeepGunner
+	}
+	
+	
 	//	$jeep.turret lock
-	$jeep lock	//MiaCosa @Chrissstrahl
+	$jeep lock
 	
 	//$jeep disconnect_paths
-	$player.viewangles = "0 0 0"	//MiaCosa @Chrissstrahl
+	
+	
+	//[206] chrissstrahl - replace static $player
+	if(level.playerJeepGunner) {
+		level.playerJeepGunner.viewangles  = "0 0 0"
+	}
 
 	$pinnedbrit01 ai_on
 	$pinnedbrit02 ai_on
@@ -171,7 +204,14 @@ StopSecondChaseTruck: {
 //=========================================================================
 	// Reset the players health scale
 	waitthread maps/e3l1.scr::SetPlayerHealthScale 1.0
-	$player removeimmune vehicle	//MiaCosa @Chrissstrahl
+	
+	
+	//[206] chrissstrahl - replace static $player
+	for (local.i = 1; local.i <= $player.size; local.i++) {
+		local.player = $player[local.i]
+		local.player removeimmune vehicle
+	}
+	
 
 	// Hacky, but the path is in the wall, and the truck won't finish driving
 	$chasetruck[1] fullstop
@@ -298,40 +338,76 @@ CleanupJeepRidePart3: {
 jeepUseLoop: {
 //=========================================================================
 	while (1) {
-		local.usekey = getboundkey1 "+use"	//MiaCosa @Chrissstrahl
+		
+		//[206] chrissstrahl - coop compatibility
+		if(level.gametype == 0){
+			local.usekey = getboundkey1 "+use"
+		}
+		else{
+			local.usekey = "USE"
+		}
+		
+		
 		local.msg = (loc_convert_string ("Press " + local.usekey + " to board the Jeep.") )
-		waitexec global/DistanceUse.scr $jeep 200 local.msg
 		
-		//$player physics_on	//MiaCosa
-		exec coop_mod/replace.scr::physics_on
-		$player takedamage	//MiaCosa @Chrissstrahl
 		
+		//[206] chrissstrahl - replace static $player
+		level.playerJeepGunner = $NULL
+		level.playerJeepGunner = waitexec global/DistanceUse.scr $jeep 200 local.msg
+		level.playerJeepGunner physics_on
+		level.playerJeepGunner takedamage
+			
+		iprintlnbold_noloc ("jeepUseLoop - use") //[206] chrissstrahl - printout info for development
+			
 		//unlock the jeep and turret
 		$jeep.turret = $jeep queryturretslotentity 0
-		$jeep unlock	//MiaCosa @Chrissstrahl
+		$jeep unlock
 		$jeep.turret unlock
-		$jeep attachturretslot 0 $player
+		$jeep attachturretslot 0 level.playerJeepGunner
 		$jeep.turret lock
 		$jeep lock
 		wait 1.5
 		
-		local.usekey = getboundkey1 "+use"	//MiaCosa @Chrissstrahl
+		
+		//[206] chrissstrahl - coop compatibility
+		if(level.gametype == 0){
+			local.usekey = getboundkey1 "+use"
+		}
+		else{
+			local.usekey = "USE"
+		}
+		
+		
 		local.msg = (loc_convert_string ("Press " + local.usekey + " to exit the Jeep.") )
 		thread global/throbtext.scr::throbtext local.msg 0
 		
-		while (!($player.useheld)) {	//MiaCosa @Chrissstrahl
+		
+		//[206] chrissstrahl - replace static $player
+		while (level.playerJeepGunner && !(level.playerJeepGunner.useheld) && level.playerJeepGunner.health > 0) {
 			waitframe
 		}
-		
+
+
 		thread global/throbtext.scr::throbtext_off
 		
-		$jeep unlock	//MiaCosa @Chrissstrahl
+		
+		iprintlnbold_noloc ("jeepUseLoop - exit") //[206] chrissstrahl - printout info for development
+		
+		
+		$jeep.turret = $jeep queryturretslotentity 0
+		$jeep unlock
 		$jeep.turret unlock
-		$jeep doUse player
+		if(level.playerJeepGunner && level.playerJeepGunner.health > 0){
+			$jeep doUse level.playerJeepGunner
+		}
 		$jeep.turret lock
 		$jeep lock
 		
-		$player.viewangles = "0 0 0"	//MiaCosa @Chrissstrahl
+		//[206] chrissstrahl - replace static $player
+		if(level.playerJeepGunner){
+			level.playerJeepGunner.viewangles = "0 0 0"
+		}
+		
 		wait 1.5
 	}
 }end
