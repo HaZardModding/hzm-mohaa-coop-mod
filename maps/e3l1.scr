@@ -1,3 +1,60 @@
+//Coop issues to deal with
+/*
+
+AfterSnipers.scr
+- compassTracker -> (maybe use closest player as origin)
+- piatpickup -> Does autotank need updating of target? -> might update tank target here: DoObjectiveDestroyTank
+- RollOutTank2 -> possibly expects a player in a tank as target, make a mental note when playing the level
+
+BritHQ.scr
+- reserved func names nodamage and takedamage
+- StartPlayerMedicRide -> might need to handle all players
+
+JeepRidePart1.scr
+- DoMedicRide -> imune/nodamage/takedamage - cheap hacks applied to all players -> not all players will be with the jeep, maybe?
+
+JeepRidePart3.sc !!!MISSION STUCK!!!
+- WaitToGetOutOfJeep -> doesen't deattach player properly
+- jeepUseLoop -> doesen't deattach player properly
+
+Check possible mixups:
+level.gametype
+level.gametype
+
+
+Other issues:
+	if (self && vector_length($player.origin - self.origin) < level.fogdist) (global/hoveringplane.scr, 187)
+	if (self && vector_length($player^
+^~^~^ Script Error: Field 'origin' applied to NULL listener
+	
+		local.flypoint[0] = $player.origin[0] + local.maxdist (global/hoveringplane.scr, 139)
+		local.flypoint[0] = $player^
+^~^~^ Script Error: Field 'origin' applied to NULL listener
+
+		$ambushinvestigators[1] exec global/moveto.scr anim/crouch_run.scr local.player.origin	//MiaCosa @Chrissstrahl (maps/e3l1/intro.scr, 363)
+		$ambushinvestigators[1] exec global/moveto.scr anim/crouch_run.scr local.player^
+
+^~^~^ Script Error: Field 'origin' applied to NULL listener
+
+		self moveto local.anim local.node (global/moveto.scr, 18)
+		self ^
+^~^~^ Script Error: Cannot cast 'NIL' to listener
+
+		$ambushinvestigators[2] exec global/moveto.scr anim/crouch_run.scr local.player.origin	//MiaCosa @Chrissstrahl (maps/e3l1/intro.scr, 372)
+		$ambushinvestigators[2] exec global/moveto.scr anim/crouch_run.scr local.player^
+^~^~^ Script Error: Field 'origin' applied to NULL listener
+
+		self moveto local.anim local.node (global/moveto.scr, 18)
+		self ^
+^~^~^ Script Error: Cannot cast 'NIL' to listener
+
+	if( $($(self).target) && $($(self).target).size > 1){ (global/exploder.scr, 573)
+	if( $($(self)^
+^~^~^ Script Error: Cannot cast 'array' to listener
+
+*/
+
+
 //=========================================================================
 main: {
 //=========================================================================
@@ -6,6 +63,7 @@ main: {
 	level.fogColor = ( .25 .26 .28 )
 
 	//[206] chrissstrahl - init coop mod
+	level.playerJeepGunner = $NULL
 	waitthread coop_mod/main.scr::main 			//chrissstrahl - start coop mod, wait for this to finish
 	
 	//level.coop_forceDropWeapons = game.true 		//[206] chrissstrahl - allow weapon drops on this map
@@ -118,7 +176,10 @@ main: {
 Fadein: {
 //=========================================================================
 	iprintlnbold_noloc ("Fadein") //[206] chrissstrahl - printout info for development
-	$player physics_off
+	
+	//[206] chrissstrahl - physics_off
+	thread coop_mod/replace.scr::physics_off
+
 	exec global/fadein.scr
 	waitframe
 
@@ -131,7 +192,7 @@ Fadein: {
 	for (local.i = 1; local.i <= $player.size; local.i++) {
 		local.player = $player[local.i]
 		local.player.viewangles  = "0 3 0"
-	}  
+	}
 }end
 
 //=========================================================================
@@ -144,7 +205,8 @@ Briefing: {
 	$player waittill sounddone
 	*/
 	iprintlnbold_noloc ("Briefing") //[206] chrissstrahl - printout info for development
-	$player physics_on
+	//[206] chrissstrahl - physics_on
+	thread coop_mod/replace.scr::physics_on
 }end
 
 //=========================================================================
@@ -187,8 +249,17 @@ SetPlayerHealthScale local.scale: {
 	//	iprintln "setting player health scale to " local.scale
 	//	iprintln "   old health: " $player.health ", old maxhealth: " $player.max_health
 
-	iprintlnbold_noloc ("SetPlayerHealthScale") //[206] chrissstrahl - printout info for development
+	
+	
+	//[206] chrissstrahl - physics_off
+	thread coop_mod/replace.scr::physics_off
 
+	//[206] chrissstrahl - lets not do this in coop - yet
+	if(level.gametype != 0){
+		iprintlnbold_noloc ("COOP SKIPPED: SetPlayerHealthScale")
+		end
+	}
+	
 	$player healthonly ($player.health / level.playerHealthScale)
 	$player.max_health = ($player.max_health / level.playerHealthScale)
 
