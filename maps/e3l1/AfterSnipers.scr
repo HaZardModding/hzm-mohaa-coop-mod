@@ -99,7 +99,18 @@ piatpickup: {
 	$tank2.gun setAimTarget level.PIATwall
 	$tank2.gun waittill ontarget
 	$tank2.gun anim fire
-	$tank2 waitthread global/autotank.scr::AimAt $player //MiaCosa @chrissstrahl
+	
+	//[206] chrissstrahl - grab closest player targetable player
+	local.player = exec coop_mod/replace.scr::player_closestTargetable $tank2
+	while(!local.player){
+		wait 1
+		if(!$tank2){
+			end
+		}
+		local.player = exec coop_mod/replace.scr::player_closestTargetable $tank2
+	}
+	
+	$tank2 waitthread global/autotank.scr::AimAt local.player //MiaCosa @chrissstrahl
 	
 	//trigger $britsfollowtrigger
 	//remove $britsfollowtrigger
@@ -175,7 +186,9 @@ DoObjectiveGoToCity: {
 	$pinnedbrit04 exec global/enable_ai.scr
 	$medic exec global/enable_ai.scr
 	
-	$medic.destination				= $player //MiaCosa @chrissstrahl
+	//[206] chrissstrahl - replace static $player
+	$medic exec coop_mod/main.scr::destination
+	
 	$medic.friendtype		        = 5
 	$medic.medichealrate            = 0.25
 	level.medictime                 = 5
@@ -374,6 +387,7 @@ ExitStageRight local.timewait: {
 
 	if(level.everyoneout >= 4) {
 		$britsescape lock //MiaCosa @chrissstrahl
+		iprintlnbold_noloc ("ExitStageRight") //[206] chrissstrahl - printout info for development
 	}
 
 	self remove
@@ -407,7 +421,20 @@ StartPreCourtyardParade: {
 //=========================================================================
 RollOutTank2: {
 //=========================================================================
-	level.playertanktarget = $player //MiaCosa @chrissstrahl
+	
+	iprintlnbold_noloc ("RollOutTank2 -> playertank?") //[206] chrissstrahl - printout info for development
+	
+	
+	//[206] chrissstrahl - grab closest player targetable player
+	local.player = exec coop_mod/replace.scr::player_closestTargetable $tank2
+	while(!local.player){
+		wait 1
+		if(!$tank2){
+			end
+		}
+		local.player = exec coop_mod/replace.scr::player_closestTargetable $tank2
+	}
+	level.playertanktarget = local.player //MiaCosa @chrissstrahl
 
 	$tank2 thread global/vehicles_thinkers.scr::enemy_tank_think2
 	$tank2 drive $tankpath 50 50 200 256
