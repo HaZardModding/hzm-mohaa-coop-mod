@@ -69,7 +69,7 @@ InitIntro: {
 DoIntro: {
 //=========================================================================
 	if (level.skipintro == 1) {
-		$player.origin = ( -1323 -5699 7 )	//MiaCosa @chrissstrahl
+		$player.origin = ( -1323 -5699 7 )	//MiaCosa @chrissstrahl //it is okay for now it is just a developer skip
 		waitthread AmbushGuysAttack
 		end
 	}
@@ -89,14 +89,15 @@ DoIntro: {
 	// Put the player in the jeep
 	//[206] chrissstrahl - do this only in singleplayer
 	if(level.gametype == 0){
-		$player.origin = $startjeep.turret.origin	//MiaCosa @Chrissstrahl
-		$startjeep doUse $player	//MiaCosa @Chrissstrahl
-		$startjeep lock	//MiaCosa @Chrissstrahl
-		$startjeep.turret lock	//MiaCosa @Chrissstrahl
+		$player.origin = $startjeep.turret.origin
+		$startjeep doUse $player
+		$startjeep lock
+		$startjeep.turret lock
 	}
-	//[206] chrissstrahl - coopify
+	//[206] chrissstrahl - cheap hack for coop
 	else{
 		thread coop_mod/replace.scr::glue $startjeep.turret NIL 1
+		wait 0.15 //wait a moment to ensure players are glued before jeep goes - prevent shaking
 	}
 
 	// Tell the jeep to drive
@@ -136,25 +137,41 @@ JeepCrash: {
 	//[206] chrissstrahl - do this only in singleplayer
 	if(level.gametype == 0){
 		$startjeep.turret = $startjeep queryturretslotentity 0
-		$startjeep unlock	//MiaCosa @Chrissstrahl
-		$startjeep.turret unlock	//MiaCosa @Chrissstrahl
-		$startjeep doUse $player	//MiaCosa @Chrissstrahl
-		$player.viewangles = ( 0 20 0 )	//MiaCosa @Chrissstrahl
+		$startjeep unlock
+		$startjeep.turret unlock
+		$startjeep doUse $player
+		$player.viewangles = ( 0 20 0 )
 		waitframe
-		$player.origin = $player.origin + (0 0 400)	//MiaCosa @Chrissstrahl
+		$player.origin = $player.origin + (0 0 400)
 	}
 	//[206] chrissstrahl - coopify
 	else{
 		thread coop_mod/replace.scr::unglue NIL 1
-		//move players to their actual spawn
 		
+level.flags[coop_spawn1angles] = ( 0 6.301 0 )
+level.flags[coop_spawn1origin] = ( -277 -5439 92 )
+level.flags[coop_spawn2origin] = ( -237 -5439 92 )
+level.flags[coop_spawn3origin] = ( -197 -5439 92 )
+level.flags[coop_spawn4origin] = ( -157 -5439 92 )
+level.flags[coop_spawn5origin] = ( -317 -5439 92 )
+level.flags[coop_spawn6origin] = ( -357 -5439 92 )
+level.flags[coop_spawn7origin] = ( -397 -5439 92 )
+level.flags[coop_spawn8origin] = ( -437 -5439 92 )
+		
+		//move players to their actual spawn
+		for (local.i = 1; local.i <= $player.size; local.i++) {
+			local.player = $player[local.i]
+			thread coop_mod/main.scr::playerPlaceAtSpawn local.player
+		}
 	}
 
 	// Shake the camera
 	exec global/earthquake.scr 3 5 0 0
 
 	// Let the player take damage from now on
-	$player takedamage	//MiaCosa @Chrissstrahl
+	
+	//[206] chrissstrahl - replace static $player
+	waitthread coop_mod/replace.scr::takedamage
 
 	// Hide the old jeep and spawn the new one
 	level.jeepcrash = spawn script_model model models/human/animation/scripted/jeepcrash.tik "origin" $bazookaTarget.origin
@@ -176,7 +193,11 @@ JeepCrash: {
 	$plane1tree2 anim death
 	wait 2
 
-	$player useweaponclass smg	//MiaCosa @Chrissstrahl
+	//[206] chrissstrahl - weapon cheap hack
+	for (local.i = 1; local.i <= $player.size; local.i++) {
+		$player[local.i] useweaponclass smg
+	}
+	
 	drawhud 1
 	//	$player safeholster 1
 }end
@@ -189,9 +210,18 @@ PlayerRotateAngles: {
 	local.otherotheraccess = 20
 	local.playerelevator = 10
 	//	$player velocity (0 0 200)
-
+	
+	
+	//[206] chrissstrahl - replace static $player
+	if(level.gametype != 0){
+		for (local.i = 1; local.i <= $player.size; local.i++) {
+			thread coop_PlayerRotateAngles $player[local.i]
+		}
+		end
+	}
+	
 	while(local.angles <= 360) {
-		$player.viewangles = (0 local.otheraccess local.angles)	//MiaCosa @Chrissstrahl
+		$player.viewangles = (0 local.otheraccess local.angles)
 		local.angles += 15
 		local.otheraccess += 15
 		local.otherotheraccess += 15
@@ -200,6 +230,30 @@ PlayerRotateAngles: {
 		$player.origin -= (0 0 local.playerelevator)
 	}
 	$player.viewangles = (0 0 0)
+}end
+
+//=========================================================================
+coop_PlayerRotateAngles local.player: { //[206] chrissstrahl - replace static $player
+//=========================================================================
+	local.angles = 20
+	local.otheraccess = 20
+	local.otherotheraccess = 20
+	local.playerelevator = 10
+	
+	while(local.angles <= 360) {
+		if(!local.player){ end }
+		
+		local.player.viewangles = (0 local.otheraccess local.angles)
+		local.angles += 15
+		local.otheraccess += 15
+		local.otherotheraccess += 15
+		
+		waitframe
+		if(!local.player){ end }
+		
+		local.player.origin -= (0 0 local.playerelevator)
+	}
+	local.player.viewangles = (0 0 0)
 }end
 
 //=========================================================================
@@ -228,14 +282,21 @@ JeepCrashAnim: {
 	spawn weapons/thompsonsmg.tik origin (level.jeepcrash.origin + (0 20 7)) "targetname" "CoolGun"
 	$CoolGun.angles = $CoolGun.angles + (0 0 90)
  	$CoolGun setthread CoolGunPickup
+	
+	//[206] chrissstrahl - give weapon always as long as we are testing
+	if(level.gametype != 0){
+		waitthread coop_mod/replace.scr::item weapons/thompsonsmg.tik 1
+	}
 
 	level.introDone = 1	
 }end
 
 //=========================================================================
 CoolGunPickup: {
-//=========================================================================
-	$player item weapons/thompsonsmg.tik
+//=========================================================================	
+	//[206] chrissstrahl - replace static $player
+	waitthread coop_mod/replace.scr::item weapons/thompsonsmg.tik
+	
 	self remove
 }end
 
@@ -309,13 +370,19 @@ InvestigatorsGo: {
 		$ambushinvestigators[1] waittill animdone
 		$ambushinvestigators[1] exec global/enable_ai.scr
 		//$ambushinvestigators[1] exec global/crouch.scr
-		$ambushinvestigators[1] exec global/moveto.scr anim/crouch_run.scr $player.origin	//MiaCosa @Chrissstrahl
+		
+		//[206] chrissstrahl - replace static $player
+		local.player = waitthread coop_mod/replace.scr::player_closestTo $ambushinvestigators[1]
+		$ambushinvestigators[1] exec global/moveto.scr anim/crouch_run.scr local.player.origin	//MiaCosa @Chrissstrahl
 		
 	}
 
 	if($ambushinvestigators[2]) {
 		$ambushinvestigators[2] exec global/enable_ai.scr
-		$ambushinvestigators[2] exec global/moveto.scr anim/crouch_run.scr $player.origin	//MiaCosa @Chrissstrahl
+		
+		//[206] chrissstrahl - replace static $player
+		local.player = waitthread coop_mod/replace.scr::player_closestTo $ambushinvestigators[2]
+		$ambushinvestigators[2] exec global/moveto.scr anim/crouch_run.scr local.player.origin	//MiaCosa @Chrissstrahl
 	}
 }end
 
@@ -330,7 +397,10 @@ WatchBuddy local.guy: {
 
 	self attackplayer
 	self.attack_type = "runandshoot"
-	self runto $player.origin	//MiaCosa @Chrissstrahl
+	
+	//[206] chrissstrahl - replace static $player
+	local.player = waitthread coop_mod/replace.scr::player_closestTo self
+	self runto local.player.origin
 }end
 
 //=========================================================================
