@@ -133,23 +133,29 @@ PickRandomFlyPoint local.maxdist:
 	local.height = level.minhoverheight + randomint(local.heightrange)
 	local.boxedge = randomint(4)
 	
+	//[206] chrissstrahl - make coop compatible
+	local.player = exec coop_mod/replace.scr::player_anyValid
+	if(!local.player){
+		local.player = $world
+	}
+	
 	switch (local.boxedge)
 	{
 	case 0:
-		local.flypoint[0] = $player.origin[0] + local.maxdist
-		local.flypoint[1] = $player.origin[1] + randomint (level.fogdist * 2) - local.maxdist
+		local.flypoint[0] = local.player.origin[0] + local.maxdist
+		local.flypoint[1] = local.player.origin[1] + randomint (level.fogdist * 2) - local.maxdist
 		break
 	case 1:
-		local.flypoint[0] = $player.origin[0] - local.maxdist
-		local.flypoint[1] = $player.origin[1] + randomint (level.fogdist * 2) - local.maxdist
+		local.flypoint[0] = local.player.origin[0] - local.maxdist
+		local.flypoint[1] = local.player.origin[1] + randomint (level.fogdist * 2) - local.maxdist
 		break
 	case 2:
-		local.flypoint[1] = $player.origin[1] + local.maxdist
-		local.flypoint[0] = $player.origin[0] + randomint (level.fogdist * 2) - local.maxdist
+		local.flypoint[1] = local.player.origin[1] + local.maxdist
+		local.flypoint[0] = local.player.origin[0] + randomint (level.fogdist * 2) - local.maxdist
 		break
 	case 3:
-		local.flypoint[1] = $player.origin[1] - local.maxdist
-		local.flypoint[0] = $player.origin[0] + randomint (level.fogdist * 2) - local.maxdist
+		local.flypoint[1] = local.player.origin[1] - local.maxdist
+		local.flypoint[0] = local.player.origin[0] + randomint (level.fogdist * 2) - local.maxdist
 		break
 	}
 
@@ -165,12 +171,17 @@ PickRandomFlyPoint local.maxdist:
 End local.flypoint
 
 PickRandomMidFlyPoint:
-
+	//[206] chrissstrahl - make coop compatible
+	local.player = exec coop_mod/replace.scr::player_anyValid
+	if(!local.player){
+		local.player = $world
+	}
+	
 	local.flypoint = ( 0 0 0 )
 	local.heightrange = (level.maxhoverheight - level.minhoverheight)
 	local.height = level.minhoverheight + randomint(local.heightrange)
-	local.flypoint[1] = $player.origin[0] + randomint (level.fogdist * 2) - level.fogdist
-	local.flypoint[1] = $player.origin[1] + randomint (level.fogdist * 2) - level.fogdist
+	local.flypoint[1] = local.player.origin[0] + randomint (level.fogdist * 2) - level.fogdist
+	local.flypoint[1] = local.player.origin[1] + randomint (level.fogdist * 2) - level.fogdist
 	local.flypoint[2] = local.height
 
 End local.flypoint
@@ -183,8 +194,14 @@ HoveringPlaneFly local.startpath:
 	self flypath self.startpath (self.scale * level.hoveringplanespeed) 10000 1000
 
 	self waitmove
+	
+	//[206] chrissstrahl - make coop compatible
+	local.player = exec coop_mod/replace.scr::player_closestTo self
+	if(!local.player){
+		local.player = $world
+	}
 
-	if (self && vector_length($player.origin - self.origin) < level.fogdist)
+	if (self && vector_length(local.player.origin - self.origin) < level.fogdist)
 	{
 		self.startpath waitthread DestroyPath
 
@@ -192,7 +209,7 @@ HoveringPlaneFly local.startpath:
 		local.newStartPath.origin = self.origin
 
 		local.endpath = waitthread NewSplinePath
-		local.dirtoplane = vector_normalize(self.origin - $player.origin)
+		local.dirtoplane = vector_normalize(self.origin - local.player.origin)
 		local.endpath.origin = self.origin + (local.dirtoplane * level.fogdist)
 		 
 		local.midpath = waitthread NewSplinePath
