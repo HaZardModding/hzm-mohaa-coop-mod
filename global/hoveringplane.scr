@@ -1,0 +1,242 @@
+//********************************************************************
+// PUBLIC
+//********************************************************************
+
+InitHoveringPlanes local.delay local.minhoverheight local.maxhoverheight local.scalemin local.scalemax local.fogdist local.model local.speed:
+
+	level.hoveringplanemodel = local.model
+	level.hoveringplanespeed = local.speed
+	level.minhoverheight = local.minhoverheight
+	level.maxhoverheight = local.maxhoverheight
+	level.hoveringplanedelay = local.delay
+	level.scalemin = local.scalemin
+	level.scalemax = local.scalemax
+	level.fogdist = local.fogdist
+	level.hoveringplaneson = 0
+	level.cursplineindex = 0
+	level.lastplanespawned = NULL
+
+End
+
+StartHoveringPlanes:
+	
+	level.hoveringplaneson = 1
+	thread HoveringPlanesManager
+		
+End
+
+StopHoveringPlanes:
+
+	level.hoveringplaneson = 0
+
+End
+
+//********************************************************************
+// PRIVATE
+//********************************************************************
+
+HoveringPlanesManager:
+
+	while (level.hoveringplaneson == 1)
+	{
+		thread CreateHoveringPlane
+
+		wait (level.hoveringplanedelay)
+	}
+
+End
+
+CreateHoveringPlane:
+	local.plane = NULL
+
+	local.randomflyby = randomint (3)
+	switch (local.randomflyby)
+	{
+		case 0:
+		case 1:
+		case 2:
+			local.plane = spawn script_model model level.hoveringplanemodel targetname "hoveringplane"
+			local.scalerange = level.scalemax - level.scalemin
+			local.scale = local.scalerange*(randomint(100)*0.01) + level.scalemin
+			local.plane scale local.scale
+
+			local.plane notsolid
+
+			local.plane.origin = waitthread PickRandomFlyPoint level.fogdist
+			if(local.plane.origin[0] > 8000) local.plane.origin[0] = 8000
+			if(local.plane.origin[0] < -8000) local.plane.origin[0] = -8000
+			if(local.plane.origin[1] > 8000) local.plane.origin[1] = 8000
+			if(local.plane.origin[1] < -8000) local.plane.origin[1] = -8000
+			if(local.plane.origin[2] > 8000) local.plane.origin[2] = 8000
+			if(local.plane.origin[2] < -8000) local.plane.origin[2] = -8000
+
+
+			local.startpath = waitthread NewSplinePath
+			local.startpath.origin = local.plane.origin
+
+			local.endpath = waitthread NewSplinePath
+			local.endpath.origin = waitthread PickRandomFlyPoint level.fogdist
+			if(local.endpath.origin[0] > 8000) local.endpath.origin[0] = 8000
+			if(local.endpath.origin[0] < -8000) local.endpath.origin[0] = -8000
+			if(local.endpath.origin[1] > 8000) local.endpath.origin[1] = 8000
+			if(local.endpath.origin[1] < -8000) local.endpath.origin[1] = -8000
+			if(local.endpath.origin[2] > 8000) local.endpath.origin[2] = 8000
+			if(local.endpath.origin[2] < -8000) local.endpath.origin[2] = -8000
+			
+			local.midpath = waitthread NewSplinePath
+			local.midpath.origin = (local.startpath.origin + local.endpath.origin) * 0.5
+			if(local.midpath.origin[0] > 8000) local.midpath.origin[0] = 8000
+			if(local.midpath.origin[0] < -8000) local.midpath.origin[0] = -8000
+			if(local.midpath.origin[1] > 8000) local.midpath.origin[1] = 8000
+			if(local.midpath.origin[1] < -8000) local.midpath.origin[1] = -8000
+			if(local.midpath.origin[2] > 8000) local.midpath.origin[2] = 8000
+			if(local.midpath.origin[2] < -8000) local.midpath.origin[2] = -8000
+			local.startpath.target = local.midpath.targetname
+			local.midpath.target = local.endpath.targetname
+
+			level.lastplanespawned = local.plane
+			local.plane waitthread HoveringPlaneFly local.startpath
+
+			break
+	}
+
+End
+
+NewSplinePath:
+
+	local.name = "hoveringplanesplinepath_" + level.cursplineindex
+	local.splinepath = spawn SplinePath targetname local.name
+	level.cursplineindex++
+	if (level.cursplineindex > 100000) level.cursplineindex = 0
+
+
+End local.splinepath
+
+PickRandomFlyPoint local.maxdist:
+
+// Need trig functions to do this method
+/*
+	local.heightrange = (local.maxdist - (level.minhoverheight - $player.origin[2])) / 2
+	local.height = level.minhoverheight + randomint(local.heightrange)
+	local.aboveplayer = $player.origin[2] - local.height
+	local.horizdist = sqrt((local.maxdist*local.maxdist)-(local.aboveplayer*local.aboveplayer))
+	local.horizangle = randomint(360)
+	local.flypoint[0] = sin(local.horizangle) * local.horizdist
+	local.flypoint[1] = cos(local.horizangle) * local.horizdist
+	local.flypoint[2] = local.height
+*/
+
+
+// Here is the method without trig
+	local.flypoint = ( 0 0 0 )
+	local.heightrange = (level.maxhoverheight - level.minhoverheight)
+	local.height = level.minhoverheight + randomint(local.heightrange)
+	local.boxedge = randomint(4)
+	
+	switch (local.boxedge)
+	{
+	case 0:
+		local.flypoint[0] = $player.origin[0] + local.maxdist
+		local.flypoint[1] = $player.origin[1] + randomint (level.fogdist * 2) - local.maxdist
+		break
+	case 1:
+		local.flypoint[0] = $player.origin[0] - local.maxdist
+		local.flypoint[1] = $player.origin[1] + randomint (level.fogdist * 2) - local.maxdist
+		break
+	case 2:
+		local.flypoint[1] = $player.origin[1] + local.maxdist
+		local.flypoint[0] = $player.origin[0] + randomint (level.fogdist * 2) - local.maxdist
+		break
+	case 3:
+		local.flypoint[1] = $player.origin[1] - local.maxdist
+		local.flypoint[0] = $player.origin[0] + randomint (level.fogdist * 2) - local.maxdist
+		break
+	}
+
+	local.flypoint[2] = local.height
+
+	if (local.flypoint[0] < -8000) local.flypoint[0] = -8000
+	if (local.flypoint[1] < -8000) local.flypoint[1] = -8000
+	if (local.flypoint[2] < -8000) local.flypoint[2] = -8000
+	if (local.flypoint[0] > 8000) local.flypoint[0] = 8000
+	if (local.flypoint[1] > 8000) local.flypoint[1] = 8000
+	if (local.flypoint[2] > 8000) local.flypoint[2] = 8000
+
+End local.flypoint
+
+PickRandomMidFlyPoint:
+
+	local.flypoint = ( 0 0 0 )
+	local.heightrange = (level.maxhoverheight - level.minhoverheight)
+	local.height = level.minhoverheight + randomint(local.heightrange)
+	local.flypoint[1] = $player.origin[0] + randomint (level.fogdist * 2) - level.fogdist
+	local.flypoint[1] = $player.origin[1] + randomint (level.fogdist * 2) - level.fogdist
+	local.flypoint[2] = local.height
+
+End local.flypoint
+
+HoveringPlaneFly local.startpath:
+	if!(self)
+		End
+	self.startpath = local.startpath
+	self thread KillPlane
+	self flypath self.startpath (self.scale * level.hoveringplanespeed) 10000 1000
+
+	self waitmove
+
+	if (self && vector_length($player.origin - self.origin) < level.fogdist)
+	{
+		self.startpath waitthread DestroyPath
+
+		local.newStartPath = waitthread NewSplinePath
+		local.newStartPath.origin = self.origin
+
+		local.endpath = waitthread NewSplinePath
+		local.dirtoplane = vector_normalize(self.origin - $player.origin)
+		local.endpath.origin = self.origin + (local.dirtoplane * level.fogdist)
+		 
+		local.midpath = waitthread NewSplinePath
+		local.midpath.origin = self.origin + (local.dirtoplane * (0.5*level.fogdist))
+
+		local.newStartPath.target = local.midpath.targetname
+		local.midpath.target = local.endpath.targetname
+
+		self thread HoveringPlaneFly local.newStartPath
+		End
+	}
+	if(self)
+		self waitthread DestroyHoveringPlane
+
+End
+
+KillPlane:
+	while(self)
+	{
+		if(self.origin[0] > 8000 || self.origin[0] < -8000 ||
+			self.origin[1] > 8000 || self.origin[1] < -8000 ||
+			self.origin[2] > 8000 || self.origin[2] < -8000)
+			self remove
+		wait 0.2
+	}
+
+End
+
+
+DestroyPath:
+	local.curpath = self
+	while (local.curpath)
+	{
+		local.nextpath = local.curpath.target
+		local.curpath remove
+		local.curpath = local.nextpath
+	}
+End
+
+DestroyHoveringPlane:
+
+	self.startpath waitthread DestroyPath
+		
+	self remove
+
+End
+
