@@ -1493,7 +1493,8 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 	}
 	for (local.i = 1;local.i <= $player.size;local.i++){
 		local.player =  $player[local.i]
-		if (isAlive local.player && local.player.dmteam != "spectator"){
+		//[206] chrissstrahl - additional checks to make sure glueing does only apply to valid players
+		if (isAlive local.player && local.player.dmteam != "spectator" && (waitthread coop_mod/main.scr::lmsGetRemainingLives local.player > 0) && local.player.flags["coop_isAlive"] == game.true){
 			thread coop_mod/main.scr::playerGlue local.player NIL local.hide
 		}	
 	}
@@ -2657,7 +2658,6 @@ fullheal:{
 //=========================================================================
 nodamage:{
 //=========================================================================
-if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread replace/noDamage->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
 	if (level.gametype == 0){
 		$player nodamage
 		end
@@ -2673,7 +2673,6 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 //=========================================================================
 takedamage:{
 //=========================================================================
-if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread replace/takedamage->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
 	if (level.gametype == 0){
 		$player takedamage
 		end
@@ -2684,3 +2683,29 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 		local.player takedamage
 	}
 }end
+
+
+//[206] Chrissstrahl - get player with highest Z
+//=========================================================================
+playerHighestZaxis:{
+//=========================================================================
+	if (level.gametype == 0){
+		end $player
+	}
+	
+	local.highestZ = -99999
+	local.playerHighest = NIL
+	for (local.i = 1; local.i <= $player.size; local.i++){
+		local.player = $player[local.i]
+		local.zAxis = local.player.origin[2]
+		
+		if(local.zAxis > local.highestZ){
+			local.highestZ = local.zAxis
+			local.playerHighest = local.player
+		}
+	}
+	
+	if(local.playerHighest){
+		end local.playerHighest
+	}
+}end NIL
