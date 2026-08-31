@@ -1,0 +1,172 @@
+//[206] chrissstrahl
+//This is to make sure there is always a player in the jeep
+
+
+//player -> Initial player that is currently the gunner
+//replacementtype -> How to replace the player
+//Level Variables are used to make sure Bind Scripts omit the Gunner
+//=========================================================================
+main local.player local.replacementtype local.jeep local.jeepTurret:{
+//=========================================================================
+	if(!local.player){
+		error ( "coop_mod/jeepGunner.scr::main - no valid player given" ) 1000
+		end
+	}
+	if(!local.jeep){
+		error ( "coop_mod/jeepGunner.scr::main - no valid jeep given" ) 1000
+		end
+	}
+	if(!local.jeep){
+		error ( "coop_mod/jeepGunner.scr::main - no valid jeepTurret given" ) 1000
+		end
+	}
+	if(!local.replacementtype){
+		local.replacementtype = 1
+	}
+	
+	level.coop_jeepGunnerActive = game.true
+	level.coop_jeepGunner = local.player
+	
+	//mark player so that this player will be skipped when players are glued
+	level.coop_jeepGunner.flags["coop_isJeepGunner"] = 1
+	level.coop_jeepGunner physics_off
+	level.coop_jeepGunner takedamage
+	
+	//attach to gun
+	local.jeep unlock
+	local.jeepTurret unlock
+	local.jeep attachturretslot 0 level.coop_jeepGunner
+	local.jeepTurret lock
+	local.jeep lock
+	
+	thread waitForGunner
+	
+	//check gunner - find replacement if needed
+	while(level.coop_jeepGunnerActive)
+	{
+		local.findNewPlayer = game.true
+		if(level.coop_jeepGunner){
+			if(	level.coop_jeepGunner.health > 0 &&
+				level.coop_jeepGunner.dmteam != "spectator" &&
+				(waitthread coop_mod/main.scr::lmsGetRemainingLives local.player > 0) &&
+				local.player.flags["coop_isAlive"] == game.true)
+			{
+				local.findNewPlayer = game.false
+			}
+			else{
+				waitthread exitGunner
+				println( "jeepGunner.scr::main - gunner dead or spec" )
+			}
+		}
+		
+		if($player.size){
+			if(local.findNewPlayer){
+				local.player = NIL
+				//next valid player by number
+				if(local.replacementtype == 1){
+					for (local.i = 1;local.i <= $player.size;local.i++){
+						local.player = $player[local.i]
+						if(	local.player.health > 0 &&
+							local.player.dmteam != "spectator" &&
+							(waitthread coop_mod/main.scr::lmsGetRemainingLives local.player > 0) &&
+							local.player.flags["coop_isAlive"] == game.true)
+						{
+							break
+						}
+					}
+				}
+				//random (next) player 
+				else if(local.replacementtype == 2){
+				 	local.player = exec coop_mod/replace.scr::player_random
+				}
+
+				//check if player is actually good and then use this player
+				if(	local.player && local.player.health > 0 &&
+					local.player.dmteam != "spectator" &&
+					(waitthread coop_mod/main.scr::lmsGetRemainingLives local.player > 0) &&
+					local.player.flags["coop_isAlive"] == game.true )
+				{
+					println( "jeepGunner.scr::main - new player found" )			
+				
+					level.coop_jeepGunner = local.player
+					
+					//mark
+					level.coop_jeepGunner.flags["coop_isJeepGunner"] = 1
+					
+					//unglue
+					thread coop_mod/replace.scr::unglue NIL 1
+					
+					level.coop_jeepGunner physics_off
+					level.coop_jeepGunner takedamage
+					
+					//attach to gun
+					local.jeep unlock
+					local.jeepTurret unlock
+					local.jeep attachturretslot 0 level.coop_jeepGunner
+					local.jeepTurret lock
+					local.jeep lock
+				}
+			}
+		}
+		//wait until any player spawns in again
+		else{
+			println( "jeepGunner.scr::main - waitfor player spawn" )
+			level waittill playerspawn
+		}
+		waitframe
+	}
+	
+	if(level.coop_jeepGunner){
+		level.coop_jeepGunner.flags["coop_isJeepGunner"] = 0
+	}
+	
+	thread coop_mod/eventsystem.scr::doEvent "jeepGunnerDone"
+}end
+
+//=========================================================================
+waitForGunner:{
+//=========================================================================
+	waitthread coop_mod/eventsystem.scr::waitTillEvent "jeepGunnerDone"
+}end
+
+//=========================================================================
+checkForGunner:{
+//=========================================================================
+	if (thread coop_mod/eventsystem.scr::isEventActive "jeepGunnerDone"){
+		end 1
+	}
+}end 0
+
+//stop forcing gunners
+//=========================================================================
+stopGunner:{
+//=========================================================================
+	local.player = level.coop_jeepGunner
+	
+	if(level.coop_jeepGunner){
+		level.coop_jeepGunner.flags["coop_isJeepGunner"] = 0
+		level.coop_jeepGunner.flags["coop_physicsOff"] = 0
+		level.coop_jeepGunner physics_on
+	}
+	
+	level.coop_jeepGunnerActive = game.false
+	level.coop_jeepGunner = NIL
+}end
+
+
+//allow gunner to leave
+//=========================================================================
+exitGunner:{
+//=========================================================================
+	iprintln_noloc( "jeepGunner.scr::main - exitGunner" )
+	
+	local.player = level.coop_jeepGunner
+	if(level.coop_jeepGunner){
+		level.coop_jeepGunner = NIL
+	}
+	if(local.player){
+		local.player.flags["coop_isJeepGunner"] = 0
+		local.player.flags["coop_physicsOff"] = 0
+		local.player physics_on
+	}
+}end
