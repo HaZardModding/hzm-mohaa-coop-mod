@@ -171,7 +171,7 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 forceTeam local.player:{
 //=========================================================================
 if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread main/forceTeam->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-	if( local.player == NIL || local.player == NULL ){ end }
+	if( !local.player ){ end }
 
 	//local.player.flags["coop_team"] = local.player.dmteam //[200] Smithy - we don't need to track if we know allies is what will make us active
 	waitthread resetSpawn local.player
@@ -283,15 +283,11 @@ skipTeamAndWeaponSelect local.player:{
 //=========================================================================
 if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread main/skipTeamAndWeaponSelect->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
 	//[201] Tiredsstrahl - Fix player being spawned in LMS when he shouldn't
-	//EXIT on NIL
-	//EXIT on NULL
 	//EXIT if player is flagged as totally dead in LMS
-	//if(local.player == NIL || local.player == NULL || thread lmsGetRemainingLives local.player < 1){
-	if(local.player == NIL || local.player == NULL || local.player.flags["coop_lmsForcedInSpectator"] == 1){
+	if(!local.player || local.player.flags["coop_lmsForcedInSpectator"] == 1){
 		wait game.ms
 		end
 	}
-	//END [201]
 
 	//[200] Smithy - put here to stop spam that prevents players typing/using menu
 	local.switchDelay = getcvar "g_teamswitchdelay"  //[200] Smithy - stop switch delay intefering 
@@ -358,7 +354,7 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 printInfo local.player local.message local.bold local.strictTime local.waitingtime:{
 //=========================================================================
 if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread main/printInfo->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-	if(local.player == NULL || local.message.size < 1){ end }
+	if(!local.player || local.message.size < 1){ end }
 
 	if(local.waitingtime == NIL){ local.waitingtime = 3 }
 
@@ -1129,6 +1125,18 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 	}else{
 		local.entity = waitthread getGlueEntity local.player					
 	}
+	
+	
+	//[206] Chrissstrahl - do not glue jeep gunner
+	//this is a additional check layer - also called paranoya
+	//
+	//this may cause sideeffects such as:
+	// - the gunner when able to exit the gun by other means than death being able to escape the vehicle ride
+	if(level.coop_jeepGunner){
+		if(local.player.entnum == level.coop_jeepGunner.entnum){
+			end
+		}
+	}
 
 	//[200] chrissstrahl - added forcelegsstate to avoid:
 	//ERROR: Stopping due to possible infinite leg state loop //e1l3 entering rowboat at level start
@@ -1170,7 +1178,7 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 }end($(level.coop_glueTo + (local.player.entnum + local.offset)))
 
 //[201] chrissstrahl - changed function name to fix typo
-//[200] Chrissstrahl - used to to check if a player should be for into spectator
+//[200] Chrissstrahl - used to to check if a player should be forced into spectator
 //=========================================================================
 lmsGetRemainingLives local.player:{
 //=========================================================================
@@ -1221,7 +1229,7 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 				
 				//[201] chrissstrahl - make sure to clear all flags to prevent ongoing scripts to reinstate player
 				//need probaly to sort out which ones are crucial
-				//i know this stuff is mostly set in the next frame but that is one frame to late, thias is causing strange handling
+				//i know this stuff is mostly set in the next frame but that is one frame to late, this is causing strange handling
 				local.player.flags["coop_respawning"] = FALSE //prevent further handling in parent func
 				local.player.flags["coop_iAmTruelyActive"] = 0 //prevent further handling in critical funcs
 				
