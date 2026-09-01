@@ -64,7 +64,7 @@ PlayerGetOut: {
 		
 	}else{
 		local.usekey = "USE"
-	}
+	}	
 	
 	local.msg = (loc_convert_string ("Press " + local.usekey + " to exit the Jeep."))
 	thread global/throbtext.scr::throbtext local.msg 0
@@ -75,7 +75,7 @@ PlayerGetOut: {
 			waitframe
 		}
 	}else{
-		while (level.playerJeepGunner && !(level.playerJeepGunner.useheld) && level.playerJeepGunner.health > 0) {
+		while (level.coop_jeepGunner && !(level.coop_jeepGunner.useheld) && level.coop_jeepGunner.health > 0) {
 			waitframe
 		}
 	}
@@ -140,6 +140,8 @@ WaitToGetOutOfJeep: {
 //=========================================================================
 	thread startRain
 	thread StopSecondChaseTruck
+	
+	iprintlnbold_noloc("WaitToGetOutOfJeep");
 
 	$pinnedbrit01 ai_on
 	$pinnedbrit02 ai_on
@@ -154,6 +156,9 @@ WaitToGetOutOfJeep: {
 	$endguysfire TurnOn
 	thread maps/e3l1/Courtyard.scr::TurnOnSnipers
 	level.ridedone = 1
+	
+	//[206] chrissstrahl - unglue all players
+	thread coop_mod/replace.scr::unglue NIL 1
 
 	waitthread PlayerGetOut
 	thread KillEffects
@@ -171,8 +176,8 @@ WaitToGetOutOfJeep: {
 	
 	
 	//[206] chrissstrahl - replace static $player
-	if(level.playerJeepGunner) {
-		$jeep doUse level.playerJeepGunner
+	if(level.coop_jeepGunner) {
+		$jeep doUse level.coop_jeepGunner
 	}
 	
 	
@@ -183,9 +188,12 @@ WaitToGetOutOfJeep: {
 	
 	
 	//[206] chrissstrahl - replace static $player
-	if(level.playerJeepGunner) {
-		level.playerJeepGunner.viewangles  = "0 0 0"
+	if(level.coop_jeepGunner) {
+		level.coop_jeepGunner.viewangles  = "0 0 0"
 	}
+	
+	//[206] chrissstrahl - stop enforcing jeep gunner
+	thread coop_mod/jeepGunner.scr::stopGunner
 
 	$pinnedbrit01 ai_on
 	$pinnedbrit02 ai_on
@@ -195,6 +203,11 @@ WaitToGetOutOfJeep: {
 	$pinnedbrit02 show
 	$pinnedbrit03 show
 	$pinnedbrit04 show
+	
+	//[206] chrissstrahl - wait a moment before allowing back in
+	//otherwhise the player that holds use for a moment will just
+	//enter the jeep again
+	wait(0.5);
 	
 	thread jeepUseLoop
 }end
@@ -354,10 +367,10 @@ jeepUseLoop: {
 		//[206] chrissstrahl - replace static $player
 		level.playerJeepGunner = $NULL
 		level.playerJeepGunner = waitexec global/DistanceUse.scr $jeep 200 local.msg
-		level.playerJeepGunner physics_on
+		level.playerJeepGunner physics_off
 		level.playerJeepGunner takedamage
 			
-		iprintlnbold_noloc ("jeepUseLoop - use") //[206] chrissstrahl - printout info for development
+iprintlnbold_noloc ("jeepUseLoop - use") //[206] chrissstrahl - printout info for development
 			
 		//unlock the jeep and turret
 		$jeep.turret = $jeep queryturretslotentity 0
@@ -391,7 +404,7 @@ jeepUseLoop: {
 		thread global/throbtext.scr::throbtext_off
 		
 		
-		iprintlnbold_noloc ("jeepUseLoop - exit") //[206] chrissstrahl - printout info for development
+iprintlnbold_noloc ("jeepUseLoop - exit") //[206] chrissstrahl - printout info for development
 		
 		
 		$jeep.turret = $jeep queryturretslotentity 0
@@ -399,6 +412,7 @@ jeepUseLoop: {
 		$jeep.turret unlock
 		if(level.playerJeepGunner && level.playerJeepGunner.health > 0){
 			$jeep doUse level.playerJeepGunner
+			level.playerJeepGunner physics_on
 		}
 		$jeep.turret lock
 		$jeep lock
