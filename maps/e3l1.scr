@@ -1,70 +1,9 @@
 //Coop issues to deal with
 /*
-
-AfterSnipers.scr
-- compassTracker -> (maybe use closest player as origin)
-- piatpickup -> Does autotank need updating of target? -> might update tank target here: DoObjectiveDestroyTank
-- RollOutTank2 -> possibly expects a player in a tank as target, make a mental note when playing the level
-
-BritHQ.scr
-- reserved func names nodamage and takedamage
-- StartPlayerMedicRide -> might need to handle all players
-
-JeepRidePart1.scr
-- DoMedicRide -> imune/nodamage/takedamage - cheap hacks applied to all players -> not all players will be with the jeep, maybe?
-
-JeepRidePart3.sc !!!MISSION STUCK!!!
-- WaitToGetOutOfJeep -> doesen't deattach player properly
-- jeepUseLoop -> doesen't deattach player properly
-
-Check possible mixups:
-level.gametype
-level.gametype
-
-
-Other issues:
-	if (self && vector_length($player.origin - self.origin) < level.fogdist) (global/hoveringplane.scr, 187)
-	if (self && vector_length($player^
-^~^~^ Script Error: Field 'origin' applied to NULL listener
-	
-		local.flypoint[0] = $player.origin[0] + local.maxdist (global/hoveringplane.scr, 139)
-		local.flypoint[0] = $player^
-^~^~^ Script Error: Field 'origin' applied to NULL listener
-
-		$ambushinvestigators[1] exec global/moveto.scr anim/crouch_run.scr local.player.origin	//MiaCosa @Chrissstrahl (maps/e3l1/intro.scr, 363)
-		$ambushinvestigators[1] exec global/moveto.scr anim/crouch_run.scr local.player^
-
-^~^~^ Script Error: Field 'origin' applied to NULL listener
-
-		self moveto local.anim local.node (global/moveto.scr, 18)
-		self ^
-^~^~^ Script Error: Cannot cast 'NIL' to listener
-
-		$ambushinvestigators[2] exec global/moveto.scr anim/crouch_run.scr local.player.origin	//MiaCosa @Chrissstrahl (maps/e3l1/intro.scr, 372)
-		$ambushinvestigators[2] exec global/moveto.scr anim/crouch_run.scr local.player^
-^~^~^ Script Error: Field 'origin' applied to NULL listener
-
-		self moveto local.anim local.node (global/moveto.scr, 18)
-		self ^
-^~^~^ Script Error: Cannot cast 'NIL' to listener
-
-	if( $($(self).target) && $($(self).target).size > 1){ (global/exploder.scr, 573)
-	if( $($(self)^
-^~^~^ Script Error: Cannot cast 'array' to listener
-
+- Triggers need to respond to vehicle instead of player along the jeep path
+- Make medic go to next node or walk away in a random direction when used by player
+- fix jeep getting blown up does not fail the mission
 */
-
-//CHRISSSTRAHL DEV TEST REMOVE BEFORE RELASE
-//CHRISSSTRAHL DEV TEST REMOVE BEFORE RELASE
-//CHRISSSTRAHL DEV TEST REMOVE BEFORE RELASE
-//CHRISSSTRAHL DEV TEST REMOVE BEFORE RELASE
-//CHRISSSTRAHL DEV TEST REMOVE BEFORE RELASE
-//CHRISSSTRAHL DEV TEST REMOVE BEFORE RELASE
-//CHRISSSTRAHL DEV TEST REMOVE BEFORE RELASE
-//CHRISSSTRAHL DEV TEST REMOVE BEFORE RELASE
-level.skipintro = 1
-level.coop_testJeepGlue = 1
-
 
 //=========================================================================
 main: {
@@ -74,7 +13,9 @@ main: {
 	level.fogColor = ( .25 .26 .28 )
 
 	//[206] chrissstrahl - init coop mod
-	level.playerJeepGunner = $NULL
+	level.coop_jeepGunner = $NULL
+	level.coopPrevMap = "e2l3"				//chrissstrahl - set previouse map (for mom voteing)
+	level.coopNextMap = "e3l1"				//chrissstrahl - set next map (for mom voteing)
 	waitthread coop_mod/main.scr::main 			//chrissstrahl - start coop mod, wait for this to finish
 	
 	//level.coop_forceDropWeapons = game.true 		//[206] chrissstrahl - allow weapon drops on this map
@@ -180,7 +121,9 @@ main: {
 	$nextleveltrigger waittill trigger
 
 	//end level
-	exec global/missioncomplete.scr e3l2 1
+	//[206] Chrissstrahl - made coop compatible
+	//exec global/missioncomplete.scr e3l2 1
+	thread coop_missioncomplete
 }end
 
 //=========================================================================
@@ -260,15 +203,14 @@ SetPlayerHealthScale local.scale: {
 	//	iprintln "setting player health scale to " local.scale
 	//	iprintln "   old health: " $player.health ", old maxhealth: " $player.max_health
 
-	
-	
-	//[206] chrissstrahl - physics_off
-	thread coop_mod/replace.scr::physics_off
 
 	//[206] chrissstrahl - lets not do this in coop - yet
 	if(level.gametype != 0){
 		iprintlnbold_noloc ("COOP SKIPPED: SetPlayerHealthScale")
 		end
+	}
+	else{
+		$player physics_off
 	}
 	
 	$player healthonly ($player.health / level.playerHealthScale)
@@ -321,3 +263,73 @@ startMusic_e3l1_main: {
 	thread coop_mod/replace.scr::tmstartloop "sound/music/E2L2_Road_to_Tobruk.mp3; tmvolume 2"
 	//	$player stufftext "tmvolume 2"
 }end
+
+//============================================================
+coop_updateSpawn1BritCampHQ:{
+//============================================================
+	//set master angle, reset possible alternative angles
+	level.flags[coop_spawn1angles] = ( 0 357 0 )
+	for( local.i = 2;local.i<=8;local.i++){
+		level.flags["coop_spawn"+local.i+"angles"] = ( 0 0 0 )
+	}
+
+	level.flags[coop_spawn1origin] = ( 3442 -3844 230 ) 
+	level.flags[coop_spawn2origin] = ( 3482 -3844 230 ) 
+	level.flags[coop_spawn3origin] = ( 3442 -3804 230 ) 
+	level.flags[coop_spawn4origin] = ( 3482 -3804 230 ) 
+	level.flags[coop_spawn5origin] = ( 3442 -3764 230 ) 
+	level.flags[coop_spawn6origin] = ( 3482 -3764 230 ) 
+	level.flags[coop_spawn7origin] = ( 3442 -3724 230 ) 
+	level.flags[coop_spawn8origin] = ( 3482 -3724 230 ) 
+}end
+
+//============================================================
+coop_updateSpawn2Courtyard:{
+//============================================================
+	iprintlnbold_noloc("Coop DEV Info: coop_updateSpawn2Courtyard")
+
+	//set master angle, reset possible alternative angles
+	level.flags[coop_spawn1angles] = ( 0 343 0 ) 
+	for( local.i = 2;local.i<=8;local.i++){
+		level.flags["coop_spawn"+local.i+"angles"] = ( 0 0 0 )
+	}
+
+	level.flags[coop_spawn1origin] = ( -632 3413 176 ) 
+	level.flags[coop_spawn2origin] = ( -592 3413 176 ) 
+	level.flags[coop_spawn3origin] = ( -672 3413 176 ) 
+	level.flags[coop_spawn4origin] = ( -712 3413 176 ) 
+	level.flags[coop_spawn5origin] = ( -712 3363 176 ) 
+	level.flags[coop_spawn6origin] = ( -672 3363 176 ) 
+	level.flags[coop_spawn7origin] = ( -632 3363 176 ) 
+	level.flags[coop_spawn8origin] = ( -592 3363 176 ) 
+}end
+
+//============================================================
+coop_updateSpawn3JeepStuck:{
+//============================================================
+	iprintlnbold_noloc("Coop DEV Info: coop_updateSpawn3JeepStuck")
+
+	//set master angle, reset possible alternative angles
+	level.flags[coop_spawn1angles] = ( 0 0 0 ) 
+	for( local.i = 2;local.i<=8;local.i++){
+		level.flags["coop_spawn"+local.i+"angles"] = ( 0 0 0 )
+	}
+
+	//need to substract 82 on Z-axis - these values where taken via viewpos
+	level.flags[coop_spawn1origin] = ( -470 -319 122 ) // () : 28
+	level.flags[coop_spawn2origin] = ( -630 67 121 ) // () : -8
+	level.flags[coop_spawn3origin] = ( 346 334 131 ) // () : -28
+	level.flags[coop_spawn4origin] = ( 231 302 281 ) // () : -31
+	level.flags[coop_spawn5origin] = ( 1085 -272 178 ) // () : 130
+	level.flags[coop_spawn6origin] = ( 1425 -312 149 ) // () : 152
+	level.flags[coop_spawn7origin] = ( 239 -623 122 ) // () : 58
+	level.flags[coop_spawn8origin] = ( -593 -248 193 ) // () : 12
+}end
+
+//[206] chrissstrahl - this is called locally
+//============================================================
+coop_missioncomplete:{
+//============================================================
+	exec global/missioncomplete.scr (level.coopNextMap) 1
+}end
+
