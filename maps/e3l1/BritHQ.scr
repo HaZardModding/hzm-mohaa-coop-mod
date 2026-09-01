@@ -40,17 +40,21 @@ InitBritHQ:
 	if($alliedcampparade2ndorigin)
 		$alliedcampparade2ndorigin rendereffects "+dontdraw"
 end
+
 //--------------------------------------------------
 DoObjectiveFindBritHQ:
 //--------------------------------------------------
 	
 	if (level.skipobjFindBritHQ	== 1)
 	{
+		//[206] chrissstrahl - move spawn locations
+		thread maps/e3l1.scr::coop_updateSpawn1BritCampHQ
+	
 		$player.origin = $commander.origin + (0 -30 0) 	//MiaCosa @chrissstrahl //it is okay for now it is just a developer skip
 		$medic ai_on
 		$commander ai_on
 		$TheMap remove
-		$aagun.destroyed = 1`
+		$aagun.destroyed = 1
 		end
 	}
 
@@ -179,16 +183,41 @@ CommanderRunAway:
 	$commander walkto NULL
 	$commander exec global/stand.scr
 	$commander exec global/enable_ai.scr
-
 end
+
 //--------------------------------------------------
 DoObjectiveGetOnJeep:
 //--------------------------------------------------
+	//[206] chrissstrahl - spawn jeep attach spots for players
+	if(level.gametype != 0){
+		spawn script_model model "models/items/Af_P_Lantern.tik" origin ( 4168 -3703 70 ) notsolid 1 targetname coop_JeepGlue1
+		spawn script_model model "models/items/Af_P_Lantern.tik" origin ( 4208 -3703 70 ) notsolid 1 targetname coop_JeepGlue2
+		spawn script_model model "models/items/Af_P_Lantern.tik" origin ( 4128 -3703 70 ) notsolid 1 targetname coop_JeepGlue3
+		spawn script_model model "models/items/Af_P_Lantern.tik" origin ( 4088 -3703 70 ) notsolid 1 targetname coop_JeepGlue4
+		spawn script_model model "models/items/Af_P_Lantern.tik" origin ( 4088 -3753 70 ) notsolid 1 targetname coop_JeepGlue5
+		spawn script_model model "models/items/Af_P_Lantern.tik" origin ( 4128 -3753 70 ) notsolid 1 targetname coop_JeepGlue6
+		spawn script_model model "models/items/Af_P_Lantern.tik" origin ( 4168 -3753 70 ) notsolid 1 targetname coop_JeepGlue7
+		spawn script_model model "models/items/Af_P_Lantern.tik" origin ( 4208 -3753 70 ) notsolid 1 targetname coop_JeepGlue8
+		waitframe
+		for(local.i=1;local.i<9;local.i++){
+			local.ent = $("coop_JeepGlue"+local.i)
+			local.ent bind $jeep
+		}
+	}
+	
+
 	if (level.skipobjGetOnJeep == 1)
 	{
-         if (level.skipobjMedicReachGoal == 0)
-		   thread StartPlayerMedicRide
-		 iprintln "KILLING WALL"
+         if (level.skipobjMedicReachGoal == 0){
+			//[206] Chrissstrahl - grab player in coop
+			local.player = exec coop_mod/replace.scr::player_anyValid
+			while(!local.player){
+				waitframe
+				local.player = exec coop_mod/replace.scr::player_anyValid
+			}
+			thread StartPlayerMedicRide local.player 
+		 }
+		 //iprintln "KILLING WALL"
 		 killclass CrateObject // MiaCosa @chrissstrahl
 	     end
 	}
@@ -259,14 +288,9 @@ end
 //--------------------------------------------------
 StartPlayerMedicRide local.player:
 //--------------------------------------------------
-	
 	//*******************
 	thread medicDriveAnim
 	//*******************
-
-	//[206] chrissstrahl - replace static $player
-	local.player physics_on	//MiaCosa @chrissstrahl
-	local.player takedamage	//MiaCosa @chrissstrahl
 
 	//unlock the jeep and turret
 	$jeep.turret = $jeep queryturretslotentity 0
@@ -274,13 +298,20 @@ StartPlayerMedicRide local.player:
 	$jeep.turret unlock
 
 	//[206] chrissstrahl - replace static $player
-	$jeep attachturretslot 0 local.player
-	level.playerJeepGunner = local.player
+	//$jeep attachturretslot 0 local.player
+	//$jeep.turret lock
+	//$jeep lock	
 	
+	//[206] chrissstrahl - make sure that there is a gunner for the entire sequence
+	thread coop_mod/jeepGunner.scr::main local.player 1 $jeep $jeep.turret
+	waitframe
 
-	$jeep.turret lock
-	$jeep lock
-
+	
+	//[206] chrissstrahl - glue all players to the jeep - glue each player to a own spot by providing just the base targetname
+	if(level.gametype != 0){
+		exec coop_mod/replace.scr::glue "coop_JeepGlue" 99
+	}
+	
 	wait 1.5
 
 	level.playerInJeep = 1
@@ -525,19 +556,23 @@ BritCampBattle:
 	// wait until the Brits are spawned
 	local.spawntrigger waittill trigger 
 	waitframe
-	for(local.i = 1; local.i <= $friendly.size; local.i++)
+	for(local.i = 1; local.i <= $friendly.size; local.i++){
 		$friendly[local.i] thread spawnedFriendlyWatch
+	}
 	// wait until the PC gets close to the battle
 	$takedamageaxis waittill trigger
-	if($alliedcampparade2ndorigin)
+	if($alliedcampparade2ndorigin){
 		$alliedcampparade2ndorigin thread global/parade.scr::RunParade
+	}
 	$medic ai_on
 	$commander ai_on
 	waitframe
-	for(local.i = 1; local.i <= $friendly.size; local.i++)
+	for(local.i = 1; local.i <= $friendly.size; local.i++){
 		$friendly[local.i] thread enableFriendlies
-
-
+	}
+	
+	//[206] chrissstrahl - move spawn locations
+	thread maps/e3l1.scr::coop_updateSpawn1BritCampHQ
 end
 
 // ------------------------------------
