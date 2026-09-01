@@ -40,6 +40,35 @@ InitJeepStuck: {
 main: {
 //=========================================================================
 	$jeep stop
+	
+	//[206] chrissstrahl - move spawn locations - temporary location to defend the medic/jeep
+	thread maps/e3l1.scr::coop_updateSpawn3JeepStuck
+	
+	//[206] chrissstrahl - unglueplayers, otherwhise the medic gets stuck when returning to jeep
+	if(level.gametype != 0){
+		exec coop_mod/replace.scr::unglue NIL 1
+		waitframe
+		
+		for(local.i=1;local.i<9;local.i++){
+			local.ent = $("coop_JeepGlue"+local.i)
+			if(local.ent){
+				local.ent remove
+			}
+		}
+		
+		//place players somewhere around the area to defend the jeep
+		//do not allow players to move
+		exec coop_mod/replace.scr::physics_off
+		//move players to specific places
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player =  $player[local.i]
+			if( local.player.dmteam != "spectator" && local.player.health > 0 ){
+				waitthread game.main::playerPlaceAtSpawn local.player
+			}
+		}
+		waitframe
+	}
+	
 
 	//$medic turnto $player
 	$medic waitthread global/loopanim.scr::LoopAnimStop
@@ -47,7 +76,7 @@ main: {
 	//TEMP VO
 	//iprintln "(DFRUS_E3L1_PW2313) Watch our backs while I help this soldier."
 	$medic say A_31_MedTalk_06
-	$medic waittill saydone	//MiaCosa @Chrissstrahl
+	$medic waittill saydone	//MiaCosa @Chrissstrahl -> [206] chrissstrahl -> thread coop_mod/replace.scr::say_wait "A_31_MedTalk_06"
 
 	// $jeep disconnect_paths
 	thread getMedicToWounded
@@ -61,6 +90,12 @@ main: {
 	waitthread getMedicToJeep
 	$medic.direction = 3
 	waitthread isWoundedInJeep
+	
+	//[206] chrissstrahl - glue all players to the jeep - glue each player to a own spot by providing just the base targetname
+	if(level.gametype != 0){	
+		thread coop_mod/replace.scr::physics_on //reset
+		exec coop_mod/replace.scr::glue "coop_JeepGlue" 99 //restore
+	}
 
 	$planefly10 thread SpinPlane "planefly10" 16
 	$citybomb2.myexplodertrigger = waitthread global/FindTrigger.scr::FindTrigger "planeexplosion"
