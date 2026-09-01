@@ -58,15 +58,20 @@ compassTracker: {
 	local.curObjective = level.currentobjective
 
 	while ( level.gotPIAT == 0) {
-		local.height = $player.origin[2] //MiaCosa @chrissstrahl
+		//[206] chrissstrahl - grab player that is at the highest Z axis
+		//local.height = $player.origin[2] //MiaCosa @chrissstrahl
+		local.player waitthread coop_mod/replace.scr::playerHighestZaxis
+		if(local.player){
+			local.height = local.player.origin[2]
 
-		if (local.height > local.flipHeight) {
-			waitthread global/objectives.scr::add_objectives level.objPIAT 2  "Retrieve Munitions from the Supply House" $piat.origin
-			waitthread global/objectives.scr::current_objectives level.objPIAT
-		}
-		else {
-			waitthread global/objectives.scr::add_objectives level.objPIAT 2  "Retrieve Munitions from the Supply House" $compasstracker.origin
-			waitthread global/objectives.scr::current_objectives level.objPIAT
+			if (local.height > local.flipHeight) {
+				waitthread global/objectives.scr::add_objectives level.objPIAT 2  "Retrieve Munitions from the Supply House" $piat.origin
+				waitthread global/objectives.scr::current_objectives level.objPIAT
+			}
+			else {
+				waitthread global/objectives.scr::add_objectives level.objPIAT 2  "Retrieve Munitions from the Supply House" $compasstracker.origin
+				waitthread global/objectives.scr::current_objectives level.objPIAT
+			}
 		}
 		
 		waitframe
@@ -76,7 +81,11 @@ compassTracker: {
 //=========================================================================
 piatpickup: {
 //=========================================================================
-	self remove
+	//[206] Chrissstrahl - fix weapon can't be picked up in coop
+	//make sure the weapons stays but the pickup thread won't be started twiche
+	//self remove
+	self setthread ""
+	
 	level.gotPIAT = 1
 	local.origin = level.PIATwall.origin
 	spawn script_origin model "fx/dummy.tik" "targetname" "WallSoundmaker" origin (656 4663 424)
