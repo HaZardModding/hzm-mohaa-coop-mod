@@ -22,7 +22,16 @@ InitJeepStuck: {
 	level.JeepStuckParade = waitthread global/FindTrigger.scr::FindTrigger "JeepStuckParade"
 	level.planecrashtrigger = waitthread global/FindTrigger.scr::FindTrigger "planeexplosion"
 	level.jeepstucktrigger = waitthread global/FindTrigger.scr::FindTrigger "exploderjeepstuck"
-	level.jeepstuck2trigger = waitthread global/FindTrigger.scr::FindTrigger "exploderjeepstuck2"
+	level.jeepstuck2trigger = waitthread global/FindTrigger.scr::FindTrigger "exploderjeepstuck2"	
+	
+	//[206] chrissstrahl - change spawnflags, so it will activate even if no player is in jeep
+	level.chasetrucktrigger spawnflags 8
+	level.planecrashtrigger spawnflags 8
+	level.JeepStuckParade spawnflags 8
+	level.jeepstucktrigger spawnflags 8
+	level.jeepstuck2trigger spawnflags 8
+
+	
 	level.planecrashtrigger nottriggerable
 	level.jeepstucktrigger nottriggerable
 	level.jeepstuck2trigger nottriggerable
@@ -41,8 +50,8 @@ main: {
 //=========================================================================
 	$jeep stop
 	
-	//[206] chrissstrahl - move spawn locations - temporary location to defend the medic/jeep
-	thread maps/e3l1.scr::coop_updateSpawn3JeepStuck
+	//[206] chrissstrahl - update spawnlocations
+	thread maps/e3l1.scr::coop_updateSpawn2JeepStuck
 	
 	//[206] chrissstrahl - unglueplayers, otherwhise the medic gets stuck when returning to jeep
 	if(level.gametype != 0){
@@ -62,7 +71,7 @@ main: {
 		//move players to specific places
 		for (local.i = 1;local.i <= $player.size;local.i++){
 			local.player =  $player[local.i]
-			if( local.player.dmteam != "spectator" && local.player.health > 0 ){
+			if( local.player.dmteam != "spectator" && !local.player.isSpectator && local.player.health > 0 && local.player.flags["coop_isActive"]){
 				waitthread game.main::playerPlaceAtSpawn local.player
 			}
 		}
@@ -96,6 +105,10 @@ main: {
 		thread coop_mod/replace.scr::physics_on //reset
 		exec coop_mod/replace.scr::glue "coop_JeepGlue" 99 //restore
 	}
+	
+	//[206] chrissstrahl - move spawn locations - temporary location to defend the medic/jeep
+	thread maps/e3l1.scr::coop_updateSpawn3Courtyard
+	
 
 	$planefly10 thread SpinPlane "planefly10" 16
 	$citybomb2.myexplodertrigger = waitthread global/FindTrigger.scr::FindTrigger "planeexplosion"
@@ -348,6 +361,12 @@ PassengerGetInJeep local.jeep local.passenger: {
 //=========================================================================
 handleWoundedWonder: {
 //=========================================================================
+	//[206] chrissstrahl - prevent double execution - this thread is executed from 2 different places because we want it to fire always regardless if a player is in jeep
+	if(level.handleWoundedWonder){
+		end
+	}
+	level.handleWoundedWonder = 1
+		
 	$woundedguy ai_on
 	$woundedguy show
 	$woundedguy threatbias ignoreme
@@ -456,6 +475,10 @@ SpinPlane local.triggername local.rotationamount: {
 	self.scale = 0.5
 	self notsolid
 	local.trigger = waitthread global/FindTrigger.scr::FindTrigger local.triggername   // "planefly10"
+	
+	//[206] chrissstrahl - make sure this trigger fires always also if no player is present
+	local.trigger spawnflags 8 //respond to actor/monster
+	
 	local.trigger waittill trigger
 
 	//	"planefly10"

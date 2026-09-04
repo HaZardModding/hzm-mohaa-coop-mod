@@ -8,6 +8,10 @@
 //=========================================================================
 main: {
 //=========================================================================
+	//[206] chrissstrahl - change spawnflags of trigger so they respond also to actors
+	//this should fix triggers not firing if player is dead or in spec and not inside the jeep
+	thread coop_triggerCoopification "enemyspawnertrigger"
+
 	level.farDist = 2200
 	level.fogBias = 1000
 	level.fogColor = ( .25 .26 .28 )
@@ -206,7 +210,6 @@ SetPlayerHealthScale local.scale: {
 
 	//[206] chrissstrahl - lets not do this in coop - yet
 	if(level.gametype != 0){
-		iprintlnbold_noloc ("COOP SKIPPED: SetPlayerHealthScale")
 		end
 	}
 	else{
@@ -267,6 +270,8 @@ startMusic_e3l1_main: {
 //============================================================
 coop_updateSpawn1BritCampHQ:{
 //============================================================
+iprintlnbold_noloc("Coop DEV Info: coop_updateSpawn1BritCampHQ")
+	
 	//set master angle, reset possible alternative angles
 	level.flags[coop_spawn1angles] = ( 0 357 0 )
 	for( local.i = 2;local.i<=8;local.i++){
@@ -284,9 +289,31 @@ coop_updateSpawn1BritCampHQ:{
 }end
 
 //============================================================
-coop_updateSpawn2Courtyard:{
+coop_updateSpawn2JeepStuck:{
 //============================================================
-	iprintlnbold_noloc("Coop DEV Info: coop_updateSpawn2Courtyard")
+	iprintlnbold_noloc("Coop DEV Info: coop_updateSpawn2JeepStuck")
+
+	//set master angle, reset possible alternative angles
+	level.flags[coop_spawn1angles] = ( 0 0 0 ) 
+	for( local.i = 2;local.i<=8;local.i++){
+		level.flags["coop_spawn"+local.i+"angles"] = ( 0 0 0 )
+	}
+
+	//need to substract 82 on Z-axis - these values where taken via viewpos
+	level.flags[coop_spawn1origin] = ( -470 -319 122 ) // () : 28
+	level.flags[coop_spawn2origin] = ( -630 67 121 ) // () : -8
+	level.flags[coop_spawn3origin] = ( 346 334 131 ) // () : -28
+	level.flags[coop_spawn4origin] = ( 231 302 281 ) // () : -31
+	level.flags[coop_spawn5origin] = ( 1085 -272 178 ) // () : 130
+	level.flags[coop_spawn6origin] = ( 1425 -312 149 ) // () : 152
+	level.flags[coop_spawn7origin] = ( 239 -623 122 ) // () : 58
+	level.flags[coop_spawn8origin] = ( -593 -248 193 ) // () : 12
+}end
+
+//============================================================
+coop_updateSpawn3Courtyard:{
+//============================================================
+iprintlnbold_noloc("Coop DEV Info: coop_updateSpawn3Courtyard")
 
 	//set master angle, reset possible alternative angles
 	level.flags[coop_spawn1angles] = ( 0 343 0 ) 
@@ -304,26 +331,34 @@ coop_updateSpawn2Courtyard:{
 	level.flags[coop_spawn8origin] = ( -592 3363 176 ) 
 }end
 
+//[206] chrissstrahl - this is called locally
 //============================================================
-coop_updateSpawn3JeepStuck:{
+coop_triggerFireDelayed local.trigger local.time:{
 //============================================================
-	iprintlnbold_noloc("Coop DEV Info: coop_updateSpawn3JeepStuck")
-
-	//set master angle, reset possible alternative angles
-	level.flags[coop_spawn1angles] = ( 0 0 0 ) 
-	for( local.i = 2;local.i<=8;local.i++){
-		level.flags["coop_spawn"+local.i+"angles"] = ( 0 0 0 )
+	wait local.time
+	if(local.trigger){
+		trigger local.trigger
 	}
+}end
 
-	//need to substract 82 on Z-axis - these values where taken via viewpos
-	level.flags[coop_spawn1origin] = ( -470 -319 122 ) // () : 28
-	level.flags[coop_spawn2origin] = ( -630 67 121 ) // () : -8
-	level.flags[coop_spawn3origin] = ( 346 334 131 ) // () : -28
-	level.flags[coop_spawn4origin] = ( 231 302 281 ) // () : -31
-	level.flags[coop_spawn5origin] = ( 1085 -272 178 ) // () : 130
-	level.flags[coop_spawn6origin] = ( 1425 -312 149 ) // () : 152
-	level.flags[coop_spawn7origin] = ( 239 -623 122 ) // () : 58
-	level.flags[coop_spawn8origin] = ( -593 -248 193 ) // () : 12
+
+//[206] chrissstrahl - this is called locally
+//============================================================
+coop_triggerCoopification local.targetname:{
+//============================================================
+	if(local.targetname){
+		if($(local.targetname)){
+			local.triggersSet = 0
+			for (local.i = 1; local.i <= $(local.targetname).size; local.i++) {
+				local.trigger = $(local.targetname)[local.i]
+				if(local.trigger){
+					local.trigger spawnflags 8
+					local.triggersSet++
+				}
+			}
+			//println("coop_triggerCoopification "+local.triggersSet+" spawnflags set for "+local.targetname);
+		}
+	}
 }end
 
 //[206] chrissstrahl - this is called locally
