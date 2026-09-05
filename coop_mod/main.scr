@@ -574,33 +574,36 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 	while( local.player && local.player.flags["coop_makesolid"] != NIL ){
 		local.touch = 0
 		
-		if(local.player.health == NIL){
-			println("DEVDEBUG=====================playerMakeSolidAsap")
-			println("time:"+level.time+" "+local.player+" t:$"+local.player.targetname+" m:"+local.player.model+" c:"+local.player.classname)
-			println("================================================")
-		}
-	
-		if(local.player.health == NIL && local.player.health <= 0){
+		/*
+		println("DEVDEBUG=====================playerMakeSolidAsap")
+		println("time:"+level.time+" "+local.player+" t:$"+local.player.targetname+" m:"+local.player.model+" c:"+local.player.classname)
+		println("================================================") */
+		
+		//[206] chrissstrahl - Using isAlive to properly detect player presence and health
+		if(!isAlive local.player){
 			local.player.flags["coop_makesolid"] = NIL
-//println("COOPDEBUG: playerMakeSolidAsap 4 while exit "+local.player.entnum+" dead")
+			//println("COOPDEBUG: playerMakeSolidAsap 4 while exit "+local.player.entnum+" dead")
 			end
 		}
 		
 		//[203] chrissstrahl - removed check, because player is not quite "ready" when this func is run for the first time || local.player.flags["coop_isActive"] != 1
-		if(level.gametype != 0 && local.player.dmteam == "spectator"){
+		
+		
+		//[206] chrissstrahl - Using .isSpectator to properly detect all Spectator states
+		if(level.gametype != 0 && local.player.isSpectator){
 			local.player.flags["coop_makesolid"] = NIL
-//println("COOPDEBUG: playerMakeSolidAsap 5 while exit "+local.player.entnum+" spectator/inactive")
-//println("COOPDEBUG: playerMakeSolidAsap 5 while exit ["+local.player.dmteam+"] - coop_isActive: "+local.player.flags["coop_isActive"])
+			//println("COOPDEBUG: playerMakeSolidAsap 5 while exit "+local.player.entnum+" spectator/inactive")
+			//println("COOPDEBUG: playerMakeSolidAsap 5 while exit ["+local.player.dmteam+"] - coop_isActive: "+local.player.flags["coop_isActive"])
 			end
 		}
 
 		//[200] chrissstrahl - added notsolid here just to be sure the player is notsolid from the get go
-//println("COOPDEBUG: playerMakeSolidAsap 6 while "+local.player.entnum+" notsolid")
+		//println("COOPDEBUG: playerMakeSolidAsap 6 while "+local.player.entnum+" notsolid")
 		local.player notsolid
 		
 		//don't do player checks in sp
 		if( level.gametype == 0){
-//println("COOPDEBUG: playerMakeSolidAsap 7 while exit "+local.player.entnum+" singleplayer")
+			//println("COOPDEBUG: playerMakeSolidAsap 7 while exit "+local.player.entnum+" singleplayer")
 			goto playerMakeSolidAsap_spCheck
 		}
 		
@@ -610,7 +613,12 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 				
 			//don't check the player against him self
 			//[202] chrissstrahl - restored spectator check to old standard because it was causing a bug on spawn!
-			if(local.player == local.otherPlayer || local.otherPlayer.dmteam == "spectator" || local.otherPlayer.health <= 0 ){ //local.otherPlayer.flags["coop_isActive"] != 1
+			//[206] chrissstrahl - Using isAlive to properly detect player presence and health
+			//[206] chrissstrahl - Using .isSpectator to properly detect all Spectator states
+			if(	!isAlive local.otherPlayer ||
+				local.otherPlayer.isSpectator ||
+				local.player == local.otherPlayer) //local.otherPlayer.flags["coop_isActive"] != 1
+			{
 				continue
 			}
 			
@@ -663,13 +671,17 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 		//[203] chrissstrahl - added additional checks - we had script errors there
 		if(local.player){
 			local.player.flags["coop_makesolid"] = NIL
-			if(local.player.health > 0 && local.player.dmteam != "spectator" ){
+			//[206] chrissstrahl - Using isAlive to properly detect player presence and health
+			//[206] chrissstrahl - Using .isSpectator to properly detect all Spectator states
+			if(	isAlive local.player &&
+				!local.player.isSpectator )
+			{
 				local.player solid
 			}
 		}
 		end
 		
-		//code that is executed if objects are touching
+		//jumplabel - code that is executed if objects are touching
 		playerMakeSolidAsap_touching:
 		
 		//println("playerMakeSolidAsap loop")
@@ -791,15 +803,17 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 		//if everything is ok, wait a moment then try again
 		if(level.coop_player != NULL && local.grabNewPlayer != 1){
 			//[200] chrissstrahl - added handle for singleplayer
+			//[206] chrissstrahl - Using isAlive to properly detect player presence and health
+			//[206] chrissstrahl - Using .isSpectator to properly detect all Spectator states
 			if(level.gametype != 0){
-				if(	level.coop_player.dmteam == "spectator" ||
-					level.coop_player.health <= 0 ||
+				if(	!isAlive level.coop_player ||
+					level.coop_player.isSpectator||
 					level.coop_player.flags["coop_isActive"] != 1 ||
 					level.coop_player.flags["coopDevNoclip"] != NIL	) //[203] chrissstrahl - added check to exclude player in noclip
 				{
 					local.tries++
 				}
-			}else if(level.coop_player.health <= 0){
+			}else if(!isAlive level.coop_player){
 				end
 			}
 
@@ -842,7 +856,15 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 	//find a valid player to follow, this is used to direct the ai to a player to follow
 	for (local.i = 1;local.i <= $player.size;local.i++){
 		local.player =  $player[local.i]
-		if(local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 && local.player.flags["coopDevNoclip"] == NIL){ //[203] chrissstrahl - added to prevent noclip player
+		
+		//[203] chrissstrahl - added to prevent noclip player
+		//[206] chrissstrahl - Using isAlive to properly detect player presence and health
+		//[206] chrissstrahl - Using .isSpectator to properly detect all Spectator states
+		if(	isAlive local.player &&
+			!local.player.isSpectator &&
+			local.player.flags["coop_isActive"] == 1 &&
+			local.player.flags["coopDevNoclip"] == NIL)
+		{
 			level.coop_player = local.player
 			//iprintlnbold_noloc ( "player found..." + local.i + "::" + level.coop_player )
 			end
