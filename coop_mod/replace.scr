@@ -339,7 +339,6 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 //this accepts eigther of both paramaters (enity, vector)
 //this function is just a quick fix, this needs adjustment
 	local.objectOrigin = ( 0 0 0 )
-	local.player = NULL
 	local.playerReturn = NULL
 	local.currentDistance = 999999
 	local.closestDistance = 999999
@@ -358,7 +357,12 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 	for (local.i = 1;local.i <= $player.size;local.i++){
 		local.player = $player[local.i]
 		//[203] chrissstrahl - ignoring now players that are in noclip
-		if( local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 && local.player.flags["coopDevNoclip"] == NIL){
+		//[206] chrissstrahl - Fixed: returning spectators when sv_team_spawn_interval is set and player wants to respawn added .isSpectator check
+		if( isAlive local.player &&
+			!local.player.isSpectator &&
+			local.player.dmteam != "spectator" &&
+			local.player.flags["coop_isActive"] == 1 &&
+			local.player.flags["coopDevNoclip"] == NIL){
 			//[202] chrissstrahl - upgraded to calculate distance only once
 			local.currentDistance =  vector_length( local.player.origin - local.objectOrigin )
 			if(local.currentDistance < local.closestDistance ){
@@ -1117,23 +1121,27 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 			}
 		}
 	}
+	
+	//[206] chrissstrahl - make sure we don't add the same item twice
+	//[206] chrissstrahl - support up to 6 items
+	if(level.coop_playerItem1 == NIL){ level.coop_playerItem1 = local.item; end}
+	else if(level.coop_playerItem1 == local.item){ end }
+	 
+	
+	if(level.coop_playerItem2 == NIL){ level.coop_playerItem2 = local.item; end }
+	else if(level.coop_playerItem2 == local.item){ end }
 
-	if(level.coop_playerItem1 == NIL ){
-		level.coop_playerItem1 = local.item
-		end
-	}
-	if(level.coop_playerItem2 == NIL ){
-		level.coop_playerItem2 = local.item
-		end
-	}
-	if(level.coop_playerItem3 == NIL ){
-		level.coop_playerItem3 = local.item
-		end
-	}
-	if(level.coop_playerItem4 == NIL ){
-		level.coop_playerItem4 = local.item
-		end
-	}
+	if(level.coop_playerItem3 == NIL){ level.coop_playerItem3 = local.item; end }
+	else if(level.coop_playerItem3 == local.item){ end }
+	
+	if(level.coop_playerItem4 == NIL){ level.coop_playerItem4 = local.item; end }
+	else if(level.coop_playerItem4 == local.item){ end }
+	
+	if(level.coop_playerItem5 == NIL){ level.coop_playerItem5 = local.item; end }
+	else if(level.coop_playerItem5 == local.item){ end }
+	
+	if(level.coop_playerItem6 == NIL){ level.coop_playerItem6 = local.item; end }
+	else if(level.coop_playerItem6 == local.item){ end }
 }end
 
 //=========================================================================
@@ -1153,6 +1161,8 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 	if(level.coop_playerItem2 == local.item ){ level.coop_playerItem2 = NIL }
 	if(level.coop_playerItem3 == local.item ){ level.coop_playerItem3 = NIL }
 	if(level.coop_playerItem4 == local.item ){ level.coop_playerItem4 = NIL }
+	if(level.coop_playerItem5 == local.item ){ level.coop_playerItem5 = NIL }
+	if(level.coop_playerItem6 == local.item ){ level.coop_playerItem6 = NIL }
 }end
 
 //[204] Chrissstrahl - added alias
@@ -1182,6 +1192,8 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 	level.coop_playerItem2 = NIL
 	level.coop_playerItem3 = NIL
 	level.coop_playerItem4 = NIL
+	level.coop_playerItem5 = NIL
+	level.coop_playerItem6 = NIL
 }end
 
 //checks if any player can see this actor
