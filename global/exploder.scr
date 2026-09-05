@@ -565,13 +565,26 @@ explodechunk:
 
 	if (self.pause != NIL)
 	wait self.pause
-
+	
+	if (!self){ end } //[206] Chrissstrahl - fix console spam?
+	
 	self show
 	self notsolid
 	
-	//[205] chrissstrahl - fix console spam on (e1l1), grab only one target - untested
-	if( $($(self).target) && $($(self).target).size > 1){
-		self.target = $($(self).target)[1]
+	//[206] chrissstrahl - fix console spam, grab only one target
+	//I assume that target can be a entity or a targetname
+	if(self.target){
+		//type: 0-NIL/NULL, 1-string,2-entity,3-vector,4-int/float,5-entityarray
+		local.varType = waitthread game.main::returnVarType local.i NIL "global/exploder.scr::explodechunk"
+		
+		if(local.varType == 1){ //targetname (string)
+			self.target = $(self.target)
+			self.target = self.target[1]
+		}
+		//(entity) - do nothing
+		else if(local.varType == 5){ //entityarray
+			self.target = self.target[1]
+		}
 	}
 	
 	local.vec = (self.origin - self.target.origin)
