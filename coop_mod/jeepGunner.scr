@@ -66,8 +66,8 @@ main local.player local.replacementtype local.jeep local.jeepTurret:{
 				if(local.replacementtype == 1){
 					for (local.i = 1;local.i <= $player.size;local.i++){
 						local.player = $player[local.i]
-						if(	local.player.health > 0 &&
-							local.player.dmteam != "spectator" &&
+						if(	isAlive local.player &&
+							!local.player.isSpectator &&
 							(waitthread coop_mod/main.scr::lmsGetRemainingLives local.player > 0) &&
 							local.player.flags["coop_isAlive"] == game.true)
 						{
@@ -81,8 +81,8 @@ main local.player local.replacementtype local.jeep local.jeepTurret:{
 				}
 
 				//check if player is actually good and then use this player
-				if(	local.player && local.player.health > 0 &&
-					local.player.dmteam != "spectator" &&
+				if(	isAlive local.player &&
+					!local.player.isSpectator &&
 					(waitthread coop_mod/main.scr::lmsGetRemainingLives local.player > 0) &&
 					local.player.flags["coop_isAlive"] == game.true )
 				{
@@ -91,18 +91,16 @@ main local.player local.replacementtype local.jeep local.jeepTurret:{
 					level.coop_jeepGunner = local.player
 					
 					//mark
-					thread coop_mod/jeepGunner.scr::setGunnerFlag level.coop_jeepGunner 1
+					thread coop_mod/jeepGunner.scr::setGunnerFlag local.player 1
 					
 					//unglue
-					thread coop_mod/replace.scr::unglue NIL 1
-					
-					level.coop_jeepGunner physics_off
-					level.coop_jeepGunner takedamage
-					
+					local.player unglue
+					local.player physics_off
+					local.player takedamage
 					//attach to gun
 					local.jeep unlock
 					local.jeepTurret unlock
-					local.jeep attachturretslot 0 level.coop_jeepGunner
+					local.jeep attachturretslot 0 local.player
 					local.jeepTurret lock
 					local.jeep lock
 				}
