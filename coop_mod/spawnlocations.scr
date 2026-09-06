@@ -3290,7 +3290,7 @@ e3l1:{
 //=========================================================================
 e3l1_update1:{
 //=========================================================================
-	iprintlnbold_noloc("Coop DEV Info: coop_updateSpawn1BritCampHQ")
+	//iprintlnbold_noloc("Coop DEV Info: coop_updateSpawn1BritCampHQ")
 	
 	level.flags[coop_spawn1origin] = ( 3442 -3844 230 ) 
 	level.flags[coop_spawn2origin] = ( 3482 -3844 230 ) 
@@ -3311,7 +3311,7 @@ e3l1_update1:{
 //=========================================================================
 e3l1_update2:{
 //=========================================================================
-	iprintlnbold_noloc("Coop DEV Info: coop_updateSpawn2JeepStuck")
+	//iprintlnbold_noloc("Coop DEV Info: coop_updateSpawn2JeepStuck")
 	
 	//need to substract 82 on Z-axis - these values where taken via viewpos
 	level.flags[coop_spawn1origin] = ( 280 230 281 )
@@ -3328,10 +3328,12 @@ e3l1_update2:{
 		level.flags["coop_spawn"+local.i+"angles"] = ( 0 0 0 )
 	}
 	
-	//spawn temporary gluepoints to attach players during rescue sequence
+	//spawn temporary obstacles that get players stuck during rescue sequence
+	//this works better than using glue or turning off physics
+	//the spawnlocations do exactly match the obstacle origin
 	for(local.i=1;local.i<9;local.i++){ //notsolid 1
 		if(!$("coop_rescueSequenceSpot"+local.i)){
-			spawn script_model model "models/items/Af_P_Lantern.tik" origin ( level.flags["coop_spawn"+local.i+"origin"] ) targetname ("coop_rescueSequenceSpot"+local.i)
+			spawn script_model model "models/items/Af_P_Lantern.tik" origin ( level.flags["coop_spawn"+local.i+"origin"] ) targetname ("coop_rescueSequenceSpot"+local.i) hide 1
 		}
 	}
 	waitframe
@@ -3355,12 +3357,31 @@ e3l1_update2:{
 			thread game.main::playerPlaceAtSpawn local.player
 		}
 	}
+	
+	//make sure to delete the obstacles
+	thread e3l1_update2_delete
+}end
+
+//=========================================================================
+e3l1_update2_delete:{
+//=========================================================================
+	while(level.woundedInJeep){
+		wait 1
+	}
+	
+	//remove the temp obstacles
+	for(local.i=1;local.i<9;local.i++){
+		local.ent = $("coop_rescueSequenceSpot"+local.i)
+		if(local.ent){
+			local.ent remove
+		}
+	}
 }end
 
 //=========================================================================
 e3l1_update3:{
 //=========================================================================
-	iprintlnbold_noloc("Coop DEV Info: coop_updateSpawn3Courtyard")
+	//iprintlnbold_noloc("Coop DEV Info: coop_updateSpawn3Courtyard")
 
 	//set master angle, reset possible alternative angles
 	level.flags[coop_spawn1angles] = ( 0 343 0 ) 
