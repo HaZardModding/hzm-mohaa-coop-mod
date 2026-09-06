@@ -3273,11 +3273,9 @@ level.flags[coop_spawn8origin] = ( 5818 -2537 -257 )
 */
 }end
 
-//[206] chrissstrahl
 //=========================================================================
 e3l1:{
 //=========================================================================
-if(level.cMTE_coop_spawnlocations){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread spawnlocations/e3l1->"+level.cMTE+"" )}
 	level.flags[coop_spawn1angles] = ( 0 319.092 0 )
 	level.flags[coop_spawn1origin] = ( -1009 -4684 200 )
 	level.flags[coop_spawn2origin] = ( -1009 -4644 200 )
@@ -3287,17 +3285,115 @@ if(level.cMTE_coop_spawnlocations){if(!level.cMTE){level.cMTE=0}; level.cMTE++; 
 	level.flags[coop_spawn6origin] = ( -1009 -4764 200 )
 	level.flags[coop_spawn7origin] = ( -1009 -4804 200 )
 	level.flags[coop_spawn8origin] = ( -1009 -4844 200 )
-/*
-level.flags[coop_spawn1angles] = ( 0 25.345 0 )
-level.flags[coop_spawn1origin] = ( -1256 -5666 10 )
-level.flags[coop_spawn2origin] = ( -1216 -5666 10 )
-level.flags[coop_spawn3origin] = ( -1296 -5666 10 )
-level.flags[coop_spawn4origin] = ( -1336 -5666 10 )
-level.flags[coop_spawn5origin] = ( -1336 -5716 10 )
-level.flags[coop_spawn6origin] = ( -1296 -5716 10 )
-level.flags[coop_spawn7origin] = ( -1256 -5716 10 )
-level.flags[coop_spawn8origin] = ( -1216 -5716 10 )
-*/
+}end
+
+//=========================================================================
+e3l1_update1:{
+//=========================================================================
+	iprintlnbold_noloc("Coop DEV Info: coop_updateSpawn1BritCampHQ")
+	
+	level.flags[coop_spawn1origin] = ( 3442 -3844 230 ) 
+	level.flags[coop_spawn2origin] = ( 3482 -3844 230 ) 
+	level.flags[coop_spawn3origin] = ( 3442 -3804 230 ) 
+	level.flags[coop_spawn4origin] = ( 3482 -3804 230 ) 
+	level.flags[coop_spawn5origin] = ( 3442 -3764 230 ) 
+	level.flags[coop_spawn6origin] = ( 3482 -3764 230 ) 
+	level.flags[coop_spawn7origin] = ( 3442 -3724 230 ) 
+	level.flags[coop_spawn8origin] = ( 3482 -3724 230 ) 	
+	
+	//set master angle, reset possible alternative angles
+	level.flags[coop_spawn1angles] = ( 0 357 0 )
+	for( local.i = 2;local.i<=8;local.i++){
+		level.flags["coop_spawn"+local.i+"angles"] = ( 0 0 0 )
+	}
+}end
+
+//=========================================================================
+e3l1_update2:{
+//=========================================================================
+	iprintlnbold_noloc("Coop DEV Info: coop_updateSpawn2JeepStuck")
+	
+	//need to substract 82 on Z-axis - these values where taken via viewpos
+	level.flags[coop_spawn1origin] = ( 280 230 281 )
+	level.flags[coop_spawn2origin] = ( -630 67 121 )
+	level.flags[coop_spawn3origin] = ( 346 334 131 )
+	level.flags[coop_spawn4origin] = ( 231 302 281 )
+	level.flags[coop_spawn5origin] = ( -538 189 202 )
+	level.flags[coop_spawn6origin] = ( -481 208 209 )
+	level.flags[coop_spawn7origin] = ( 239 -623 122 )
+	level.flags[coop_spawn8origin] = ( 393 409 130 )
+
+	//set master angle, reset possible alternative angles
+	for( local.i = 1;local.i<=8;local.i++){
+		level.flags["coop_spawn"+local.i+"angles"] = ( 0 0 0 )
+	}
+	
+	//spawn temporary gluepoints to attach players during rescue sequence
+	for(local.i=1;local.i<9;local.i++){ //notsolid 1
+		if(!$("coop_rescueSequenceSpot"+local.i)){
+			spawn script_model model "models/items/Af_P_Lantern.tik" origin ( level.flags["coop_spawn"+local.i+"origin"] ) targetname ("coop_rescueSequenceSpot"+local.i)
+		}
+	}
+	waitframe
+	//drop to floor so player touches ground
+	for(local.i=1;local.i<9;local.i++){
+		local.ent = $("coop_rescueSequenceSpot"+local.i)
+		local.ent droptofloor
+	}
+	waitframe
+	//update actual spawn locations with real pos otherwhise we would have to substract 82 on Z-axis, because these values where taken via viewpos
+	for(local.i=1;local.i<9;local.i++){
+		local.ent = $("coop_rescueSequenceSpot"+local.i)
+		level.flags["coop_spawn"+local.i+"origin"] = ( local.ent.origin )
+	}
+	//make sure players get moved to spawn locations befor unglue
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player = $player[local.i]
+		if( isAlive local.player &&
+			!local.player.isSpectator)
+		{
+			thread game.main::playerPlaceAtSpawn local.player
+		}
+	}
+}end
+
+//=========================================================================
+e3l1_update3:{
+//=========================================================================
+	iprintlnbold_noloc("Coop DEV Info: coop_updateSpawn3Courtyard")
+
+	//set master angle, reset possible alternative angles
+	level.flags[coop_spawn1angles] = ( 0 343 0 ) 
+	for( local.i = 2;local.i<=8;local.i++){
+		level.flags["coop_spawn"+local.i+"angles"] = ( 0 0 0 )
+	}
+
+	level.flags[coop_spawn1origin] = ( -632 3413 176 ) 
+	level.flags[coop_spawn2origin] = ( -592 3413 176 ) 
+	level.flags[coop_spawn3origin] = ( -672 3413 176 ) 
+	level.flags[coop_spawn4origin] = ( -712 3413 176 ) 
+	level.flags[coop_spawn5origin] = ( -712 3363 176 ) 
+	level.flags[coop_spawn6origin] = ( -672 3363 176 ) 
+	level.flags[coop_spawn7origin] = ( -632 3363 176 ) 
+	level.flags[coop_spawn8origin] = ( -592 3363 176 )
+	
+	level.coop_disableSpawnWarper	= game.false	//chrissstrahl - enable respawn warper
+}end
+
+//=========================================================================
+e3l2:{
+//=========================================================================
+	/*
+	level.flags[coop_spawn1angles] = ( 0 319.092 0 )
+	level.flags[coop_spawn1origin] = ( -1009 -4684 200 )
+	level.flags[coop_spawn2origin] = ( -1009 -4644 200 )
+	level.flags[coop_spawn3origin] = ( -1009 -4604 200 )
+	level.flags[coop_spawn4origin] = ( -1009 -4564 200 )
+	level.flags[coop_spawn5origin] = ( -1009 -4724 200 )
+	level.flags[coop_spawn6origin] = ( -1009 -4764 200 )
+	level.flags[coop_spawn7origin] = ( -1009 -4804 200 )
+	level.flags[coop_spawn8origin] = ( -1009 -4844 200 )
+	*/
 }end
 
 /* TEMPLATE
