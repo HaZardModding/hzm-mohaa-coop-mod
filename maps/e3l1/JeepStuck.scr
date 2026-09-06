@@ -50,32 +50,36 @@ main: {
 //=========================================================================
 	$jeep stop
 	
-	//[206] chrissstrahl - update spawnlocations
-	thread maps/e3l1.scr::coop_updateSpawn2JeepStuck
-	
 	//[206] chrissstrahl - unglueplayers, otherwhise the medic gets stuck when returning to jeep
 	if(level.gametype != 0){
-		exec coop_mod/replace.scr::unglue NIL 1
-		waitframe
+		//update spawnlocations
+		waitthread coop_mod/spawnlocations.scr::e3l1_update2
 		
+		//spawn temporary gluepoints to attach players during rescue sequence
 		for(local.i=1;local.i<9;local.i++){
-			local.ent = $("coop_JeepGlue"+local.i)
-			if(local.ent){
-				local.ent remove
-			}
+			spawn script_model model "models/items/Af_P_Lantern.tik" origin ( level.flags["coop_spawn"+local.i+"origin"] ) notsolid 1 targetname ("coop_JeepGlue"+local.i)
+			//local.ent hide
 		}
-		
-		//place players somewhere around the area to defend the jeep
-		//do not allow players to move
-		exec coop_mod/replace.scr::physics_off
-		//move players to specific places
+		waitframe
+		for(local.i=1;local.i<9;local.i++){
+			local.ent = $("coop_rescueSequenceSpot"+local.i)
+			local.ent droptofloor
+			//local.ent hide
+		}
+		//make sure players get moved to spawn locations befor unglue
 		for (local.i = 1;local.i <= $player.size;local.i++){
 			local.player =  $player[local.i]
-			if( local.player.dmteam != "spectator" && !local.player.isSpectator && local.player.health > 0 && local.player.flags["coop_isActive"]){
-				waitthread game.main::playerPlaceAtSpawn local.player
+			if( isAlive local.player &&
+				!local.player.isSpectator)
+			{
+				thread game.main::playerPlaceAtSpawn local.player
 			}
 		}
 		waitframe
+		//unglue from jeep
+		waitthread coop_mod/replace.scr::unglue NIL 1
+		//glue players to the spots
+		thread coop_mod/replace.scr::glue "coop_rescueSequenceSpot" NIL NIL
 	}
 	
 
@@ -101,13 +105,15 @@ main: {
 	waitthread isWoundedInJeep
 	
 	//[206] chrissstrahl - glue all players to the jeep - glue each player to a own spot by providing just the base targetname
-	if(level.gametype != 0){	
-		thread coop_mod/replace.scr::physics_on //reset
-		exec coop_mod/replace.scr::glue "coop_JeepGlue" 99 //restore
+	if(level.gametype != 0){
+		//unglue from rescue spots
+		waitthread coop_mod/replace.scr::unglue NIL 1
+		//glue to jeep again
+		thread coop_mod/replace.scr::glue "coop_JeepGlue" 99
 	}
 	
 	//[206] chrissstrahl - move spawn locations - temporary location to defend the medic/jeep
-	thread maps/e3l1.scr::coop_updateSpawn3Courtyard
+	waitthread coop_mod/spawnlocations.scr::e3l1_update3
 	
 
 	$planefly10 thread SpinPlane "planefly10" 16
