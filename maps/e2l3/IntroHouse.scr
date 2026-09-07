@@ -31,8 +31,6 @@ Init: {
 		$startClip notsolid
 	}
 
-	thread Fadein
-
 	level.jeepspeed  = 260
 	level.jeepaccel  = 500
 	level.tank1speed = 13
@@ -52,6 +50,7 @@ Init: {
 	if(level.gametype == 0){
 		$player.origin = local.porigin
 		$player.viewangles = ( 0 0 0 )
+		thread Fadein
 	}
 
 	// jeep setup
@@ -87,7 +86,9 @@ coop_debugJeep: {
 		//[205] chrissstrahl - fix console spam
 		if($player[1] && $player[1].flags["coopDevNoclip"] != NIL){
 			local.exitpos = $startjeep gettagposition "passenger_enter"
-			thread coop_mod/replace.scr::unglue local.exitpos 1
+			//[206] Chrissstrahl
+			//thread coop_mod/replace.scr::unglue local.exitpos 1
+			thread coop_mod/player_camera.scr::coop_stopPlayerTruckSpawnManager
 			end
 		}
 		wait 1
@@ -201,8 +202,11 @@ playerGetOnJeep: {
 		//$coop_truckOrigin glue level.startjeepPassengerSeat
 		//$coop_truckOrigin bind level.startjeepPassengerSeat
 		
-		thread coop_mod/replace.scr::glue level.startjeepPassengerSeat 0 1
+		//[206] chrissstrahl - coop compatibility
+		//thread coop_mod/replace.scr::glue level.startjeepPassengerSeat 0 1
+		thread coop_mod/player_camera.scr::coop_playerTruckSpawnManager $startjeep ( -55 5 85 ) game.false
 		
+		thread Fadein
 //[204] chrissstrahl
 //thread coop_debugJeep
 	}
@@ -386,7 +390,11 @@ unloadJeep: {
 		//thread coop_mod/replace.scr::unglue level.startjeepPassengerSeat ( 0 0 0 ) 1
 		//local.exitpos = $startjeep gettagposition "passenger_enter"
 		//use fixed origin just in case if jeep gest stuck
-		thread coop_mod/replace.scr::unglue ( 3453 4832 166 ) 1
+		
+		//[206] Chrissstrahl
+		//thread coop_mod/replace.scr::unglue local.exitpos 1
+		//thread coop_mod/replace.scr::unglue ( 3453 4832 166 ) 1
+		thread coop_mod/player_camera.scr::coop_stopPlayerTruckSpawnManager
 	}
 }end
 
@@ -500,11 +508,12 @@ StartTankThinkThread local.delay: {
 	local.kiltjeep.angles = local.jeep_angles
 	local.kiltjeep playsound e2l3_jeep_explo
 
-	//[204]chrissstrahl - kill players to close to jeep
+	//[204] chrissstrahl - kill players to close to jeep
+	//[206] chrissstrahl - updated
 	for (local.i = 1;local.i <= $player.size;local.i++){
 		local.player =  $player[local.i]
-		if( local.player.health > 0 ){
-			if(level.gametype == 0 || local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1){
+		if( isAlive local.player ){
+			if(level.gametype == 0 || !local.player.isSpectator){
 				if(local.player isTouching local.kiltjeep){
 					local.player exec global/bullethit.scr (0 -1 0) 200000 50 1
 				}
