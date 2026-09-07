@@ -79,9 +79,6 @@ DoIntro: {
 	$jeeppassenger unholster
 
 	// Setup player for first rail ride
-	//[206] chrissstrahl - coop compatibility
-	thread coop_mod/replace.scr::nodamage
-
 	//unlock the jeep and turret
 	$startjeep.turret = $startjeep queryturretslotentity 0
 	$startjeep unlock
@@ -97,9 +94,12 @@ DoIntro: {
 	}
 	//[206] chrissstrahl - cheap hack for coop
 	else{
-		thread coop_mod/replace.scr::glue $startjeep.turret NIL 1
-		waitthread coop_mod/replace.scr::waitForPlayer //chrissstrahl - coop compatible
-		wait 1.15 //wait a moment to ensure players are glued before jeep goes - prevent shaking
+		//[206] chrissstrahl - coop compatibility
+		waitthread coop_mod/replace.scr::waitForPlayer
+		thread coop_mod/player_camera.scr::coop_playerTruckSpawnManager $startjeep ( -95 0 100 ) game.false
+		
+		//thread coop_mod/replace.scr::glue $startjeep.turret NIL 1
+		//wait 1.15 //wait a moment to ensure players are glued before jeep goes - prevent shaking
 	}
 
 	// Tell the jeep to drive
@@ -161,16 +161,16 @@ JeepCrash: {
 		//move players to their actual spawn
 		for (local.i = 1; local.i <= $player.size; local.i++) {
 			local.player = $player[local.i]
+			if(!isAlive local.player || local.player.isSpectator ){
+				continue
+			}
 			thread coop_mod/main.scr::playerPlaceAtSpawn local.player
 		}
 		
 		waitthread coop_mod/replace.scr::unglue NIL 1
 		
-		//move players to their actual spawn
-		for (local.i = 1; local.i <= $player.size; local.i++) {
-			local.player = $player[local.i]
-			thread coop_mod/main.scr::playerPlaceAtSpawn local.player
-		}
+		//[206][hotfix] Chrissstrahl
+		thread coop_mod/player_camera.scr::coop_stopPlayerTruckSpawnManager
 	}
 
 	// Shake the camera
@@ -203,6 +203,10 @@ JeepCrash: {
 
 	//[206] chrissstrahl - weapon cheap hack
 	for (local.i = 1; local.i <= $player.size; local.i++) {
+		local.player = $player[local.i]
+		if(!isAlive local.player || local.player.isSpectator ){
+			continue
+		}
 		$player[local.i] useweaponclass smg
 	}
 	
@@ -243,10 +247,14 @@ PlayerRotateAngles: {
 //=========================================================================
 coop_PlayerRotateAngles local.player: { //[206] chrissstrahl - replace static $player
 //=========================================================================
+	if(!local.player){ end }
+	
 	local.angles = 20
 	local.otheraccess = 20
 	local.otherotheraccess = 20
-	local.playerelevator = 10
+	//local.playerelevator = 10 //disabled, because we want to move eac player to their spawn location
+	
+	thread coop_mod/main.scr::playerPlaceAtSpawn local.player
 	
 	while(local.angles <= 360) {
 		if(!local.player){ end }
@@ -259,7 +267,7 @@ coop_PlayerRotateAngles local.player: { //[206] chrissstrahl - replace static $p
 		waitframe
 		if(!local.player){ end }
 		
-		local.player.origin -= (0 0 local.playerelevator)
+		//local.player.origin -= (0 0 local.playerelevator)
 	}
 	local.player.viewangles = (0 0 0)
 }end
