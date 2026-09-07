@@ -1,0 +1,240 @@
+//This makes the players view from a camera
+//this allows viewing from a vehicle without jerking or shaking view when attached to a vehicle
+//This script was created by Smithy for m1l1 [202] and put in this global file and adjusted by Chrissstrahl for easier access
+//This applies to all players, this can only be run in a single instance
+
+
+//[206]Chrissstrahl - checks if the camera is currently active
+//=========================================================================
+coop_coopVehicleCameraIsActive:{
+//=========================================================================
+	local.isActive = 0
+	if(level.thread["coop_playerTruckSpawnManager"]){
+		local.isActive = 1
+	}
+}end local.isActive
+
+//=========================================================================
+coop_playerTruckSpawnManager local.vehicle local.cameraOffset local.individualView:{
+//=========================================================================
+	//println("player_camera.scr::coop_playerTruckSpawnManager start")
+
+	if (!level.gametype){ end }
+	if (level.thread["coop_playerTruckSpawnManager"]){ end }
+	
+	level.thread["coop_playerTruckSpawnManager"] = local
+	
+	//[206] Chrissstrahl - show error
+	if(!local.vehicle){
+		for(local.i=0;local.i<3;local.i++){
+			println("Error: player_camera.scr - local.vehicle was NULL or NIL")
+		}
+		end
+	}
+	
+	//[206] Chrissstrahl - set camera offset
+	if(local.cameraOffset != NIL){
+		level.coop_playerCameraOffset = local.cameraOffset
+	}else{
+		level.coop_playerCameraOffset = ( 0 0 0 )
+	}
+	
+	
+	//[206]Chrissstrahl - spawn only if it doesn't exist
+	if(!$coopVehicleOrigin){ spawn script_origin targetname "coopVehicleOrigin" }
+	if(!$coopViewOrigin){ spawn script_origin targetname "coopViewOrigin" }
+	
+	$coopVehicleOrigin glue $(local.vehicle)
+
+	//println ("origin is: " + level.intropath gettagposition "tag_camera")
+	
+	$coopViewOrigin.origin = $coopVehicleOrigin.origin
+	$coopViewOrigin bind $coopVehicleOrigin
+	
+	
+	//[206]Chrissstrahl - make sure player does not affect anything - force to all players
+	thread coop_mod/replace.scr::nodamage
+	thread coop_mod/replace.scr::hide
+	thread coop_mod/replace.scr::physics_off
+	
+	waitthread coop_startPlayerTruckViews
+	
+	//[206]Chrissstrahl - should players view from their own view?
+	if(local.individualView){
+		thread coop_coopVehicleCameraUpdate local.vehicle
+	}
+	
+	while (1){
+		level waittill playerspawn
+		group.player = parm.other
+		group.player hide
+		if (!group.player.isSpectator){
+			if (group.player.coopVehicleCamera){			
+				group.player.coopVehicleCamera delete
+				group.player.coopVehicleCamera = NULL
+			}
+			thread coop_spawncoopVehicleCamera
+			thread coop_startcoopVehicleCamera
+		}
+		wait 1
+		//println "******************** cam is: " group.player.coopVehicleCamera
+	}
+}end
+
+//[206]Chrissstrahl - update cameras for all players so they can look around
+//=========================================================================
+coop_coopVehicleCameraUpdate local.vehicle:{
+//=========================================================================
+	println("player_camera.scr::coop_coopVehicleCameraUpdate - does not work and needs fixing")
+	end
+	//this needs fixing - see m1l1 how to fix this
+	//this needs fixing - see m1l1 how to fix this
+	//this needs fixing - see m1l1 how to fix this
+	//this needs fixing - see m1l1 how to fix this
+	
+	while(waitthread coop_coopVehicleCameraIsActive){
+		if(!local.vehicle){
+			end
+		}
+		local.angles = local.vehicle.viewangles
+		thread coop_maintainCameraAngles local.angles
+		waitframe
+	}
+}end
+
+//=========================================================================
+coop_spawncoopVehicleCamera:{
+//=========================================================================
+	if (!group.player.coopVehicleCamera){
+		//println "GOING TO TRUCK ORIGIN"
+		group.player.coopVehicleCamera = spawn Camera //models/statweapons/m1l1truckride.tik
+		group.player.coopVehicleCamera.origin = ($coopViewOrigin.origin + level.coop_playerCameraOffset)
+		group.player.coopVehicleCamera bind $coopViewOrigin
+		group.player.coopVehicleCamera.targetname = "coopVehicleCamera"
+		group.player.coopVehicleCamera.player = group.player
+	}
+}end
+
+//[202] Smithy - make them look through their truck camera
+//============================================================================
+coop_startcoopVehicleCamera:{
+//============================================================================	
+	if (group.player.coopVehicleCamera && !group.player.incoopVehicleCamera){
+		group.player.incoopVehicleCamera = game.true
+				
+		local.name = ("coopVehicleCamera_" + group.player.entnum)
+		local.cam = group.player.coopVehicleCamera
+		local.cam targetname local.name
+		
+		local.camerause = spawn trigger_camerause target local.name	
+		local.camerause doUse group.player
+		local.camerause delete
+		
+		local.cam targetname "coopVehicleCamera"
+		
+		//println "********************* *************** *********** player set to truck view"
+		//println group.player.origin
+		//println local.cam.origin
+	}
+}end
+
+//[202] Smithy - stop them looking through their truck camera
+//============================================================================
+coop_stopcoopVehicleCamera:{
+//============================================================================	
+	if (group.player.incoopVehicleCamera){
+		group.player.incoopVehicleCamera = game.false
+		
+		local.name = ("coopVehicleCamera_" + group.player.entnum)
+		local.cam = group.player.coopVehicleCamera
+		local.cam targetname local.name
+		
+		local.camerause = spawn trigger_camerause target local.name
+		local.camerause doUse group.player
+		local.camerause delete
+		
+		local.cam targetname "coopVehicleCamera"
+		
+		//println "*********************** NOT IN CAM ANYMORE"
+	}
+	
+	//[206]Chrissstrahl - should players view from their own view?
+	level.coop_playerCameraIndividual = 0
+}end
+
+//[202][hotfix] Smithy
+//=========================================================================
+coop_stopPlayerTruckSpawnManager:{
+//=========================================================================	
+	if (level.thread["coop_playerTruckSpawnManager"]){ 
+		level.thread["coop_playerTruckSpawnManager"] delete 
+	}
+	thread coop_stopPlayerTruckViews
+}end
+
+//[202][hotfix] Smithy
+//=========================================================================
+coop_startPlayerTruckViews:{
+//=========================================================================
+	for (local.i = 1; local.i <= $player.size; local.i++){
+		group.player = $player[local.i]
+		if (!group.player.isSpectator){
+			waitthread coop_spawncoopVehicleCamera
+			waitthread coop_startcoopVehicleCamera
+		}
+	}
+}end
+
+//[202][hotfix] Smithy
+//=========================================================================
+coop_stopPlayerTruckViews:{
+//=========================================================================
+	for (local.i = 1; local.i <= $player.size; local.i++){
+		group.player = $player[local.i]	
+		//group.player takedamage
+		if (!group.player.isSpectator && group.player.incoopVehicleCamera){	
+			//println "player_camera.scr::coop_stopPlayerTruckViews stop"		
+			waitthread coop_stopcoopVehicleCamera			
+			//group.player solid
+			
+			//[206]Chrissstrahl - make player solid again
+			thread coop_mod/main.scr::playerMakeSolidAsap group.player
+			
+			//[206]Chrissstrahl - move player to spawn location
+			thread coop_mod/main.scr::playerPlaceAtSpawn group.player
+		}
+	}
+	if ($coopVehicleCamera){
+		$coopVehicleCamera delete
+	}
+	
+	cueplayer
+	
+	//[206]Chrissstrahl - show players enable physics
+	thread coop_mod/replace.scr::takedamage
+	thread coop_mod/replace.scr::show
+	thread coop_mod/replace.scr::physics_on
+}end
+
+//[202][hotfix] Smithy
+//=========================================================================
+coop_maintainCameraAngles local.angles:{
+//=========================================================================
+	for (local.i = 1; local.i <= $coopVehicleCamera.size; local.i++){
+		local.camera = $coopVehicleCamera[local.i]
+		group.player = local.camera.player		
+		if (group.player){
+			//println "PLAYER IN SPEC? " group.player.isSpectator
+			if (!group.player.isSpectator){
+				println ( "player angles:"+group.player.viewangles )
+				local.camera.angles = group.player.viewangles + local.angles
+			}else{
+				//println "coop_maintainCameraAngles stop"
+				thread coop_stopcoopVehicleCamera //detach
+				local.camera waitthread game.replace::delete
+				local.i = 0 								
+				continue
+			}	
+		}
+	}
+}end
