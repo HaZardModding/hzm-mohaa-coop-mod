@@ -572,22 +572,25 @@ explodechunk:
 	self notsolid
 	
 	//[206] chrissstrahl - fix console spam, grab only one target
-	//I assume that target can be a entity or a targetname
-	if(self.target){
-		//type: 0-NIL/NULL, 1-string,2-entity,3-vector,4-int/float,5-entityarray
-		local.varType = waitthread game.main::returnVarType local.i NIL "global/exploder.scr::explodechunk"
-		
-		if(local.varType == 1){ //targetname (string)
-			self.target = $(self.target)
-			self.target = self.target[1]
-		}
-		//(entity) - do nothing
-		else if(local.varType == 5){ //entityarray
-			self.target = self.target[1]
-		}
+	//I assume that target can be a entity, entityarray or a targetname
+	//type: 0-NIL/NULL, 1-string,2-entity,3-vector,4-int/float,5-entityarray
+	local.varType = waitthread game.main::returnVarType (self.target) NIL "global/exploder.scr::explodechunk"
+	if(local.varType == 1){ //targetname (string)
+		local.targetOrigin = $(self.target).origin
 	}
+	else if(local.varType == 2){ //entity
+		local.targetOrigin = self.target.origin
+	}	
+	else if(local.varType == 5){ //entityarray
+		local.targetOrigin = self.target[1].origin
+	}
+	else{
+		println("global/exploder.scr::explodechunk - unknown varType - please fix: "+self.targetname)
+		end
+	}
+
 	
-	local.vec = (self.origin - self.target.origin)
+	local.vec = (self.origin - local.targetOrigin)
 	local.veclength = vector_length (local.vec)
 	local.vec = vector_normalize (local.vec)
 	local.vecscale = local.veclength * -1
@@ -611,15 +614,15 @@ explodechunk:
 
 	if ((self.anglex == 0) && (self.angley == 0) && (self.anglez == 0))
 	{
-		if (self.origin[0] > self.target.origin[0])
-		local.xnum = self.origin[0] - self.target.origin[0]
+		if (self.origin[0] > local.targetOrigin[0])
+		local.xnum = self.origin[0] - local.targetOrigin[0]
 		else
-		local.xnum = self.target.origin[0] - self.origin[0]
+		local.xnum = local.targetOrigin[0] - self.origin[0]
 
-		if (self.origin[1] > self.target.origin[1])
-		local.ynum = self.origin[1] - self.target.origin[1]
+		if (self.origin[1] > local.targetOrigin[1])
+		local.ynum = self.origin[1] - local.targetOrigin[1]
 		else
-		local.ynum = self.target.origin[1] - self.origin[1]
+		local.ynum = local.targetOrigin[1] - self.origin[1]
 
 
 		self.anglex = randomfloat(local.veclength / 3) * (randomint(3) - 1)
