@@ -2736,3 +2736,98 @@ playerHighestZaxis:{
 		end local.playerHighest
 	}
 }end NIL
+
+
+//[206] Chrissstrahl - immobilize players
+//paramater 1 - activate
+//paramater 2 - give X units move radius allowence
+//parameter 3 - show message
+//=========================================================================
+immobilize local.immobilize local.maxRadius local.message:{
+//=========================================================================	
+	if(local.immobilize == NIL){
+		error ( "coop_mod/replace.scr::immobilize - parameter 1 was NIL, 0 or 1" ) 1000
+	}
+	
+	if(!local.immobilize){ level.coop_playerimmobilize = 0;end }
+	level.coop_playerimmobilize = 1
+	
+	//reset all players
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if(local.player){
+			local.player.flags["immobilize"] = NIL
+		}
+	}
+	
+	//watch all players - spectator, death, reconnect, join
+	while(level.coop_playerimmobilize){
+		if(level.coop_playerGlue){
+			break
+		}
+	
+		for (local.i = 1;local.i <= $player.size;local.i++){
+			local.player =  $player[local.i]
+			if(level.gametype == 0 || isAlive local.player && !local.player.isSpectator ){
+				if(local.player.flags["immobilize"] == NIL){
+					thread immobilizePlayer local.player local.maxRadius local.message
+				}
+			}
+		}
+		waitframe
+	}
+}end
+
+
+//[206] Chrissstrahl - immobilize players
+//=========================================================================
+immobilizePlayer local.player local.maxRadius local.message:{
+//=========================================================================
+	local.player.flags["immobilize"] = 1
+	
+	//drop player, avoid midair
+	local.player droptofloor
+	waitframe
+	
+	//player no longer valid
+	if(!isAlive local.player){
+		if(local.player){
+			local.player.flags["immobilize"] = NIL
+		}
+		end
+	}
+	
+	local.playerOrigin = local.player.origin
+	local.origin = local.player.origin
+	local.origin[2] = 0 //ignore z
+	
+	//give zero allowence if none was defined
+	if(local.maxRadius == NIL){
+		local.maxRadius = 0
+	}
+	
+	local.lastMsgTime = 0
+	
+	while(level.coop_playerimmobilize){
+		if(!isAlive local.player || local.player.isSpectator){
+			break;
+		}
+		
+		local.playerOriginThisFrame = local.player.origin
+		local.playerOriginThisFrame[2] = 0 //ignore z
+		//move player back to his original origin if the player get out of bounds - we don't want to compare z-axis
+		if(vector_length( local.playerOriginThisFrame - local.origin ) > local.maxRadius){
+			local.player origin local.playerOrigin
+			thread coop_mod/main.scr::playerMakeSolidAsap local.player
+			if(local.message && (local.lastMsgTime + 5) < level.time){
+				local.lastMsgTime = level.time
+				local.player iprint ( "Movement is currently restricted!" ) 1
+			}
+		}
+		waitframe
+	}
+	
+	if(local.player){
+		local.player.flags["immobilize"] = NIL
+	}
+}end
