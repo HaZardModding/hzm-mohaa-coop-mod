@@ -13,9 +13,9 @@ Widget
 resource
 Label
 {
-	title "1. Select a Mission\n2. Select a Map\n3. Click Apply"
+	title "Online Help\n \n \n \n1. Select a Mission\n2. Select a Map\n3. Click Apply"
 	name "coop_startMapSelect"
-	rect 50 200 400 300
+	rect 30 150 400 300
 	fgcolor 1.00 1.00 1.00 1.00
 	bgcolor 0.50 0.50 0.50 0.00
 	borderstyle "NONE"
@@ -34,6 +34,7 @@ Button
 	borderstyle "NONE"
 	font facfont-20
 	textalign center
+	shader "textures/mohmenu/coop/hzmqrcode"
 }
 resource
 Button
