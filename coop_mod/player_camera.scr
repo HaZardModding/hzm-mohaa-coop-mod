@@ -14,6 +14,16 @@ coop_coopVehicleCameraIsActive:{
 	}
 }end local.isActive
 
+//[206]Chrissstrahl - stop personal camera and reset everything
+//=========================================================================
+coop_stopCameraPersonal local.player:{
+//=========================================================================
+	if(!local.player){ end }
+	local.cameraPersonal = ("coopVehicleCamera_" + local.player.entnum)
+	if($(local.cameraPersonal)){ local.cameraPersonal delete }
+	local.player.flags["coop_cameraModeVehicle"] = NIL
+}end
+
 //=========================================================================
 coop_playerTruckSpawnManager local.vehicle local.cameraOffset local.individualView:{
 //=========================================================================
@@ -26,7 +36,7 @@ coop_playerTruckSpawnManager local.vehicle local.cameraOffset local.individualVi
 	
 	//[206] Chrissstrahl - show error
 	if(!local.vehicle){
-		for(local.i=0;local.i<3;local.i++){
+		for(local.i=0;local.i<5;local.i++){
 			println("Error: player_camera.scr - local.vehicle was NULL or NIL")
 		}
 		end
@@ -68,6 +78,9 @@ coop_playerTruckSpawnManager local.vehicle local.cameraOffset local.individualVi
 		level waittill playerspawn
 		group.player = parm.other
 		group.player hide
+		
+		waitthread coop_stopCameraPersonal group.player
+		
 		if (!group.player.isSpectator){
 			if (group.player.coopVehicleCamera){			
 				group.player.coopVehicleCamera delete
@@ -76,7 +89,6 @@ coop_playerTruckSpawnManager local.vehicle local.cameraOffset local.individualVi
 			thread coop_spawncoopVehicleCamera
 			thread coop_startcoopVehicleCamera
 		}
-		wait 1
 		//println "******************** cam is: " group.player.coopVehicleCamera
 	}
 }end
@@ -118,9 +130,10 @@ coop_spawncoopVehicleCamera:{
 //[202] Smithy - make them look through their truck camera
 //============================================================================
 coop_startcoopVehicleCamera:{
-//============================================================================	
-	if (group.player.coopVehicleCamera && !group.player.incoopVehicleCamera){
-		group.player.incoopVehicleCamera = game.true
+//============================================================================		
+	if (group.player.coopVehicleCamera && !group.player.flags["coop_cameraModeVehicle"]){
+		
+		group.player.flags["coop_cameraModeVehicle"] = game.true
 				
 		local.name = ("coopVehicleCamera_" + group.player.entnum)
 		local.cam = group.player.coopVehicleCamera
@@ -141,9 +154,9 @@ coop_startcoopVehicleCamera:{
 //[202] Smithy - stop them looking through their truck camera
 //============================================================================
 coop_stopcoopVehicleCamera:{
-//============================================================================	
-	if (group.player.incoopVehicleCamera){
-		group.player.incoopVehicleCamera = game.false
+//============================================================================
+	if (group.player.flags["coop_cameraModeVehicle"]){
+		group.player.flags["coop_cameraModeVehicle"] = game.false
 		
 		local.name = ("coopVehicleCamera_" + group.player.entnum)
 		local.cam = group.player.coopVehicleCamera
@@ -157,9 +170,6 @@ coop_stopcoopVehicleCamera:{
 		
 		//println "*********************** NOT IN CAM ANYMORE"
 	}
-	
-	//[206]Chrissstrahl - should players view from their own view?
-	level.coop_playerCameraIndividual = 0
 }end
 
 //[202][hotfix] Smithy
@@ -191,17 +201,15 @@ coop_stopPlayerTruckViews:{
 //=========================================================================
 	for (local.i = 1; local.i <= $player.size; local.i++){
 		group.player = $player[local.i]	
-		//group.player takedamage
-		if (!group.player.isSpectator && group.player.incoopVehicleCamera){	
+		if (group.player.flags["coop_cameraModeVehicle"]){	
 			//println "player_camera.scr::coop_stopPlayerTruckViews stop"		
 			waitthread coop_stopcoopVehicleCamera			
-			//group.player solid
 			
-			//[206]Chrissstrahl - make player solid again
-			thread coop_mod/main.scr::playerMakeSolidAsap group.player
-			
-			//[206]Chrissstrahl - move player to spawn location
-			thread coop_mod/main.scr::playerPlaceAtSpawn group.player
+			//[206]Chrissstrahl - make player solid again - move player to spawn location
+			if(!group.player.isSpectator){
+				thread coop_mod/main.scr::playerMakeSolidAsap group.player
+				thread coop_mod/main.scr::playerPlaceAtSpawn group.player				
+			}
 		}
 	}
 	if ($coopVehicleCamera){
@@ -210,10 +218,11 @@ coop_stopPlayerTruckViews:{
 	
 	cueplayer
 	
-	//[206]Chrissstrahl - show players enable physics
+	//[206]Chrissstrahl - all players
 	thread coop_mod/replace.scr::takedamage
 	thread coop_mod/replace.scr::show
 	thread coop_mod/replace.scr::physics_on
+	level.coop_playerCameraIndividual = 0
 }end
 
 //[202][hotfix] Smithy
@@ -222,14 +231,13 @@ coop_maintainCameraAngles local.angles:{
 //=========================================================================
 	for (local.i = 1; local.i <= $coopVehicleCamera.size; local.i++){
 		local.camera = $coopVehicleCamera[local.i]
-		group.player = local.camera.player		
+		group.player = local.camera.player
 		if (group.player){
-			//println "PLAYER IN SPEC? " group.player.isSpectator
 			if (!group.player.isSpectator){
-				println ( "player angles:"+group.player.viewangles )
+				//println ("player angles:"+group.player.viewangles)
 				local.camera.angles = group.player.viewangles + local.angles
 			}else{
-				//println "coop_maintainCameraAngles stop"
+				//println ("coop_maintainCameraAngles stop")
 				thread coop_stopcoopVehicleCamera //detach
 				local.camera waitthread game.replace::delete
 				local.i = 0 								
