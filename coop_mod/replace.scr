@@ -1672,13 +1672,21 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 	}
 }end
 
-//[200] chrissstrahl - can now handle vector or entity in parameter 1
 //WITHINDISTANCEOF
-//returns 1 if any player is within given distance of given entity
+//If any player is within given distance, it will return 1 else 0
+//Parameter 1 takes: entity or vector
 //=========================================================================
 withinDistanceOf local.ent local.distance:{
 //=========================================================================
-if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread replace/withinDistanceOf->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
+	if( local.ent == NULL || local.ent == NIL){
+		error ( "coop_mod/replace.scr::withinDistanceOf - parameter1 was NULL or NIL" ) 1000
+		end 0
+	}
+	if( local.distance == NIL){
+		error ( "coop_mod/replace.scr::withinDistanceOf - parameter2 was NIL" ) 1000
+		end 0
+	}
+	
 	if( level.gametype == 0 ){
 		if( vector_length($player.origin - local.ent.origin) <= local.distance ){
 			end 1
@@ -1686,46 +1694,33 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 		end 0
 	}
 
-	if( local.ent == NULL ){
-		error ( "coop_mod/replace.scr::withinDistanceOf - parameter1 was NULL" ) 1000
-		end 0
-	}
-	if( local.ent == NIL){
-		error ( "coop_mod/replace.scr::withinDistanceOf - parameter1 was NIL" ) 1000
-		end 0
-	}
-	if( local.distance == NIL){
-		error ( "coop_mod/replace.scr::withinDistanceOf - parameter2 was NIL" ) 1000
-		end 0
-	}
-
-	//[200] chrissstrahl - added to detect vector or entity
+	//detect vector or entity or else error out
 	local.vOrigin = (0 0 0)
-	local.varType = thread coop_mod/main.scr::returnVarType local.ent NIL "replace::withinDistanceOf"
-
-	//[200] chrissstrahl - fixed type detection
-	if(local.varType == 3){
+	local.varType = thread game.main::returnVarType local.ent NIL "replace::withinDistanceOf"
+	if(local.varType == 3){ //vector
 		local.vOrigin = local.ent
-	}else if(local.varType == 2){
-		//[200] chrissstrahl - added to detect arrays
+	}else if(local.varType == 2){ //entity
 		if( int(local.ent.size) > 1 ){
 			error ( "coop_mod/replace.scr::withinDistanceOf - parameter1 was ENTITY-ARRAY" ) 1000
 			end 0
 		}
 		local.vOrigin = local.ent.origin
 	}
-	//[200] chrissstrahl - added error info if bad type
 	else{
-		local.vartypeName = waitthread coop_mod/main.scr::returnVarTypename local.varType
+		local.vartypeName = waitthread game.main::returnVarTypename local.varType
 		error ( "coop_mod/replace.scr::withinDistanceOf - parameter1 was ("+local.vartypeName+") needs to be VECTOR or ENTITY" ) 1000
 		end 0
 	}
 
-	//[200] chrissstrahl - simplified code
+	//[206] chrissstrahl - using now isAlive and isSpectator	
+	//ignoring players that are in noclip
 	for (local.i = 1;local.i <= $player.size;local.i++){
 		local.player =  $player[local.i]
-		//[203] chrissstrahl - ignoring now players that are in noclip
-		if( local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 && local.player.flags["coopDevNoclip"] == NIL){
+		if(	isAlive local.player &&
+			!local.player.isSpectator &&
+			local.player.flags["coop_isActive"] == 1 &&
+			local.player.flags["coopDevNoclip"] == NIL)
+		{
 			if( vector_length((local.player.origin) - (local.vOrigin)) <= local.distance ){
 				end 1
 			}
