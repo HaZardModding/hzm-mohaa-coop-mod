@@ -27,19 +27,11 @@ main local.player local.replacementtype local.jeep local.jeepTurret:{
 	level.coop_jeepGunnerActive = game.true
 	level.coop_jeepGunner = local.player
 	
-	//mark player so that this player will be skipped when players are glued
-	thread coop_mod/jeepGunner.scr::setGunnerFlag level.coop_jeepGunner 1
-	level.coop_jeepGunner physics_off
-	level.coop_jeepGunner takedamage
-	
-	//attach to gun
-	local.jeep unlock
-	local.jeepTurret unlock
-	local.jeep attachturretslot 0 level.coop_jeepGunner
-	local.jeepTurret lock
-	local.jeep lock
-	
+	//event
 	thread waitForGunner
+	
+	//make player use the gun
+	waitthread enterGunner local.player local.jeep local.jeepTurret
 	
 	//check gunner - find replacement if needed
 	while(level.coop_jeepGunnerActive)
@@ -48,7 +40,7 @@ main local.player local.replacementtype local.jeep local.jeepTurret:{
 		if(level.coop_jeepGunner){
 			if(	level.coop_jeepGunner.health > 0 &&
 				level.coop_jeepGunner.dmteam != "spectator" &&
-				(waitthread coop_mod/main.scr::lmsGetRemainingLives local.player > 0) &&
+				(waitthread game.main::lmsGetRemainingLives local.player > 0) &&
 				local.player.flags["coop_isAlive"] == game.true)
 			{
 				local.findNewPlayer = game.false
@@ -68,7 +60,7 @@ main local.player local.replacementtype local.jeep local.jeepTurret:{
 						local.player = $player[local.i]
 						if(	isAlive local.player &&
 							!local.player.isSpectator &&
-							(waitthread coop_mod/main.scr::lmsGetRemainingLives local.player > 0) &&
+							(waitthread game.main::lmsGetRemainingLives local.player > 0) &&
 							local.player.flags["coop_isAlive"] == game.true)
 						{
 							break
@@ -83,26 +75,13 @@ main local.player local.replacementtype local.jeep local.jeepTurret:{
 				//check if player is actually good and then use this player
 				if(	isAlive local.player &&
 					!local.player.isSpectator &&
-					(waitthread coop_mod/main.scr::lmsGetRemainingLives local.player > 0) &&
+					(waitthread game.main::lmsGetRemainingLives local.player > 0) &&
 					local.player.flags["coop_isAlive"] == game.true )
 				{
-					println( "jeepGunner.scr::main - new player found" )			
-				
-					level.coop_jeepGunner = local.player
+					println( "jeepGunner.scr::main - new player found" )	
 					
-					//mark
-					thread coop_mod/jeepGunner.scr::setGunnerFlag local.player 1
-					
-					//unglue
-					local.player unglue
-					local.player physics_off
-					local.player takedamage
-					//attach to gun
-					local.jeep unlock
-					local.jeepTurret unlock
-					local.jeep attachturretslot 0 local.player
-					local.jeepTurret lock
-					local.jeep lock
+					//make player use the gun
+					waitthread enterGunner local.player local.jeep local.jeepTurret
 				}
 			}
 		}
@@ -115,16 +94,17 @@ main local.player local.replacementtype local.jeep local.jeepTurret:{
 	}
 	
 	if(level.coop_jeepGunner){
-		thread coop_mod/jeepGunner.scr::setGunnerFlag level.coop_jeepGunner 0
+		thread setGunnerFlag level.coop_jeepGunner 0
 	}
 	
-	thread coop_mod/eventsystem.scr::doEvent "jeepGunnerDone"
+	//event
+	thread game.event "jeepGunnerDone"
 }end
 
 //=========================================================================
 waitForGunner:{
 //=========================================================================
-	waitthread coop_mod/eventsystem.scr::waitTillEvent "jeepGunnerDone"
+	waitthread game.waittill "jeepGunnerDone"
 }end
 
 //=========================================================================
@@ -142,7 +122,7 @@ stopGunner:{
 	local.player = level.coop_jeepGunner
 	
 	if(level.coop_jeepGunner){
-		thread coop_mod/jeepGunner.scr::setGunnerFlag level.coop_jeepGunner 0
+		thread setGunnerFlag level.coop_jeepGunner 0
 		level.coop_jeepGunner.flags["coop_physicsOff"] = 0
 		level.coop_jeepGunner physics_on
 	}
@@ -151,6 +131,29 @@ stopGunner:{
 	level.coop_jeepGunner = NIL
 }end
 
+//make gunner use gun
+//=========================================================================
+enterGunner local.player local.jeep local.jeepTurret:{
+//=========================================================================
+	level.coop_jeepGunner = local.player
+	
+	//putaway player weapon
+	local.player forcetorsostate PUTAWAY_MAIN
+	
+	//mark - prevents glueing
+	thread setGunnerFlag local.player 1
+	
+	local.player unglue
+	local.player physics_off
+	local.player takedamage
+	
+	//attach to gun
+	local.jeep unlock
+	local.jeepTurret unlock
+	local.jeep attachturretslot 0 local.player
+	local.jeepTurret lock
+	local.jeep lock
+}end
 
 //allow gunner to leave
 //=========================================================================
@@ -161,7 +164,7 @@ exitGunner:{
 		level.coop_jeepGunner = NIL
 	}
 	if(local.player){
-		thread coop_mod/jeepGunner.scr::setGunnerFlag local.player 0
+		thread setGunnerFlag local.player 0
 		local.player.flags["coop_physicsOff"] = 0
 		local.player physics_on
 	}
