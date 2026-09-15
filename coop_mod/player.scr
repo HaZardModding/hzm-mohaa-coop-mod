@@ -53,54 +53,37 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 			if( local.player.dmteam == "spectator" ){
 				waitthread manageSpectator local.player
 			}
-////////////////////////////////////////NO SPECTATOR TEAM
+////////////////////////////////////////NOT SPECTATOR TEAM
 			else{
-				//this makes sure that the player does not get spawned anywhere in the map
-				//where he was spectating at, the moment the player spawns he needs to be
-				//already at the spawnlocation or he can telefrag a player, friendly or enemy
-				if(local.player.flags["coop_isActive"] == -1){
-					//[202] chrissstrahl - changed printout to just console text
-					//commanddelay .1 iprintlnbold_noloc("PLAYER HIT BACKUP SPAWN") //[202] Smithy - i dont believe this will ever hit if spawnEvent takes care of it
-					commanddelay .1 println("COOPDEBUG: player.scr::manage - PLAYER HIT BACKUP SPAWN") //[202] Smithy - i dont believe this will ever hit if spawnEvent takes care of it
-					//local.player.flags["coop_isActive"] = 0
-					//waitthread coop_mod/main.scr::playerPlaceAtSpawn local.player
-				}
-				//PHYSICS
-				//[202] chrissstrahl - THIS WAS MOVED TO player.scr::manage
-				//- reason 1: this function is only called there
-				//- reason 2: We need to reduce a bit the thread calls to see if we can fix a issue we have, that sometimes no more threads are being created/executed
-				//waitthread manageNoSpectator local.player
-				
 /////////////////////////////////////////ALIVE
-				if (!local.player.isSpectator && local.player.health > 0){ //[202] Smithy - fixed players being able to respawn anywhere
-
+				//[202] Smithy - fixed players being able to respawn anywhere
+				//[202] Smithy - 'isSpectator' also checks for temp spectators (very useful).
+				if (isAlive local.player && !local.player.isSpectator){ 
 					//PHYSICS
 					//[206] chrissstrahl - moved here because it would cause issues when players respawn
-					if (level.coop_physicsOff){
+					if (level.coop_physicsOff || level.coop_playerGlue){
 						local.player physics_off
+						if(level.coop_physicsOff){
+							local.player.flags["coop_physicsOff"] = 1
+						}
+					}				
+					else{
+						local.player.flags["coop_physicsOff"] = 0
+						local.player physics_on
 					}
-				
-					//spawning is event based handled in: main.scr::playerSpawnEvent
-					//waitthread manageAlive local.player local.i
+/////////////////////////////////////////SPAWNING
+					//is event based handled in: main.scr::playerSpawnEvent
 					
 					//[202][hotfix] chrissstrahl - check also for new cvar that disables respawn warper - fixed time check
-					if( !level.coop_disableSpawnWarper && !level.coop_cvarRespawnDisable && !level.coop_playerGlue ){
+					if( !level.coop_disableSpawnWarper &&
+						!level.coop_cvarRespawnDisable &&
+						!level.coop_playerGlue ){
 						if(	local.player.flags["coop_respawnTime"] == NIL || local.player.flags["coop_respawnTime"] < (level.time - 2) ){
 							local.player.flags["coop_respawnTime"]		= level.time
 							local.player.flags["coop_respawnOrigin"]	= local.player.origin
 							local.player.flags["coop_respawnAngle"]		= local.player.viewangles[1]
 						}
 					}
-					
-					//[202] Smithy - 'isSpectator' also checks for temp spectators (very useful).
-					//i.e. those who have died and are floating around but not actually in spectator team.
-					//see game code:					
-					//bool Player::IsSpectator( void )
-					//{
-					//	return ( m_bSpectator || m_bTempSpectator );
-					//}		
-					//m_bSpectator = team spectator
-					//m_bTempSpectator = floaty dude but not on spec team
 				}
 /////////////////////////////////////////DEAD
 				//death is event based handled in: main.scr::playerDeathEvent
@@ -112,21 +95,17 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 				end
 			}
 			
+/////////////////////////////////////////NAME-CHANGE / NAME-COMMANDS
 			//prevent this thread to be executed several times
 			//moved it here because we need spectators also to work
-			//[203] chrissstrahl - fixing player name command detection
 			if(	level.time > (local.player.flags["coop_netnameChanged"] + (game.frame * 15))){
 				if(local.player.flags["coop_netname"] != local.player.netname || waitthread coop_mod/main.scr::containsText local.player.netname "," ){
 					thread manageNamechange local.player
 				}
 			}
 		}
-		
-		
-		//[202] Smithy - moved here and done in one //[200] chrissstrahl - used for LMS to detect when a player leaves
+/////////////////////////////////////////PLAYER COUNT CHANGED
 		local.playerCount = $player.size
-
-		//[200] chrissstrahl - call player changed func if number of players changed
 		if(local.prevPlayerCount != local.playerCount){
 			waitthread coop_mod/main.scr::playerCountChanged local.prevPlayerCount local.playerCount
 			//[206] chrissstrahl - execute thread when player left server: coop_playerJustLeft
@@ -134,18 +113,10 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 				thread game.main::startThread ("maps/"+level.coop_mapname+".scr::"+"coop_playerJustLeft") $world
 			}
 		}
-
-
-		//[202] chrissstrahl - this function code was moved here
-		//- reason 1: this function is only called there
-		//- reason 2: We need to reduce a bit the thread calls to see if we can fix a issue we have, that sometimes no more threads are being created/executed
-		//
-		//[200] chrissstrahl - LMS - check if condistions have changed
-		//waitthread coop_mod/main.scr::lmsCheckLives local.prevPlayerCount local.playerCount
-		
-		local.prevLmsLives = level.coop_lmsLives //[201] chrissstrahl - fixed typo
-		level.coop_lmsLives = int(getcvar("coop_lmsLives")) //[201] chrissstrahl - cvar from to coop_lmsLives
-		if(level.coop_lmsLives <= 0 ){ //[201] chrissstrahl - fixed typo
+		//LMS Handle
+		local.prevLmsLives = level.coop_lmsLives
+		level.coop_lmsLives = int(getcvar("coop_lmsLives"))
+		if(level.coop_lmsLives <= 0 ){
 			level.coop_lmsLives = 0
 			level.coop_lmsAllowJoin = 1
 
@@ -170,10 +141,10 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 			}
 		}
 
-		//[200] chrissstrahl - keep track of player count
+		//keep track of player count
 		local.prevPlayerCount = local.playerCount
 	
-		//[202] chrissstrahl - all this needs to be done only once per server frame (sv_fps)
+		//all this needs to be done only once per server frame (sv_fps)
 		waitframe
 	}
 }end
@@ -680,39 +651,6 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	}
 }end
 
-/* [202] chrissstrahl - THIS WAS MOVED TO player.scr::manage
-- reason 1: this function is only called there
-- reason 2: We need to reduce a bit the thread calls to see if we can fix a issue we have, that sometimes no more threads are being created/executed
-
-//no spectator player handling
-//called from ::manage if player is not a spectator
-//=========================================================================
-manageNoSpectator local.player:{
-//=========================================================================
-if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread player/manageNoSpectator->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-//PHYSICS
-if (level.coop_physicsOff){ local.player physics_off }
-}end
-*/
-
-/* [202] chrissstrahl - THIS WAS MOVED TO player.scr::manage
-- reason 1: this function is only called there
-- reason 2: We need to reduce a bit the thread calls to see if we can fix a issue we have, that sometimes no more threads are being created/executed
-
-//alive player handling
-//called from ::manage if player is not a spectator and has positive health
-//=========================================================================
-manageAlive local.player:{
-//=========================================================================
-if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread player/manageAlive->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-//Code that is executed upon spawning is now in:
-//coop_mod/main.scr::playerSpawnEvent
-
-// SAVE CURRENT LOCATION FOR RESTORING ON RESPAWN /////
-	waitthread manageAliveSaveLocation local.player
-}end
-*/
-
 //alive Spawning player handling
 //called from main.scr::playerSpawnEvent if player just spawned
 //=========================================================================
@@ -868,7 +806,9 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	//respawn if allowed at last pos before death of player
 	//also do not respawn if coop_respawnOrigin flag is set to 0 0 0 or something very close
 	//[202][hotfix] chrissstrahl - added check for cvar disabled respawn warper
-	if( !level.coop_disableSpawnWarper && !level.coop_cvarRespawnDisable && vector_length( local.player.flags["coop_respawnOrigin"] ) > 10){
+	if(	!level.coop_disableSpawnWarper &&
+		!level.coop_cvarRespawnDisable &&
+		vector_length( local.player.flags["coop_respawnOrigin"] ) > 10){
 		//make player solid as soon as possible (checks if inside other players or friendly)
 		thread coop_mod/main.scr::playerMakeSolidAsap local.player
 		
@@ -887,28 +827,6 @@ if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println(
 	}
 	local.player.flags["coop_respawning"] = FALSE
 }end
-
-
-/* [202] chrissstrahl - THIS WAS MOVED TO player.scr::manage
-- reason 1: this function is only called there
-- reason 2: We need to reduce a bit the thread calls to see if we can fix a issue we have, that sometimes no more threads are being created/executed
-
-//alive player handling - used to save location on player
-//called from ::manageAlive if
-// player is not a spectator and has positive health
-// player has flag set: local.player.flags["coop_respawning"] != game.true
-// if global var level.coop_disableSpawnWarper != game.true
-//=========================================================================
-manageAliveSaveLocation local.player:{
-//=========================================================================
-if(level.cMTE_coop_player){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread player/manageAliveSaveLocation->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-	if(	local.player.flags["coop_respawnTime"] == NIL || local.player.flags["coop_respawnTime"] < (level.time + 2) ){
-		local.player.flags["coop_respawnTime"]		= level.time
-		local.player.flags["coop_respawnOrigin"]	= local.player.origin
-		local.player.flags["coop_respawnAngle"]		= local.player.viewangles[1]
-	}
-}end
-*/
 
 //handles dead player
 //called from ::manage if player health is negative or 0
