@@ -775,6 +775,7 @@ showtouch:{
 
 	exec game.main::printInfo self ("Show TOUCH ON" ) 1 NIL
 	self.flags["coop_momShowTouch"] = 1
+	local.clientNumber = self.entnum
 	
 //prints out a message what the player is touching
 //this is used for debugging objects that are hard to find otherwise
@@ -786,20 +787,39 @@ showtouch:{
 			local.ent = getentbyentnum local.i
 			//exists and has a model (is a tiki)
 			
-			if(local.ent != NULL && self istouching local.ent && local.ent.model != NIL && local.ent.model.size > 6){
-				//filter weapons and player (current weapon and playermodel)
-				if(	waitexec game.main::containsText local.ent.model "weapons/" ||
-					local.ent.entnum == self.entnum)
-				{
-					//waitexec game.main::containsText local.ent.model "player/"){
-					//exec game.main::printInfo $player[1] "touching a weapon" 1 NIL
-					continue
+			if(local.ent != NULL && self istouching local.ent ){
+				{					
+					local.entTargetname = local.ent.targetname
+					local.entClassname = local.ent.classname
+					
+					//Classes we want to ignore
+					if(	local.entClassname == "TouchField" || //door touchfields
+						local.entClassname == "Animate" || //discarded magazines
+						local.entClassname == "Player" || //players
+						local.entClassname == "InventoryItem" || //inventory
+						local.entClassname == "HelmetObject" || //poping off helmets
+						local.entClassname == "Rain" ) //func_rain
+					{
+						continue
+					}
+					
+					//Targetnames we want to ignore
+					if(local.entTargetname == "player"+local.clientNumber+"Inventory") //worldmodel of player weapon
+					{
+						continue
+					}
+					
+					local.vec = local.ent.origin
+					local.model = waitexec coop_mod/strings.scr::remove local.ent.model "models/"
+					if(local.model){
+						
+						exec game.main::printInfo self ("[touching] @ "+level.coop_mapname+" ["+local.entClassname+"] '$"+local.entTargetname+"' "+local.model+" at "+int(local.vec[0])+" "+int(local.vec[1])+" "+int(local.vec[2])) 1 NIL 10
+					}
+					else{
+						exec game.main::printInfo self ("[touching] @ "+level.coop_mapname+" ["+local.entClassname+"] '$"+local.entTargetname+"' NoModel, target='"+local.ent.targetname+"' at "+int(local.vec[0])+" "+int(local.vec[1])+" "+int(local.vec[2])) 1 NIL 10
+					}
+					local.ent thread dev_blink self 0.5
 				}
-				
-				local.vec = local.ent.origin
-				local.model = waitexec coop_mod/strings.scr::remove local.ent.model "models/"
-				exec game.main::printInfo self ("[touching] @ "+level.coop_mapname+" $"+local.ent.targetname+": "+local.model+" at "+int(local.vec[0])+" "+int(local.vec[1])+" "+int(local.vec[2])) 1 NIL 10
-				local.ent thread dev_blink self 0.5
 			}
 		}
 		wait 1		
