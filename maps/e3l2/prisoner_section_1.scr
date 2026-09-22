@@ -132,7 +132,7 @@ startPrisonerMarch: {
 	
 	//$sniper3 favoriteenemy $player //Chrissstrahl
 	$sniper3 exec coop_mod/replace.scr::favoriteenemy //Chrissstrahl
-
+iprintln_noloc("::startPrisonerMarch - balconyfall sniper3")
 	// bring to life sniper3
 	$sniper3 thread MyBalconyFall
 
@@ -160,6 +160,8 @@ startPrisonerMarch: {
 	while (level.prisonerSceneGuysAlive > 0) { 
 		waitframe 
 	}
+	
+	iprintln_noloc("::startPrisonerMarch - no guys alive anymore")
 }end
 
 //=========================================================================
@@ -290,10 +292,12 @@ followZeLeader: {
 //=========================================================================
 dontGetTooClose: {
 //=========================================================================
+	iprintln_noloc("::dontGetTooClose - 1")
 	//while (vector_length($player.origin - $prisoner.origin) > 600) { //chrissstrahl
-	while !(waitexec coop_mod/replace.scr::withinDistanceOf $prisoner 600) { //chrissstrahl
-		waitframe
+	while ($prisoner && !(waitthread coop_mod/replace.scr::withinDistanceOf $prisoner.origin 600)) {
+		wait 0.25
 	}
+	iprintln_noloc("::dontGetTooClose - 2")
 
 	//iprintln "got too close!"
 	level.playerAttacking = 1
@@ -407,16 +411,22 @@ runForCover:
 	self waittill turndone
 	self lookat $player
 	*/
+	
+	iprintln_noloc("::runForCover - talk1")
 
 	self anim A_32_PvtScottTalk_01
 	self waittill animdone
 	self say A_32_Terry_1A
 	self waittill saydone	//MiaCosa @chrissstrahl
 	wait 0.5
+	
+	iprintln_noloc("::runForCover - talk2")
 
 	self say A_32_Terry_1B
 	self waittill saydone
 	level.marching_prisoner_saved = 1
+	
+	iprintln_noloc("::runForCover - objective")
 
 	if ($HomeStretchCompTarg0) {
 		waitthread global/ObjMgr.scr::SetObjCompassTarg "findPOWs" $HomeStretchCompTarg0
@@ -432,16 +442,19 @@ runForCover:
 	//	local.home_point = spawn script_origin
 	//	local.home_point.origin = ( 4151 23 -127 )
 	//	self thread maps/e3l2.scr::doRunTo local.home_point
+	
+	iprintln_noloc("::runForCover - $PrisonerRunForHomeNode")
 
 	self thread maps/e3l2.scr::doRunTo $PrisonerRunForHomeNode
 	local.runThread = parm.previousthread
 
 	while (1) {
-		//if (!(vector_within self.origin $player.origin 2000)) { //chrissstrahl
-		if (!(waitexec coop_mod/replace.scr::withinDistanceOf self 2000)) { //chrissstrahl
+		//if (!(vector_within self.origin $player.origin 2000)) { //MiaCosa @chrissstrahl
+		if (!(waitexec coop_mod/replace.scr::withinDistanceOf self 2000)) { //MiaCosa @chrissstrahl
 			break
 		}
 		wait 2
+		iprintln_noloc("::runForCover - while distance")
 	}
 
 	local.runThread remove
@@ -452,6 +465,13 @@ runForCover:
 //=========================================================================
 mustLive: {
 //=========================================================================
+	//[206] chrissstrahl - development hack
+	if(getCvar("username") == "chrissstrahl"){
+		self heal 1
+		self nodamage
+		iprintln_noloc("::mustLive - hack in place")
+	}
+	
 	self waittill death
 	iprintln "You failed to protect the prisoner’s escape."
 	wait 1
