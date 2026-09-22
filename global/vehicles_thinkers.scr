@@ -556,10 +556,10 @@ LoadPassenger local.slot local.guy_type local.special local.passenger_name:
 end
 
 //------------------------------------------------------------------------------
-UnloadPassengers local.playerseek:
+UnloadPassengers local.playerseek local.coopOffset: //[207] chrissstrahl - added optional offest parameter
 //------------------------------------------------------------------------------
 	for (local.slot = 0; local.slot <= 6; local.slot++){
-		self thread truck_passenger_unload local.slot local.playerseek
+		self thread truck_passenger_unload local.slot local.playerseek local.coopOffset
 	}
 end
 
@@ -664,7 +664,7 @@ truck_unload local.playerseek:
 end
 
 //=========================================================================
-truck_passenger_unload local.slot local.playerseek:{
+truck_passenger_unload local.slot local.playerseek local.coopOffset:{ //[207] chrissstrahl - added optional offest parameter
 //=========================================================================
 	local.ent = self QueryPassengerSlotEntity local.slot
 	if !(isAlive local.ent){ end }
@@ -681,6 +681,14 @@ truck_passenger_unload local.slot local.playerseek:{
 	local.ent.origin = self gettagposition local.tag
 	local.ent.angles = self gettagangles local.tag
 	local.ent notsolid
+	
+	//[207] chrissstrahl - added optional offest parameter
+	//[207] chrissstrahl - allow offset NPC hanging in the air and then dropping down, is just crap
+	if(local.coopOffset){
+		local.newOrigin = ( local.ent.origin + local.coopOffset )
+		local.ent.origin = local.newOrigin
+	}
+	
 	local.ent physics_on
 	local.ent anim_noclip ("opel_passenger" + local.slot)
 	local.ent waittill animdone
