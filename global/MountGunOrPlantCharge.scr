@@ -40,7 +40,6 @@ Parameters:
 
 
 MountGunOrPlantCharge local.turret local.throbber local.gun_use_range local.throbber_use_range local.gun_name local.script_file_name local.get_on_gun_thread_name local.get_off_gun_thread_name local.place_explosives_thread_name local.usable_cannon:
-
 	if (level.mgopc_init == NIL)
 	{
 		if (level.mgopc_help_text_only_first_time == NIL)
@@ -90,29 +89,129 @@ MountGunOrPlantCharge local.turret local.throbber local.gun_use_range local.thro
 //	local.takes_precedence = "throbber"
 
 
+	//[207] chrissstrahl - 
+	local.player = NULL
+	if(level.gametype == 0){ local.player = $player }
+
 	local.prev_time = level.time
 	while (self && local.turret && local.usable_cannon)
 	{
-		// maint player-press-use state:
-
-		if ($player.useheld != local.player_holding_use)
+		//[207] chrissstrahl - get closest player to the gun and the explosive that is holding use
+		//prefer the player closest to the gun/turret, then work with that player
+		//
+		//- if local.player does exist, then the gun is manned and we will favour this player
+		
+		//[207] chrissstrahl - Check if the gun is in use
+		//==================================== GUN IN USE
+		if(self.player_status == "onGun"){
+			//check if the player is still there
+			local.freeGun = 0
+			if(!isAlive local.player){
+				local.freeGun = 1
+			}
+			
+			if(local.freeGun){
+				if(local.player){
+					self.flags["currentPlayer"] = local.player.entnum
+				}else{
+					self.flags["currentPlayer"] = NIL
+				}
+				
+				self waitthread local.script_file_name::local.get_off_gun_thread_name
+				self.player_status = "away"
+				waitframe
+				self.flags["currentPlayer"] = NIL
+				
+				//println("MountGunOrPlantCharge onGun (get off)")
+				continue
+			}
+		}
+		//==================================== GUN FREE
+		//- check for entity, grab closest player
+		//- compare players, use player cloeset to gun instead of explosive
+		else{			
+			//[206] chrissstrahl - ChatGTP - detect useheld change with change of player 
+			local.previous_player = local.player
+			local.player = NULL
+			
+			local.playerClosestGun = NULL
+			local.playerClosestExplosive = NULL
+			//local.throbber - Explosive
+			//local.usable_cannon - Usable Gun
+			
+			//Get player closest to explosive
+			if(local.throbber){
+				local.playerClosestExplosive = waitthread game.replace::player_closestTo local.throbber
+				if(	!isAlive local.playerClosestExplosive ||
+					local.playerClosestExplosive.isSpectator ||
+					!(vector_within local.playerClosestExplosive.origin local.throbber.origin local.throbber_use_range))
+				{
+					local.playerClosestExplosive = NULL
+				}
+			}else{
+				println("::INFO: No Explosive given for "+local.usable_cannon+" at "+local.usable_cannon.origin)
+			}
+			
+			//Get player closest to turret
+			if(local.usable_cannon){
+				local.playerClosestGun = waitthread game.replace::player_closestTo local.usable_cannon
+				if(	!isAlive local.playerClosestGun ||
+					local.playerClosestGun.isSpectator ||
+					!(vector_within local.playerClosestGun.origin local.usable_cannon.origin local.gun_use_range))
+				{
+					local.playerClosestGun = NULL
+				}
+			}
+			else{
+				println("::INFO: No Gun given for "+local.turret+" at "+local.turret.origin)
+			}
+			
+			//[206] chrissstrahl - coop compatibility
+			//prefer player closer to the gun than explosive
+			if(local.playerClosestExplosive){
+				local.player = local.playerClosestExplosive
+			}
+			if(local.playerClosestGun){
+				local.player = local.playerClosestGun
+				self.flags["currentPlayer"] = local.player.entnum
+			}
+			if(!local.player){
+				waitframe
+				self.flags["currentPlayer"] = NIL
+				continue
+			}
+			
+		}
+		
+		//[206] chrissstrahl - ChatGTP - detect useheld change with change of player 
+		if (local.player != local.previous_player)
 		{
-			if ($player.useheld)
+			local.player_holding_use = local.player.useheld
+			local.player_just_pressed_use = 0
+			local.player_just_released_use = 0
+		}
+	
+		// maint player-press-use state:
+		if (local.player.useheld != local.player_holding_use) //[207] chrissstrahl
+		{
+			if (local.player.useheld) //[207] chrissstrahl
 			{
 				//if (self == $Cannon1)
-				//iprintlnbold "***** PLAYER PRESSED USE"
+				//println("***** PLAYER PRESSED USE")
+				
 				local.player_just_pressed_use = 1
 				local.player_just_released_use = 0
 			}
 			else
 			{
 				//if (self == $Cannon1)
-				//iprintlnbold "***** PLAYER RELEASED USE"
+				//println("***** PLAYER RELEASED USE")
+				
 				local.player_just_pressed_use = 0
 				local.player_just_released_use = 1
 			}
 
-			local.player_holding_use = $player.useheld
+			local.player_holding_use = local.player.useheld //[207] chrissstrahl
 		}
 		else
 		{
@@ -123,7 +222,7 @@ MountGunOrPlantCharge local.turret local.throbber local.gun_use_range local.thro
 
 		// maint player-with-gun-and-throbber state:
 
-		local.player_forward = (angles_toforward $player.angles)
+		local.player_forward = (angles_toforward local.player.angles) //[207] chrissstrahl
 		local.gun_forward = (angles_toforward local.turret.angles)
 		local.gun_forward[2] = 0
 		local.gun_forward = (vector_normalize local.gun_forward)
@@ -137,10 +236,10 @@ MountGunOrPlantCharge local.turret local.throbber local.gun_use_range local.thro
 		local.gun_to_throbber[2] = 0
 
 		local.throbber_origin = local.turret.origin + local.gun_to_throbber
-		local.throbber_origin[2] = $player.origin[2]
+		local.throbber_origin[2] = local.player.origin[2] //[207] chrissstrahl
 
-		local.gun_to_player = ($player.origin - local.turret.origin)
-		local.throbber_to_player = ($player.origin - local.throbber_origin)
+		local.gun_to_player = (local.player.origin - local.turret.origin) //[207] chrissstrahl
+		local.throbber_to_player = (local.player.origin - local.throbber_origin) //[207] chrissstrahl
 
 
 // Debug printer
@@ -154,11 +253,11 @@ MountGunOrPlantCharge local.turret local.throbber local.gun_use_range local.thro
 //			local.prev_time = level.time
 //		}
 
-		local.gun_says_use_me = (local.usable_cannon canuse $player)
+		local.gun_says_use_me = (local.usable_cannon canuse local.player) //[207] chrissstrahl
 		local.player_facing_gun = ((vector_dot local.player_forward local.gun_forward) > 0)
 		local.can_use_gun = ((local.gun_says_use_me == 1) &&
 								local.player_facing_gun &&
-								(vector_within $player.origin self.origin local.gun_use_range))
+								(vector_within local.player.origin self.origin local.gun_use_range)) //[207] chrissstrahl
 
 
 		local.player_on_side_of_throbber = ((vector_dot local.gun_to_throbber local.gun_to_player) > 0)
@@ -166,7 +265,7 @@ MountGunOrPlantCharge local.turret local.throbber local.gun_use_range local.thro
 		local.can_use_throbber = ((self.noexplode == 0) &&
 									local.player_on_side_of_throbber &&
 									local.player_facing_throbber &&
-									(vector_within $player.origin local.throbber_origin local.throbber_use_range))
+									(vector_within local.player.origin local.throbber_origin local.throbber_use_range)) //[207] chrissstrahl
 
 		local.help_text_requested = local.help_text_active		// by default, same as before
 
@@ -213,7 +312,8 @@ MountGunOrPlantCharge local.turret local.throbber local.gun_use_range local.thro
 					// get on the damn gun
 
 					//if (self == $Cannon1)
-					//iprintlnbold "***** PLAYER MOUNTED GUN"
+					//println("***** PLAYER MOUNTED GUN")
+					
 					self waitthread local.script_file_name::local.get_on_gun_thread_name
 
 					level.mgopc_did_mount_gun = 1
@@ -263,7 +363,8 @@ MountGunOrPlantCharge local.turret local.throbber local.gun_use_range local.thro
 					// set the damn explosives
 
 					//if (self == $Cannon1)
-					//iprintlnbold "***** PLAYER SET EXPLOSIVES"
+					//println("***** PLAYER SET EXPLOSIVES")
+					
 					self waitthread local.script_file_name::local.place_explosives_thread_name
 
 					self.player_status = "didSetThrobber"
@@ -282,6 +383,8 @@ MountGunOrPlantCharge local.turret local.throbber local.gun_use_range local.thro
 				local.help_text_requested = "none"
 				break
 		}
+		
+		//println("MountGunOrPlantCharge self.player_status:"+self.player_status)
 
 
 		if (local.gun_name)
@@ -303,12 +406,18 @@ MountGunOrPlantCharge local.turret local.throbber local.gun_use_range local.thro
 						thread global/throbtext.scr::throbtext_off
 						break
 					case "throbber":
-						local.usekey = getboundkey1 "+use"
+						//[206] chrissstrahl - coop compatibility
+						if(level.gametype == 0){ local.usekey = getboundkey1 "+use" }
+						else{local.usekey = "USE"}
+						
 						local.msg = ( loc_convert_string ( "Press " + local.usekey + " to plant the explosive." ) )
 						thread global/throbtext.scr::throbtext local.msg 1000
 						break
 					case "gun":
-						local.usekey = getboundkey1 "+use"
+						//[206] chrissstrahl - coop compatibility
+						if(level.gametype == 0){ local.usekey = getboundkey1 "+use" }
+						else{local.usekey = "USE"}
+
 						local.msg = ( loc_convert_string ( "Press " + local.usekey + " to use the " + local.gun_name + "." ) )
 						thread global/throbtext.scr::throbtext local.msg 1000
 						break
