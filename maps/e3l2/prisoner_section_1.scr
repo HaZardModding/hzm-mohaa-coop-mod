@@ -39,7 +39,12 @@ InitSection: {
 	waitthread global/ManSpawnNamed.scr::Init "mgGuy2"
 	waitthread global/ManSpawnNamed.scr::Init "sniper2"
 	waitthread global/ManSpawnNamed.scr::Init "sniper3"
-
+	
+	//[207] chrissstrahl - Spawn this guy early when savegame is loaded
+	if(level.coop_saveLoaded == 2){
+		waitthread global/ManSpawnNamed.scr::Spawn "mgGuy2"
+	}
+	
 	//	$gaurd1 exec global/disable_ai.scr
 	//	$gaurd2 exec global/disable_ai.scr
 	//	$prisoner exec global/disable_ai.scr
@@ -58,6 +63,15 @@ InitSection: {
 waitToDie: {
 //=========================================================================
 	level.prisonerSceneGuysAlive ++
+	
+	//[207] chrissstrahl - make sure arrays are handled right
+	if(self.size > 1){
+		for (local.i = 1;local.i <= self.size;local.i++){
+			self[local.i] thread waitToDie
+		}
+		end
+	}
+	
 	self waittill death
 	level.prisonerSceneGuysAlive --
 }end
@@ -66,6 +80,11 @@ waitToDie: {
 //=========================================================================
 LoadTheTruckthread local.crosser: {
 //=========================================================================
+	if(level.LoadTheTruckthread){		
+		end
+	}
+	level.LoadTheTruckthread = 1
+	
 	// loadup the truck guys
 	$theTruck waitthread global/vehicles_thinkers.scr::truck_INIT
 	$theTruck waitthread global/vehicles_thinkers.scr::LoadPassengers 3 "models/human/german_wehrmact_soldier" NIL "truckGuys"
@@ -98,9 +117,13 @@ startPrisonerMarch: {
 	waitthread global/ManSpawnNamed.scr::Spawn "gaurd1"
 	waitthread global/ManSpawnNamed.scr::Spawn "gaurd2"
 	waitthread global/ManSpawnNamed.scr::Spawn "prisoner"
-	waitthread global/ManSpawnNamed.scr::Spawn "mgGuy2"
+	
+	//[207] chrissstrahl - We spawn this guy earlier else where when the save is loaded
+	if(!level.coop_saveLoaded){
+		waitthread global/ManSpawnNamed.scr::Spawn "mgGuy2"
+	}
+	
 	waitthread global/ManSpawnNamed.scr::Spawn "sniper3"
-	waitframe
 
 	$gaurd1 exec global/disable_ai.scr
 	$gaurd2 exec global/disable_ai.scr
@@ -132,7 +155,7 @@ startPrisonerMarch: {
 	
 	//$sniper3 favoriteenemy $player //Chrissstrahl
 	$sniper3 exec coop_mod/replace.scr::favoriteenemy //Chrissstrahl
-iprintln_noloc("::startPrisonerMarch - balconyfall sniper3")
+
 	// bring to life sniper3
 	$sniper3 thread MyBalconyFall
 
@@ -155,13 +178,16 @@ iprintln_noloc("::startPrisonerMarch - balconyfall sniper3")
 	$gaurd1 exec global/enable_ai.scr
 	$gaurd2 exec global/enable_ai.scr
 	thread truckGuys
+	
+	//[207] chrissstrahl - make sure he won't die during testing
+	if(getCvar("username") == "Chrissstrahl"){
+		$prisoner nodamage
+	}
 
 	//$prisoner exec global/enable_ai.scr
 	while (level.prisonerSceneGuysAlive > 0) { 
 		waitframe 
 	}
-	
-	iprintln_noloc("::startPrisonerMarch - no guys alive anymore")
 }end
 
 //=========================================================================
@@ -176,7 +202,16 @@ MyBalconyFall: {
 
 	// need the set health very high to catch
 	// when guy is dead.
-	self.health += 10000
+	//[206] chrissstrahl - this needed fixing, he had somehow way to much health
+	//scale heal +60 per player
+	local.healthForSniper3 = 10005
+	local.healthScale = waitthread game.replace::player_numActive
+	if(local.healthScale){
+		local.healthForSniper3 = (local.healthForSniper3 + ( 60 * local.healthScale))
+	}
+	
+	self.health = local.healthForSniper3
+	
 	self.nolongpain = 1
 	self.ainocrouch = 1
 	self.ainoprone = 1
@@ -199,8 +234,14 @@ MyBalconyFall: {
 	// get the direction to jump
 	local.angle = self.angles
 
-	// wait to get hurt  
-	while (self.health > 10000) {
+	// wait to get hurt
+	//[206] chrissstrahl - upgraded:
+	// - exit if self is NULL
+	while (1) {
+		if(!self){ end }
+		if(self.health <= 10000){
+			break
+		}
 		waitframe
 	}
   
@@ -292,12 +333,10 @@ followZeLeader: {
 //=========================================================================
 dontGetTooClose: {
 //=========================================================================
-	iprintln_noloc("::dontGetTooClose - 1")
 	//while (vector_length($player.origin - $prisoner.origin) > 600) { //chrissstrahl
 	while ($prisoner && !(waitthread coop_mod/replace.scr::withinDistanceOf $prisoner.origin 600)) {
 		wait 0.25
 	}
-	iprintln_noloc("::dontGetTooClose - 2")
 
 	//iprintln "got too close!"
 	level.playerAttacking = 1
@@ -314,9 +353,11 @@ waitToBeAttacked: {
 //=========================================================================
 truckGuys: {
 //=========================================================================
-	println "unloading the truck guys"
 	$truckGuys waitthread UnloadGuyFromTruck
-	$theTruck thread global/vehicles_thinkers.scr::UnloadPassengers	
+	
+	//[207] chrissstrahl - added offset so npc do not spawn to far above the truck
+	//$theTruck thread global/vehicles_thinkers.scr::UnloadPassengers
+	$theTruck thread global/vehicles_thinkers.scr::UnloadPassengers NIL ( 0 0 -50 )
 }end
 
 //=========================================================================
@@ -395,39 +436,42 @@ runForCover:
 	self nodamage
 	self exec global/LoopAnim.scr::LoopAnimStop
 	waitframe
-
-	//self turnto $player 	//MiaCosa
-	self exec coop_mod/replace.scr::turnto 	//MiaCosa
-
-	// run to player
-	self.movedoneradius = 200
 	
-	//self runto $player 	//MiaCosa
-	self exec coop_mod/replace.scr::runtoClosest 	//MiaCosa
-	
-	self waittill movedone
+	//[207] chrissstrahl - it is better to have him run to a spot, instead of a player
+	if(level.gametype == 0){
+		self exec coop_mod/replace.scr::turnto 	//MiaCosa
+		// run to player
+		self.movedoneradius = 200
+		self exec coop_mod/replace.scr::runtoClosest 	//MiaCosa
+		self waittill movedone	
+	}
+	else{
+		//Let us reuse a entity to make the ai work
+		$tank2Path2 origin ( -163 170 -432 )
+		while(self && vector_length(($tank2Path2.origin) - (self.origin)) > 25){
+			self runto $tank2Path2
+			self waittill movedone
+		}
+		self exec coop_mod/replace.scr::turnto
+	}
 
 	/*
 	self waittill turndone
 	self lookat $player
 	*/
 	
-	iprintln_noloc("::runForCover - talk1")
-
 	self anim A_32_PvtScottTalk_01
 	self waittill animdone
-	self say A_32_Terry_1A
-	self waittill saydone	//MiaCosa @chrissstrahl
-	wait 0.5
+	//[207] chrissstrahl - skip sequence
+	if(getCvar("username") != "Chrissstrahl"){
+		self say A_32_Terry_1A
+		self waittill saydone	//MiaCosa @chrissstrahl
+		wait 0.5
+		self say A_32_Terry_1B
+		self waittill saydone
+	}
 	
-	iprintln_noloc("::runForCover - talk2")
-
-	self say A_32_Terry_1B
-	self waittill saydone
 	level.marching_prisoner_saved = 1
-	
-	iprintln_noloc("::runForCover - objective")
-
 	if ($HomeStretchCompTarg0) {
 		waitthread global/ObjMgr.scr::SetObjCompassTarg "findPOWs" $HomeStretchCompTarg0
 	}
@@ -442,41 +486,79 @@ runForCover:
 	//	local.home_point = spawn script_origin
 	//	local.home_point.origin = ( 4151 23 -127 )
 	//	self thread maps/e3l2.scr::doRunTo local.home_point
-	
-	iprintln_noloc("::runForCover - $PrisonerRunForHomeNode")
 
-	self thread maps/e3l2.scr::doRunTo $PrisonerRunForHomeNode
+	//[206] chrissstrahl - using different path convinient for coop/testing
+	if(level.gametype == 0){
+		self thread maps/e3l2.scr::doRunTo $PrisonerRunForHomeNode
+	}else{
+		//Let us reuse a entity to make the ai work
+		$tank2Path2 origin ( 2957 252 -432 )
+		while(self && vector_length(($tank2Path2.origin) - (self.origin)) > 25){
+			self runto $tank2Path2
+			self waittill movedone
+		}
+		$tank2Path2 origin ( 3469 196 -432 )
+		while(self && vector_length(($tank2Path2.origin) - (self.origin)) > 25){
+			self runto $tank2Path2
+			self waittill movedone
+		}
+		//$tank2Path2 origin ( 3565 196 -432 )
+		$tank2Path2 origin ( 3504 196 -432 )
+		while(self && vector_length(($tank2Path2.origin) - (self.origin)) > 25){
+			self runto $tank2Path2
+			self waittill movedone
+		}
+		$tank2Path2 origin ( 3757 204 -432 )
+		while(self && vector_length(($tank2Path2.origin) - (self.origin)) > 25){
+			self runto $tank2Path2
+			self waittill movedone
+		}
+		$tank2Path2 origin ( 3989 204 -424 )
+		while(self && vector_length(($tank2Path2.origin) - (self.origin)) > 25){
+			self runto $tank2Path2
+			self waittill movedone
+		}
+		$tank2Path2 origin ( 4149 164 -400 )
+		while(self && vector_length(($tank2Path2.origin) - (self.origin)) > 25){
+			self runto $tank2Path2
+			self waittill movedone
+		}
+		$tank2Path2 origin ( 4205 -76 -400 )
+		while(self && vector_length(($tank2Path2.origin) - (self.origin)) > 25){
+			self runto $tank2Path2
+			self waittill movedone
+		}
+	}
+	
 	local.runThread = parm.previousthread
 
-	while (1) {
-		//if (!(vector_within self.origin $player.origin 2000)) { //MiaCosa @chrissstrahl
-		if (!(waitexec coop_mod/replace.scr::withinDistanceOf self 2000)) { //MiaCosa @chrissstrahl
+	//[206] chrissstrahl - cheap hack to remove him
+	while (self) {
+		if (!(waitthread coop_mod/replace.scr::withinDistanceOf self 2000)) {
 			break
 		}
-		wait 2
-		iprintln_noloc("::runForCover - while distance")
+		wait 1
 	}
 
 	local.runThread remove
 	self hide
 	self ai_off
+	
+	//[206] Chrissstrahl - make notsolid and eventually remove
+	self notsolid
 }end
 
 //=========================================================================
 mustLive: {
 //=========================================================================
-	//[206] chrissstrahl - development hack
-	if(getCvar("username") == "chrissstrahl"){
-		self heal 1
-		self nodamage
-		iprintln_noloc("::mustLive - hack in place")
-	}
-	
 	self waittill death
-	iprintln "You failed to protect the prisoner’s escape."
+	iprintln "You failed to protect the prisoner's escape."
 	wait 1
 	iprintln "Mission Failed."
 	wait 1
+	
+	//[207] chrissstrahl - set state, allow to restart level near this scene
+	thread maps/e3l2/coopState.scr::coop_setSave "PrisonerAtGunpoint"	
 	
 	//missionfailed 	//MiaCosa
 	exec coop_mod/replace.scr::missionfailed 	//MiaCosa
