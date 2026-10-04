@@ -4,6 +4,11 @@
 //=========================================================================
 InitSection: {
 //=========================================================================
+	//[207] chrissstrahl - skip on savegame
+	if(level.coop_saveLoaded){
+		end
+	}
+
 	waitthread global/ManSpawnNamed.scr::Init "openDoorGuy" 
 	waitthread global/ManSpawnNamed.scr::Init "TowerExploderGuy1"
 	waitthread global/ManSpawnNamed.scr::Init "TowerExploderGuy2"
@@ -105,14 +110,16 @@ DoSection: {
 			($Cannon1GuyB && (isalive $Cannon1GuyB) && ($Cannon1GuyB.health == $Cannon1GuyB.max_health))) {
 
 		$Cannon1 waitthread maps/e3l2/cannons.scr::CannonFire "Cannon1TargPoint" 1
-
-		if (vector_within $player.origin $Cannon1.origin local.cannon_range) { 	//MiaCosa @chrissstrahl
+		
+		//[206] chrissstrahl - make coop compatible
+		if (waitthread coop_mod/replace.scr::withinDistanceOf $Cannon1 local.cannon_range) {
 			break
 		}
 
 		wait (0.3 + (randomfloat 1))
 
-		if (vector_within $player.origin $Cannon1.origin local.cannon_range) { 	//MiaCosa @chrissstrahl
+		//[206] chrissstrahl - make coop compatible
+		if (waitthread coop_mod/replace.scr::withinDistanceOf $Cannon1 local.cannon_range) {
 			break
 		}
 	}
@@ -187,7 +194,10 @@ MonitorCannon: {
 	waitframe
 
 	$OpenDoorSection open self
-	self favoriteenemy $player 	//MiaCosa @chrissstrahl
+	
+	//[206] chrissstrahl - made coop compatible
+	self thread coop_mod/replace.scr::favoriteenemy	
+	
 	self runto $openDoorGuyDest
 	self waittill movedone
 	self exec global/enable_ai.scr
@@ -256,15 +266,26 @@ initTank: {
 //=========================================================================
 waitTillDeath: {
 //=========================================================================
-	while (isAlive $tank2) {
-		waitframe 
+	while (isAlive $tank2 && isAlive $Cannon1_Use) {
+		waitframe
 	}
 
-	radiusdamage $tank2.origin 500 500
-	$Cannon1_Throb show
-	$Cannon1.noexplode = 0
-	waitthread global/ObjMgr.scr::RevealObj "killModellos"
-	waitthread global/ObjMgr.scr::SetCurrObj "killModellos"
+	if(!isAlive $tank2){
+		radiusdamage $tank2.origin 500 500
+	}
+	
+	
+	//[206] chrissstrahl - detect if cannon is destroyed by tank and react acordingly
+	if(isAlive $Cannon1_Use){
+		$Cannon1_Throb show
+		$Cannon1.noexplode = 0
+		waitthread global/ObjMgr.scr::RevealObj "killModellos"
+		waitthread global/ObjMgr.scr::SetCurrObj "killModellos"
+	}else{
+		thread maps/e3l2.scr::Cannon1DestructionThread
+		waitframe
+		$Cannon1_Throb remove
+	}
 }end
 
 // tankAttack
@@ -287,7 +308,21 @@ tankKillPlayer: {
 		$tank2FireTrigger waittill trigger
 
 		if (level.cannonInUse != NULL) {
-			$player damage $world 50 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0 	//MiaCosa @chrissstrahl
+			//[206] chrissstrahl - make coop compatible
+			for (local.i = 1;local.i <= $player.size;local.i++){
+				local.player =  $player[local.i]
+				if(	isAlive local.player ){
+					if( level.gametype == 0 || (vector_within local.player.origin level.cannonInUse.origin 100)){
+						if( level.gametype == 0 || !local.player.isSpectator && local.player.flags["coopDevNoclip"] == NIL){
+							local.player damage $world 50 $world (0 0 0) (0 0 0) (0 0 0) 0 9 0 0 
+							iprintln_noloc("cannon_section_1.scr - tankKillPlayer - in radius")
+						}
+					}
+					else{
+						iprintln_noloc("cannon_section_1.scr - tankKillPlayer - outside radius")
+					}
+				}
+			}
 		}
 	}
 }end
