@@ -64,6 +64,16 @@ DoSection: {
 
 	$TankPinDownTrigger waittill trigger
 	exec global/autosave.scr 1
+	
+	//[206] chrissstrahl - do not allow them to be killed
+	if(level.gametype != 0){
+		$BarneyPinned1 nodamage
+		$BarneyPinned2 nodamage
+		$BarneyPinnedHurt nodamage
+	}
+	
+	//[206] chrissstrahl - update spawnlocations
+	thread coop_mod/spawnlocations.scr::e3l2_update1
 
 	$BarneyPinnedHurt thread InjuredSoundsThread
 
@@ -217,11 +227,18 @@ DoSection: {
 		$BarneyPinned1 healthonly 4
 		$BarneyPinned1 unholster
 		$BarneyPinned1 exec global/enable_ai.scr
-		$BarneyPinned1.destination = $player	//MiaCosa @chrissstrahl
 		$BarneyPinned1.friendtype = 1
 		$BarneyPinned1.distance = 225
 		$BarneyPinned1 thread global/friendly.scr::friendlythink
 		$BarneyPinned1.targetname = "Barney"
+		
+		//[206] chrissstrahl - make coop compatible
+		$BarneyPinned1 thread coop_mod/main.scr::destination
+		
+		//[206] chrissstrahl - allow to be killed again
+		if(level.gametype != 0){
+			$BarneyPinned1 takedamage
+		}
 	}
 
 	if (isalive $BarneyPinned2) {
@@ -237,11 +254,18 @@ DoSection: {
 		$BarneyPinned2 healthonly 4
 		$BarneyPinned2 unholster
 		$BarneyPinned2 exec global/enable_ai.scr
-		$BarneyPinned2.destination = $player	//MiaCosa @chrissstrahl
 		$BarneyPinned2.friendtype = 1
 		$BarneyPinned2.distance = 250
 		$BarneyPinned2 thread global/friendly.scr::friendlythink
 		$BarneyPinned2.targetname = "Barney"
+		
+		//[206] chrissstrahl - make coop compatible
+		$BarneyPinned2 thread coop_mod/main.scr::destination
+		
+		//[206] chrissstrahl - allow to be killed again
+		if(level.gametype != 0){
+			$BarneyPinned2 takedamage
+		}
 	}
 
 	// cleanup
@@ -259,15 +283,23 @@ InitEnemies: {
 	waitthread global/ManSpawnNamed.scr::Spawn "towersniper1"
 	waitframe
 
+	//[206] chrissstrahl - wait for a player
+	while(!$player){ waitframe }
+	local.player = waitthread coop_mod/replace.scr::player_closestTo $towersniper1
+
 	// $towersniper1 waitthread maps/e3l2.scr::EnableGuy
-	$towersniper1.target = $player	//MiaCosa @chrissstrahl
+	$towersniper1.target = local.player	//MiaCosa @chrissstrahl
 
 	// $sandbagguy waitthread maps/e3l2.scr::EnableGuy
 	$sandbagguy waitexec global/disable_ai.scr
 	$sandbagguy thread maps/e3l2.scr::doRunTo $sandbagtarget
 	$sandbagguy waittill movedone
 	$sandbagguy exec global/enable_ai.scr
-	$sandbagguy.target = $player
+	
+	//[206] chrissstrahl - wait for a player
+	while(!$player){ waitframe }
+	local.player = waitthread coop_mod/replace.scr::player_closestTo $sandbagguy
+	$sandbagguy.target = local.player
 }end
 
 //=========================================================================
@@ -329,15 +361,16 @@ initTank: {
 		if (local.targetNo > 2) {
 			local.tank_max_sight_range = 2048
 			local.tank_max_shot_range = 1024
-
-			if (!(vector_within self.origin $player.origin local.tank_max_shot_range)) {	//MiaCosa @chrissstrahl
+			
+			//[206] chrissstrahl - made coop compatible - distance checks
+			if (!(waitthread coop_mod/replace.scr::withinDistanceOf self.origin local.tank_max_shot_range)) {
 				self.tankShotLimit = 0
 
-				while (!(vector_within self.origin $player.origin local.tank_max_shot_range)) {
-					if (!(vector_within self.origin $player.origin local.tank_max_sight_range)) {
+				while (!(waitthread coop_mod/replace.scr::withinDistanceOf self.origin local.tank_max_shot_range)) {
+					if (!(waitthread coop_mod/replace.scr::withinDistanceOf self.origin local.tank_max_sight_range)) {
 						self hide
 
-						while (!(vector_within self.origin $player.origin local.tank_max_sight_range)) {
+						while (!(waitthread coop_mod/replace.scr::withinDistanceOf self.origin local.tank_max_sight_range)) {
 							wait 0.5
 						}
 						self show
@@ -357,7 +390,11 @@ initTank: {
 
 		// tank fired, camera shake mag. it proportional to distance to target
 		local.target = $(self.tankTarget)
-		local.dir = local.target.origin - $player.origin	//MiaCosa @chrissstrahl
+		
+		//[206] chrissstrahl - make coop compatible
+		local.player = waitthread coop_mod/replace.scr::player_closestTo local.target
+		if(!local.player){ local.player = $world }
+		local.dir = local.target.origin - local.player.origin
 
 		local.dist = vector_length local.dir
 		if (local.dist < 1) {
