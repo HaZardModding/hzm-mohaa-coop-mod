@@ -3,7 +3,15 @@
 InitSection: {
 //=========================================================================
 	$medic threatbias ignoreme
-	$player heal 1	//MiaCosa @Chrissstrahl
+	//[206] chrissstrahl - coop compatible
+	if(level.gametype == 0){
+		$player heal 1
+	}
+	
+	//[207] chrissstrahl - a save is loaded mission will start else where
+	if(	level.coop_saveLoaded ){
+		end
+	}
 
 	if ($AirAxis1) {
 		$AirAxis1.targetname = "AirAxis"
@@ -64,19 +72,30 @@ DoSection: {
 
 	if ((level.warp_to_section == NIL) || (level.warp_to_section == "None")) {
 		//	thread DoIntroPlaneGag
+		
+		//[206] chrissstrahl - coop compatibility
 		// do intro-section
 		//$player physics_off	//MiaCosa
-		exec coop_mod/replace.scr::physics_off
+		//exec coop_mod/replace.scr::physics_off
+		thread game.replace::immobilize 1 200 1
 		
-
 		if (level.skip_opening_briefing) {
 			goto SkipBriefingGoto
 		}
 
 		wait 2
+		
+		//[206] chrissstrahl - coop compatibility
 		//$medic turnto $player	//MiaCosa
 		$medic exec coop_mod/replace.scr::turnto
 		$medic say A_32_Whittaker_1B
+		
+		//[206] chrissstrahl - developer skip
+		if(getCvar("username") == "Chrissstrahl"){
+			local.fake = 1
+			goto SkipBriefingGoto
+		}
+		
 		$medic waittill saydone	//MiaCosa @Chrissstrahl
 		wait 0.5
 
@@ -88,8 +107,11 @@ DoSection: {
 	}
 
 SkipBriefingGoto:
+	//[206] chrissstrahl - coop compatibility
 	//$player physics_on	//MiaCosa
-	exec coop_mod/replace.scr::physics_on
+	//exec coop_mod/replace.scr::physics_on
+	thread game.replace::immobilize 0 0 0
+	
 	drawhud 1
 	waitthread maps/e3l2.scr::InitPlayer
 	waitthread global/ObjMgr.scr::RevealObj "findPOWs"
@@ -110,7 +132,9 @@ AirAxisThink: {
 //=========================================================================
 	self ai_on
 	self german		// in case guy still has the wrong model... (it was flagged as american)
-	self favoriteenemy $player	//MiaCosa @Chrissstrahl
+
+	//[206] chrissstrahl - made coop compatible
+	self thread coop_mod/replace.scr::favoriteenemy
 
 	if (self.target && $(self.target)) {
 		self exec global/RunChainWhileShooting.scr $(self.target)
@@ -420,17 +444,26 @@ DoRoomGag: {
 	// level.dangerousness++
 
 	// $RoomGuy2 thread maps/e3l2.scr::EnableGuy
-	$RoomGuy2 favoriteenemy $player	//MiaCosa @Chrissstrahl
-	$RoomGuy3 favoriteenemy $player
-	$RoomGuy4 favoriteenemy $player
 	
-	// $RoomGuy1 waitthread maps/e3l2.scr::EnableGuy
+	//[206] chrissstrahl - made coop compatible
+	$RoomGuy2 thread coop_mod/replace.scr::favoriteenemy
+	$RoomGuy3 thread coop_mod/replace.scr::favoriteenemy
+	$RoomGuy4 thread coop_mod/replace.scr::favoriteenemy
+	
+	// $RoomGuy1 waitthread maps/e3l2.scr::EnableGuy	
 	$RoomGuy1 waitexec global/disable_ai.scr
 	$Door2Trigger2 open $RoomGuy1	
-	$RoomGuy1 favoriteenemy $player
+	
+	//[206] chrissstrahl - made coop compatible
+	$RoomGuy1 thread coop_mod/replace.scr::favoriteenemy
+	
 	$RoomGuy1 thread maps/e3l2.scr::doRunTo $guyonetarget
 	$RoomGuy1 waittill movedone
-	$RoomGuy1.target = $player
+	
+	//[206] chrissstrahl - made coop compatible
+	local.player = waitthread coop_mod/replace.scr::player_closestTo $RoomGuy1
+	$RoomGuy1.target = local.player
+	
 	$RoomGuy1 exec global/enable_ai.scr
 
 	if (($RoomGuy1 && (isalive $RoomGuy1)) ||
