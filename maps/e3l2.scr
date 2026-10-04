@@ -14,6 +14,20 @@ main: {
 	level.coopNextMap = "e3l3"				//chrissstrahl - set next map (for mom voteing)
 	waitthread coop_mod/main.scr::main 		//chrissstrahl - start coop mod, wait for this to finish
 
+	//DEVELOMENT TEST
+	//DEVELOMENT TEST
+	//DEVELOMENT TEST
+	//DEVELOMENT TEST
+	//DEVELOMENT TEST
+	//DEVELOMENT TEST
+	if(getCvar("username") == "Chrissstrahl"){
+		local.fake = 1
+		//setcvar "coop_save" "PrisonerAtGunpoint"
+	}
+	
+	//[207] chrissstrahl - load "save"
+	waitthread maps/e3l2/coopState.scr::coop_loadSave //active this after testing
+
 	exec global/auto.scr
 	exec maps/e3l2/light_e3l2.scr
 	exec global/exploder.scr
@@ -55,16 +69,10 @@ main: {
 	waitthread maps/e3l2/objectives.scr::InitObjectives
 	waitthread InitSnipers
 	waitthread InitMG42s
-
-
-	//$player stufftext "tmstop" //MiaCosa - singleplayer
+	
 	exec coop_mod/replace.scr::tmstop //MiaCosa - coop compatibility
-	
-	wait 2	
-
-	//$player stufftext "tmstartloop sound/music/Kleveburg.mp3" //MiaCosa - coop compatibility
+	//wait 2
 	exec coop_mod/replace.scr::tmstartloop "sound/music/Kleveburg.mp3" //MiaCosa
-	
 	thread global/music.scr::SetVolume 2
 	
 	setcvar g_mission 3
@@ -82,71 +90,97 @@ main: {
 
 	// facilitate debug "section warping"
 
-	//@chrissstrahl
-	if (level.warp_to_section == "TankPinDown") {
-		$player.origin = (2432 -5520 -64)
-		$player.angles = (0 90 0)
-		$player.viewangles = (0 90 0)
-		$medic.origin = (2496 -5600 -64)
-		$medic.angles = (0 90 0)
-	}
-	else if (level.warp_to_section == "MiniCourtyard") {
-		$player.origin = (1240 -3872 -432)
-		$player.angles = (0 180 0)
-		$player.viewangles = (0 180 0)
+	//[207] chrissstrahl - handle hacks
+	if(!level.coop_saveLoaded){
+		if (level.warp_to_section == "TankPinDown") {
+			//[206] chrissstrahl - made coop compatible
+			waitthread coop_mod/replace.scr::waitForPlayer;wait 1
+			
+			$player.origin = (2432 -5520 -64)
+			$player.angles = (0 90 0)
+			$player.viewangles = (0 90 0)
+			$medic.origin = (2496 -5600 -64)
+			$medic.angles = (0 90 0)
+		}
+		else if (level.warp_to_section == "MiniCourtyard") {
+			//[206] chrissstrahl - made coop compatible
+			waitthread coop_mod/replace.scr::waitForPlayer;wait 1
+			
+			$player.origin = (1240 -3872 -432)
+			$player.angles = (0 180 0)
+			$player.viewangles = (0 180 0)
 
-		$medic.stop_thinking = 1
+			$medic.stop_thinking = 1
 
-		spawn "models/human/2nd-ranger_private.tik" targetname "BarneyPinned1_warp" origin (1248 -4072 -432) angles (0 90 0)
-		spawn "models/human/2nd-ranger_private.tik" targetname "BarneyPinned2_warp" origin (1248 -4172 -432) angles (0 90 0)
+			spawn "models/human/2nd-ranger_private.tik" targetname "BarneyPinned1_warp" origin (1248 -4072 -432) angles (0 90 0)
+			spawn "models/human/2nd-ranger_private.tik" targetname "BarneyPinned2_warp" origin (1248 -4172 -432) angles (0 90 0)
 
-		$BarneyPinned1_warp.destination = $player
-		$BarneyPinned1_warp.friendtype = 1
-		$BarneyPinned1_warp.distance = 225
-		$BarneyPinned1_warp thread global/friendly.scr::friendlythink
-		$BarneyPinned1_warp.targetname = "Barney"
+			$BarneyPinned1_warp.destination = $player
+			$BarneyPinned1_warp.friendtype = 1
+			$BarneyPinned1_warp.distance = 225
+			$BarneyPinned1_warp thread global/friendly.scr::friendlythink
+			$BarneyPinned1_warp.targetname = "Barney"
 
-		$BarneyPinned2_warp.destination = $player
-		$BarneyPinned2_warp.friendtype = 1
-		$BarneyPinned2_warp.distance = 250
-		$BarneyPinned2_warp thread global/friendly.scr::friendlythink
-		$BarneyPinned2_warp.targetname = "Barney"
-	}
-	else if (level.warp_to_section == "PrisonerAtGunpoint") {
-		//$player.origin = (560 240 -432)
-		$player.origin = ( 1084 328 -455 )
-		$player.angles = (0 180 0)
-		$player.viewangles = (0 180 0)
-		$medic.stop_thinking = 1
-	}
-	else if (level.warp_to_section == "TankModeloRace") {
-		$player.origin = (1327 -914 -315)
-		$player.angles = (0 0 0)
-		$player.viewangles = (0 0 0)
-		$medic.stop_thinking = 1
-	}
-	else if (level.warp_to_section == "PrisonerRescue") {
-		$player.origin = ( -1984 -1466 -455)
-		$player.angles = (0 180 0)
-		$player.viewangles = (0 180 0)
-		$medic.stop_thinking = 1
-	}
-	else if (level.warp_to_section == "SecondModello") {
-		$player.origin = ( -1984 -1466 -455)
-		$player.angles = (0 180 0)
-		$player.viewangles = (0 180 0)
-		$medic.stop_thinking = 1
-	}
-	else if (level.warp_to_section == "FinalScene" || level.warp_to_section == "FinalSceneGetaway") {
-		$player.origin = ( -2088 1168 -453 )
-		$player.angles = (0 90 0)
-		$player.viewangles = (0 90 0)
-		$medic.stop_thinking = 1
-		level.num_cannons_remaining = 1
+			$BarneyPinned2_warp.destination = $player
+			$BarneyPinned2_warp.friendtype = 1
+			$BarneyPinned2_warp.distance = 250
+			$BarneyPinned2_warp thread global/friendly.scr::friendlythink
+			$BarneyPinned2_warp.targetname = "Barney"
+		}
+		else if (level.warp_to_section == "PrisonerAtGunpoint") {
+			//[206] chrissstrahl - made coop compatible
+			waitthread coop_mod/replace.scr::waitForPlayer;wait 1
+			
+			//$player.origin = (560 240 -432)
+			$player.origin = ( 1084 328 -455 )
+			$player.angles = (0 180 0)
+			$player.viewangles = (0 180 0)
+			$medic.stop_thinking = 1
+			
+			//[207] chrissstrahl - adjust level for scene
+			thread maps/m3l2/coopState.scr::coop_prisonerAtGunpoint
+		}
+		else if (level.warp_to_section == "TankModeloRace") {
+			//[206] chrissstrahl - made coop compatible
+			waitthread coop_mod/replace.scr::waitForPlayer;wait 1
+			
+			$player.origin = (1327 -914 -315)
+			$player.angles = (0 0 0)
+			$player.viewangles = (0 0 0)
+			$medic.stop_thinking = 1
+		}
+		else if (level.warp_to_section == "PrisonerRescue") {
+			//[206] chrissstrahl - made coop compatible
+			waitthread coop_mod/replace.scr::waitForPlayer;wait 1
+			
+			$player.origin = ( -1984 -1466 -455)
+			$player.angles = (0 180 0)
+			$player.viewangles = (0 180 0)
+			$medic.stop_thinking = 1
+		}
+		else if (level.warp_to_section == "SecondModello") {
+			//[206] chrissstrahl - made coop compatible
+			waitthread coop_mod/replace.scr::waitForPlayer;wait 1
+			
+			$player.origin = ( -1984 -1466 -455)
+			$player.angles = (0 180 0)
+			$player.viewangles = (0 180 0)
+			$medic.stop_thinking = 1
+		}
+		else if (level.warp_to_section == "FinalScene" || level.warp_to_section == "FinalSceneGetaway") {
+			//[206] chrissstrahl - made coop compatible
+			waitthread coop_mod/replace.scr::waitForPlayer;wait 1
+			
+			$player.origin = ( -2088 1168 -453 )
+			$player.angles = (0 90 0)
+			$player.viewangles = (0 90 0)
+			$medic.stop_thinking = 1
+			level.num_cannons_remaining = 1
 
-		if (level.warp_to_section == "FinalSceneGetaway") {
-			$player.origin = ( -871 4102 -453 )
-			$prisoner.origin = ( -1085 4087 -453 )
+			if (level.warp_to_section == "FinalSceneGetaway") {
+				$player.origin = ( -871 4102 -453 )
+				$prisoner.origin = ( -1085 4087 -453 )
+			}
 		}
 	}
 
@@ -192,7 +226,10 @@ main: {
 //=========================================================================
 InitPlayer: {
 //=========================================================================
-	$player heal 1 //MiaCosa - this will never be executed, this function is disabled
+	//[206] chrissstrahl - make coop compatible
+	if(level.gametype == 0){
+		$player heal 1
+	}
 	waitexec global/loadout.scr
 	waitthread global/items.scr::add_item "explosive"	noprint // Show explosive inventory icon
 }end
@@ -208,10 +245,12 @@ InitFriends: {
 //=========================================================================
 PlayerUseKeyThread: {
 //=========================================================================
+	
+	//[206] chrissstrahl - I don't think this is used anywhere
+	end
+	
 	level.player_use_held = 0
 	level.player_use_just_pressed = 0
-	
-	//@chrissstrahl
 
 	while (1) {
 		local.last_use_held = level.player_use_held
@@ -334,11 +373,19 @@ InitMG42s: {
 //=========================================================================
 startsniper2: {
 //=========================================================================
+	//[207] chrissstrahl - we need a delay here if we load a save
+	if( level.coop_saveLoaded ){
+		wait 3
+	}
+	
+	
 	println "start sniper 2 trigger hit"
 	$sniper2 show
 	$sniper2 ai_on
 	//$sniper2 waitexec global/enable_ai.scr
-	$sniper2 favoriteenemy $player //@chrissstrahl
+	
+	//[206] chrissstrahl - made coop compatible
+	$sniper2 thread coop_mod/replace.scr::favoriteenemy
 }end
 
 // doWalkTo
@@ -444,4 +491,29 @@ EnableGuy: {
 //=========================================================================
 	self show
 	self ai_on
+}end
+
+//[206] chrissstrahl
+//=========================================================================
+coop_playerJustDied:{
+//=========================================================================
+	//move player that is to close to any cannon to spawn spot, so they don't get stuck
+	//the cannons rotate with the player using them turning, so this can be a issue
+	//for the user of the cannon as well as other player close by
+	for(local.i=1;local.i<4;local.i++){
+		local.cannon = $("Cannon"+local.i)
+		if(!local.cannon){ continue }
+		
+		if(vector_within self.origin local.cannon.origin 130){
+			thread coop_mod/main.scr::playerPlaceAtSpawn self
+			break
+		}
+	}
+}end
+
+//[206] chrissstrahl
+//=========================================================================
+coop_playerJustRespawned:{
+//=========================================================================
+	//obstable check moved to: coop_mod/variables.scr::levelObstacleArrays
 }end
