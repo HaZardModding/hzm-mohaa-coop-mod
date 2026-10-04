@@ -7,9 +7,11 @@
 InitCannons: {
 //=========================================================================
 	level.mgopc_help_text_only_first_time = 1
-	$Cannon1 waitthread InitACannon $Cannon1_Use $Cannon1_Throb
-	$Cannon2 waitthread InitACannon $Cannon2_Use $Cannon2_Throb
-	$Cannon3 waitthread InitACannon $Cannon3_Use $Cannon3_Throb
+	//[207] chrissstrahl - added exist checks
+	if($Cannon1){ $Cannon1 waitthread InitACannon $Cannon1_Use $Cannon1_Throb }	
+	if($Cannon2){ $Cannon2 waitthread InitACannon $Cannon2_Use $Cannon2_Throb }
+	if($Cannon3){ $Cannon3 waitthread InitACannon $Cannon3_Use $Cannon3_Throb }
+	
 }end
 
 //=========================================================================
@@ -59,7 +61,11 @@ HoldChargePlace local.turret local.vis_cannon: {
 	local.rotatedOffset[2] = vector_dot local.offset local.up
 
 	//iprintln ( "HI, I should be at " + local.rotatedOffset )
-	while ( self.exploded == 0 ) {
+
+	//[206] chrissstrahl - added check for local.turret
+	//in singleplayer this getting destroyed would kill the player and end the mission
+	//in multiplayer it will result in a script error spam
+	while ( self && self.exploded == 0 && local.turret) {
 		local.fwd  = angles_toforward local.turret.angles
 		local.left = angles_toleft local.turret.angles
 		local.up   = angles_toup local.turret.angles
@@ -208,14 +214,25 @@ PlayerMountCannon: {
 	self.usable_cannon show
 	self.turret show
 
-	self.usable_cannon unlock	//MiaCosa @chrissstrahl
+	self.usable_cannon unlock
 	self.turret unlock
-
+	
+	//[206] chrissstrahl - coop compatibility
+	local.player = $player
+	local.playerEntNum = self.flags["currentPlayer"]
+	if(level.gametype != 0 && local.playerEntNum != NIL){
+		local.tempPlayer = NULL
+		local.tempPlayer = waitthread game.main::getClient local.playerEntNum
+	}
 	self.turret setusable 1
-	self.usable_cannon douse $player	//MiaCosa @chrissstrahl
+	if(local.player){
+		self.usable_cannon douse local.player	//MiaCosa @chrissstrahl
+	}
+	
+	
 	self.turret setusable 0
 
-	self.usable_cannon lock	//MiaCosa @chrissstrahl
+	self.usable_cannon lock
 	self.turret lock
 	level.cannonInUse = self.usable_cannon.targetname
 
@@ -236,11 +253,22 @@ PlayerDismountCannon: {
 	local.angles[0] = 0
 	self.usable_cannon unlock
 	self.turret unlock
-
+	
+	//[206] chrissstrahl - coop compatibility
+	local.player = $player
+	local.playerEntNum = self.flags["currentPlayer"]
+	if(level.gametype != 0 && local.playerEntNum != NIL){
+		local.tempPlayer = NULL
+		local.tempPlayer = waitthread game.main::getClient local.playerEntNum
+	}
 	self.turret setusable 1
-	self.usable_cannon douse $player	//MiaCosa @chrissstrahl
+	if(local.player){
+		self.usable_cannon douse local.player	//MiaCosa @chrissstrahl
+	}
+
+
 	self.turret setusable 0
-	self.usable_cannon lock	//MiaCosa @chrissstrahl
+	self.usable_cannon lock
 	self.turret lock
 
 	self show
@@ -257,7 +285,12 @@ PlayerDismountCannon: {
 
 	local.player_detach_dist = 128
 	local.rel_pos = ((angles_toforward self.angles) * -local.player_detach_dist)
-	$player.origin = ( (self.origin[0] + local.rel_pos[0]) (self.origin[1] + local.rel_pos[1]) (self.origin[2] + 32) )	//MiaCosa @chrissstrahl
+	
+	//[206] chrissstrahl - coop compatibility
+	if(local.player){
+		local.player.origin = ( (self.origin[0] + local.rel_pos[0]) (self.origin[1] + local.rel_pos[1]) (self.origin[2] + 32) )
+		thread coop_mod/main.scr::playerMakeSolidAsap local.player
+	}
 }end
 
 //=========================================================================
