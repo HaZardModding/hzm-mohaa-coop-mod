@@ -1,0 +1,192 @@
+//chrissstrahl 16.09.2026
+//This is used for e3l2 to simulate a kind of savegame, preparing the level and moving spawnlocations
+//If a set in e3l2_hacks.scr or executed after maprestart on missionfailure
+//
+//These functions are executed only during level start
+
+//=========================================================================
+coop_setSave local.name:{
+//=========================================================================
+	if(level.gametype == 0){ end }
+	
+	if(local.name == NIL){
+		println("::coop_setSave - Was given no name for the save - aborted.")
+		end
+	}
+	setcvar "coop_save" local.name
+}end
+
+//=========================================================================
+coop_loadSave:{
+//=========================================================================
+	if(level.gametype == 0){ end }
+	
+	level.coop_saveLoaded = 0
+	
+	local.save = getcvar("coop_save")
+	
+	if(local.save == "PrisonerAtGunpoint"){
+		thread coop_prisonerAtGunpoint
+		
+		println("::")
+		println(":::::::::::::::::::::")
+		println("::coop_loadSave - Loaded coop_save "+local.save+".")
+		println(":::::::::::::::::::::")
+		println("::")
+	}
+
+	local.save = NIL
+	setcvar "coop_save" ""
+}end
+
+//=========================================================================
+coop_checkRemove local.ent:{
+//=========================================================================
+	if($(local.ent)){ local.ent remove }
+}end
+
+//=========================================================================
+coop_checkDelete local.ent:{
+//=========================================================================
+	if(local.ent){ local.ent delete }
+}end
+
+//=========================================================================
+coop_prisonerAtGunpoint:{
+//=========================================================================
+	level.coop_saveLoaded = 2
+	thread coop_mod/spawnlocations.scr::e3l2_update5
+	
+	//medic
+	$medic.stop_thinking = 1
+	//AirSectionStartTrigger
+	//AirSectionMidwayTrigger
+	//AirSectionLatterTrigger
+	//AirBombTrigger
+
+	
+	//Tank Pindown wounded
+	//TankPinRoomTrigger
+	//tankpindownfinishtrigger
+	//towersniper1
+	//sandbagguy
+	//wallguy
+	//BaddieSection3Trigger
+	
+	//First Prisoners
+	//MCStepOutTrigger
+	//MCAmbushTrigger
+	//MCJailPowsActiveTrigger
+	
+	//Maschingunner - church
+	//machinegunnertrigger
+	//WoundedGuy1SectionTrigger
+	//WoundedGuy1ProximityTrigger
+	
+	//cannon 1 stuff
+	//BaddieSection5Trigger
+	//
+	//
+	//
+	thread coop_checkDelete $Cannon1	
+	thread coop_checkDelete $Cannon1_Shot_Region
+	thread coop_checkDelete $Cannon1GuyA
+	thread coop_checkDelete $Cannon1GuyB
+	
+	//remove destroyable entities
+	local.tower1_exploder_trigger = NULL
+	local.tower2_exploder_trigger = NULL
+	for (local.i=1; local.i<=$explodertrigger.size; local.i++) {
+		if ($explodertrigger[local.i].set == 7) {
+			local.tower1_exploder_trigger = $explodertrigger[local.i]
+		}
+		else if ($explodertrigger[local.i].set == 9) {
+			local.tower2_exploder_trigger = $explodertrigger[local.i]
+		}
+	}
+	if(local.tower1_exploder_trigger){ local.tower1_exploder_trigger delete }
+	if(local.tower2_exploder_trigger){ local.tower2_exploder_trigger delete }
+	
+	//tank04
+	//$tank04
+	
+	//tank2
+	//$tank2Path origin ( 3421 220 -400 )
+	//$tank2 connect_paths
+	//$player_t34 connect_paths
+	
+	spawn trigger_relay targetname "tank2FireTrigger"
+	$tank2 hide
+	local.gun = $tank2 QueryTurretSlotEntity 0
+	local.gun hide
+	$tank2.gun = local.gun
+	$tank2.tankFireTrigger = $tank2FireTrigger
+	$tank2.health = 1
+	$tank2.health_set = 1
+	$tank2.tankType = panzer
+	$tank2.tankSpeed = 3
+	$tank2.tankAccel = 20
+	$tank2.tankLookAhead = 200
+	$tank2.tankPath = $tank2Path
+	$tank2.tankPathLoop = 0
+	$tank2.tankDriveDelay = 0
+	$tank2.tankEngageDelay = 0
+	$tank2.tankStunTime = 3
+	$tank2.tankGuysJumpOut = 0
+	$tank2.tankReloadTime = 4
+	level.tankDebugPrint = 0
+	$tank2 show
+	local.gun show
+	$tank2.gun maxYawOffset 85
+	$tank2 waitthread maps/e3l2/thinkTank.scr::tankGo
+	$tank2.health = 1
+	$tank2.health_set = 1
+	$tank2 removeondeath 0
+	wait 0.2
+	//$tank2 origin( 3380 220 -454 )
+	$tank2 origin( 3280 320 -454 )
+	$tank2 kill
+	$tank2 thread maps/e3l2/thinkTank.scr::tank_killed
+	$tank2 connect_paths
+
+	//$deadtruck thread maps/e3l2/cannon_section_1.scr::InitTruck
+	//$tank2 thread maps/e3l2/cannon_section_1.scr::initTank
+	//waitframe
+	//$tank2 thread maps/e3l3/scene1.scr::TruckSmoke
+	//$deadtruck thread InitTruck
+	//$OpenDoorSection lock
+	
+	//[206] chrissstrahl - made coop compatible
+	waitthread coop_mod/replace.scr::waitForPlayer
+	fadein 3.5 0 0 0 1
+	
+	//Prisoner at Gunpoint
+	thread maps/e3l2/prisoner_section_1.scr::LoadTheTruckthread
+	
+	//cornor building
+	$smalldoor1 lock
+	//CornerHouseCompTrigger0
+	//CornerHouseCompTrigger1
+	//CornerHouseCompTrigger2
+	//CornerHouseCompTrigger4
+	//CornerHouseCompFinalTrigger
+	//radioman_compass_trigger
+	//apartmentguy
+	//
+	//
+
+	//medic at start
+	$medic remove
+	$AirBombTrigger remove
+	$FirstStreetTruck1 remove
+	$RoomGuysTrigger remove
+	$MedicWarpHackTrigger remove
+	for (local.i = 1;local.i <= $AirAxis.size;local.i++){
+		$AirAxis[local.i] remove
+		//println ("Removed: AirAxis"+local.i)
+	}
+	for (local.i = 1;local.i <= $RoomGuy.size;local.i++){
+		$RoomGuy[local.i] remove
+		//println ("Removed: RoomGuy"+local.i)
+	}
+}end
