@@ -1,9 +1,13 @@
 // Medic thinkerton
 
-
-MedicInit:
-
-	$medic.destination = $player //@chrissstrahl
+MedicInit:{
+	//[206] chrissstrahl - make coop compatible
+	if(level.gametype == 0){
+		$medic.destination = $player
+	}else{
+		$medic thread coop_mod/main.scr::destination
+	}
+	
 	$medic.friendtype  = 5		//medic
 	$medic.distance    = 256		//100		//16
 	//$medic lookat $player
@@ -18,28 +22,52 @@ MedicInit:
 
 	$medic thread MedicThink
 //	$medic thread MedicMustLive
-//	$medic thread MedicPeriodicHealingThread
+	//[206] chrissstrahl - enable for coop
+	if(level.gametype != 0){
+		$medic thread MedicPeriodicHealingThread
+	}
 
 	level.medic_safe = 0
+}end
 
-	end
 
-
-MedicThink:
-
+MedicThink:{
 	thread MedicThinkStart
 	local.thread = parm.previousthread
 	self waittill death
-	if (local.thread)
+	if (local.thread){
 		local.thread delete
+	}
+}end
 
-	end
 
-
+//[206] chrissstrahl - function documentation
+//Medic goes to heal the player if the player is within 480 units of the medic.
+//- case 101: T1) evaluating "dangerous destination", if there is a cover spot within medic leash of player,
+//				  go to D4 state, otherwise, go to D3 state
+//- case 102: T2) animating crouch, near player - when done with anim, go to D1 state
+//- case 103: T3) animating crouch, near cover, when done with anim, go to D2 state
+//- case 104: T4) animating stand-up, near player, when done with anim, go to S1 state
+//- case 201: D1) crouching near player, if Danger is deactivated, go to T4 state
+//				  if player is outside of medic leash, go to T1 state
+//- case 202: D2) crouching at cover point, if Danger is deactivated, go to T5 state
+//				  if player is outside of medic leash, go to T1 state
+//- case 203: D3) running to player, in danger, if Danger is deactivated, go to S2 state
+//				  if within stop range of player, go to T2 state
+//- case 204: D4) running to cover, if Danger is deactivated, go to S2 state
+//				  if within crouch range of cover, go to T3 state
+//				  if cover dest is too far from player, goto T1 state
+//- case 301: S1) standing near player, if Danger is activated, go to T1 state
+//				  if player is outside of medic leash, start running to player and go to S2 state
+//- case 302: S2) running to player, no danger, if Danger is activated, go to T1 state
+//				  if within stop range of player, go to S1 state
+//- case 501: M1) going to forced huddle point
+//- case 502: M2) holding at forced huddle point
+//- case 901: X1) destination pathing is failing, Diagnostic / Error states, sets state for 301
 MedicThinkStart:
 
 	if (level.frienddebug == NIL)
-	println (self + " did friendlythink")
+		println (self + " did friendlythink")
 
 		level.entref++
 		self.entref = "friendly" + level.entref
@@ -66,7 +94,12 @@ MedicThinkStart:
 		if (self.distance == NIL)
 			self.distance = 250
 
-		self.destination = $player //@chrissstrahl
+		//[206] chrissstrahl - make coop compatible
+		if(level.gametype == 0){
+			$medic.destination = $player
+		}else{
+			$medic.destination = level.coop_player
+		}
 
 		if (getcvar(debug) == "1")
 			println ("destination is " + self.destination + " and friendtype is " + self.friendtype)
@@ -108,7 +141,12 @@ MedicThinkStart:
 //	self.health = 5000
 //	self ammo_grenade 4
 
-		self.lastdestination = $player // was -1 //@chrissstrahl
+		//[206] chrissstrahl - make coop compatible
+		if(level.gametype == 0){
+			self.lastdestination = $player // was -1
+		}else{
+			$medic.lastdestination = level.coop_player
+		}
 
 		local.standtime = level.time
 		local.runtime = level.time
@@ -146,6 +184,10 @@ println "**** MEDIC STARTING THINK"
 
 			//if (self.wounded_to_heal != NULL)
 			//iprintlnbold "WANTING TO HEAL THE SUCKER"
+			
+			//[206] chrissstrahl - make coop compatible - wait for any player to join
+			while(!$player || !level.coop_player){ wait 1 }
+			
 
 			if ((self.wounded_to_heal != NULL) && 
 				((vector_within self.origin self.wounded_to_heal.origin 480) ||
@@ -223,6 +265,9 @@ println "**** MEDIC STARTING THINK"
 					local.nearest_distance = 100000
 
 					//println "Medic looking for nearest cover point"
+					
+					//[206] chrissstrahl - make coop compatible - wait for any player to join
+					while(!$player || !level.coop_player){ wait 1 }
 
 					for (local.i=1; local.i<=$MedicCoverPoint.size; local.i++)
 					{
@@ -242,6 +287,9 @@ println "**** MEDIC STARTING THINK"
 						self waittill animdone
 						self.crouching = 0
 					}
+					
+					//[206] chrissstrahl - make coop compatible - wait for any player to join
+					while(!$player || !level.coop_player){ wait 1 }
 
 					if (local.nearest_index == -1)
 					{
@@ -313,6 +361,9 @@ println "**** MEDIC STARTING THINK"
 				case 201:
 					// if Danger is deactivated, go to T4 state
 					// if player is outside of medic leash, go to T1 state
+					
+					//[206] chrissstrahl - make coop compatible - wait for any player to join
+					while(!$player || !level.coop_player){ wait 1 }
 
 					self.crouching = 1
 					if (level.dangerousness <= 0)
@@ -327,6 +378,9 @@ println "**** MEDIC STARTING THINK"
 				case 202:
 					// if Danger is deactivated, go to T5 state
 					// if player is outside of medic leash, go to T1 state
+					
+					//[206] chrissstrahl - make coop compatible - wait for any player to join
+					while(!$player || !level.coop_player){ wait 1 }
 
 					self.crouching = 1
 					if (level.dangerousness <= 0)
@@ -357,6 +411,9 @@ println "**** MEDIC STARTING THINK"
 					// if Danger is deactivated, go to S2 state
 					// if within crouch range of cover, go to T3 state
 					// if cover dest is too far from player, goto T1 state
+					
+					//[206] chrissstrahl - make coop compatible - wait for any player to join
+					while(!$player || !level.coop_player){ wait 1 }
 
 					self.crouching = 0
 					if (level.dangerousness <= 0)
@@ -381,6 +438,9 @@ println "**** MEDIC STARTING THINK"
 				case 301:
 					// if Danger is activated, go to T1 state
 					// if player is outside of medic leash, start running to player and go to S2 state
+					
+					//[206] chrissstrahl - make coop compatible - wait for any player to join
+					while(!$player || !level.coop_player){ wait 1 }
 
 					self.crouching = 0
 					if (level.dangerousness > 0)
@@ -579,7 +639,7 @@ MedicPeriodicHealingThread:
 			(self.wounded_to_heal == NULL) &&
 			(self.stop_thinking == 0))
 		{
-			self waitthread MedicImpromptuHeal $player  //@chrissstrahl
+			self waitthread MedicImpromptuHeal $player //[206] chrissstrahl - leave this! The Array is handled in function
 			self waitthread MedicHealThyself
 		}
 		//else
@@ -591,12 +651,22 @@ end
 
 
 MedicImpromptuHeal local.ent:
+	
+	//[206] chrissstrahl - make coop compatible - this function will only handle $player
+	for (local.i = 1;local.i <= local.ent.size;local.i++){
+		local.player = $player[local.i]
+		
+		//[206] chrissstrahl - made coop compatible
+		if(!isAlive local.player){ continue }
+		if(level.gametype != 0 && local.player.isSpectator ){ continue }
+		
+		//[206] chrissstrahl - made coop compatible
+		//local.health = (local.player.health * 100) / local.player.maxhealth
+		local.playerMaxHealth = waitthread coop_mod/main.scr::playerHealthMaxActual
+		local.health = local.player.health
+		local.healthMedicLevel = ((local.playerMaxHealth / 100) * 65)
 
-	if (isalive local.ent)
-	{
-		local.health = (local.ent.health * 100) / local.ent.maxhealth
-
-		if (local.health < 65)		//level.medicmin)
+		if (local.health < local.healthMedicLevel)		//level.medicmin)
 		{
 			self.no_idle = 0
 
@@ -607,28 +677,31 @@ MedicImpromptuHeal local.ent:
 			}
 
 			self.movedoneradius = 150		//100
-			self runto local.ent
+			self runto local.player
 			self waittill movedone
 
 			//self exec global/stand.scr
-
-			if (isalive local.ent)
+			
+			//[206] chrissstrahl - made coop compatible
+			if(level.gametype == 0 && isAlive local.player || isAlive local.player && !local.player.isSpectator)
 			{
-				if (vector_within self.origin local.ent.origin 190)		//140)
+				if (vector_within self.origin local.player.origin 190)		//140)
 				//local.vec = vector_length (self.origin - local.ent.origin)
 				//if (local.vec < 140)
 				{
 					//self nodamage
 					self.avoidplayer = 0
 //					self.no_idle = 1
-					self turnto local.ent
+					self turnto local.player
 					self waittill turndone
 					self upperanim pass_canteen_start
 					self waittill upperanimdone
 
-					local.ent heal 0.5
-					self playsound med_canteen
-					//self playsound med_kit
+					if(level.gametype == 0 && isAlive local.player || isAlive local.player && !local.player.isSpectator){
+						local.player heal 0.5
+						self playsound med_canteen
+						//self playsound med_kit
+					}
 
 					self upperanim pass_canteen_end
 					self waittill upperanimdone
