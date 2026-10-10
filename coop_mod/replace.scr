@@ -7,7 +7,6 @@
 //	level waittill spawn					waitthread coop_mod/replace.scr::waitTillSpawn
 //	level waittill spawn					waitthread coop_mod/replace.scr::waitForPlayer - PLAYER SPAWNING IN TEAM
 //	level waittill prespawn					waitthread coop_mod/replace.scr::waitTillPrespawn
-//	$player.origin							local.vecOriginPlayerMultiplayer = exec coop_mod/replace.scr::player_origin
 //	$ent cansee $player 3500				( exec coop_mod/replace.scr::player_anyCanBeSeen $ent 3500 ) == TRUE
 //	local.player = $player[local.random]	local.player = exec coop_mod/replace.scr::player_random
 
@@ -329,9 +328,8 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 //if origin is set that will be used instead of object
 //if object and origin are not set any player will be returned
 //=========================================================================
-player_closestTo local.object local.origin:{
+player_closestTo local.object local.origin local.minDisPreferred:{
 //=========================================================================
-if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread replace/player_closestTo->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
 	//SINGLEPLAYER////////////////////////////
 	if( level.gametype == 0 ){ end $player }
 
@@ -343,38 +341,63 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 	local.currentDistance = 999999
 	local.closestDistance = 999999
 
-	if( local.origin != NIL ){
+	//error out
+	if(local.origin == NIL && local.object == NIL){
+		error ( "replace.scr::player_closest - parameter 1 and 2 was NIL" ) 1000
+		end NULL
+	}
+	
+	//using origin instead of entity
+	if(local.origin != NIL){
 		local.objectOrigin = local.origin
 	}
-	else if( local.object == NULL || local.object == NIL){
-		//iprintlnbold_noloc("player_closestTo NIL/NULL")
-		local.playerReturn = exec coop_mod/replace.scr::player_anyValid
-	}
+	//when using entity but it could not be found
 	else{
-		//[206] chrissstrahl - allow to handle enity array
-		if(local.objectOrigin.size > 1){
-			local.objectOrigin = local.objectOrigin[1]
+		//no clue what to do other than grabbing a random player
+		if(local.object == NULL){
+			end local.playerReturn = exec coop_mod/replace.scr::player_anyValid
 		}
-	
-		//iprintlnbold_noloc("player_closestTo " + local.object.targetname )
+		//handle entity array
+		if(local.object.size > 1){
+			println("### WARNING ### replace.scr::player_closestTo - parameter 1 was array, grabing [1] might cause unforeseen consequences")
+			local.object = local.object[1]
+		}
 		local.objectOrigin = local.object.origin
-	}
+	}	
+	
+	//[207] chrissstrahl - added support for not preferred but valid player - Example: Multiple players and one to close to Tank
+	local.notPreferredButValidPlayer = NULL
+	local.notPreferredButValidMaxDist = 0
+	local.notPreferredButValidLastBestDist = 99999
+	
 	for (local.i = 1;local.i <= $player.size;local.i++){
 		local.player = $player[local.i]
 		//[203] chrissstrahl - ignoring now players that are in noclip
 		//[206] chrissstrahl - Fixed: returning spectators when sv_team_spawn_interval is set and player wants to respawn added .isSpectator check
-		if( isAlive local.player &&
-			!local.player.isSpectator &&
-			local.player.dmteam != "spectator" &&
-			local.player.flags["coop_isActive"] == 1 &&
-			local.player.flags["coopDevNoclip"] == NIL){
-			//[202] chrissstrahl - upgraded to calculate distance only once
+		//[207] chrissstrahl - using now isPlayerActive to standardise the way how to check for active players
+		//[207] chrissstrahl - allowing now to check also for minumum distance required to object
+		if( waitthread game.main::isPlayerActive local.player && local.player.flags["coopDevNoclip"] == NIL){
 			local.currentDistance =  vector_length( local.player.origin - local.objectOrigin )
+			
+			//check both so we have a fallback
+			//minimum distance required check
+			if(local.minDisPreferred){
+				if(local.currentDistance > local.minDisPreferred && local.notPreferredButValidLastBestDist > local.currentDistance){
+					local.notPreferredButValidPlayer		= local.player
+					local.notPreferredButValidLastBestDist	= local.currentDistance
+				}
+			}
+			//normal closest check			
 			if(local.currentDistance < local.closestDistance ){
 				local.playerReturn		= local.player
 				local.closestDistance	= local.currentDistance
 			}
 		}
+	}
+	
+	//[207] chrissstrahl - added support for not preferred but valid player - Example: Multiple players and one to close to Tank
+	if(local.notPreferredButValidPlayer){
+		local.playerReturn = local.notPreferredButValidPlayer
 	}
 }end local.playerReturn
 
@@ -468,14 +491,6 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 		local.playerReturn = waitthread player_closestTo local.object
 	}
 }end local.playerReturn
-
-//=========================================================================
-player_origin:{
-//=========================================================================
-	while(1){
-		println("player_origin - outdated func used, crashed game on purpose");
-	}
-}end local.playerOrigin
 
 //=========================================================================
 waittill_spawn:{
@@ -2927,3 +2942,40 @@ triggerActorSpawnflags local.targetname local.spawnflags:{
 		}
 	}
 }end
+
+//[207] chrissstrahl - this should make using setAimTarget much easier
+//Optional:
+//Parm 2 - Become current enemy - NIL/1
+//Parm 3 - min Distance a player would be prefered at (Example: for Tanks)  - NIL/integer
+//============================================================
+setAimTarget local.target local.becomeCurrentEnemy local.minDisPreferred:{
+//============================================================
+	if(local.target == NIL){
+		error ( "replace.scr::setAimTarget - parameter 1 was NIL" ) 1000
+		end NULL
+	}
+	
+	local.targetNew = local.target
+	
+	//Handle player and other
+	if(local.target != NULL){
+		//handle player
+		if(waitthread isPlayerObject local.target){
+			local.targetNew = waitthread player_closestTo self NIL local.minDisPreferred
+		}
+		//handle other array
+		else if(local.target.size > 1){
+			local.targetNew = local.target[1]
+		}
+	}
+	//Handle NULL
+	else{
+		local.becomeCurrentEnemy = 0
+	}
+	
+	if(local.becomeCurrentEnemy){
+		self setAimTarget local.targetNew 1
+	}else{
+		self setAimTarget local.targetNew
+	}
+}end local.targetNew
