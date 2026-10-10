@@ -98,7 +98,10 @@ CannonFire local.targ_name local.targ_closest_to_player: {
 		// pick an origin based on the passed-in set name
 		if ($(local.targ_name).size > 1) {
 			if (local.targ_closest_to_player) {
-				local.nearest = waitexec global/FindNearestEntity.scr $player.origin local.targ_name	//MiaCosa @chrissstrahl
+				//[207] chrissstrahl - coop compatibility
+				local.player = local.targetNew = waitthread coop_mod/replace.scr::player_closestTo $(local.targ_name)
+				if(!local.player){ local.player = $world }
+				local.nearest = waitexec global/FindNearestEntity.scr local.player.origin local.targ_name
 				
 				local.dest = local.nearest.origin
 			}
@@ -255,11 +258,16 @@ PlayerDismountCannon: {
 	self.turret unlock
 	
 	//[206] chrissstrahl - coop compatibility
-	local.player = $player
-	local.playerEntNum = self.flags["currentPlayer"]
-	if(level.gametype != 0 && local.playerEntNum != NIL){
-		local.tempPlayer = NULL
-		local.tempPlayer = waitthread game.main::getClient local.playerEntNum
+	if(level.gametype == 0){
+		local.player = $player
+	}else{	
+		local.playerEntNum = self.flags["currentPlayer"]
+		if( && local.playerEntNum != NIL){
+			local.tempPlayer = waitthread game.main::getClient local.playerEntNum
+			if(local.tempPlayer){
+				local.player = local.tempPlayer
+			}
+		}
 	}
 	self.turret setusable 1
 	if(local.player){
