@@ -131,7 +131,8 @@ DoSection: {
 
 	// wait for the player to blow the door
 	level.blowDoorTrigger waittill trigger
-	if (level.warp_to_section == "FinalSceneGetaway") {
+	//[207] chrissstrahl - make coop save compatible
+	if (level.warp_to_section == "FinalSceneGetaway" || !$prisoner) {
 		waitthread global/ManSpawnNamed.scr::Spawn "prisoner"
 	}
 
@@ -142,8 +143,22 @@ DoSection: {
 	// wait for the player to go up the stairs
 	$finalScenePOWTrigger2 waittill trigger
 
+	//DEVELOMENT TEST
+	//DEVELOMENT TEST
+	//DEVELOMENT TEST
+	//DEVELOMENT TEST
+	//DEVELOMENT TEST
+	//DEVELOMENT TEST
+	if(getCvar("username") == "Chrissstrahl"){
+		goto DoSection_skipEnemySpawn
+	}
+	
 	// spawn first set of enemy attackers
 	waitthread global/ai.scr::spawnset 2051 spawn2051
+	
+	//[207] chrissstrahl - dev skip
+	DoSection_skipEnemySpawn:
+	
 	waitthread rollTruck1
 	// waitthread global/ObjMgr.scr::SetObjDesc "protectPOWs" "Cover Allied Prisoners' Escape"
 	waitthread global/ObjMgr.scr::SetObjCompassTarg "protectPOWs" $Truck1 1
@@ -364,6 +379,16 @@ exitStageLeft: {
 	}
 
 	self threatbias 0
+	
+	//DEVELOMENT TEST
+	//DEVELOMENT TEST
+	//DEVELOMENT TEST
+	//DEVELOMENT TEST
+	//DEVELOMENT TEST
+	//DEVELOMENT TEST
+	if(getCvar("username") == "Chrissstrahl"){
+		goto exitStageLeft_skipEnemySpawn
+	}
 
 	// spawn my own wave of enemies
 	switch (self.powNo) {
@@ -378,6 +403,9 @@ exitStageLeft: {
 			waitthread global/ai.scr::spawnset 2053 spawn2053
 			break
 	}
+	
+	//[207] chrissstrahl - dev skip
+	exitStageLeft_skipEnemySpawn:
 
 	// say my line, if I have one
 	if (self.powNo == 1) {
@@ -438,6 +466,18 @@ exitStageLeft: {
 //=========================================================================
 powDontDie: {
 //=========================================================================
+	//DEVELOMENT TEST
+	//DEVELOMENT TEST
+	//DEVELOMENT TEST
+	//DEVELOMENT TEST
+	//DEVELOMENT TEST
+	//DEVELOMENT TEST
+	if(getCvar("username") == "Chrissstrahl"){
+		local.fake = 1
+		self health 99999
+		self nodamage
+	}
+
 	self waittill death
 	level.fs_a_pow_died = 1
 
@@ -453,6 +493,9 @@ powDontDie: {
 
 	//missionfailed 	//MiaCosa
 	exec coop_mod/replace.scr::missionfailed
+	
+	//[207] Chrissstrahl
+	setcvar "coop_save" "FinalScene"
 }end
 
 // rollTruck1
@@ -596,18 +639,36 @@ truckTriggerTimer: {
 //=========================================================================
 theGrandGetaway: {
 //=========================================================================
-	// wait for player to get in the truck
-	waitthread detectPlayerUseTruck
+	//[207] chrissstrahl - Made multiplayer compatible
+	/*if(level.gametype == 0){
+		// wait for player to get in the truck
+		waitthread detectPlayerUseTruck
+	}else{*/
+		while(!waitexec coop_mod/replace.scr::withinDistanceOf $Truck1 250){
+			waitframe
+		}
+	/*}*/
+
 	waitthread global/ObjMgr.scr::CompleteObj "escape"
 
+	//$player notsolid //chrissstrahl
+	
+	//[207] chrissstrahl - glue players to Truck for end sequence
+	//$Truck1 AttachPassengerSlot 4 $player //chrissstrahl
+	wait 1
+	local.playerSeatPos = $Truck1.origin
+	local.playerSeatPos += ( 70 5 18 )
+	spawn script_origin origin local.playerSeatPos targetname playerTruckSeat
+	waitframe
+	$playerTruckSeat bind $Truck1
+	exec coop_mod/replace.scr::glue $playerTruckSeat 16 1 //chrissstrahl
+	
+	//[207] chrissstrahl - make sure the truck does not jump over crates
+	removeclass "CrateObject"
+	
 	// stick the player in the truck
 	//$player physics_off 	//MiaCosa
-	exec coop_mod/replace.scr::physics_off 	//MiaCosa
-	
-//$player notsolid //chrissstrahl
-	
-	//$Truck1 AttachPassengerSlot 4 $player //chrissstrahl
-	exec coop_mod/replace.scr::glue $Truck1 $Truck1.angles 1 //chrissstrahl
+	exec coop_mod/replace.scr::physics_off 	//MiaCosa	
 	
 	// spawn script_object targetname "toGlue"
 	// $toGlue attach $Truck1 origin 0 ( -25 -60 25 )
@@ -623,7 +684,11 @@ theGrandGetaway: {
 	$Truck1 drive $Truck1Escape 300 150 200 200 
 	$tank4 thread rollTank4
 	$Truck1 waittill drive
-	exec global/missioncomplete.scr e3l3 1
+	
+	
+	//[207] chrissstrahl
+	//exec global/missioncomplete.scr e3l3 1
+	exec global/missioncomplete.scr m1l1 1
 }end
 
 // maintainAngles

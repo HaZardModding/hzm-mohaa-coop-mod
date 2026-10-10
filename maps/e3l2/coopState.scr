@@ -33,6 +33,14 @@ coop_loadSave:{
 		println("::coop_loadSave - Loaded coop_save "+local.save+".")
 		println(":::::::::::::::::::::")
 		println("::")
+	}else if(local.save == "FinalScene"){
+		thread coop_FinalScene
+		
+		println("::")
+		println(":::::::::::::::::::::")
+		println("::coop_loadSave - Loaded coop_save "+local.save+".")
+		println(":::::::::::::::::::::")
+		println("::")
 	}
 
 	local.save = NIL
@@ -56,14 +64,6 @@ coop_prisonerAtGunpoint:{
 //=========================================================================
 	level.coop_saveLoaded = 2
 	thread coop_mod/spawnlocations.scr::e3l2_update5
-	
-	//medic
-	$medic.stop_thinking = 1
-	//AirSectionStartTrigger
-	//AirSectionMidwayTrigger
-	//AirSectionLatterTrigger
-	//AirBombTrigger
-
 	
 	//Tank Pindown wounded
 	//TankPinRoomTrigger
@@ -189,4 +189,82 @@ coop_prisonerAtGunpoint:{
 		$RoomGuy[local.i] remove
 		//println ("Removed: RoomGuy"+local.i)
 	}
+	
+	//medic
+	wait 5
+	$medic.stop_thinking = 1
+	wait 1
+	$medic remove
+	//AirSectionStartTrigger
+	//AirSectionMidwayTrigger
+	//AirSectionLatterTrigger
+	//AirBombTrigger
+}end
+
+//=========================================================================
+coop_FinalScene:{
+//=========================================================================
+	level.coop_saveLoaded = 3
+	
+	thread coop_mod/spawnlocations.scr::e3l2_update8
+	
+	//remove unused shit, we will not reach these locations anymore
+	thread coop_checkDelete $Cannon1	
+	thread coop_checkDelete $Cannon1_Shot_Region
+	thread coop_checkDelete $Cannon1GuyA
+	thread coop_checkDelete $Cannon1GuyB
+	local.tower1_exploder_trigger = NULL
+	local.tower2_exploder_trigger = NULL
+	for (local.i=1; local.i<=$explodertrigger.size; local.i++) {
+		if ($explodertrigger[local.i].set == 7) {
+			local.tower1_exploder_trigger = $explodertrigger[local.i]
+		}
+		else if ($explodertrigger[local.i].set == 9) {
+			local.tower2_exploder_trigger = $explodertrigger[local.i]
+		}
+	}
+	if(local.tower1_exploder_trigger){ local.tower1_exploder_trigger delete }
+	if(local.tower2_exploder_trigger){ local.tower2_exploder_trigger delete }
+	$smalldoor1 lock
+	//medic at start
+	$medic remove
+	$AirBombTrigger remove
+	$FirstStreetTruck1 remove
+	$RoomGuysTrigger remove
+	$MedicWarpHackTrigger remove
+	for (local.i = 1;local.i <= $AirAxis.size;local.i++){
+		$AirAxis[local.i] remove
+		//println ("Removed: AirAxis"+local.i)
+	}
+	for (local.i = 1;local.i <= $RoomGuy.size;local.i++){
+		$RoomGuy[local.i] remove
+		//println ("Removed: RoomGuy"+local.i)
+	}
+	
+	$tank2 remove
+	$tank5 remove
+	waitthread coop_mod/butler.scr::removePath $tank2Path2
+	waitthread coop_mod/butler.scr::removePath $tank5Path3
+
+	//block the way back
+	
+	//thread coop_mod/replace.scr::spawnclip "-3026 0 -446" ( -10 -1000 -100 )  ( 100 1000 1200 ) "noTargetNameForYou" 1.5 90 "No way back for you!" NIL NIL
+	thread coop_mod/replace.scr::spawnclip "-3130 0 -456" ( -10 -1000 -100 )  ( 80 1000 2000 ) "noTargetNameForYou" 1.2 90 "No way back for you!" NIL NIL
+	thread coop_mod/replace.scr::spawnclip "-2900 0 -456" ( -10 -1000 -100 )  ( 80 1000 2000 ) "noTargetNameForYou" 1.2 90 "No way back for you!" NIL NIL
+	
+	waitthread coop_mod/replace.scr::waitForPlayer
+	fadein 3.5 0 0 0 1
+	
+	wait 5
+	
+	//just one cannon to destroy
+	level.num_cannons_remaining = 1
+
+	//objectives
+	waitthread global/ObjMgr.scr::RevealObj "findPOWs"
+	waitthread global/ObjMgr.scr::RevealObj "killModellos"
+	waitthread global/ObjMgr.scr::CompleteObj "killModellos" 1
+	waitthread global/ObjMgr.scr::CompleteObj "killModellos" 2
+	waitthread global/ObjMgr.scr::SetObjCompassTarg "findPOWs" $finalScenePOWSpawner[1]
+	waitthread global/ObjMgr.scr::SetCurrObj "findPOWs"
 }end
