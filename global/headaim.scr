@@ -4,34 +4,57 @@
 //2018.07.24
 
 // specify a target entity (must have a head), a range of variance, and an offset (ie can't aim any closer than this offset)
+//Fixed with ChatGTP
 //======================================================
 main local.targetEnt local.range local.offset:{
 //======================================================
-	//[200] chrissstrahl - fixed usage of deprecated var
-	//[200] chrissstrahl - fixed logic
-	if( level.gametype != 0 ){
-		if( exec coop_mod/replace.scr::isPlayerArray local.targetEnt ){
+	if(!local.targetEnt){ end }
+	if(!(isalive self)){ end }
+
+	//0=NIL/NULL, 1=string, 2=entity, 3=vector,
+	//4=int/float, 5=entityarray
+	local.varType = waitthread game.main::returnVarType local.targetEnt NIL "global/headaim.scr::main"
+
+	//resolve targetname and determine resulting type
+	if(local.varType == 1){
+		local.targetEnt = $(local.targetEnt)
+		if(!local.targetEnt){ end }
+
+		local.varType = waitthread game.main::returnVarType local.targetEnt NIL "global/headaim.scr::main"
+	}
+
+	//handle player array before accepting a single entity
+	if(level.gametype != 0 && waitthread coop_mod/replace.scr::isPlayerArray local.targetEnt){
+		local.targetEnt = exec coop_mod/replace.scr::player_closestTo self
+
+		while(local.targetEnt == NULL){
+			waitframe
+			if(!(isalive self)){ end }
+
 			local.targetEnt = exec coop_mod/replace.scr::player_closestTo self
-			while( local.targetEnt == NULL){
-				if( self == NULL ){ end }
-				local.targetEnt = exec coop_mod/replace.scr::player_closestTo self
-				waitframe
-			}	
 		}
 	}
-	
-	//[203] chrissstrahl - fixed check
-	if( !local.targetEnt || !$(local.targetEnt) || !(isalive self) ){ end }
-	
-	local.a = $(local.targetEnt) gettagposition "bip01 head"
+	else if(local.varType == 5){
+		local.targetEnt = local.targetEnt[1]
+	}
+	else if(local.varType != 2){
+		error ( "global/headaim.scr::main - unknown varType - please fix: "+self.targetname ) 1000
+		end
+	}
 
-	for (local.i=0;local.i<3;local.i++){
-		if (randomint(100) > 50){
+	if(!local.targetEnt){ end }
+	if(!(isalive self)){ end }
+
+	local.a = local.targetEnt gettagposition "bip01 head"
+
+	for(local.i=0;local.i<3;local.i++){
+		if(randomint(100) > 50){
 			local.a[local.i] = local.a[local.i] + randomint(local.range) + local.offset
 		}
 		else{
 			local.a[local.i] = local.a[local.i] - randomint(local.range) - local.offset
 		}
 	}
+
 	self exec global/aimat.scr local.a
 }end
