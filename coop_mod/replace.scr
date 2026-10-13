@@ -143,13 +143,7 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 //=========================================================================
 isPlayerObject local.object:{
 //=========================================================================
-if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread replace/isPlayerObject->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
-	//HIRACY:
-	//1. ENTITY CHECK
-	//2. VECTOR CHECK -> CHAR>1 STRING CHECK -> INT/FLOAT CHECK -> DEFAULT TO STRING
-	//3. DEFAULT TO STRING
-	//4. NO MATCHING TYPE (-1 could not detect type)
-	local.varType = thread coop_mod/main.scr::returnVarType local.ent game.true "isPlayerObject"
+	local.varType = thread coop_mod/main.scr::returnVarType local.ent "isPlayerObject"
 	
 	if(local.varType == 2 && local.object.entnum < level.coop_svmaxclients){ end 1 }
 	if(local.varType == 5 && waitthread isPlayerArray local.object){ end 1 }
@@ -164,7 +158,6 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 //=========================================================================
 isPlayerArray local.entity:{
 //=========================================================================
-if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread replace/isPlayerArray->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
 	//level.coop_singleplayer reads cvar g_gametype value upon level start once
 	//level.coop_svmaxclients reads cvar sv_maxclients value upon level start once
 
@@ -334,8 +327,7 @@ player_closestTo local.object local.origin local.minDisPreferred:{
 	if( level.gametype == 0 ){ end $player }
 
 	//MULTIPLAYER////////////////////////////
-//this accepts eigther of both paramaters (enity, vector)
-//this function is just a quick fix, this needs adjustment
+	//this accepts eigther of both paramaters (enity, vector)
 	local.objectOrigin = ( 0 0 0 )
 	local.playerReturn = NULL
 	local.currentDistance = 999999
@@ -343,7 +335,7 @@ player_closestTo local.object local.origin local.minDisPreferred:{
 
 	//error out
 	if(local.origin == NIL && local.object == NIL){
-		error ( "replace.scr::player_closest - parameter 1 and 2 was NIL" ) 1000
+		//error ( "replace.scr::player_closest - parameter 1 and 2 was NIL" ) 1000
 		end NULL
 	}
 	
@@ -355,39 +347,53 @@ player_closestTo local.object local.origin local.minDisPreferred:{
 	else{
 		//no clue what to do other than grabbing a random player
 		if(local.object == NULL){
-			end local.playerReturn = exec coop_mod/replace.scr::player_anyValid
+			local.playerReturn = thread coop_mod/replace.scr::player_anyValid
+			end local.playerReturn
 		}
 		//handle entity array
 		if(local.object.size > 1){
-			println("### WARNING ### replace.scr::player_closestTo - parameter 1 was array, grabing [1] might cause unforeseen consequences")
+			//println("### WARNING ### replace.scr::player_closestTo - parameter 1 was array, grabing [1] might cause unforseen consequences")
 			local.object = local.object[1]
 		}
 		local.objectOrigin = local.object.origin
 	}	
 	
 	//[207] chrissstrahl - added support for not preferred but valid player - Example: Multiple players and one to close to Tank
-	local.notPreferredButValidPlayer = NULL
-	local.notPreferredButValidMaxDist = 0
-	local.notPreferredButValidLastBestDist = 99999
+	local.playerClosestZone = NULL
+	local.playerClosestSpec = NULL
+	local.playerClosestZoneLastBestDist = 99999
+	local.playerClosestSpecLastBestDist = 99999
 	
 	for (local.i = 1;local.i <= $player.size;local.i++){
 		local.player = $player[local.i]
 		//[203] chrissstrahl - ignoring now players that are in noclip
 		//[206] chrissstrahl - Fixed: returning spectators when sv_team_spawn_interval is set and player wants to respawn added .isSpectator check
 		//[207] chrissstrahl - using now isPlayerActive to standardise the way how to check for active players
-		//[207] chrissstrahl - allowing now to check also for minumum distance required to object
-		if( waitthread game.main::isPlayerActive local.player && local.player.flags["coopDevNoclip"] == NIL){
+		//[207] chrissstrahl - allowing now to check also for minimum distance required to object
+		if(local.player){
 			local.currentDistance =  vector_length( local.player.origin - local.objectOrigin )
+		
+			//spectator, dead or otherwhise not a primary target - ignore mindist ZONE
+			if(local.player.isSpectator || local.player.flags["coopDevNoclip"] != NIL || !(thread game.main::isPlayerAlive local.player)){
+				if(local.playerClosestSpecLastBestDist > local.currentDistance){
+					local.playerClosestSpec = local.player
+					local.playerClosestSpecLastBestDist = local.currentDistance
+				}
+				continue
+			}
 			
-			//check both so we have a fallback
-			//minimum distance required check
+			//player inside the mindistance zone
 			if(local.minDisPreferred){
-				if(local.currentDistance > local.minDisPreferred && local.notPreferredButValidLastBestDist > local.currentDistance){
-					local.notPreferredButValidPlayer		= local.player
-					local.notPreferredButValidLastBestDist	= local.currentDistance
+				if(local.currentDistance < local.minDisPreferred){
+					if(local.playerClosestZoneLastBestDist > local.currentDistance){
+						local.playerClosestZone = local.player
+						local.playerClosestZoneLastBestDist = local.currentDistance
+					}
+					continue
 				}
 			}
-			//normal closest check			
+			
+			//normal closest check
 			if(local.currentDistance < local.closestDistance ){
 				local.playerReturn		= local.player
 				local.closestDistance	= local.currentDistance
@@ -395,9 +401,17 @@ player_closestTo local.object local.origin local.minDisPreferred:{
 		}
 	}
 	
-	//[207] chrissstrahl - added support for not preferred but valid player - Example: Multiple players and one to close to Tank
-	if(local.notPreferredButValidPlayer){
-		local.playerReturn = local.notPreferredButValidPlayer
+	//no valid alive player in correct distance, use closest player
+	if(!local.playerReturn){
+		local.playerReturn = local.playerClosestZone
+	}
+	//no alive closest player - use spec/dead/noclip
+	if(!local.playerReturn){
+		local.playerReturn = local.playerClosestSpec
+	}
+	//no player at all
+	if(!local.playerReturn){
+		local.playerReturn = NULL
 	}
 }end local.playerReturn
 
@@ -405,7 +419,6 @@ player_closestTo local.object local.origin local.minDisPreferred:{
 //=========================================================================
 player_closestTargetable local.object:{
 //=========================================================================
-if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread replace/player_closestTargetable->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
 	//SINGLEPLAYER////////////////////////////
 	if( level.gametype == 0 ){ end $player }
 
@@ -427,7 +440,7 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 	for (local.i = 1;local.i <= $player.size;local.i++){
 		local.player = $player[local.i]
 		//[203] chrissstrahl - ignoring now players that are in noclip
-		if( local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 && local.player.flags["coopDevNoclip"] == NIL){
+		if(!(local.player.isSpectator) || local.player.flags["coopDevNoclip"] == NIL || (thread game.main::isPlayerAlive local.player)){
 			if(local.player canseenoents local.object){
 				if( vector_length( local.player.origin - local.objectOrigin ) < local.closestDistance ){
 					local.playerReturn		= local.player
@@ -439,7 +452,7 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 	
 	//[204] chrissstrahl - no valid player found return any closest player - give it to the dedicated func
 	if(local.playerReturn == NULL){
-		local.playerReturn = waitthread player_closestTo local.object
+		local.playerReturn = thread player_closestTo local.object
 	}
 }end local.playerReturn
 
@@ -447,7 +460,6 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 //=========================================================================
 player_closestInFront local.object:{
 //=========================================================================
-if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread replace/player_closestInFront->"+level.cMTE+"" )} //[204] chrissstrahl - this is to debug the coop mod thread handling
 	//SINGLEPLAYER////////////////////////////
 	if( level.gametype == 0 ){ end $player }
 
@@ -474,7 +486,7 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 	for (local.i = 1;local.i <= $player.size;local.i++){
 		local.player = $player[local.i]
 		//[203] chrissstrahl - ignoring now players that are in noclip
-		if( local.player.health > 0 && local.player.dmteam != "spectator" && local.player.flags["coop_isActive"] == 1 && local.player.flags["coopDevNoclip"] == NIL){
+		if(!(local.player.isSpectator) || local.player.flags["coopDevNoclip"] == NIL || (thread game.main::isPlayerAlive local.player)){
 			//check if player is actually in front
 			local.vObjDir = vector_subtract local.player.origin self.origin
 			local.vObjDir = vector_normalize local.vObjDir
@@ -1544,11 +1556,13 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 	
 	//[202] chrissstrahl - added support for exitpoint and show
 	if(local.ent){
-		local.varType = thread coop_mod/main.scr::returnVarType local.ent NIL "replace::unglue 1"
+		local.varType = thread coop_mod/main.scr::returnVarType local.ent "replace::unglue 1"
 		//entity
 		if(local.varType == 2){ local.exitPoint = local.ent.origin } //grab origin
 		//vector
 		else if(local.varType == 3){ local.exitPoint =  local.ent} //use origin
+		//array
+		else if(local.varType == 3){ local.exitPoint =  local.ent[0].origin} //use origin
 		//bad type
 		else{
 			local.varTypeName = thread coop_mod/main.scr::returnVarTypename local.varType
@@ -1711,7 +1725,7 @@ withinDistanceOf local.ent local.distance:{
 
 	//detect vector or entity or else error out
 	local.vOrigin = (0 0 0)
-	local.varType = thread game.main::returnVarType local.ent NIL "replace::withinDistanceOf"
+	local.varType = thread game.main::returnVarType local.ent "replace::withinDistanceOf"
 	if(local.varType == 3){ //vector
 		local.vOrigin = local.ent
 	}else if(local.varType == 2){ //entity
@@ -1722,7 +1736,7 @@ withinDistanceOf local.ent local.distance:{
 		local.vOrigin = local.ent.origin
 	}
 	else{
-		local.vartypeName = waitthread game.main::returnVarTypename local.varType
+		local.vartypeName = thread game.main::returnVarTypename local.varType
 		error ( "coop_mod/replace.scr::withinDistanceOf - parameter1 was ("+local.vartypeName+") needs to be VECTOR or ENTITY" ) 1000
 		end 0
 	}
@@ -1992,11 +2006,11 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 	if(self == NULL){ end }
 	self solid
 
-	local.vartype = waitthread coop_mod/main.scr::returnVarType local.awaypos NIL "replace::solid"
+	local.vartype = thread coop_mod/main.scr::returnVarType local.awaypos "replace::solid"
 
 	//[200] chrissstrahl - make sure the right var type is used
 	if(local.vartype != 2 && local.vartype != 3){
-		local.varTypeName = waitthread coop_mod/main.scr::returnVarTypename local.vartype
+		local.varTypeName = thread coop_mod/main.scr::returnVarTypename local.vartype
 		error ( "coop_mod/replace.scr::solid - parameter1 was of type "+local.varTypeName+", but needs to be: Enity or Vector" ) 1000
 		end
 	}
@@ -2150,11 +2164,11 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 	}
 
 	//[200] chrissstrahl - allow detection of var type of parameter1
-	local.vartype =	waitthread coop_mod/main.scr::returnVarType local.ent NIL "replace::teleportToOnTouch"
+	local.vartype =	thread coop_mod/main.scr::returnVarType local.ent "replace::teleportToOnTouch"
 
 	//[200] chrissstrahl - make sure the right var type is used
 	if(local.vartype != 2 && local.vartype != 3){
-		local.varTypeName = waitthread coop_mod/main.scr::returnVarTypename local.vartype
+		local.varTypeName = thread coop_mod/main.scr::returnVarTypename local.vartype
 		error ( "coop_mod/replace.scr::teleportToOnTouch - parameter1 was of type "+local.varTypeName+", but needs to be: Enity or Vector" ) 1000
 		end
 	}
