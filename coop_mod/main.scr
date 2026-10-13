@@ -461,7 +461,7 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 	
 
 	
-	local.varType = waitthread returnVarType local.i NIL "main::playerPlaceAtSpawn"
+	local.varType = thread returnVarType local.i NIL "main::playerPlaceAtSpawn"
 	
 //println("playerPlaceAtSpawn 1 start for: "+local.i+" var type is "+local.varType)
 	
@@ -477,7 +477,7 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 	}
 	//error out, it is better than never finding out whats wrong
 	else{
-		local.typename = waitthread returnVarTypename local.varType
+		local.typename = thread returnVarTypename local.varType
 		error ("coop_mod/main.scr::playerPlaceAtSpawn - does not support var type: "+local.typename) 1000
 	}
 
@@ -542,7 +542,6 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 //=========================================================================
 playerMakeSolidAsap local.i:{
 //=========================================================================
-if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread main/playerMakeSolidAsap->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
 	if(!local.i){ end }
 
 	local.player = NULL
@@ -550,7 +549,7 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 	//if we are given a entity instead of a number, deal with it
 	//detecting a single player entity as 0
 	//detecting a interger as 1 or
-	local.varType = waitthread returnVarType local.i NIL "main::playerMakeSolidAsap"
+	local.varType = thread returnVarType local.i NIL "main::playerMakeSolidAsap"
 	
 //println("COOPDEBUG: playerMakeSolidAsap 1 for: "+local.i+"["+local.i.entnum+"], vartype: "+waitthread returnVarTypename(local.varType))
 	
@@ -566,7 +565,7 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 	}
 	//error out, it is better than never finding out whats wrong
 	else{
-		local.typename = waitthread returnVarTypename(local.varType) "playerMakeSolidAsap"
+		local.typename = thread returnVarTypename(local.varType) "playerMakeSolidAsap"
 		error ( "coop_mod/main.scr::playerMakeSolidAsap - does not support var type: "+local.typename ) 1000
 	}
 	
@@ -594,9 +593,6 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 			//println("COOPDEBUG: playerMakeSolidAsap 4 while exit "+local.player.entnum+" dead")
 			end
 		}
-		
-		//[203] chrissstrahl - removed check, because player is not quite "ready" when this func is run for the first time || local.player.flags["coop_isActive"] != 1
-		
 		
 		//[206] chrissstrahl - Using .isSpectator to properly detect all Spectator states
 		if(level.gametype != 0 && local.player.isSpectator){
@@ -1011,22 +1007,20 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 	}
 }end local.newString
 
-//return type of variable
-//performs a series of checks to determine the variable type ?
-//type: 0-NIL/NULL, 1-string,2-entity,3-vector,4-int/float,5-entityarray
-//-1 could not detect type
+//returns the type of a given variable
+//this function works wbased on asumptions, it can be totally wrong but should usually be sufficent
 //
-//[202] chrissstrahl - added feature to differ between entity and entity array via parameter, added NULL check
+//results:
+//0=NIL or NULL
+//1=String
+//2=Entity
+//3=Vector
+//4=Integer/Float
+//5=Entity-array
 //
-//HIRACY:
-//1. ENTITY CHECK (NO ARRAY)
-//2. VECTOR CHECK -> CHAR>1 STRING CHECK -> INT/FLOAT CHECK -> DEFAULT TO STRING
-//3. DEFAULT TO STRING
-//4. NO MATCHING TYPE (-1 could not detect type)
 //=========================================================================
 returnVarType local.var local.differArray local.threadName:{
 //=========================================================================
-if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread main/returnVarType->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
 	if(local.var == NIL ){
 		println("main.scr::returnVarType was NIL ["+string(local.var)+"] -> "+string(local.threadName)+"")
 		end 0
@@ -1036,137 +1030,122 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 		end 0
 	}
 
-	local.stringified = string(local.var)
-	local.stringifiedSize = local.stringified.size
-
-//chrissstrahl - debug activated
-//println("size   ("+local.var.size+")")
-//println("string ("+local.stringified+")")
-
-//var is of type entity(single one) or string
-	if(local.var.size == 0){
-	//it can be either a empty string or a entity
-		if(local.stringifiedSize == 0 ){ end 1 }
-		end 2
+	local.varSize			= local.var.size
+	local.stringified		= string(local.var)
+	local.stringifiedSize	= local.stringified.size
+	
+	if(local.stringifiedSize == 12 && local.stringified == "Type 'array'" && local.varSize > 1){
+		end 5 //entity-array
 	}
-//var is type of integer, entity(array) or vector or singleletter string
-	else if(local.var.size == 1){
-		//[202] chrissstrahl - try to catch strange error we are having
+
+	if(local.varSize == 0){
 		if(local.stringifiedSize == 0 && local.stringified == ""){
-			//println("main.scr::returnVarType unknown var at unexpected place")
-			//[202] Smithy - e.g. this can be ScriptModel or ScriptSlave
-			//yes, classname property assumes it is an entity
-			//local.class = local.var.classname 
-			//if (local.class != NIL){
-				end 2
-			//}
-			//end -1
-		}		
+			end 1 //string
+		}
+		error ( "main.scr::returnVarType - unknown size 0 variabletype in "+string(local.threadName) ) 1000
+		end 0 //NIL/NULL
+	}
+	//==================SIZE===== 1 ===
+	//entity, vector, string
+	if(local.varSize == 1){
+		//entity without targetname
+		if(local.stringifiedSize == 0){
+			end 2 //entity
+		}
+		//vector
 		local.firstChar = string(local.stringified[0])
-	//assume it is a vector if it is in brackets
-		if( local.stringified[0] == "(" && local.stringified[local.stringifiedSize-1] == ")" ){
-			end 3
+		if(local.stringifiedSize >= 30 && local.stringified[0] == "(" && local.stringified[local.stringifiedSize-1] == ")" ){
+			end 3 //vector
 		}
-	//note: can NOT detect entities with a targetname < 2 chars
-		if(local.stringifiedSize > 1){
-		//entity targetnames never start with a number or a colon not a number will be 0 when converted
-			if(	int(local.firstChar) == 0 && int(local.stringified) == 0 && local.stringified != "0.000" && local.stringified[0] != "."){
-				//[202] chrissstrahl - differ between entity and entity array if wanted
-				if(local.differArray){ //make sure it does not accept a word-string as true
-					end 5
-				}else{
-					end 2
-				}
-			}
-
-			//[200] chrissstrahl - allow this thread to be executed within 1 frame
-			//no waits anywhere allow for greater usage flexibility
-			local.thisIsAFloat = 0
-			if( local.stringified == "0.000" ){
-				local.thisIsAFloat = 1
-			}else{
-				if( float(local.stringified) == 0 ){
-					local.thisIsAFloat = 0
-				}
-				else{
-					local.dotAt = -1
-					local.afterDot = 0
-					for(local.i=0;local.i<local.stringified.size;local.i++){
-						if(local.afterDot != -1){
-							local.afterDot++
-						}
-						if(local.stringified[local.i] == "."){
-							local.dotAt = local.i
-							local.afterDot = 0
-						}
-					}
-					if(local.afterDot == 3){
-						local.thisIsAFloat = 1
-					}
-				}
-			}
-			if( local.thisIsAFloat == 1 || int(local.stringified) != 0){
-				end 4
-			}
-		}else{
-			if(int(local.stringified) != 0 || local.stringified == "0" || local.stringified != "0.000"){
-				end 4
+		//entity
+		if($(local.var)){
+			end 2
+		}
+		//float
+		if(local.stringifiedSize >= 5){
+			if(thread isFloat local.var){
+				end 4 //float
 			}
 		}
-	//fallback to string
-		end 1
+		//integer
+		if(thread isNumeric local.var){
+			end 4 //int
+		}		
+		error ( "main.scr::returnVarType - unknown size 1 variabletype in "+string(local.threadName) ) 1000
+		end 1 //NIL/NULL
 	}
-//must be a string
-	else{
-		if(local.stringifiedSize == 0 && local.stringified == ""){
-			//[202] Smithy - e.g. this can be ScriptModel or ScriptSlave
-			//yes, classname property assumes it is an entity
-			//local.class = local.var.classname 
-			//if (local.class != NIL){
-				end 2
-			//}
-			//end -1
-		}	
-		end 1
-	}
-}end -1
+}end 1
 
 //returns associated type name of type number
 //=========================================================================
 returnVarTypename local.var:{
 //=========================================================================
-if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread main/returnVarTypename->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
+	if(local.var == 0){ end "NIL/NULL" } //[207] chrissstrahl
 	if(local.var == 1){ end "String" }
 	if(local.var == 2){ end "Entity" }
 	if(local.var == 3){ end "Vector" }
 	if(local.var == 4){ end "Int/Float" }
-	//[202] chrissstrahl - updated typenames
 	if(local.var == 5){ end "Entity Array" }
 }end "Unknown"
 
-//check if it is a float, game makes sure float always has 3 digits after the dot
+//cheap isNumeric check
+//=========================================================================
+isNumeric local.var:{
+//=========================================================================
+	local.varString = string(local.var)
+	if(local.varString.size == 0){ end 0 }
+	
+	local.start = 0
+	if(local.varString[local.i] == "-"){local.start=1}
+
+	for(local.i=local.start;local.i<local.varString.size;local.i++){
+		local.char = local.varString[local.i]
+		if(local.char != "0" && local.char != "1" &&
+		   local.char != "2" && local.char != "3" &&
+		   local.char != "4" && local.char != "5" &&
+		   local.char != "6" && local.char != "7" &&
+		   local.char != "8" && local.char != "9"){
+			end 0
+		}
+	}
+}end 1
+
+//checks format: optional minus, digits, dot, exactly three digits
 //=========================================================================
 isFloat local.var:{
 //=========================================================================
-if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread main/isFloat->"+level.cMTE+"" )} //[202] chrissstrahl - this is to debug the coop mod thread handling
 	local.stringified = string(local.var)
-	if( local.stringified == "0.000" ){ end 1 }
-	if( float(local.stringified) == 0 ){ end 0 }
+	local.length = local.stringified.size
 
-	local.dotAt = -1
-	local.afterDot = 0
-	for(local.i=0;local.i<local.stringified.size;local.i++){
-		if(local.afterDot != -1){
-			local.afterDot++
-		}
-		if(local.stringified[local.i] == "."){
-			local.dotAt = local.i
-			local.afterDot = 0
-		}
+	if(local.length < 5){ end 0 }
+	
+	local.dotAt = local.length - 4
+	if(local.stringified[local.dotAt] != "."){ end 0 }
+	
+	if(local.stringified == "0.000"){ end 1 }
+	
+
+	local.start = 0
+	if(local.stringified[0] == "-"){
+		local.start = 1
 	}
 
-	if(local.afterDot == 3){ end 1 }
-}end 0
+	//at least one digit before the dot
+	if(local.dotAt <= local.start){ end 0 }
+
+	for(local.i = local.start; local.i < local.length; local.i++){
+		if(local.i != local.dotAt){
+			local.char = local.stringified[local.i]
+			if(local.char != "0" && local.char != "1" &&
+			   local.char != "2" && local.char != "3" &&
+			   local.char != "4" && local.char != "5" &&
+			   local.char != "6" && local.char != "7" &&
+			   local.char != "8" && local.char != "9"){
+				end 0
+			}
+		}
+	}
+}end 1
 
 //[200] chrissstrahl - text to print if developer needs to be activated
 //=========================================================================
@@ -1209,7 +1188,7 @@ if(level.cMTE_coop_main){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "
 	local.player forcelegsstate "STAND" //[200][hotfix] Smithy - reverting to old way. it very rarely happens anyway so this may or may not fix it.
 
 	if(!local.entity){
-		println "(coop_mod/main.scr::playerGlue): *ERROR* - local.entity is " local.entity " for " local.player local.player.entnum
+		println "(coop_mod/main.scr::playerGlue): *ERROR* - local.entity is " local.entity " for " local.player " clinet: " local.player.entnum
 	}else{					
 		if(level.coop_glueAngle != NIL){
 			local.player glue local.entity level.coop_glueAngle
@@ -1645,3 +1624,16 @@ getCleanVectorString local.dirtyVector:{
 	local.vStr += int(local.dirtyVector[2])
 }end local.vStr
 
+//[207] Chrissstrahl - standard to check for player health
+//=========================================================================
+isPlayerAlive local.player:{
+//=========================================================================
+	if(level.gametype == 0){
+		end (isAlive $player)
+	}
+	
+	if (local.player == NIL){
+		error ( "main.scr::isPlayerAlive - parameter 1 was NIL, needs to be player" ) 1000
+		end 0		
+	}
+}end (isAlive local.player)
