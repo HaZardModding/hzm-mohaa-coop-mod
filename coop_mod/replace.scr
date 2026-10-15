@@ -335,7 +335,7 @@ player_closestTo local.object local.origin local.minDisPreferred:{
 
 	//error out
 	if(local.origin == NIL && local.object == NIL){
-		//error ( "replace.scr::player_closest - parameter 1 and 2 was NIL" ) 1000
+		error ( "replace.scr::player_closest - parameter 1 and 2 was NIL" ) 1000
 		end NULL
 	}
 	
@@ -2625,10 +2625,9 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 //============================================================================
 open:{
 //============================================================================
-if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread replace/open->"+level.cMTE+"" )}
 	local.player = exec coop_mod/replace.scr::player_closestTo self
 
-	if(local.player == NULL){
+	if(!local.player){
 		local.player = $world
 	}
 	self open local.player
@@ -2638,9 +2637,7 @@ if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println
 //============================================================================
 favoriteenemy:{
 //============================================================================
-if(level.cMTE_coop_replace){if(!level.cMTE){level.cMTE=0}; level.cMTE++; println( "-#-#- thread replace/favoriteenemy->"+level.cMTE+"" )}
 	local.player = exec coop_mod/replace.scr::player_closestTo self
-
 	self favoriteenemy local.player
 }end
 
@@ -2973,13 +2970,19 @@ setAimTarget local.target local.becomeCurrentEnemy local.minDisPreferred:{
 	
 	//Handle player and other
 	if(local.target != NULL){
-		//handle player
-		if(waitthread isPlayerObject local.target){
-			local.targetNew = waitthread player_closestTo self NIL local.minDisPreferred
+		local.varType = thread coop_mod/main.scr::returnVarType local.target "setAimTarget"
+		//1=String
+		if(local.varType == 1){
+			local.target = $(local.target)
 		}
-		//handle other array
-		else if(local.target.size > 1){
-			local.targetNew = local.target[1]
+		//players
+		if(thread isPlayerObject local.target){
+			local.targetNew = thread player_closestTo self NIL local.minDisPreferred
+		}
+		//entity array
+		else if(local.varType == 5){
+			//handle other array
+			local.targetNew = local.target[0]
 		}
 	}
 	//Handle NULL
