@@ -22,29 +22,28 @@ coop_loadSave:{
 	if(level.gametype == 0){ end }
 	
 	level.coop_saveLoaded = 0
-	
 	local.save = getcvar("coop_save")
 	
 	if(local.save == "PrisonerAtGunpoint"){
-		thread coop_prisonerAtGunpoint
-		
-		println("::")
-		println(":::::::::::::::::::::")
-		println("::coop_loadSave - Loaded coop_save "+local.save+".")
-		println(":::::::::::::::::::::")
-		println("::")
+		thread coop_doLoadSave "coop_prisonerAtGunpoint"
 	}else if(local.save == "FinalScene"){
-		thread coop_FinalScene
-		
-		println("::")
-		println(":::::::::::::::::::::")
-		println("::coop_loadSave - Loaded coop_save "+local.save+".")
-		println(":::::::::::::::::::::")
-		println("::")
+		thread coop_doLoadSave "coop_FinalScene"
 	}
-
+	
 	local.save = NIL
 	setcvar "coop_save" ""
+}end
+
+//=========================================================================
+coop_doLoadSave local.save:{
+//=========================================================================
+	if(!local.save && local.save != ""){ end }
+	thread (local.save)
+	println("::")
+	println(":::::::::::::::::::::")
+	println("::coop_loadSave - Loaded coop_save "+local.save+".")
+	println(":::::::::::::::::::::")
+	println("::")
 }end
 
 //=========================================================================
@@ -156,10 +155,6 @@ coop_prisonerAtGunpoint:{
 	//$deadtruck thread InitTruck
 	//$OpenDoorSection lock
 	
-	//[206] chrissstrahl - made coop compatible
-	waitthread coop_mod/replace.scr::waitForPlayer
-	fadein 3.5 0 0 0 1
-	
 	//Prisoner at Gunpoint
 	thread maps/e3l2/prisoner_section_1.scr::LoadTheTruckthread
 	
@@ -192,6 +187,9 @@ coop_prisonerAtGunpoint:{
 	
 	//medic
 	wait 5
+	
+	fadein 3.5 0 0 0 1
+	
 	$medic.stop_thinking = 1
 	wait 1
 	$medic remove
@@ -243,8 +241,8 @@ coop_FinalScene:{
 	
 	$tank2 remove
 	$tank5 remove
-	waitthread coop_mod/butler.scr::removePath $tank2Path2
-	waitthread coop_mod/butler.scr::removePath $tank5Path3
+	thread coop_mod/butler.scr::removePath $tank2Path2
+	thread coop_mod/butler.scr::removePath $tank5Path3
 
 	//block the way back
 	
@@ -252,10 +250,9 @@ coop_FinalScene:{
 	thread coop_mod/replace.scr::spawnclip "-3130 0 -456" ( -10 -1000 -100 )  ( 80 1000 2000 ) "noTargetNameForYou" 1.2 90 "No way back for you!" NIL NIL
 	thread coop_mod/replace.scr::spawnclip "-2900 0 -456" ( -10 -1000 -100 )  ( 80 1000 2000 ) "noTargetNameForYou" 1.2 90 "No way back for you!" NIL NIL
 	
-	waitthread coop_mod/replace.scr::waitForPlayer
-	fadein 3.5 0 0 0 1
-	
 	wait 5
+	
+	fadein 3.5 0 0 0 1
 	
 	//just one cannon to destroy
 	level.num_cannons_remaining = 1
