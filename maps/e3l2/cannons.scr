@@ -220,16 +220,26 @@ PlayerMountCannon: {
 	self.usable_cannon unlock
 	self.turret unlock
 	
-	//[206] chrissstrahl - coop compatibility
-	local.player = $player
+	
+	
+	//[207] chrissstrahl - coop compatibility
 	local.playerEntNum = self.flags["currentPlayer"]
-	if(level.gametype != 0 && local.playerEntNum != NIL){
-		local.tempPlayer = NULL
-		local.tempPlayer = waitthread game.main::getClient local.playerEntNum
+	
+	
+	if(level.gametype == 0){
+		local.player = $player
+	}else if(local.playerEntNum != NIL){
+//iprintlnbold_noloc("PlayerMountCannon CLIENT: "+local.playerEntNum);
+		local.player = thread game.main::getClient local.playerEntNum
+	}else{
+//iprintlnbold_noloc("PlayerMountCannon NOCLIENT");
 	}
+	
 	self.turret setusable 1
 	if(local.player){
-		self.usable_cannon douse local.player	//MiaCosa @chrissstrahl
+//iprintlnbold_noloc("PlayerMountCannon MOUNT: "+local.playerEntNum);
+		self.flags["currentPlayer"] = local.player.entnum
+		self.usable_cannon douse local.player
 	}
 	
 	
@@ -257,13 +267,16 @@ PlayerDismountCannon: {
 	self.usable_cannon unlock
 	self.turret unlock
 	
+//iprintlnbold_noloc("PlayerDismountCannon START");
+	
 	//[206] chrissstrahl - coop compatibility
 	if(level.gametype == 0){
 		local.player = $player
 	}else{	
 		local.playerEntNum = self.flags["currentPlayer"]
 		if(local.playerEntNum != NIL){
-			local.tempPlayer = waitthread game.main::getClient local.playerEntNum
+//iprintlnbold_noloc("PlayerDismountCannon CLIENT:"+local.playerEntNum);
+			local.tempPlayer = thread game.main::getClient local.playerEntNum
 			if(local.tempPlayer){
 				local.player = local.tempPlayer
 			}
@@ -271,6 +284,7 @@ PlayerDismountCannon: {
 	}
 	self.turret setusable 1
 	if(local.player){
+//iprintlnbold_noloc("PlayerDismountCannon DOUSE:"+local.playerEntNum);
 		self.usable_cannon douse local.player	//MiaCosa @chrissstrahl
 	}
 
@@ -286,6 +300,16 @@ PlayerDismountCannon: {
 	self.usable_cannon.collisionent.angles = self.angles
 	self.collisionent.origin = self.origin
 	self.collisionent.angles = self.angles
+	
+	//[207] chrissstrahl - make sure players don't get stuck in the cannon collision ent
+	//see variables.scr::levelObstacleArrays, which is used by playerMakeSolidAsap
+	//$Cannon_Collision_Destroyed and $Cannon_Collision are checked for this level
+	for (local.i = 1;local.i <= $player.size;local.i++){
+		local.player =  $player[local.i]
+		if(local.player isTouching self.collisionent || local.player isTouching self.usable_cannon.collisionent){
+			thread coop_mod/main.scr::playerMakeSolidAsap local.player
+		}
+	}
 
 	self.usable_cannon hide
 	self.turret hide
@@ -296,6 +320,7 @@ PlayerDismountCannon: {
 	
 	//[206] chrissstrahl - coop compatibility
 	if(local.player){
+//iprintlnbold_noloc("PlayerDismountCannon ORIGIN for:"+local.playerEntNum);
 		local.player.origin = ( (self.origin[0] + local.rel_pos[0]) (self.origin[1] + local.rel_pos[1]) (self.origin[2] + 32) )
 		thread coop_mod/main.scr::playerMakeSolidAsap local.player
 	}
@@ -320,4 +345,10 @@ SetupDeadCannonCollision: {
 	local.collision.angles = self.angles
 	local.collision safesolid
 	local.collision disconnect_paths
+	
+	//[207] chrissstrahl - prevent player getting stuck on destroyed cannon
+	if(level.gametype != 0){
+		waitframe
+		local.collision notsolid
+	}
 }end
